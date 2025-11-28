@@ -336,34 +336,38 @@ Tyme uses subdomains for its services (e.g., `auth.localhost` for Keycloak). You
 
 **Windows (PowerShell as Administrator):**
 ```powershell
-# Option 1: Run the setup script
+# Option 1: Run the setup script (auto-detects your local IP)
 .\scripts\setup-hosts.bat
 
 # Option 2: Manual - Add these lines to C:\Windows\System32\drivers\etc\hosts
-# 127.0.0.1  auth.localhost
-# 127.0.0.1  traefik.localhost
-# 127.0.0.1  mail.localhost
-# 127.0.0.1  minio.localhost
-# 127.0.0.1  s3.localhost
-# 127.0.0.1  mcp.localhost
+# Replace <YOUR_LOCAL_IP> with your machine's IP (e.g., 192.168.1.100)
+# Run 'ipconfig' to find your IPv4 address
+# <YOUR_LOCAL_IP>  auth.localhost
+# <YOUR_LOCAL_IP>  traefik.localhost
+# <YOUR_LOCAL_IP>  mail.localhost
+# <YOUR_LOCAL_IP>  minio.localhost
+# <YOUR_LOCAL_IP>  s3.localhost
+# <YOUR_LOCAL_IP>  mcp.localhost
 ```
 
 **Linux/macOS:**
 ```bash
-# Option 1: Run the setup script
+# Option 1: Run the setup script (auto-detects your local IP)
 chmod +x scripts/setup-hosts.sh
 sudo ./scripts/setup-hosts.sh
 
 # Option 2: Manual - Add these lines to /etc/hosts
-# 127.0.0.1  auth.localhost
-# 127.0.0.1  traefik.localhost
-# 127.0.0.1  mail.localhost
-# 127.0.0.1  minio.localhost
-# 127.0.0.1  s3.localhost
-# 127.0.0.1  mcp.localhost
+# Replace <YOUR_LOCAL_IP> with your machine's IP (e.g., 192.168.1.100)
+# Run 'ip addr' or 'ifconfig' to find your IP address
+# <YOUR_LOCAL_IP>  auth.localhost
+# <YOUR_LOCAL_IP>  traefik.localhost
+# <YOUR_LOCAL_IP>  mail.localhost
+# <YOUR_LOCAL_IP>  minio.localhost
+# <YOUR_LOCAL_IP>  s3.localhost
+# <YOUR_LOCAL_IP>  mcp.localhost
 ```
 
-> **Note**: The main application at `localhost` typically works without hosts file changes. The subdomains are required for Keycloak authentication and other services.
+> **Important**: Do NOT use `127.0.0.1` - Docker containers interpret this as themselves. Use your machine's local network IP address (e.g., `192.168.x.x` or `10.x.x.x`). The setup scripts will auto-detect the correct IP.
 
 ### 3. Start All Services
 

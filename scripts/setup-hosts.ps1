@@ -4,11 +4,19 @@
 # This script adds the required local domain entries to your hosts file.
 # Run PowerShell as Administrator to execute this script.
 #
+# IMPORTANT: Uses your local network IP (not 127.0.0.1) so Docker containers
+# can properly communicate with services on the host.
+#
 # Usage:
 #   1. Open PowerShell as Administrator
 #   2. Navigate to the project directory
 #   3. Run: .\scripts\setup-hosts.ps1
+#   4. Or with manual IP: .\scripts\setup-hosts.ps1 -IP 192.168.1.100
 # =============================================================================
+
+param(
+    [string]$IP = ""
+)
 
 # Check if running as Administrator
 $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -26,17 +34,62 @@ if (-not $isAdmin) {
     exit 1
 }
 
+# Function to detect local IP address
+function Get-LocalIPAddress {
+    # Get the first IPv4 address that is not a loopback and is connected
+    $networkAdapters = Get-NetIPAddress -AddressFamily IPv4 | 
+        Where-Object { 
+            $_.IPAddress -ne "127.0.0.1" -and 
+            $_.PrefixOrigin -ne "WellKnown" -and
+            ($_.IPAddress -like "192.168.*" -or $_.IPAddress -like "10.*" -or $_.IPAddress -like "172.*")
+        } | 
+        Sort-Object -Property InterfaceIndex
+    
+    if ($networkAdapters) {
+        return $networkAdapters[0].IPAddress
+    }
+    
+    # Fallback: try hostname resolution
+    $hostName = [System.Net.Dns]::GetHostName()
+    $hostEntry = [System.Net.Dns]::GetHostEntry($hostName)
+    $ipv4 = $hostEntry.AddressList | Where-Object { $_.AddressFamily -eq 'InterNetwork' -and $_.ToString() -ne '127.0.0.1' } | Select-Object -First 1
+    
+    if ($ipv4) {
+        return $ipv4.ToString()
+    }
+    
+    return $null
+}
+
+# Determine IP address to use
+if ($IP -eq "") {
+    $localIP = Get-LocalIPAddress
+    if (-not $localIP) {
+        Write-Host ""
+        Write-Host "ERROR: Could not detect local IP address." -ForegroundColor Red
+        Write-Host "Please specify your IP manually:" -ForegroundColor Yellow
+        Write-Host "  .\scripts\setup-hosts.ps1 -IP 192.168.1.100" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Run 'ipconfig' to find your IPv4 address."
+        exit 1
+    }
+    Write-Host "Detected local IP address: $localIP" -ForegroundColor Green
+} else {
+    $localIP = $IP
+    Write-Host "Using provided IP address: $localIP" -ForegroundColor Yellow
+}
+
 # Hosts file path
 $hostsFile = "$env:SystemRoot\System32\drivers\etc\hosts"
 
-# Required host entries
+# Required host entries (using detected/provided local IP)
 $hostEntries = @(
-    @{ IP = "127.0.0.1"; Domain = "auth.localhost" },
-    @{ IP = "127.0.0.1"; Domain = "traefik.localhost" },
-    @{ IP = "127.0.0.1"; Domain = "mail.localhost" },
-    @{ IP = "127.0.0.1"; Domain = "minio.localhost" },
-    @{ IP = "127.0.0.1"; Domain = "s3.localhost" },
-    @{ IP = "127.0.0.1"; Domain = "mcp.localhost" }
+    @{ IP = $localIP; Domain = "auth.localhost" },
+    @{ IP = $localIP; Domain = "traefik.localhost" },
+    @{ IP = $localIP; Domain = "mail.localhost" },
+    @{ IP = $localIP; Domain = "minio.localhost" },
+    @{ IP = $localIP; Domain = "s3.localhost" },
+    @{ IP = $localIP; Domain = "mcp.localhost" }
 )
 
 Write-Host ""
@@ -45,6 +98,7 @@ Write-Host "  Tyme - Local Domain Setup" -ForegroundColor Cyan
 Write-Host "===========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Hosts file: $hostsFile"
+Write-Host "Local IP:   $localIP"
 Write-Host ""
 
 # Read current hosts file content
