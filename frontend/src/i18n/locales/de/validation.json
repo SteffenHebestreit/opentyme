@@ -1,0 +1,20 @@
+{
+  "required": "Dieses Feld ist erforderlich",
+  "email": "Ungültige E-Mail-Adresse",
+  "min": "Muss mindestens {{min}} Zeichen lang sein",
+  "max": "Darf höchstens {{max}} Zeichen lang sein",
+  "minNumber": "Muss mindestens {{min}} sein",
+  "maxNumber": "Darf höchstens {{max}} sein",
+  "positive": "Muss eine positive Zahl sein",
+  "integer": "Muss eine ganze Zahl sein",
+  "url": "Ungültige URL",
+  "date": "Ungültiges Datum",
+  "future": "Datum muss in der Zukunft liegen",
+  "past": "Datum muss in der Vergangenheit liegen",
+  "match": "Felder stimmen nicht überein",
+  "unique": "Dieser Wert existiert bereits",
+  "invalid": "Ungültiger Wert",
+  "tooShort": "Zu kurz",
+  "tooLong": "Zu lang",
+  "pattern": "Ungültiges Format"
+}

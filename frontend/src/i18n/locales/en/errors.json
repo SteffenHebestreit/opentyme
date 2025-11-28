@@ -1,0 +1,40 @@
+{
+  "dashboardLoadFailed": "We couldn't load your dashboard.",
+  "checkConnection": "Please check your connection and try again.",
+  "tryAgain": "Try again",
+  "somethingWentWrong": "Something went wrong",
+  "goToDashboard": "Go to Dashboard",
+  "goBack": "Go Back",
+  "notFound": "Page Not Found",
+  "forbidden": "Access Forbidden",
+  "serverError": "Server Error",
+  "notFoundPage": {
+    "title": "404 - Page Not Found",
+    "message": "The page you're looking for doesn't exist.",
+    "goHome": "Go to Dashboard"
+  },
+  "serverErrorPage": {
+    "title": "500 - Server Error",
+    "message": "Something went wrong on our end. Please try again later."
+  },
+  "networkError": {
+    "title": "Network Error",
+    "message": "Unable to connect to the server. Please check your connection."
+  },
+  "unauthorized": {
+    "title": "Unauthorized",
+    "message": "You don't have permission to access this resource."
+  },
+  "forbiddenPage": {
+    "title": "Forbidden",
+    "message": "Access to this resource is forbidden."
+  },
+  "timeout": {
+    "title": "Request Timeout",
+    "message": "The request took too long to complete."
+  },
+  "unknown": {
+    "title": "Unknown Error",
+    "message": "An unexpected error occurred."
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "dashboardLoadFailed": "Wir konnten Ihr Dashboard nicht laden.",
+  "checkConnection": "Bitte überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+  "tryAgain": "Erneut versuchen",
+  "somethingWentWrong": "Etwas ist schiefgelaufen",
+  "goToDashboard": "Zum Dashboard",
+  "goBack": "Zurück",
+  "notFound": "Seite nicht gefunden",
+  "forbidden": "Zugriff verweigert",
+  "serverError": "Serverfehler",
+  "notFoundPage": {
+    "title": "404 - Seite nicht gefunden",
+    "message": "Die gesuchte Seite existiert nicht.",
+    "goHome": "Zum Dashboard"
+  },
+  "serverErrorPage": {
+    "title": "500 - Serverfehler",
+    "message": "Auf unserer Seite ist etwas schief gelaufen. Bitte versuchen Sie es später erneut."
+  },
+  "networkError": {
+    "title": "Netzwerkfehler",
+    "message": "Verbindung zum Server fehlgeschlagen. Bitte überprüfen Sie Ihre Verbindung."
+  },
+  "unauthorized": {
+    "title": "Nicht autorisiert",
+    "message": "Sie haben keine Berechtigung, auf diese Ressource zuzugreifen."
+  },
+  "forbiddenPage": {
+    "title": "Verboten",
+    "message": "Der Zugriff auf diese Ressource ist verboten."
+  },
+  "timeout": {
+    "title": "Zeitüberschreitung",
+    "message": "Die Anfrage hat zu lange gedauert."
+  },
+  "unknown": {
+    "title": "Unbekannter Fehler",
+    "message": "Ein unerwarteter Fehler ist aufgetreten."
+  }
+}

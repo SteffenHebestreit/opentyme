@@ -1,0 +1,113 @@
+{
+  "title": "Systemadministration",
+  "subtitle": "Verwalten Sie System-Backups, Wiederherstellung und automatische Backup-Zeitpläne",
+  "tabs": {
+    "backups": "Backups",
+    "schedules": "Zeitpläne"
+  },
+  "backups": {
+    "title": "Backup-Verlauf",
+    "createButton": "Backup erstellen",
+    "noBackups": "Keine Backups verfügbar",
+    "table": {
+      "status": "Status",
+      "name": "Name",
+      "type": "Typ",
+      "includes": "Enthält",
+      "size": "Größe",
+      "created": "Erstellt",
+      "actions": "Aktionen"
+    },
+    "types": {
+      "manual": "Manuell",
+      "scheduled": "Geplant",
+      "auto": "Automatisch"
+    },
+    "status": {
+      "pending": "Ausstehend",
+      "in_progress": "In Bearbeitung",
+      "completed": "Abgeschlossen",
+      "failed": "Fehlgeschlagen"
+    },
+    "includes": {
+      "database": "DB",
+      "storage": "Speicher",
+      "config": "Konfig"
+    },
+    "actions": {
+      "restore": "Wiederherstellen",
+      "delete": "Löschen",
+      "download": "Herunterladen"
+    },
+    "confirmRestore": "Sind Sie sicher, dass Sie von diesem Backup wiederherstellen möchten? Dies überschreibt die aktuellen Daten!",
+    "confirmDelete": "Sind Sie sicher, dass Sie dieses Backup löschen möchten?",
+    "restoreSuccess": "Wiederherstellung erfolgreich abgeschlossen! Das System wird automatisch neu gestartet.",
+    "restoreError": "Wiederherstellung des Backups fehlgeschlagen",
+    "deleteSuccess": "Backup erfolgreich gelöscht",
+    "deleteError": "Löschen des Backups fehlgeschlagen",
+    "createSuccess": "Backup erfolgreich erstellt",
+    "createError": "Erstellen des Backups fehlgeschlagen"
+  },
+  "schedules": {
+    "title": "Backup-Zeitpläne",
+    "createButton": "Zeitplan erstellen",
+    "noSchedules": "Keine Backup-Zeitpläne konfiguriert",
+    "enabled": "Aktiviert",
+    "disabled": "Deaktiviert",
+    "retention": "Aufbewahrung",
+    "retentionDays": "{{days}} Tage",
+    "lastRun": "Letzte Ausführung",
+    "nextRun": "Nächste Ausführung",
+    "actions": {
+      "edit": "Bearbeiten",
+      "delete": "Löschen",
+      "enable": "Aktivieren",
+      "disable": "Deaktivieren"
+    },
+    "confirmDelete": "Sind Sie sicher, dass Sie diesen Zeitplan löschen möchten?",
+    "deleteSuccess": "Zeitplan erfolgreich gelöscht",
+    "deleteError": "Löschen des Zeitplans fehlgeschlagen",
+    "createSuccess": "Zeitplan erfolgreich erstellt",
+    "createError": "Erstellen des Zeitplans fehlgeschlagen",
+    "updateSuccess": "Zeitplan erfolgreich aktualisiert",
+    "updateError": "Aktualisierung des Zeitplans fehlgeschlagen"
+  },
+  "createBackupModal": {
+    "title": "Backup erstellen",
+    "nameLabel": "Backup-Name (optional)",
+    "namePlaceholder": "Leer lassen für automatisch generierten Namen",
+    "includesLabel": "Was eingeschlossen werden soll",
+    "includeDatabase": "Datenbank einschließen",
+    "includeStorage": "Speicher einschließen (Dateien)",
+    "includeConfig": "Konfiguration einschließen",
+    "createButton": "Backup erstellen",
+    "creatingButton": "Wird erstellt...",
+    "cancel": "Abbrechen"
+  },
+  "scheduleModal": {
+    "titleCreate": "Zeitplan erstellen",
+    "titleEdit": "Zeitplan bearbeiten",
+    "nameLabel": "Zeitplan-Name",
+    "namePlaceholder": "z.B. Tägliches Backup",
+    "cronLabel": "Cron-Ausdruck",
+    "cronPlaceholder": "0 2 * * *",
+    "cronHelperText": "Beispiele: \"0 2 * * *\" (täglich um 2 Uhr), \"0 */6 * * *\" (alle 6 Stunden)",
+    "retentionLabel": "Aufbewahrungstage",
+    "emailLabel": "Benachrichtigungs-E-Mail",
+    "emailPlaceholder": "admin@beispiel.de",
+    "emailHelperText": "Optional",
+    "enableSchedule": "Zeitplan aktivieren",
+    "includeDatabase": "Datenbank einschließen",
+    "includeStorage": "Speicher einschließen",
+    "includeConfig": "Konfiguration einschließen",
+    "createButton": "Erstellen",
+    "updateButton": "Aktualisieren",
+    "savingButton": "Wird gespeichert...",
+    "cancel": "Abbrechen"
+  },
+  "errors": {
+    "loadBackups": "Laden der Backups fehlgeschlagen",
+    "loadSchedules": "Laden der Zeitpläne fehlgeschlagen",
+    "generic": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut."
+  }
+}

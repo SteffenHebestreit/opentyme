@@ -1,0 +1,97 @@
+{
+  "title": "Projects",
+  "subtitle": "Track project health, budgets, and timelines alongside their associated clients.",
+  "addProject": "Add project",
+  "editProject": "Edit project",
+  "createProject": "Create project",
+  "saveChanges": "Save changes",
+  "cancel": "Cancel",
+  "saving": "Saving…",
+  "edit": "Edit",
+  "delete": "Delete",
+  "deleting": "Deleting…",
+  "search": "Search projects by name or client",
+  "noAuth": "Please log in to view project information.",
+  "status": {
+    "label": "Status",
+    "all": "All statuses",
+    "notStarted": "Not started",
+    "active": "Active",
+    "onHold": "On hold",
+    "completed": "Completed"
+  },
+  "client": {
+    "label": "Client",
+    "all": "All clients",
+    "required": "Client is required",
+    "noClients": "You need at least one client before you can create a project. Head over to the Clients page to add one."
+  },
+  "table": {
+    "project": "Project",
+    "client": "Client",
+    "status": "Status",
+    "timeline": "Timeline",
+    "budget": "Budget",
+    "trackedHours": "Tracked hrs",
+    "actions": "Actions",
+    "start": "Start",
+    "due": "Due",
+    "rate": "Rate"
+  },
+  "form": {
+    "name": {
+      "label": "Project name",
+      "placeholder": "Website redesign",
+      "required": "Project name is required"
+    },
+    "description": {
+      "label": "Description",
+      "placeholder": "Share an overview, deliverables, or key notes"
+    },
+    "startDate": {
+      "label": "Start date"
+    },
+    "dueDate": {
+      "label": "Due date"
+    },
+    "budget": {
+      "label": "Budget",
+      "placeholder": "15000",
+      "min": "Budget must be zero or higher"
+    },
+    "currency": {
+      "label": "Currency"
+    },
+    "rateType": {
+      "label": "Rate type",
+      "hourly": "Hourly",
+      "fixedFee": "Fixed fee",
+      "noRate": "No rate"
+    },
+    "hourlyRate": {
+      "label": "Hourly rate",
+      "placeholder": "75",
+      "required": "Hourly rate is required for hourly projects",
+      "min": "Hourly rate must be zero or higher"
+    },
+    "estimatedHours": {
+      "label": "Estimated hours",
+      "placeholder": "120",
+      "min": "Estimated hours must be zero or higher"
+    },
+    "recurringPayment": {
+      "label": "Recurring Monthly Payment",
+      "description": "Enable this for projects with fixed monthly payments that don't require invoices (e.g., monthly retainers, subscriptions). Payments can be recorded directly without creating invoices."
+    }
+  },
+  "empty": {
+    "title": "No projects yet",
+    "message": "Start tracking your work by creating a project. Attach clients, manage budgets, and monitor progress all in one place."
+  },
+  "messages": {
+    "created": "Project created successfully.",
+    "updated": "Project updated successfully.",
+    "deleted": "Project deleted successfully.",
+    "deleteConfirm": "Delete {{name}}? This action cannot be undone."
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "title": "Finances",
+  "subtitle": "Manage invoices, track payments, and record expenses",
+  "dateRange": {
+    "startDate": "Start Date",
+    "endDate": "End Date"
+  },
+  "summary": {
+    "totalIncome": "Total Income",
+    "totalExpensesRefunds": "Total Expenses / Refunds",
+    "totalInvoiced": "Total Invoiced",
+    "netAmount": "Net Amount",
+    "netTax": "Net / Tax"
+  },
+  "tabs": {
+    "invoices": "Invoices",
+    "payments": "Payments",
+    "expenses": "Expenses",
+    "taxPrepayments": "Tax Prepayments"
+  }
+}

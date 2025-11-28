@@ -1,0 +1,330 @@
+{
+  "title": "Rechnungen",
+  "subtitle": "Senden Sie professionelle Rechnungen und überwachen Sie den Zahlungsstatus.",
+  "noAuth": "Bitte melden Sie sich an, um Rechnungen zu verwalten.",
+  "create": "Rechnung erstellen",
+  "edit": "Rechnung bearbeiten",
+  "delete": "Rechnung löschen",
+  "view": "Rechnung ansehen",
+  "send": "Rechnung senden",
+  "download": "PDF herunterladen",
+  "generateButton": "Aus Zeiteinträgen generieren",
+  "noInvoices": "Keine Rechnungen gefunden",
+  "empty": {
+    "title": "Noch keine Rechnungen",
+    "message": "Erstellen Sie Ihre erste Rechnung, um Kunden für erledigte Arbeit abzurechnen. Generieren Sie Rechnungen aus erfassten Zeiten oder erstellen Sie sie manuell."
+  },
+  "summary": {
+    "total": "Rechnungen gesamt",
+    "invoiced": "Gesamtbetrag",
+    "paid": "Bezahlt",
+    "unpaid": "Unbezahlt"
+  },
+  "filters": {
+    "search": "Rechnungen nach Nummer, Kunde oder Projekt durchsuchen",
+    "status": {
+      "label": "Status",
+      "all": "Alle Status"
+    },
+    "client": {
+      "label": "Kunde",
+      "all": "Alle Kunden"
+    }
+  },
+  "table": {
+    "invoice": "Rechnung",
+    "client": "Kunde",
+    "status": "Status",
+    "issueDate": "Rechnungsdatum",
+    "dueDate": "Fälligkeitsdatum",
+    "amount": "Betrag",
+    "actions": "Aktionen",
+    "project": "Projekt",
+    "paid": "Bezahlt",
+    "due": "Fällig",
+    "tax": "Steuer",
+    "cannotEdit": "Rechnung mit Status {{status}} kann nicht bearbeitet werden. Stornieren Sie sie zuerst, um Änderungen vorzunehmen."
+  },
+  "deleting": "Wird gelöscht...",
+  "saving": "Wird gespeichert…",
+  "cancel": "Abbrechen",
+  "close": "Schließen",
+  "detail": {
+    "title": "Rechnungsdetails",
+    "recordPayment": "Zahlung erfassen",
+    "downloadPDF": "PDF anzeigen",
+    "downloading": "Wird geöffnet...",
+    "cancelInvoice": "Rechnung stornieren",
+    "enableZugferd": "Als ZUGFeRD E-Rechnung erstellen (EN 16931 Standard)",
+    "error": "Fehler beim Laden der Rechnungsdetails.",
+    "noInvoice": "Keine Rechnung ausgewählt.",
+    "billing": {
+      "overbilled": "⚠️ Rechnung überfakturiert",
+      "underbilled": "⚠️ Rechnung unterfakturiert",
+      "invoiceTotal": "Rechnungssumme",
+      "totalPaid": "Bereits gezahlt",
+      "balance": "Saldo"
+    },
+    "sections": {
+      "invoice": "Rechnung",
+      "status": "Status",
+      "dates": "Daten",
+      "issued": "Ausgestellt",
+      "due": "Fällig",
+      "client": "Kunde",
+      "project": "Projekt",
+      "notes": "Notizen",
+      "lineItems": "Rechnungsposten",
+      "payments": "Zahlungen"
+    },
+    "table": {
+      "description": "Beschreibung",
+      "qty": "Menge",
+      "unitPrice": "Einzelpreis",
+      "total": "Gesamt"
+    },
+    "totals": {
+      "subtotal": "Zwischensumme",
+      "tax": "MwSt ({{rate}}%)",
+      "total": "Gesamt",
+      "totalPaid": "Bereits gezahlt",
+      "balanceDue": "Offener Betrag",
+      "paidInFull": "Vollständig bezahlt"
+    },
+    "payments": {
+      "date": "Datum",
+      "type": "Art",
+      "method": "Methode",
+      "transactionId": "Transaktions-ID",
+      "amount": "Betrag",
+      "typePayment": "↓ Zahlung",
+      "typeRefund": "↑ Rückerstattung",
+      "typeExpense": "→ Ausgabe"
+    }
+  },
+  "cancelModal": {
+    "title": "Rechnung stornieren",
+    "confirmMessage": "Möchten Sie die Rechnung {{invoiceNumber}} wirklich stornieren?",
+    "no": "Nein, behalten",
+    "yes": "Ja, stornieren",
+    "cancelling": "Wird storniert...",
+    "warning": {
+      "title": "Diese Rechnung hat bereits Zahlungen",
+      "totalPaid": "Bereits gezahlt",
+      "totalAmount": "Gesamtbetrag",
+      "paymentsNotice": "Durch das Stornieren werden die Zahlungen nicht gelöscht. Sie müssen dem Kunden möglicherweise eine Rückerstattung gewähren oder die Zahlungen einer neuen Rechnung zuordnen."
+    },
+    "notice": "Nach dem Stornieren können Sie bei Bedarf eine neue Rechnung erstellen. Diese Aktion kann nicht rückgängig gemacht werden."
+  },
+  "generate": {
+    "title": "Aus Zeiteinträgen generieren",
+    "submit": "Rechnung generieren",
+    "generating": "Wird generiert…",
+    "client": {
+      "label": "Kunde (optional)",
+      "all": "Alle Kunden"
+    },
+    "project": {
+      "label": "Projekt (optional)",
+      "all": "Alle Projekte"
+    },
+    "startDate": "Startdatum",
+    "endDate": "Enddatum",
+    "customization": {
+      "title": "Rechnungsanpassung"
+    },
+    "headline": {
+      "label": "Rechnungsüberschrift (Optional)",
+      "placeholder": "z.B. {project_name} - {period}",
+      "showPlaceholders": "Verfügbare Platzhalter",
+      "preview": "Vorschau"
+    },
+    "headerTemplate": {
+      "label": "Kopfzeilen-Vorlage (Optional)"
+    },
+    "footerTemplate": {
+      "label": "Fußzeilen-Vorlage (Optional)"
+    },
+    "termsTemplate": {
+      "label": "Zahlungsbedingungen-Vorlage (Optional)"
+    },
+    "template": {
+      "none": "Keine"
+    },
+    "errors": {
+      "endDateAfterStart": "Das Enddatum muss nach dem Startdatum liegen"
+    }
+  },
+  "recordPayment": {
+    "title": "Zahlung erfassen",
+    "submit": "Zahlung erfassen",
+    "recording": "Wird erfasst...",
+    "paymentType": "Zahlungsart",
+    "paymentAmount": "Zahlungsbetrag",
+    "refundAmount": "Rückerstattungsbetrag",
+    "paymentDate": "Zahlungsdatum",
+    "paymentMethod": "Zahlungsmethode",
+    "transactionId": "Transaktions-ID / Referenz (Optional)",
+    "transactionIdPlaceholder": "z.B. TXN-123456",
+    "notes": "Notizen (Optional)",
+    "notesPlaceholder": "Zusätzliche Notizen hinzufügen...",
+    "excludeFromTax": {
+      "label": "Von Steuererklärung ausschließen",
+      "description": "Diese Zahlung wird nicht in Steuerberechnungen und Berichten berücksichtigt"
+    },
+    "info": {
+      "invoice": "Rechnung",
+      "totalAmount": "Gesamtbetrag",
+      "alreadyPaid": "Bereits gezahlt",
+      "remainingBalance": "Offener Betrag"
+    },
+    "types": {
+      "payment": {
+        "label": "Zahlung (Eingehend)",
+        "description": "Vom Kunden erhaltenes Geld"
+      },
+      "refund": {
+        "label": "Rückerstattung (Ausgehend)",
+        "description": "An den Kunden zurückgezahltes Geld wegen Überzahlung"
+      }
+    },
+    "methods": {
+      "cash": "Bargeld",
+      "check": "Scheck",
+      "creditCard": "Kreditkarte",
+      "bankTransfer": "Banküberweisung",
+      "paypal": "PayPal",
+      "other": "Sonstiges"
+    },
+    "errors": {
+      "invalidAmount": "Bitte geben Sie einen gültigen Betrag ein (positive Zahl)",
+      "exceedsBalance": "Der Zahlungsbetrag darf den Restbetrag nicht überschreiten ({{balance}})",
+      "failed": "Zahlung konnte nicht erfasst werden"
+    }
+  },
+  "form": {
+    "title": {
+      "create": "Rechnung erstellen",
+      "edit": "Rechnung bearbeiten"
+    },
+    "submit": {
+      "create": "Rechnung erstellen",
+      "edit": "Änderungen speichern"
+    },
+    "noClients": "Fügen Sie einen Kunden hinzu, bevor Sie eine Rechnung erstellen.",
+    "client": {
+      "label": "Kunde",
+      "placeholder": "Kunde auswählen"
+    },
+    "project": {
+      "label": "Projekt (optional)",
+      "placeholder": "Kein Projekt"
+    },
+    "invoiceNumber": {
+      "label": "Rechnungsnummer",
+      "placeholder": "RE-2024-001"
+    },
+    "status": {
+      "label": "Status"
+    },
+    "issueDate": {
+      "label": "Rechnungsdatum"
+    },
+    "dueDate": {
+      "label": "Fälligkeitsdatum"
+    },
+    "currency": {
+      "label": "Währung"
+    },
+    "taxRate": {
+      "label": "Steuersatz (optional)",
+      "placeholder": "Kein Steuersatz"
+    },
+    "subTotal": {
+      "label": "Betrag (Netto)",
+      "placeholder": "0,00"
+    },
+    "headline": {
+      "label": "Rechnungsüberschrift (Optional)",
+      "placeholder": "z.B. {project_name} - {period}",
+      "showPlaceholders": "Verfügbare Platzhalter",
+      "preview": "Vorschau"
+    },
+    "headerTemplate": {
+      "label": "Kopfzeilen-Vorlage (Optional)",
+      "placeholder": "Keine"
+    },
+    "footerTemplate": {
+      "label": "Fußzeilen-Vorlage (Optional)",
+      "placeholder": "Keine"
+    },
+    "termsTemplate": {
+      "label": "Zahlungsbedingungen-Vorlage (Optional)",
+      "placeholder": "Keine"
+    },
+    "template": {
+      "none": "Keine"
+    },
+    "customization": {
+      "title": "Rechnungsanpassung"
+    },
+    "invoiceText": {
+      "label": "Rechnungstext (optional)",
+      "placeholder": "Benutzerdefinierter Rechnungstext, Begrüßung oder Bedingungen"
+    },
+    "footerText": {
+      "label": "Fußzeilentext (optional)",
+      "placeholder": "Zahlungsbedingungen, Bankverbindung oder Fußzeileninformationen"
+    },
+    "taxExemption": {
+      "label": "Steuerbefreiungshinweis (optional)",
+      "placeholder": "Steuerbefreiungshinweis oder rechtliche Referenz"
+    },
+    "notes": {
+      "label": "Notizen",
+      "placeholder": "Zahlungsbedingungen, Bankverbindung oder benutzerdefinierte Nachricht einfügen"
+    },
+    "zugferd": {
+      "label": "E-Rechnung aktivieren",
+      "description": "Erstellt eine ZUGFeRD-konforme elektronische Rechnung (Pflicht für B2B in Deutschland seit 2025). Die Rechnungs-PDF enthält eingebettete XML-Daten gemäß EN 16931 Standard."
+    },
+    "excludeFromTax": {
+      "label": "Von Steuerberichten ausschließen",
+      "description": "Markieren Sie diese Rechnung als steuerfreies Einkommen, das von USt-Voranmeldungen und Steuerberichten ausgeschlossen werden soll (z.B. für nicht steuerpflichtige Leistungen oder bestimmte Geschäftsvorgänge)."
+    }
+  },
+  "fields": {
+    "number": "Rechnungsnummer",
+    "client": "Kunde",
+    "project": "Projekt",
+    "date": "Rechnungsdatum",
+    "dueDate": "Fälligkeitsdatum",
+    "status": "Status",
+    "subtotal": "Zwischensumme",
+    "tax": "Steuer",
+    "total": "Gesamt",
+    "items": "Positionen",
+    "description": "Beschreibung",
+    "quantity": "Menge",
+    "rate": "Preis",
+    "amount": "Betrag",
+    "notes": "Notizen",
+    "terms": "Geschäftsbedingungen"
+  },
+  "status": {
+    "draft": "Entwurf",
+    "sent": "Gesendet",
+    "paid": "Bezahlt",
+    "partiallyPaid": "Teilweise bezahlt",
+    "overdue": "Überfällig",
+    "cancelled": "Storniert"
+  },
+  "messages": {
+    "createSuccess": "Rechnung erfolgreich erstellt.",
+    "updateSuccess": "Rechnung erfolgreich aktualisiert.",
+    "deleteSuccess": "Rechnung erfolgreich gelöscht.",
+    "generateSuccess": "Rechnung aus Zeiteinträgen generiert.",
+    "sendSuccess": "Rechnung erfolgreich gesendet",
+    "deleteConfirm": "Rechnung {{number}} löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+  }
+}

@@ -1,0 +1,188 @@
+{
+  "title": "Zeiterfassung",
+  "subtitle": "Erfassen Sie Ihre Arbeitszeit, verwalten Sie Timer und überwachen Sie abrechenbare Stunden in Projekten",
+  "addEntry": "Zeit manuell erfassen",
+  "editEntry": "Zeiteintrag bearbeiten",
+  "createEntry": "Eintrag erstellen",
+  "saveChanges": "Änderungen speichern",
+  "cancel": "Abbrechen",
+  "saving": "Wird gespeichert…",
+  "edit": "Bearbeiten",
+  "delete": "Löschen",
+  "deleting": "Wird gelöscht…",
+  "noAuth": "Bitte authentifizieren Sie sich, um Zeiteinträge anzuzeigen",
+  "search": "Suche nach Beschreibung, Aufgabe oder Kunde",
+  "filters": {
+    "project": "Projekt",
+    "allProjects": "Alle Projekte",
+    "client": "Kunde",
+    "allClients": "Alle Kunden",
+    "startDate": "Startdatum",
+    "endDate": "Enddatum"
+  },
+  "timer": {
+    "running": "Timer läuft",
+    "start": "Timer starten",
+    "starting": "Wird gestartet…",
+    "stop": "Timer stoppen",
+    "stopping": "Wird gestoppt…",
+    "pause": "Pause",
+    "pausing": "Wird pausiert…",
+    "started": "Gestartet",
+    "elapsed": "Verstrichene Zeit",
+    "description": "Beschreibung (optional)",
+    "descriptionPlaceholder": "Woran arbeiten Sie?",
+    "selectProject": "Projekt auswählen",
+    "subtitle": "Erfassen Sie Arbeit in Echtzeit. Wählen Sie ein Projekt und fügen Sie optional eine kurze Beschreibung hinzu, bevor Sie starten.",
+    "activeProject": "Aktives Projekt",
+    "untitledTask": "Unbenannte Aufgabe"
+  },
+  "table": {
+    "task": "Aufgabe",
+    "project": "Projekt",
+    "client": "Kunde",
+    "date": "Datum",
+    "time": "Zeit",
+    "duration": "Dauer",
+    "billable": "Abrechenbar",
+    "nonBillable": "Nicht abrechenbar",
+    "start": "Start",
+    "end": "Ende",
+    "actions": "Aktionen",
+    "active": "Läuft…"
+  },
+  "form": {
+    "modal": {
+      "title": {
+        "create": "Zeiteintrag erfassen",
+        "edit": "Zeiteintrag bearbeiten"
+      },
+      "submit": {
+        "create": "Zeit erfassen",
+        "edit": "Änderungen speichern"
+      },
+      "noProjects": "Sie benötigen mindestens ein Projekt, bevor Sie Zeit erfassen können. Erstellen Sie zuerst ein Projekt."
+    },
+    "taskName": {
+      "label": "Aufgabenname",
+      "placeholder": "Design-Review"
+    },
+    "category": {
+      "label": "Kategorie",
+      "placeholder": "Recherche, Entwicklung, QS…"
+    },
+    "description": {
+      "label": "Beschreibung",
+      "placeholder": "Fügen Sie Kontext hinzu, woran Sie gearbeitet haben"
+    },
+    "project": {
+      "label": "Projekt",
+      "placeholder": "Projekt auswählen",
+      "required": "Wählen Sie ein Projekt aus"
+    },
+    "date": {
+      "label": "Datum",
+      "required": "Datum ist erforderlich"
+    },
+    "startTime": {
+      "label": "Startzeit",
+      "required": "Startzeit ist erforderlich",
+      "validation": {
+        "invalid": "Geben Sie eine gültige Startzeit ein"
+      }
+    },
+    "endTime": {
+      "label": "Endzeit",
+      "validation": {
+        "invalid": "Geben Sie eine gültige Endzeit ein",
+        "afterStart": "Endzeit muss nach der Startzeit liegen"
+      }
+    },
+    "duration": {
+      "label": "Dauer (Stunden)",
+      "placeholder": "1.5",
+      "required": "Dauer ist erforderlich",
+      "validation": {
+        "positive": "Dauer muss größer als Null sein"
+      }
+    },
+    "billable": {
+      "label": "Abrechenbar",
+      "yes": "Ja",
+      "no": "Nein"
+    },
+    "hourlyRate": {
+      "label": "Stundensatz",
+      "placeholder": "75",
+      "validation": {
+        "min": "Stundensatz muss Null oder höher sein"
+      }
+    },
+    "timeSlotPicker": {
+      "label": "Zeitauswahl (15-Minuten-Intervalle)",
+      "show": "Zeitplan anzeigen",
+      "hide": "Zeitplan ausblenden",
+      "selectStart": "Startzeit auswählen",
+      "selectEnd": "Endzeit auswählen",
+      "available": "Verfügbar",
+      "selected": "Ausgewählt",
+      "occupied": "Belegt",
+      "clickToSelect": "Klicken Sie, um Start-/Endzeit auszuwählen"
+    }
+  },
+  "empty": {
+    "title": "Noch keine Zeiteinträge",
+    "message": "Beginnen Sie mit der Zeiterfassung, indem Sie einen Zeiteintrag erfassen oder den Timer starten. Erfassen Sie abrechenbare Stunden und halten Sie Projekte im Zeitplan."
+  },
+  "messages": {
+    "created": "Zeiteintrag erfolgreich erstellt",
+    "updated": "Zeiteintrag erfolgreich aktualisiert",
+    "deleted": "Zeiteintrag erfolgreich gelöscht",
+    "timerStarted": "Timer erfolgreich gestartet",
+    "timerStopped": "Timer erfolgreich gestoppt",
+    "timerPaused": "Timer erfolgreich pausiert",
+    "deleteConfirm": "Möchten Sie diesen Zeiteintrag wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+  },
+  "duration": {
+    "hours": "{{count}}h",
+    "minutes": "{{count}}m",
+    "hoursMinutes": "{{hours}}h {{minutes}}m",
+    "zero": "0m"
+  },
+  "charts": {
+    "dailyHours": {
+      "title": "Heutige Arbeitszeit",
+      "total": "Gesamt",
+      "totalToday": "Heute gesamt",
+      "hours": "Stunden",
+      "noData": "Heute noch keine Zeit erfasst",
+      "startTracking": "Starten Sie einen Timer oder erfassen Sie einen Eintrag"
+    },
+    "weeklyHours": {
+      "title": "Wochenübersicht",
+      "totalWeek": "Diese Woche",
+      "hoursWorked": "Arbeitsstunden",
+      "noData": "Keine Daten für diese Woche"
+    },
+    "monthlyHours": {
+      "title": "Monatsübersicht",
+      "totalMonth": "Dieser Monat",
+      "hoursWorked": "Arbeitsstunden",
+      "noData": "Keine Daten für diesen Monat"
+    },
+    "filters": {
+      "project": "Projekt",
+      "allProjects": "Alle Projekte",
+      "task": "Aufgabe",
+      "allTasks": "Alle Aufgaben",
+      "viewMode": "Ansicht",
+      "daily": "Täglich",
+      "weekly": "Wöchentlich",
+      "grouping": "Gruppierung",
+      "noGrouping": "Keine Gruppierung",
+      "groupByProject": "Nach Projekt gruppieren",
+      "groupByTask": "Nach Aufgabe gruppieren",
+      "groupByClient": "Nach Kunde gruppieren"
+    }
+  }
+}

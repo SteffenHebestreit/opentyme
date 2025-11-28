@@ -1,0 +1,97 @@
+{
+  "title": "Clients",
+  "subtitle": "Manage your client relationships, contact information, and business details",
+  "addClient": "Add client",
+  "editClient": "Edit client",
+  "createClient": "Create client",
+  "saveChanges": "Save changes",
+  "cancel": "Cancel",
+  "saving": "Saving…",
+  "edit": "Edit",
+  "delete": "Delete",
+  "deleting": "Deleting…",
+  "noAuth": "Please authenticate to view clients",
+  "search": "Search clients by name or email…",
+  "status": {
+    "label": "Status",
+    "all": "All statuses",
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "table": {
+    "client": "Client",
+    "contact": "Primary Contact",
+    "status": "Status",
+    "created": "Created",
+    "updated": "Updated",
+    "actions": "Actions"
+  },
+  "form": {
+    "name": {
+      "label": "Name",
+      "placeholder": "Acme Corporation",
+      "required": "Client name is required"
+    },
+    "email": {
+      "label": "Email",
+      "placeholder": "contact@acme.com",
+      "invalid": "Enter a valid email address"
+    },
+    "phone": {
+      "label": "Phone",
+      "placeholder": "+1 (555) 123-4567"
+    },
+    "address": {
+      "label": "Address",
+      "placeholder": "123 Main St, Springfield"
+    },
+    "city": {
+      "label": "City",
+      "placeholder": "Springfield"
+    },
+    "zipCode": {
+      "label": "Postal Code",
+      "placeholder": "12345"
+    },
+    "country": {
+      "label": "Country",
+      "placeholder": "USA"
+    },
+    "vatNumber": {
+      "label": "Tax ID",
+      "placeholder": "Tax identification number"
+    },
+    "contactPerson": {
+      "label": "Billing Contact Person",
+      "placeholder": "Jane Doe"
+    },
+    "website": {
+      "label": "Website",
+      "placeholder": "https://acme.com"
+    },
+    "notes": {
+      "label": "Notes",
+      "placeholder": "Important billing details, preferred contact times, etc."
+    },
+    "billing": {
+      "toggle": "Use Separate Billing Address",
+      "title": "Billing Address Information",
+      "email": "Billing Email",
+      "phone": "Billing Phone",
+      "address": "Billing Address",
+      "addressPlaceholder": "123 Billing St",
+      "state": "State/Province",
+      "statePlaceholder": "CA"
+    }
+  },
+  "empty": {
+    "title": "No clients yet",
+    "message": "Start building your client base by adding your first client. Track their projects, contact info, and business details."
+  },
+  "messages": {
+    "created": "Client created successfully",
+    "updated": "Client updated successfully",
+    "deleted": "Client deleted successfully",
+    "deleteConfirm": "Are you sure you want to delete {{name}}? This action cannot be undone."
+  }
+}

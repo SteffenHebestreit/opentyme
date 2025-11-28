@@ -1,0 +1,66 @@
+{
+  "title": "Zahlungen",
+  "subtitle": "Zahlungsdatensätze und Rückerstattungen ansehen und verwalten",
+  "addPayment": "Zahlung hinzufügen",
+  "create": "Zahlung erfassen",
+  "edit": "Zahlung bearbeiten",
+  "delete": "Zahlung löschen",
+  "view": "Zahlung ansehen",
+  "noPayments": "Keine Zahlungen gefunden",
+  "noPaymentsMessage": "Zahlungen werden hier angezeigt, sobald sie erfasst sind",
+  "tryAdjustingFilters": "Versuchen Sie, Ihre Filter anzupassen",
+  "searchPlaceholder": "Nach Transaktions-ID oder Notizen suchen...",
+  "fields": {
+    "amount": "Betrag",
+    "date": "Zahlungsdatum",
+    "method": "Zahlungsmethode",
+    "invoice": "Rechnung",
+    "transactionId": "Transaktions-ID",
+    "notes": "Notizen",
+    "type": "Typ"
+  },
+  "filters": {
+    "paymentType": "Zahlungstyp",
+    "paymentMethod": "Zahlungsmethode",
+    "allTypes": "Alle Typen",
+    "allMethods": "Alle Methoden"
+  },
+  "type": {
+    "payment": "Zahlung",
+    "paymentIncome": "Zahlungen (Eingang)",
+    "refund": "Rückerstattung",
+    "refundOutgoing": "Rückerstattungen (Ausgang)"
+  },
+  "summary": {
+    "totalTransactions": "Transaktionen gesamt",
+    "incomePayments": "Einnahmen (Zahlungen)",
+    "refunds": "Rückerstattungen",
+    "netAmount": "Nettobetrag"
+  },
+  "table": {
+    "date": "Datum",
+    "type": "Typ",
+    "client": "Kunde",
+    "amount": "Betrag",
+    "method": "Methode",
+    "transactionId": "Transaktions-ID",
+    "notes": "Notizen",
+    "actions": "Aktionen"
+  },
+  "method": {
+    "cash": "Bargeld",
+    "card": "Kreditkarte",
+    "bankTransfer": "Banküberweisung",
+    "paypal": "PayPal",
+    "other": "Sonstiges"
+  },
+  "messages": {
+    "createSuccess": "Zahlung erfolgreich erfasst",
+    "updateSuccess": "Zahlung erfolgreich aktualisiert",
+    "deleteSuccess": "Zahlung erfolgreich gelöscht",
+    "deleteConfirm": "Möchten Sie diese Zahlung wirklich löschen?",
+    "saving": "Wird gespeichert...",
+    "saveChanges": "Änderungen speichern",
+    "cancel": "Abbrechen"
+  }
+}

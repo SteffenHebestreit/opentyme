@@ -1,0 +1,97 @@
+{
+  "title": "Projekte",
+  "subtitle": "Verfolgen Sie Projektgesundheit, Budgets und Zeitpläne zusammen mit den zugehörigen Kunden.",
+  "addProject": "Projekt hinzufügen",
+  "editProject": "Projekt bearbeiten",
+  "createProject": "Projekt erstellen",
+  "saveChanges": "Änderungen speichern",
+  "cancel": "Abbrechen",
+  "saving": "Wird gespeichert…",
+  "edit": "Bearbeiten",
+  "delete": "Löschen",
+  "deleting": "Wird gelöscht…",
+  "search": "Projekte nach Name oder Kunde durchsuchen",
+  "noAuth": "Bitte melden Sie sich an, um Projektinformationen anzuzeigen.",
+  "status": {
+    "label": "Status",
+    "all": "Alle Status",
+    "notStarted": "Nicht begonnen",
+    "active": "Aktiv",
+    "onHold": "Pausiert",
+    "completed": "Abgeschlossen"
+  },
+  "client": {
+    "label": "Kunde",
+    "all": "Alle Kunden",
+    "required": "Kunde ist erforderlich",
+    "noClients": "Sie benötigen mindestens einen Kunden, bevor Sie ein Projekt erstellen können. Gehen Sie zur Kundenseite, um einen hinzuzufügen."
+  },
+  "table": {
+    "project": "Projekt",
+    "client": "Kunde",
+    "status": "Status",
+    "timeline": "Zeitplan",
+    "budget": "Budget",
+    "trackedHours": "Erfasste Std.",
+    "actions": "Aktionen",
+    "start": "Start",
+    "due": "Fällig",
+    "rate": "Satz"
+  },
+  "form": {
+    "name": {
+      "label": "Projektname",
+      "placeholder": "Website-Redesign",
+      "required": "Projektname ist erforderlich"
+    },
+    "description": {
+      "label": "Beschreibung",
+      "placeholder": "Teilen Sie eine Übersicht, Liefergegenstände oder wichtige Hinweise"
+    },
+    "startDate": {
+      "label": "Startdatum"
+    },
+    "dueDate": {
+      "label": "Fälligkeitsdatum"
+    },
+    "budget": {
+      "label": "Budget",
+      "placeholder": "15000",
+      "min": "Budget muss null oder höher sein"
+    },
+    "currency": {
+      "label": "Währung"
+    },
+    "rateType": {
+      "label": "Abrechnungsart",
+      "hourly": "Stündlich",
+      "fixedFee": "Festpreis",
+      "noRate": "Kein Satz"
+    },
+    "hourlyRate": {
+      "label": "Stundensatz",
+      "placeholder": "75",
+      "required": "Stundensatz ist für stündliche Projekte erforderlich",
+      "min": "Stundensatz muss null oder höher sein"
+    },
+    "estimatedHours": {
+      "label": "Geschätzte Stunden",
+      "placeholder": "120",
+      "min": "Geschätzte Stunden müssen null oder höher sein"
+    },
+    "recurringPayment": {
+      "label": "Wiederkehrende monatliche Zahlung",
+      "description": "Aktivieren Sie dies für Projekte mit festen monatlichen Zahlungen, die keine Rechnungen erfordern (z.B. monatliche Retainer, Abonnements). Zahlungen können direkt ohne Rechnungserstellung erfasst werden."
+    }
+  },
+  "empty": {
+    "title": "Noch keine Projekte",
+    "message": "Beginnen Sie mit der Verfolgung Ihrer Arbeit, indem Sie ein Projekt erstellen. Weisen Sie Kunden zu, verwalten Sie Budgets und überwachen Sie den Fortschritt an einem Ort."
+  },
+  "messages": {
+    "created": "Projekt erfolgreich erstellt.",
+    "updated": "Projekt erfolgreich aktualisiert.",
+    "deleted": "Projekt erfolgreich gelöscht.",
+    "deleteConfirm": "{{name}} löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+  }
+}

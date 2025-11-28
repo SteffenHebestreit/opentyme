@@ -1,0 +1,177 @@
+{
+  "title": "Time Tracking",
+  "subtitle": "Track your work time, manage timers, and monitor billable hours across projects",
+  "addEntry": "Log time manually",
+  "editEntry": "Edit time entry",
+  "createEntry": "Create entry",
+  "saveChanges": "Save changes",
+  "cancel": "Cancel",
+  "saving": "Saving…",
+  "edit": "Edit",
+  "delete": "Delete",
+  "deleting": "Deleting…",
+  "noAuth": "Please authenticate to view time entries",
+  "search": "Search by description, task, or client",
+  "filters": {
+    "project": "Project",
+    "allProjects": "All Projects",
+    "client": "Client",
+    "allClients": "All Clients",
+    "startDate": "Start Date",
+    "endDate": "End Date"
+  },
+  "timer": {
+    "running": "Timer running",
+    "start": "Start timer",
+    "starting": "Starting…",
+    "stop": "Stop timer",
+    "stopping": "Stopping…",
+    "pause": "Pause",
+    "pausing": "Pausing…",
+    "started": "Started",
+    "elapsed": "Elapsed time",
+    "description": "Description (optional)",
+    "descriptionPlaceholder": "What are you working on?",
+    "selectProject": "Select a project",
+    "subtitle": "Track work in real time. Select a project and optionally add a short description before starting.",
+    "activeProject": "Active project",
+    "untitledTask": "Untitled task"
+  },
+  "table": {
+    "task": "Task",
+    "project": "Project",
+    "client": "Client",
+    "date": "Date",
+    "time": "Time",
+    "duration": "Duration",
+    "billable": "Billable",
+    "nonBillable": "Non-billable",
+    "start": "Start",
+    "end": "End",
+    "actions": "Actions",
+    "active": "In progress…"
+  },
+  "form": {
+    "modal": {
+      "title": {
+        "create": "Log time entry",
+        "edit": "Edit time entry"
+      },
+      "submit": {
+        "create": "Log time",
+        "edit": "Save changes"
+      },
+      "noProjects": "You need at least one project before logging time. Create a project first."
+    },
+    "taskName": {
+      "label": "Task name",
+      "placeholder": "Design review"
+    },
+    "category": {
+      "label": "Category",
+      "placeholder": "Research, Development, QA…"
+    },
+    "description": {
+      "label": "Description",
+      "placeholder": "Add context about what you worked on"
+    },
+    "project": {
+      "label": "Project",
+      "placeholder": "Select a project",
+      "required": "Select a project"
+    },
+    "date": {
+      "label": "Date",
+      "required": "Date is required"
+    },
+    "startTime": {
+      "label": "Start time",
+      "required": "Start time is required",
+      "validation": {
+        "invalid": "Enter a valid start time"
+      }
+    },
+    "endTime": {
+      "label": "End time",
+      "validation": {
+        "invalid": "Enter a valid end time",
+        "afterStart": "End time must be after the start time"
+      }
+    },
+    "duration": {
+      "label": "Duration (hours)",
+      "placeholder": "1.5",
+      "required": "Duration is required",
+      "validation": {
+        "positive": "Duration must be greater than zero"
+      }
+    },
+    "billable": {
+      "label": "Billable",
+      "yes": "Yes",
+      "no": "No"
+    },
+    "hourlyRate": {
+      "label": "Hourly rate",
+      "placeholder": "75",
+      "validation": {
+        "min": "Hourly rate must be zero or higher"
+      }
+    }
+  },
+  "empty": {
+    "title": "No time entries yet",
+    "message": "Start tracking your work by logging a time entry or starting the timer. Track billable hours and keep projects on schedule."
+  },
+  "messages": {
+    "created": "Time entry created successfully",
+    "updated": "Time entry updated successfully",
+    "deleted": "Time entry deleted successfully",
+    "timerStarted": "Timer started successfully",
+    "timerStopped": "Timer stopped successfully",
+    "timerPaused": "Timer paused successfully",
+    "deleteConfirm": "Are you sure you want to delete this time entry? This action cannot be undone."
+  },
+  "duration": {
+    "hours": "{{count}}h",
+    "minutes": "{{count}}m",
+    "hoursMinutes": "{{hours}}h {{minutes}}m",
+    "zero": "0m"
+  },
+  "charts": {
+    "dailyHours": {
+      "title": "Today's Hours",
+      "total": "Total",
+      "totalToday": "Total today",
+      "hours": "Hours",
+      "noData": "No time logged today",
+      "startTracking": "Start a timer or log a time entry"
+    },
+    "weeklyHours": {
+      "title": "Weekly Overview",
+      "totalWeek": "This week",
+      "hoursWorked": "Hours worked",
+      "noData": "No data for this week"
+    },
+    "monthlyHours": {
+      "title": "Monthly Overview",
+      "totalMonth": "This month",
+      "hoursWorked": "Hours worked",
+      "noData": "No data for this month"
+    },
+    "filters": {
+      "project": "Project",
+      "allProjects": "All projects",
+      "task": "Task",
+      "allTasks": "All tasks",
+      "viewMode": "View",
+      "daily": "Daily",
+      "weekly": "Weekly",
+      "grouping": "Grouping",
+      "noGrouping": "No grouping",
+      "groupByProject": "Group by project",
+      "groupByTask": "Group by task",
+      "groupByClient": "Group by client"
+    }
+  }
+}

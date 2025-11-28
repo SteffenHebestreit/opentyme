@@ -1,0 +1,131 @@
+{
+  "title": "Dashboard",
+  "welcome": {
+    "title": "Willkommen!",
+    "message": "Melden Sie sich an, um Ihr personalisiertes Dashboard freizuschalten und den Überblick über Projekte, Rechnungen und abrechenbare Zeit zu behalten."
+  },
+  "greeting": "Willkommen zurück, {{name}}! Hier ist, was heute in Ihrem Arbeitsbereich passiert.",
+  "analyticsInsights": "Analytics & Einblicke",
+  "metrics": {
+    "activeProjects": "Aktive Projekte",
+    "totalClients": "Kunden gesamt",
+    "hoursThisWeek": "Stunden diese Woche",
+    "unpaidInvoices": "Unbezahlte Rechnungen",
+    "outstandingAmount": "Ausstehender Betrag",
+    "revenueThisMonth": "Umsatz diesen Monat",
+    "revenueLastMonth": "Umsatz letzten Monat",
+    "totalRevenue": "Gesamtumsatz",
+    "billableHours": "Abrechenbare Stunden"
+  },
+  "charts": {
+    "timeTrend": {
+      "title": "Zeiterfassung Trend",
+      "totalHours": "Stunden gesamt",
+      "billableHours": "Abrechenbare Stunden",
+      "nonBillableHours": "Nicht abrechenbare Stunden",
+      "days": "Tage",
+      "noData": "Keine Daten verfügbar",
+      "startTracking": "Beginnen Sie mit der Zeiterfassung, um Trends zu sehen"
+    },
+    "revenueByClient": {
+      "title": "Top-Kunden nach Umsatz",
+      "subtitle": "Basierend auf bezahlten Rechnungen",
+      "revenue": "Umsatz",
+      "invoices": "Rechnungen",
+      "noData": "Keine Umsatzdaten verfügbar",
+      "createInvoices": "Erstellen Sie Rechnungen und erhalten Sie Zahlungen, um Kundenumsätze zu sehen"
+    },
+    "billableRatio": {
+      "title": "Abrechnungsquote",
+      "subtitle": "Gesamtleistung",
+      "billable": "Abrechenbar",
+      "nonBillable": "Nicht abrechenbar",
+      "billableHours": "Abrechenbare Stunden",
+      "nonBillableHours": "Nicht abrechenbare Stunden",
+      "totalHours": "{{hours}} Std. gesamt",
+      "hours": "{{hours}} Std.",
+      "loading": "Lade Diagrammdaten...",
+      "error": "Fehler beim Laden der Daten",
+      "noData": "Noch keine Zeiteinträge",
+      "noDataDescription": "Erfassen Sie Zeit, um Ihre Abrechnungsquote zu sehen"
+    },
+    "projectProfitability": {
+      "title": "Projektrentabilität",
+      "subtitle": "Umsatz- vs. Kostenanalyse",
+      "profitLoss": "Gewinn/Verlust (€)",
+      "profitable": "Rentabel",
+      "lossMaking": "Verlustbringend",
+      "profit": "Gewinn",
+      "cost": "Kosten",
+      "revenue": "Umsatz",
+      "margin": "Marge",
+      "loading": "Lade Diagrammdaten...",
+      "error": "Fehler beim Laden der Daten",
+      "noData": "Keine Projektdaten verfügbar",
+      "noDataDescription": "Erstellen Sie Projekte und erfassen Sie Zeit, um die Rentabilität zu sehen"
+    }
+  },
+  "recentTimeEntries": {
+    "title": "Letzte Zeiteinträge",
+    "project": "Projekt",
+    "hours": "Stunden",
+    "viewAll": "Alle Einträge anzeigen",
+    "noEntries": "Keine aktuellen Zeiteinträge erfasst.",
+    "startTracking": "Beginnen Sie mit der Zeiterfassung, um Einträge hier zu sehen",
+    "unassigned": "Nicht zugewiesen",
+    "noDescription": "Keine Beschreibung vorhanden",
+    "task": "Aufgabe",
+    "billable": "Abrechenbar",
+    "nonBillable": "Nicht abrechenbar"
+  },
+  "recentInvoices": {
+    "title": "Letzte Rechnungen",
+    "client": "Kunde",
+    "amount": "Betrag",
+    "status": "Status",
+    "viewAll": "Alle Rechnungen anzeigen",
+    "noInvoices": "Keine aktuellen Rechnungen anzuzeigen.",
+    "createInvoice": "Erstellen Sie Ihre erste Rechnung",
+    "invoice": "Rechnung",
+    "due": "Fällig",
+    "updated": "Aktualisiert"
+  },
+  "quickActions": {
+    "title": "Schnellaktionen",
+    "logTime": "Zeit erfassen",
+    "logTimeDesc": "Abrechenbare Stunden für ein Projekt erfassen",
+    "addClient": "Kunde hinzufügen",
+    "addClientDesc": "Einen neuen Kundendatensatz erstellen",
+    "createInvoice": "Rechnung erstellen",
+    "createInvoiceDesc": "Eine Rechnung aus erfasster Arbeit generieren",
+    "newProject": "Neues Projekt",
+    "newProjectDesc": "Ein neues Projekt beginnen",
+    "startTimer": "Timer starten",
+    "addExpense": "Ausgabe hinzufügen"
+  },
+  "analytics": {
+    "title": "Analytics & Einblicke"
+  },
+  "yearlyFinancialSummary": {
+    "title": "Finanzübersicht {{year}}",
+    "period": "Zeitraum: {{start}} - {{end}}",
+    "error": "Fehler beim Laden der Finanzübersicht",
+    "retry": "Erneut versuchen",
+    "totalRevenue": "Gesamteinnahmen",
+    "totalRevenueDesc": "Bruttoeinnahmen (inkl. Steuer)",
+    "totalExpenses": "Gesamtausgaben",
+    "totalExpensesDesc": "Bruttoausgaben (inkl. Steuer)",
+    "taxPayable": "Steuerschuld",
+    "taxPayableDesc": "Netto-Umsatzsteuer",
+    "remainingTaxPayableDesc": "Netto-USt nach Vorauszahlungen",
+    "netProfit": "Nettogewinn",
+    "netProfitDesc": "Nettoeinnahmen - Nettoausgaben",
+    "netRevenue": "Nettoeinnahmen",
+    "netExpenses": "Nettoausgaben",
+    "revenueTax": "Umsatzsteuer",
+    "expenseTax": "Vorsteuer",
+    "vatPrepayments": "USt-Vorauszahlungen",
+    "incomeTaxPrepayments": "ESt-Vorauszahlungen",
+    "totalPrepayments": "Vorauszahlungen gesamt"
+  }
+}

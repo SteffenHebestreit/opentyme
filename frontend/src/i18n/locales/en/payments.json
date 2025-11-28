@@ -1,0 +1,66 @@
+{
+  "title": "Payments",
+  "subtitle": "View and manage payment records and refunds",
+  "addPayment": "Add Payment",
+  "create": "Record Payment",
+  "edit": "Edit Payment",
+  "delete": "Delete Payment",
+  "view": "View Payment",
+  "noPayments": "No payments found",
+  "noPaymentsMessage": "Payments will appear here once they are recorded",
+  "tryAdjustingFilters": "Try adjusting your filters",
+  "searchPlaceholder": "Search by transaction ID or notes...",
+  "fields": {
+    "amount": "Amount",
+    "date": "Payment Date",
+    "method": "Payment Method",
+    "invoice": "Invoice",
+    "transactionId": "Transaction ID",
+    "notes": "Notes",
+    "type": "Type"
+  },
+  "filters": {
+    "paymentType": "Payment Type",
+    "paymentMethod": "Payment Method",
+    "allTypes": "All Types",
+    "allMethods": "All Methods"
+  },
+  "type": {
+    "payment": "Payment",
+    "paymentIncome": "Payments (Income)",
+    "refund": "Refund",
+    "refundOutgoing": "Refunds (Outgoing)"
+  },
+  "summary": {
+    "totalTransactions": "Total Transactions",
+    "incomePayments": "Income (Payments)",
+    "refunds": "Refunds",
+    "netAmount": "Net Amount"
+  },
+  "table": {
+    "date": "Date",
+    "type": "Type",
+    "client": "Client",
+    "amount": "Amount",
+    "method": "Method",
+    "transactionId": "Transaction ID",
+    "notes": "Notes",
+    "actions": "Actions"
+  },
+  "method": {
+    "cash": "Cash",
+    "card": "Credit Card",
+    "bankTransfer": "Bank Transfer",
+    "paypal": "PayPal",
+    "other": "Other"
+  },
+  "messages": {
+    "createSuccess": "Payment recorded successfully",
+    "updateSuccess": "Payment updated successfully",
+    "deleteSuccess": "Payment deleted successfully",
+    "deleteConfirm": "Are you sure you want to delete this payment?",
+    "saving": "Saving...",
+    "saveChanges": "Save Changes",
+    "cancel": "Cancel"
+  }
+}

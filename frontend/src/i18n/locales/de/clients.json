@@ -1,0 +1,97 @@
+{
+  "title": "Kunden",
+  "subtitle": "Verwalten Sie Ihre Kundenbeziehungen, Kontaktinformationen und Geschäftsdetails",
+  "addClient": "Kunde hinzufügen",
+  "editClient": "Kunde bearbeiten",
+  "createClient": "Kunde erstellen",
+  "saveChanges": "Änderungen speichern",
+  "cancel": "Abbrechen",
+  "saving": "Wird gespeichert…",
+  "edit": "Bearbeiten",
+  "delete": "Löschen",
+  "deleting": "Wird gelöscht…",
+  "noAuth": "Bitte authentifizieren Sie sich, um Kunden anzuzeigen",
+  "search": "Kunden nach Name oder E-Mail durchsuchen…",
+  "status": {
+    "label": "Status",
+    "all": "Alle Status",
+    "active": "Aktiv",
+    "inactive": "Inaktiv"
+  },
+  "table": {
+    "client": "Kunde",
+    "contact": "Hauptkontakt",
+    "status": "Status",
+    "created": "Erstellt",
+    "updated": "Aktualisiert",
+    "actions": "Aktionen"
+  },
+  "form": {
+    "name": {
+      "label": "Name",
+      "placeholder": "Acme Corporation",
+      "required": "Kundenname ist erforderlich"
+    },
+    "email": {
+      "label": "E-Mail",
+      "placeholder": "kontakt@acme.com",
+      "invalid": "Bitte geben Sie eine gültige E-Mail-Adresse ein"
+    },
+    "phone": {
+      "label": "Telefon",
+      "placeholder": "+49 (30) 123-4567"
+    },
+    "address": {
+      "label": "Adresse",
+      "placeholder": "Hauptstraße 123, Berlin"
+    },
+    "city": {
+      "label": "Stadt",
+      "placeholder": "Berlin"
+    },
+    "zipCode": {
+      "label": "Postleitzahl",
+      "placeholder": "10115"
+    },
+    "country": {
+      "label": "Land",
+      "placeholder": "Deutschland"
+    },
+    "vatNumber": {
+      "label": "Steuernummer",
+      "placeholder": "Steueridentifikationsnummer"
+    },
+    "contactPerson": {
+      "label": "Rechnungsansprechpartner",
+      "placeholder": "Max Mustermann"
+    },
+    "website": {
+      "label": "Webseite",
+      "placeholder": "https://acme.de"
+    },
+    "notes": {
+      "label": "Notizen",
+      "placeholder": "Wichtige Rechnungsdetails, bevorzugte Kontaktzeiten, usw."
+    },
+    "billing": {
+      "toggle": "Separate Rechnungsadresse verwenden",
+      "title": "Rechnungsadressinformationen",
+      "email": "Rechnungs-E-Mail",
+      "phone": "Rechnungstelefon",
+      "address": "Rechnungsadresse",
+      "addressPlaceholder": "Rechnungsstraße 123",
+      "state": "Bundesland",
+      "statePlaceholder": "BE"
+    }
+  },
+  "empty": {
+    "title": "Noch keine Kunden",
+    "message": "Beginnen Sie mit dem Aufbau Ihres Kundenstamms, indem Sie Ihren ersten Kunden hinzufügen. Verfolgen Sie deren Projekte, Kontaktinformationen und Geschäftsdetails."
+  },
+  "messages": {
+    "created": "Kunde erfolgreich erstellt",
+    "updated": "Kunde erfolgreich aktualisiert",
+    "deleted": "Kunde erfolgreich gelöscht",
+    "deleteConfirm": "Möchten Sie {{name}} wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+  }
+}

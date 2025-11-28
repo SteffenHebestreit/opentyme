@@ -1,0 +1,285 @@
+{
+  "title": "Invoices",
+  "subtitle": "Send professional invoices and monitor payment status.",
+  "noAuth": "Please log in to manage invoices.",
+  "create": "Create invoice",
+  "edit": "Edit Invoice",
+  "delete": "Delete Invoice",
+  "view": "View Invoice",
+  "send": "Send Invoice",
+  "download": "Download PDF",
+  "generateButton": "Generate from time entries",
+  "noInvoices": "No invoices found",
+  "empty": {
+    "title": "No invoices yet",
+    "message": "Create your first invoice to bill clients for work completed. Generate invoices from tracked time or craft one manually."
+  },
+  "summary": {
+    "total": "Total Invoices",
+    "invoiced": "Total Invoiced",
+    "paid": "Paid",
+    "unpaid": "Unpaid"
+  },
+  "filters": {
+    "search": "Search invoices by number, client, or project",
+    "status": {
+      "label": "Status",
+      "all": "All statuses"
+    },
+    "client": {
+      "label": "Client",
+      "all": "All clients"
+    }
+  },
+  "table": {
+    "invoice": "Invoice",
+    "client": "Client",
+    "status": "Status",
+    "issueDate": "Issue date",
+    "dueDate": "Due date",
+    "amount": "Amount",
+    "actions": "Actions",
+    "project": "Project",
+    "paid": "Paid",
+    "due": "Due",
+    "tax": "Tax",
+    "cannotEdit": "Cannot edit invoice with status: {{status}}. Cancel it first to make changes."
+  },
+  "deleting": "Deleting...",
+  "saving": "Saving…",
+  "cancel": "Cancel",
+  "close": "Close",
+  "detail": {
+    "title": "Invoice details",
+    "recordPayment": "Record Payment",
+    "downloadPDF": "View PDF",
+    "downloading": "Opening...",
+    "cancelInvoice": "Cancel Invoice",
+    "enableZugferd": "Generate as ZUGFeRD e-invoice (EN 16931 standard)",
+    "error": "Failed to load invoice details.",
+    "noInvoice": "No invoice selected.",
+    "billing": {
+      "overbilled": "⚠️ Invoice Overbilled",
+      "underbilled": "⚠️ Invoice Underbilled",
+      "invoiceTotal": "Invoice Total",
+      "totalPaid": "Total Paid",
+      "balance": "Balance"
+    },
+    "sections": {
+      "invoice": "Invoice",
+      "status": "Status",
+      "dates": "Dates",
+      "issued": "Issued",
+      "due": "Due",
+      "client": "Client",
+      "project": "Project",
+      "notes": "Notes",
+      "lineItems": "Line items",
+      "payments": "Payments"
+    },
+    "table": {
+      "description": "Description",
+      "qty": "Qty",
+      "unitPrice": "Unit price",
+      "total": "Total"
+    },
+    "totals": {
+      "subtotal": "Subtotal",
+      "tax": "Tax ({{rate}}%)",
+      "total": "Total",
+      "totalPaid": "Total Paid",
+      "balanceDue": "Balance Due",
+      "paidInFull": "Paid in Full"
+    },
+    "payments": {
+      "date": "Date",
+      "type": "Type",
+      "method": "Method",
+      "transactionId": "Transaction ID",
+      "amount": "Amount",
+      "typePayment": "↓ Payment",
+      "typeRefund": "↑ Refund",
+      "typeExpense": "→ Expense"
+    }
+  },
+  "cancelModal": {
+    "title": "Cancel Invoice",
+    "confirmMessage": "Are you sure you want to cancel invoice {{invoiceNumber}}?",
+    "no": "No, Keep It",
+    "yes": "Yes, Cancel Invoice",
+    "cancelling": "Cancelling...",
+    "warning": {
+      "title": "This invoice has payments recorded",
+      "totalPaid": "Total Paid",
+      "totalAmount": "Total Amount",
+      "paymentsNotice": "Cancelling will not delete the payments. You may need to refund the client or reassign payments to a new invoice."
+    },
+    "notice": "Once cancelled, you can create a new invoice if needed. This action cannot be undone."
+  },
+  "generate": {
+    "title": "Generate from time entries",
+    "submit": "Generate invoice",
+    "generating": "Generating…",
+    "client": {
+      "label": "Client (optional)",
+      "all": "All clients"
+    },
+    "project": {
+      "label": "Project (optional)",
+      "all": "All projects"
+    },
+    "startDate": "Start date",
+    "endDate": "End date",
+    "errors": {
+      "endDateAfterStart": "End date must be after the start date"
+    }
+  },
+  "recordPayment": {
+    "title": "Record Payment",
+    "submit": "Record Payment",
+    "recording": "Recording...",
+    "paymentType": "Payment Type",
+    "paymentAmount": "Payment Amount",
+    "refundAmount": "Refund Amount",
+    "paymentDate": "Payment Date",
+    "paymentMethod": "Payment Method",
+    "transactionId": "Transaction ID / Reference (Optional)",
+    "transactionIdPlaceholder": "e.g., TXN-123456",
+    "notes": "Notes (Optional)",
+    "notesPlaceholder": "Add any additional notes...",
+    "excludeFromTax": {
+      "label": "Exclude from Tax Declaration",
+      "description": "This payment will not be included in tax calculations and reports"
+    },
+    "info": {
+      "invoice": "Invoice",
+      "totalAmount": "Total Amount",
+      "alreadyPaid": "Already Paid",
+      "remainingBalance": "Remaining Balance"
+    },
+    "types": {
+      "payment": {
+        "label": "Payment (Incoming)",
+        "description": "Money received from client"
+      },
+      "refund": {
+        "label": "Refund (Outgoing)",
+        "description": "Money returned to client for overpayment"
+      }
+    },
+    "methods": {
+      "cash": "Cash",
+      "check": "Check",
+      "creditCard": "Credit Card",
+      "bankTransfer": "Bank Transfer",
+      "paypal": "PayPal",
+      "other": "Other"
+    },
+    "errors": {
+      "invalidAmount": "Please enter a valid amount (positive number)",
+      "exceedsBalance": "Payment amount cannot exceed remaining balance ({{balance}})",
+      "failed": "Failed to record payment"
+    }
+  },
+  "form": {
+    "title": {
+      "create": "Create invoice",
+      "edit": "Edit invoice"
+    },
+    "submit": {
+      "create": "Create invoice",
+      "edit": "Save changes"
+    },
+    "noClients": "Add a client before creating an invoice.",
+    "client": {
+      "label": "Client",
+      "placeholder": "Select a client"
+    },
+    "project": {
+      "label": "Project (optional)",
+      "placeholder": "No project"
+    },
+    "invoiceNumber": {
+      "label": "Invoice number",
+      "placeholder": "INV-2024-001"
+    },
+    "status": {
+      "label": "Status"
+    },
+    "issueDate": {
+      "label": "Issue date"
+    },
+    "dueDate": {
+      "label": "Due date"
+    },
+    "currency": {
+      "label": "Currency"
+    },
+    "taxRate": {
+      "label": "Tax Rate (optional)",
+      "placeholder": "No tax rate"
+    },
+    "subTotal": {
+      "label": "Amount (Net)",
+      "placeholder": "0.00"
+    },
+    "invoiceText": {
+      "label": "Invoice Text (optional)",
+      "placeholder": "Custom invoice text, greeting, or terms"
+    },
+    "footerText": {
+      "label": "Footer Text (optional)",
+      "placeholder": "Payment terms, bank details, or footer information"
+    },
+    "taxExemption": {
+      "label": "Tax Exemption Notice (optional)",
+      "placeholder": "Tax exemption notice or legal reference"
+    },
+    "notes": {
+      "label": "Notes",
+      "placeholder": "Include payment terms, bank details, or custom messaging"
+    },
+    "zugferd": {
+      "label": "Enable E-Invoice",
+      "description": "Generate a ZUGFeRD-compliant electronic invoice (mandatory for B2B in Germany since 2025). The invoice PDF will include embedded XML data according to EN 16931 standard."
+    },
+    "excludeFromTax": {
+      "label": "Exclude from Tax Reports",
+      "description": "Mark this invoice as tax-exempt income that should be excluded from VAT declarations and tax reports (e.g., for non-taxable services or certain business transactions)."
+    }
+  },
+  "fields": {
+    "number": "Invoice Number",
+    "client": "Client",
+    "project": "Project",
+    "date": "Invoice Date",
+    "dueDate": "Due Date",
+    "status": "Status",
+    "subtotal": "Subtotal",
+    "tax": "Tax",
+    "total": "Total",
+    "items": "Line Items",
+    "description": "Description",
+    "quantity": "Quantity",
+    "rate": "Rate",
+    "amount": "Amount",
+    "notes": "Notes",
+    "terms": "Terms & Conditions"
+  },
+  "status": {
+    "draft": "Draft",
+    "sent": "Sent",
+    "paid": "Paid",
+    "partiallyPaid": "Partially Paid",
+    "overdue": "Overdue",
+    "cancelled": "Cancelled"
+  },
+  "messages": {
+    "createSuccess": "Invoice created successfully.",
+    "updateSuccess": "Invoice updated successfully.",
+    "deleteSuccess": "Invoice deleted successfully.",
+    "generateSuccess": "Invoice generated from time entries.",
+    "sendSuccess": "Invoice sent successfully",
+    "deleteConfirm": "Delete invoice {{number}}? This action cannot be undone."
+  }
+}

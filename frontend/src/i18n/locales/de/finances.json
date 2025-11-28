@@ -1,0 +1,21 @@
+{
+  "title": "Finanzen",
+  "subtitle": "Rechnungen verwalten, Zahlungen verfolgen und Ausgaben erfassen",
+  "dateRange": {
+    "startDate": "Startdatum",
+    "endDate": "Enddatum"
+  },
+  "summary": {
+    "totalIncome": "Gesamteinnahmen",
+    "totalExpensesRefunds": "Gesamtausgaben / Rückerstattungen",
+    "totalInvoiced": "Gesamt fakturiert",
+    "netAmount": "Nettobetrag",
+    "netTax": "Netto / Steuer"
+  },
+  "tabs": {
+    "invoices": "Rechnungen",
+    "payments": "Zahlungen",
+    "expenses": "Ausgaben",
+    "taxPrepayments": "Steuervorauszahlungen"
+  }
+}

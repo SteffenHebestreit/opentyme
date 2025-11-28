@@ -1,0 +1,131 @@
+{
+  "title": "Dashboard",
+  "welcome": {
+    "title": "Welcome!",
+    "message": "Log in to unlock your personalized dashboard and stay on top of projects, invoices, and billable time."
+  },
+  "greeting": "Welcome back, {{name}}! Here's what's happening across your workspace today.",
+  "analyticsInsights": "Analytics & Insights",
+  "metrics": {
+    "activeProjects": "Active Projects",
+    "totalClients": "Total Clients",
+    "hoursThisWeek": "Hours This Week",
+    "unpaidInvoices": "Unpaid Invoices",
+    "outstandingAmount": "Outstanding Amount",
+    "revenueThisMonth": "Revenue This Month",
+    "revenueLastMonth": "Revenue Last Month",
+    "totalRevenue": "Total Revenue",
+    "billableHours": "Billable Hours"
+  },
+  "charts": {
+    "timeTrend": {
+      "title": "Time Tracking Trend",
+      "totalHours": "Total Hours",
+      "billableHours": "Billable Hours",
+      "nonBillableHours": "Non-Billable Hours",
+      "days": "days",
+      "noData": "No data available",
+      "startTracking": "Start tracking time to see trends"
+    },
+    "revenueByClient": {
+      "title": "Top Clients by Revenue",
+      "subtitle": "Based on paid invoices",
+      "revenue": "Revenue",
+      "invoices": "Invoices",
+      "noData": "No revenue data available",
+      "createInvoices": "Create and receive payments to see client revenue"
+    },
+    "billableRatio": {
+      "title": "Billable Ratio",
+      "subtitle": "All-time performance",
+      "billable": "Billable",
+      "nonBillable": "Non-Billable",
+      "billableHours": "Billable Hours",
+      "nonBillableHours": "Non-Billable Hours",
+      "totalHours": "{{hours}} hrs total",
+      "hours": "{{hours}} hrs",
+      "loading": "Loading chart data...",
+      "error": "Failed to load data",
+      "noData": "No time entries yet",
+      "noDataDescription": "Track time to see your billable ratio"
+    },
+    "projectProfitability": {
+      "title": "Project Profitability",
+      "subtitle": "Revenue vs cost analysis",
+      "profitLoss": "Profit/Loss (€)",
+      "profitable": "Profitable",
+      "lossMaking": "Loss-making",
+      "profit": "Profit",
+      "cost": "Cost",
+      "revenue": "Revenue",
+      "margin": "Margin",
+      "loading": "Loading chart data...",
+      "error": "Failed to load data",
+      "noData": "No project data available",
+      "noDataDescription": "Create projects and track time to see profitability"
+    }
+  },
+  "recentTimeEntries": {
+    "title": "Recent Time Entries",
+    "project": "Project",
+    "hours": "Hours",
+    "viewAll": "View all entries",
+    "noEntries": "No recent time entries logged.",
+    "startTracking": "Start tracking time to see entries here",
+    "unassigned": "Unassigned",
+    "noDescription": "No description provided",
+    "task": "Task",
+    "billable": "Billable",
+    "nonBillable": "Non-billable"
+  },
+  "recentInvoices": {
+    "title": "Recent Invoices",
+    "client": "Client",
+    "amount": "Amount",
+    "status": "Status",
+    "viewAll": "View all invoices",
+    "noInvoices": "No recent invoices to show.",
+    "createInvoice": "Create your first invoice",
+    "invoice": "Invoice",
+    "due": "Due",
+    "updated": "Updated"
+  },
+  "quickActions": {
+    "title": "Quick Actions",
+    "logTime": "Log Time",
+    "logTimeDesc": "Track billable hours for a project",
+    "addClient": "Add Client",
+    "addClientDesc": "Create a new client record",
+    "createInvoice": "Create Invoice",
+    "createInvoiceDesc": "Generate an invoice from tracked work",
+    "newProject": "New Project",
+    "newProjectDesc": "Start tracking a new engagement",
+    "startTimer": "Start Timer",
+    "addExpense": "Add Expense"
+  },
+  "analytics": {
+    "title": "Analytics & Insights"
+  },
+  "yearlyFinancialSummary": {
+    "title": "Financial Overview {{year}}",
+    "period": "Period: {{start}} - {{end}}",
+    "error": "Failed to load financial summary",
+    "retry": "Retry",
+    "totalRevenue": "Total Revenue",
+    "totalRevenueDesc": "Gross revenue (incl. tax)",
+    "totalExpenses": "Total Expenses",
+    "totalExpensesDesc": "Gross expenses (incl. tax)",
+    "taxPayable": "Tax Payable",
+    "taxPayableDesc": "Net VAT liability",
+    "remainingTaxPayableDesc": "Net VAT after prepayments",
+    "netProfit": "Net Profit",
+    "netProfitDesc": "Net revenue - net expenses",
+    "netRevenue": "Net Revenue",
+    "netExpenses": "Net Expenses",
+    "revenueTax": "Revenue Tax (VAT)",
+    "expenseTax": "Expense Tax (Vorsteuer)",
+    "vatPrepayments": "VAT Prepayments",
+    "incomeTaxPrepayments": "Income Tax Prepayments",
+    "totalPrepayments": "Total Prepayments"
+  }
+}
