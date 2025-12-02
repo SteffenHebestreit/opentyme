@@ -233,6 +233,11 @@
     "dueDate": {
       "label": "Fälligkeitsdatum"
     },
+    "deliveryDate": {
+      "label": "Lieferdatum / Leistungszeitraum",
+      "placeholder": "z.B. 11.2025 oder November 2025",
+      "helperText": "Monat/Jahr der erbrachten Leistung (z.B. 11.2025)"
+    },
     "currency": {
       "label": "Währung"
     },

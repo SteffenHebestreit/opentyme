@@ -30,6 +30,10 @@ interface MonthlyHoursChartProps {
   timeEntries: TimeEntry[];
   /** Available projects */
   projects: Project[];
+  /** Month start date (YYYY-MM-DD) - defaults to current month's first day */
+  monthStart?: string;
+  /** Month end date (YYYY-MM-DD) - defaults to current month's last day */
+  monthEnd?: string;
 }
 
 interface PeriodHours {
@@ -103,6 +107,8 @@ function getProjectChartColor(projectName: string): string {
 export const MonthlyHoursChart: FC<MonthlyHoursChartProps> = ({
   timeEntries,
   projects,
+  monthStart,
+  monthEnd,
 }) => {
   const { t, i18n } = useTranslation('time-tracking');
   const [selectedProject, setSelectedProject] = useState<string>('all');
@@ -123,21 +129,31 @@ export const MonthlyHoursChart: FC<MonthlyHoursChartProps> = ({
     });
   }, []);
   
-  // Get current month range in Europe/Berlin timezone
+  // Get month range - use provided dates or calculate current month
   const currentMonthRange = useMemo(() => {
-    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Berlin' });
-    const [year, month, day] = todayStr.split('-').map(Number);
+    // If monthStart and monthEnd are provided, use them
+    if (monthStart && monthEnd) {
+      return { start: monthStart, end: monthEnd };
+    }
     
-    // Create dates in UTC to avoid timezone shifts
-    // Month is 0-indexed in JavaScript Date
-    const start = new Date(Date.UTC(year, month - 1, 1)); // 1st day of current month
-    const end = new Date(Date.UTC(year, month, 0)); // Last day of current month (0th day of next month)
+    // Default: current month in Europe/Berlin timezone
+    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Berlin' });
+    const [year, month] = todayStr.split('-').map(Number);
+    
+    // Create dates in local time
+    const start = new Date(year, month - 1, 1); // 1st day of current month
+    const end = new Date(year, month, 0); // Last day of current month
+    
+    // Format as YYYY-MM-DD without timezone conversion
+    const formatDate = (d: Date) => {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
     
     return {
-      start: start.toISOString().split('T')[0],
-      end: end.toISOString().split('T')[0],
+      start: formatDate(start),
+      end: formatDate(end),
     };
-  }, []);
+  }, [monthStart, monthEnd]);
   
   // Filter entries for current month only
   const monthEntries = useMemo(() => {

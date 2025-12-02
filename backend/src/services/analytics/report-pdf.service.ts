@@ -1327,6 +1327,109 @@ async function generateTimeTrackingReportPDF(
     { text: formatCurrency(dailyTotalValue, currency), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
   ]);
 
+  // CLIENT SUMMARY (grouped by client)
+  const clientSummaryMap = new Map<string, { hours: number; billable_hours: number; value: number }>();
+  data.entries.forEach(entry => {
+    const clientName = entry.client_name || 'Ohne Kunde';
+    if (!clientSummaryMap.has(clientName)) {
+      clientSummaryMap.set(clientName, { hours: 0, billable_hours: 0, value: 0 });
+    }
+    const client = clientSummaryMap.get(clientName)!;
+    client.hours += entry.hours;
+    if (entry.is_billable) {
+      client.billable_hours += entry.hours;
+      client.value += entry.value || 0;
+    }
+  });
+
+  const clientSummaryBody: any[] = [
+    [
+      { text: 'Kunde', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
+      { text: 'Gesamtstunden', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+      { text: 'Abrechenbar', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+      { text: 'Wert', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+    ],
+  ];
+
+  let clientTotalHours = 0;
+  let clientTotalBillable = 0;
+  let clientTotalValue = 0;
+
+  Array.from(clientSummaryMap.entries())
+    .sort((a, b) => b[1].hours - a[1].hours)
+    .forEach(([clientName, summary]) => {
+      clientTotalHours += summary.hours;
+      clientTotalBillable += summary.billable_hours;
+      clientTotalValue += summary.value;
+      
+      clientSummaryBody.push([
+        { text: clientName, fontSize: 8 },
+        { text: summary.hours.toFixed(2), fontSize: 8, alignment: 'right' },
+        { text: summary.billable_hours.toFixed(2), fontSize: 8, alignment: 'right' },
+        { text: formatCurrency(summary.value, currency), fontSize: 8, alignment: 'right' },
+      ]);
+    });
+
+  clientSummaryBody.push([
+    { text: 'Gesamt', fontSize: 9, bold: true, fillColor: '#f3f4f6' },
+    { text: clientTotalHours.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+    { text: clientTotalBillable.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+    { text: formatCurrency(clientTotalValue, currency), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+  ]);
+
+  // PROJECT SUMMARY (grouped by project)
+  const projectSummaryMap = new Map<string, { hours: number; billable_hours: number; value: number; client: string }>();
+  data.entries.forEach(entry => {
+    const projectName = entry.project_name || 'Ohne Projekt';
+    if (!projectSummaryMap.has(projectName)) {
+      projectSummaryMap.set(projectName, { hours: 0, billable_hours: 0, value: 0, client: entry.client_name || '' });
+    }
+    const project = projectSummaryMap.get(projectName)!;
+    project.hours += entry.hours;
+    if (entry.is_billable) {
+      project.billable_hours += entry.hours;
+      project.value += entry.value || 0;
+    }
+  });
+
+  const projectSummaryBody: any[] = [
+    [
+      { text: 'Projekt', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
+      { text: 'Kunde', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
+      { text: 'Gesamtstunden', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+      { text: 'Abrechenbar', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+      { text: 'Wert', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+    ],
+  ];
+
+  let projectTotalHours = 0;
+  let projectTotalBillable = 0;
+  let projectTotalValue = 0;
+
+  Array.from(projectSummaryMap.entries())
+    .sort((a, b) => b[1].hours - a[1].hours)
+    .forEach(([projectName, summary]) => {
+      projectTotalHours += summary.hours;
+      projectTotalBillable += summary.billable_hours;
+      projectTotalValue += summary.value;
+      
+      projectSummaryBody.push([
+        { text: projectName, fontSize: 8 },
+        { text: summary.client || '-', fontSize: 8 },
+        { text: summary.hours.toFixed(2), fontSize: 8, alignment: 'right' },
+        { text: summary.billable_hours.toFixed(2), fontSize: 8, alignment: 'right' },
+        { text: formatCurrency(summary.value, currency), fontSize: 8, alignment: 'right' },
+      ]);
+    });
+
+  projectSummaryBody.push([
+    { text: 'Gesamt', fontSize: 9, bold: true, fillColor: '#f3f4f6', colSpan: 2 },
+    {},
+    { text: projectTotalHours.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+    { text: projectTotalBillable.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+    { text: formatCurrency(projectTotalValue, currency), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+  ]);
+
   // TABLE 3: Detailed Entries
   const entriesTableBody: any[] = [
     [
@@ -1519,6 +1622,53 @@ async function generateTimeTrackingReportPDF(
             ],
           },
         ],
+        margin: [0, 0, 0, 30],
+      },
+
+      // Client Summary Table
+      {
+        text: 'Stunden nach Kunde',
+        fontSize: 12,
+        bold: true,
+        margin: [0, 0, 0, 10],
+        color: '#1e40af',
+      },
+      {
+        table: {
+          headerRows: 1,
+          widths: ['*', 80, 80, 90],
+          body: clientSummaryBody,
+        },
+        layout: {
+          hLineWidth: (i: number) => 0.5,
+          vLineWidth: (i: number) => 0.5,
+          hLineColor: () => '#94a3b8',
+          vLineColor: () => '#94a3b8',
+        },
+        margin: [0, 0, 0, 25],
+      },
+
+      // Project Summary Table
+      {
+        text: 'Stunden nach Projekt',
+        fontSize: 12,
+        bold: true,
+        margin: [0, 0, 0, 10],
+        color: '#1e40af',
+      },
+      {
+        table: {
+          headerRows: 1,
+          widths: ['*', 100, 70, 70, 80],
+          body: projectSummaryBody,
+        },
+        layout: {
+          hLineWidth: (i: number) => 0.5,
+          vLineWidth: (i: number) => 0.5,
+          hLineColor: () => '#94a3b8',
+          vLineColor: () => '#94a3b8',
+        },
+        margin: [0, 0, 0, 25],
       },
     ],
     styles: {

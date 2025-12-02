@@ -212,6 +212,11 @@
     "dueDate": {
       "label": "Due date"
     },
+    "deliveryDate": {
+      "label": "Delivery Date / Service Period",
+      "placeholder": "e.g. 11.2025 or November 2025",
+      "helperText": "Month/Year of service provided (e.g. 11.2025)"
+    },
     "currency": {
       "label": "Currency"
     },

@@ -141,11 +141,16 @@
   "charts": {
     "dailyHours": {
       "title": "Today's Hours",
+      "titleDate": "Hours on this Day",
+      "today": "Today",
       "total": "Total",
       "totalToday": "Total today",
+      "totalDay": "Total this day",
       "hours": "Hours",
       "noData": "No time logged today",
-      "startTracking": "Start a timer or log a time entry"
+      "startTracking": "Start a timer or log a time entry",
+      "previousDay": "Previous day",
+      "nextDay": "Next day"
     },
     "weeklyHours": {
       "title": "Weekly Overview",

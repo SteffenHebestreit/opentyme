@@ -47,6 +47,76 @@ export interface DailySummary {
   entryCount: number;
 }
 
+export interface ClientSummary {
+  clientName: string;
+  totalHours: number;
+  billableHours: number;
+  entryCount: number;
+}
+
+export interface ProjectSummary {
+  projectName: string;
+  clientName: string | null;
+  totalHours: number;
+  billableHours: number;
+  entryCount: number;
+}
+
+/**
+ * Group time entries by client and calculate summaries
+ */
+function generateClientSummary(entries: TimeEntry[]): ClientSummary[] {
+  const clientMap = new Map<string, ClientSummary>();
+  
+  entries.forEach(entry => {
+    const clientName = entry.client_name || 'Kein Kunde';
+    
+    if (clientMap.has(clientName)) {
+      const existing = clientMap.get(clientName)!;
+      existing.totalHours += entry.duration_hours || 0;
+      existing.billableHours += entry.billable ? (entry.duration_hours || 0) : 0;
+      existing.entryCount += 1;
+    } else {
+      clientMap.set(clientName, {
+        clientName,
+        totalHours: entry.duration_hours || 0,
+        billableHours: entry.billable ? (entry.duration_hours || 0) : 0,
+        entryCount: 1,
+      });
+    }
+  });
+  
+  return Array.from(clientMap.values()).sort((a, b) => b.totalHours - a.totalHours);
+}
+
+/**
+ * Group time entries by project and calculate summaries
+ */
+function generateProjectSummary(entries: TimeEntry[]): ProjectSummary[] {
+  const projectMap = new Map<string, ProjectSummary>();
+  
+  entries.forEach(entry => {
+    const projectName = entry.project_name || 'Unbekanntes Projekt';
+    
+    if (projectMap.has(projectName)) {
+      const existing = projectMap.get(projectName)!;
+      existing.totalHours += entry.duration_hours || 0;
+      existing.billableHours += entry.billable ? (entry.duration_hours || 0) : 0;
+      existing.entryCount += 1;
+    } else {
+      projectMap.set(projectName, {
+        projectName,
+        clientName: entry.client_name || null,
+        totalHours: entry.duration_hours || 0,
+        billableHours: entry.billable ? (entry.duration_hours || 0) : 0,
+        entryCount: 1,
+      });
+    }
+  });
+  
+  return Array.from(projectMap.values()).sort((a, b) => b.totalHours - a.totalHours);
+}
+
 /**
  * Group time entries by task and calculate summaries
  */
@@ -354,8 +424,12 @@ export async function exportTimeEntriesAsPDF(
 ): Promise<void> {
   const taskSummary = generateTaskSummary(entries);
   const dailySummary = generateDailySummary(entries);
+  const clientSummary = generateClientSummary(entries);
+  const projectSummary = generateProjectSummary(entries);
   
   const totalHours = entries.reduce((sum, entry) => sum + (entry.duration_hours || 0), 0);
+  const billableHours = entries.reduce((sum, entry) => sum + (entry.billable ? (entry.duration_hours || 0) : 0), 0);
+  const nonBillableHours = totalHours - billableHours;
   const totalEntries = entries.length;
   
   const docDefinition: TDocumentDefinitions = {
@@ -447,7 +521,12 @@ export async function exportTimeEntriesAsPDF(
         fontSize: 18,
         bold: true,
         alignment: 'center',
-        margin: [0, 100, 0, 30] as [number, number, number, number],
+        margin: [0, 30, 0, 20] as [number, number, number, number],
+      },
+      summarySubtitle: {
+        fontSize: 12,
+        bold: true,
+        color: '#374151',
       },
       summaryText: {
         fontSize: 14,
@@ -584,16 +663,116 @@ export async function exportTimeEntriesAsPDF(
   
   // --- FINAL PAGE: Summary (not counted in page numbers) ---
   const summaryContent: Content[] = [
-    { text: 'Zusammenfassung', style: 'summaryTitle' },
-    { text: '\n\n' },
-    { text: `Gesamt-Zeitraum: ${filters.startDate ? formatDate(filters.startDate) : 'Alle'} - ${filters.endDate ? formatDate(filters.endDate) : 'Alle'}`, style: 'summaryText' },
-    { text: `Gesamtstunden: ${formatHours(totalHours)}`, style: 'summaryText', bold: true, fontSize: 16 },
-    { text: `Anzahl Einträge: ${totalEntries}`, style: 'summaryText' },
-    { text: `Anzahl Aufgaben: ${taskSummary.length}`, style: 'summaryText' },
-    { text: `Anzahl Arbeitstage: ${dailySummary.length}`, style: 'summaryText' },
-    { text: '\n\n' },
-    { text: `Generiert am: ${new Date().toLocaleDateString('de-DE')} um ${new Date().toLocaleTimeString('de-DE')}`, style: 'filterText', alignment: 'center' },
+    { text: 'Gesamtzusammenfassung', style: 'summaryTitle' },
+    { text: '\n' },
   ];
+
+  // General Statistics
+  summaryContent.push(
+    { text: `Gesamt-Zeitraum: ${filters.startDate ? formatDate(filters.startDate) : 'Alle'} - ${filters.endDate ? formatDate(filters.endDate) : 'Alle'}`, style: 'summaryText' },
+    { text: '\n' },
+  );
+
+  // Hours Overview Table
+  summaryContent.push(
+    {
+      table: {
+        widths: ['*', 100],
+        body: [
+          [
+            { text: 'Gesamtstunden', bold: true, fontSize: 11, color: '#1e40af' },
+            { text: formatHours(totalHours), bold: true, fontSize: 11, alignment: 'right', color: '#1e40af' },
+          ],
+          [
+            { text: 'Abrechenbare Stunden', fontSize: 10, color: '#16a34a' },
+            { text: formatHours(billableHours), fontSize: 10, alignment: 'right', color: '#16a34a' },
+          ],
+          [
+            { text: 'Nicht abrechenbar', fontSize: 10, color: '#dc2626' },
+            { text: formatHours(nonBillableHours), fontSize: 10, alignment: 'right', color: '#dc2626' },
+          ],
+        ],
+      },
+      layout: 'noBorders',
+      margin: [0, 0, 0, 15] as [number, number, number, number],
+    }
+  );
+
+  // Client Summary Table
+  if (clientSummary.length > 0) {
+    summaryContent.push(
+      { text: 'Stunden nach Kunde', style: 'summarySubtitle', margin: [0, 10, 0, 5] as [number, number, number, number] },
+      {
+        table: {
+          headerRows: 1,
+          widths: ['*', 80, 80],
+          body: [
+            [
+              { text: 'Kunde', bold: true, fontSize: 9, fillColor: '#4F46E5', color: '#FFFFFF' },
+              { text: 'Gesamt', bold: true, fontSize: 9, fillColor: '#4F46E5', color: '#FFFFFF', alignment: 'right' },
+              { text: 'Abrechenbar', bold: true, fontSize: 9, fillColor: '#4F46E5', color: '#FFFFFF', alignment: 'right' },
+            ],
+            ...clientSummary.map((client, index) => [
+              { text: client.clientName, fontSize: 9, fillColor: index % 2 === 0 ? '#F3F4F6' : null },
+              { text: formatHours(client.totalHours), fontSize: 9, alignment: 'right', fillColor: index % 2 === 0 ? '#F3F4F6' : null },
+              { text: formatHours(client.billableHours), fontSize: 9, alignment: 'right', fillColor: index % 2 === 0 ? '#F3F4F6' : null },
+            ]),
+          ],
+        },
+        margin: [0, 0, 0, 15] as [number, number, number, number],
+      }
+    );
+  }
+
+  // Project Summary Table
+  if (projectSummary.length > 0) {
+    summaryContent.push(
+      { text: 'Stunden nach Projekt', style: 'summarySubtitle', margin: [0, 10, 0, 5] as [number, number, number, number] },
+      {
+        table: {
+          headerRows: 1,
+          widths: ['*', 100, 70, 70],
+          body: [
+            [
+              { text: 'Projekt', bold: true, fontSize: 9, fillColor: '#4F46E5', color: '#FFFFFF' },
+              { text: 'Kunde', bold: true, fontSize: 9, fillColor: '#4F46E5', color: '#FFFFFF' },
+              { text: 'Gesamt', bold: true, fontSize: 9, fillColor: '#4F46E5', color: '#FFFFFF', alignment: 'right' },
+              { text: 'Abrechenbar', bold: true, fontSize: 9, fillColor: '#4F46E5', color: '#FFFFFF', alignment: 'right' },
+            ],
+            ...projectSummary.map((project, index) => [
+              { text: project.projectName, fontSize: 9, fillColor: index % 2 === 0 ? '#F3F4F6' : null },
+              { text: project.clientName || '-', fontSize: 9, fillColor: index % 2 === 0 ? '#F3F4F6' : null },
+              { text: formatHours(project.totalHours), fontSize: 9, alignment: 'right', fillColor: index % 2 === 0 ? '#F3F4F6' : null },
+              { text: formatHours(project.billableHours), fontSize: 9, alignment: 'right', fillColor: index % 2 === 0 ? '#F3F4F6' : null },
+            ]),
+          ],
+        },
+        margin: [0, 0, 0, 15] as [number, number, number, number],
+      }
+    );
+  }
+
+  // Billing Summary
+  const totalBillableValue = entries.reduce((sum, entry) => {
+    if (entry.billable && entry.hourly_rate) {
+      return sum + ((entry.duration_hours || 0) * parseFloat(String(entry.hourly_rate)));
+    }
+    return sum;
+  }, 0);
+
+  summaryContent.push(
+    { text: '\n' },
+    { 
+      text: `Abrechnungswert: ${totalBillableValue.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })}`, 
+      style: 'summaryText', 
+      bold: true, 
+      fontSize: 14, 
+      color: '#16a34a',
+      margin: [0, 5, 0, 15] as [number, number, number, number],
+    },
+    { text: '\n' },
+    { text: `Generiert am: ${new Date().toLocaleDateString('de-DE')} um ${new Date().toLocaleTimeString('de-DE')}`, style: 'filterText', alignment: 'center' },
+  );
   
   docDefinition.content.push(...summaryContent);
   

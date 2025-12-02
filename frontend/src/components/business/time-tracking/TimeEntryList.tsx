@@ -48,6 +48,7 @@ export default function TimeEntryList() {
   const [projectFilter, setProjectFilter] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [selectedDailyDate, setSelectedDailyDate] = useState('');
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
@@ -62,6 +63,111 @@ export default function TimeEntryList() {
   const [timerDescription, setTimerDescription] = useState('');
   const [timerClientFilter, setTimerClientFilter] = useState('');
   const [modalClientFilter, setModalClientFilter] = useState('');
+
+  // Helper function to get today's date
+  const getToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Berlin' });
+  
+  // Calculate chart date ranges based on filters
+  const chartDateRanges = useMemo(() => {
+    const today = getToday();
+    const todayDate = new Date(today + 'T00:00:00');
+    
+    // Helper: get Monday of a week
+    const getMonday = (date: Date) => {
+      const d = new Date(date);
+      const day = d.getDay();
+      d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+      return d;
+    };
+    
+    // Helper: get Sunday of a week
+    const getSunday = (monday: Date) => {
+      const d = new Date(monday);
+      d.setDate(d.getDate() + 6);
+      return d;
+    };
+    
+    // Helper: get first day of month
+    const getMonthStart = (date: Date) => {
+      return new Date(date.getFullYear(), date.getMonth(), 1);
+    };
+    
+    // Helper: get last day of month
+    const getMonthEnd = (date: Date) => {
+      return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    };
+    
+    // Helper: format date as YYYY-MM-DD (local time, not UTC)
+    const formatDate = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    let dailyDate = today;
+    let weekStart: string;
+    let weekEnd: string;
+    let monthStart: string;
+    let monthEnd: string;
+    
+    if (!startDate && !endDate) {
+      // No filters: use current week and month
+      const monday = getMonday(todayDate);
+      weekStart = formatDate(monday);
+      weekEnd = formatDate(getSunday(monday));
+      monthStart = formatDate(getMonthStart(todayDate));
+      monthEnd = formatDate(getMonthEnd(todayDate));
+    } else if (startDate && endDate) {
+      // Both dates set: use the last week of the range and its month
+      const end = new Date(endDate + 'T00:00:00');
+      const monday = getMonday(end);
+      weekStart = formatDate(monday);
+      weekEnd = formatDate(getSunday(monday));
+      monthStart = formatDate(getMonthStart(end));
+      monthEnd = formatDate(getMonthEnd(end));
+      dailyDate = endDate;
+    } else if (startDate && !endDate) {
+      // Only start date: use current week/month but start from startDate if in same month
+      const start = new Date(startDate + 'T00:00:00');
+      const startMonth = start.getMonth();
+      const todayMonth = todayDate.getMonth();
+      
+      if (startMonth === todayMonth && start.getFullYear() === todayDate.getFullYear()) {
+        // Same month - use startDate's month
+        monthStart = formatDate(getMonthStart(start));
+        monthEnd = formatDate(getMonthEnd(start));
+      } else {
+        monthStart = formatDate(getMonthStart(todayDate));
+        monthEnd = formatDate(getMonthEnd(todayDate));
+      }
+      
+      const monday = getMonday(todayDate);
+      weekStart = formatDate(monday);
+      weekEnd = formatDate(getSunday(monday));
+    } else if (!startDate && endDate) {
+      // Only end date: use the week and month of the end date
+      const end = new Date(endDate + 'T00:00:00');
+      const monday = getMonday(end);
+      weekStart = formatDate(monday);
+      weekEnd = formatDate(getSunday(monday));
+      monthStart = formatDate(getMonthStart(end));
+      monthEnd = formatDate(getMonthEnd(end));
+      dailyDate = endDate;
+    } else {
+      // Fallback
+      const monday = getMonday(todayDate);
+      weekStart = formatDate(monday);
+      weekEnd = formatDate(getSunday(monday));
+      monthStart = formatDate(getMonthStart(todayDate));
+      monthEnd = formatDate(getMonthEnd(todayDate));
+    }
+    
+    return { dailyDate, weekStart, weekEnd, monthStart, monthEnd };
+  }, [startDate, endDate]);
+  
+  // Use selected daily date or calculated one
+  const effectiveDailyDate = selectedDailyDate || chartDateRanges.dailyDate;
 
   const listParams = useMemo(() => {
     return {
@@ -336,22 +442,24 @@ export default function TimeEntryList() {
       {/* Time Tracking Charts */}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <DailyHoursChart
-          timeEntries={timeEntries.filter(entry => {
-            // Get today's date in Europe/Berlin timezone as YYYY-MM-DD
-            const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Berlin' }); // en-CA gives YYYY-MM-DD format
-            return entry.entry_date === today || entry.entry_date?.startsWith(today);
-          })}
+          timeEntries={timeEntries}
           projects={projects}
+          selectedDate={effectiveDailyDate}
+          onDateChange={setSelectedDailyDate}
         />
         <WeeklyHoursChart
           timeEntries={timeEntries}
           projects={projects}
+          weekStart={chartDateRanges.weekStart}
+          weekEnd={chartDateRanges.weekEnd}
         />
       </div>
 
       <MonthlyHoursChart
         timeEntries={timeEntries}
         projects={projects}
+        monthStart={chartDateRanges.monthStart}
+        monthEnd={chartDateRanges.monthEnd}
       />
 
       {successMessage ? (

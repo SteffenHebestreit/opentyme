@@ -152,11 +152,16 @@
   "charts": {
     "dailyHours": {
       "title": "Heutige Arbeitszeit",
+      "titleDate": "Arbeitszeit am ausgewählten Tag",
+      "today": "Heute",
       "total": "Gesamt",
       "totalToday": "Heute gesamt",
+      "totalDay": "Gesamt an diesem Tag",
       "hours": "Stunden",
       "noData": "Heute noch keine Zeit erfasst",
-      "startTracking": "Starten Sie einen Timer oder erfassen Sie einen Eintrag"
+      "startTracking": "Starten Sie einen Timer oder erfassen Sie einen Eintrag",
+      "previousDay": "Vorheriger Tag",
+      "nextDay": "Nächster Tag"
     },
     "weeklyHours": {
       "title": "Wochenübersicht",

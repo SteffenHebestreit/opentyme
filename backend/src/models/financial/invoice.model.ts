@@ -49,6 +49,7 @@ export interface CreateInvoiceDto {
   status?: InvoiceStatus;
   issue_date: Date;
   due_date: Date;
+  delivery_date?: string | null; // Service period (e.g. "11.2025")
   sub_total?: number; // Net amount before tax
   tax_rate_id?: string | null;
   invoice_headline?: string | null;

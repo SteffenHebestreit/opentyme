@@ -79,9 +79,9 @@ export class InvoiceService {
         user_id, client_id, project_id, invoice_number, status, issue_date, due_date,
         sub_total, tax_rate, tax_amount, total_amount, currency, notes,
         tax_rate_id, invoice_headline, header_template_id, footer_template_id, terms_template_id,
-        invoice_text, footer_text, tax_exemption_text, enable_zugferd, exclude_from_tax
+        invoice_text, footer_text, tax_exemption_text, enable_zugferd, exclude_from_tax, delivery_date
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
       RETURNING *
     `;
     
@@ -109,6 +109,7 @@ export class InvoiceService {
       invoiceData.tax_exemption_text || null,
       invoiceData.enable_zugferd || false,
       invoiceData.exclude_from_tax || false,
+      invoiceData.delivery_date || null,
     ];
 
     try {
@@ -397,6 +398,11 @@ export class InvoiceService {
     if (invoiceData.exclude_from_tax !== undefined) { 
       setParts.push(`exclude_from_tax = $${paramIndex++}`);
       values.push(invoiceData.exclude_from_tax);
+    }
+    
+    if (invoiceData.delivery_date !== undefined) { 
+      setParts.push(`delivery_date = $${paramIndex++}`);
+      values.push(invoiceData.delivery_date || null);
     }
 
     // Handle financial fields that should be calculated

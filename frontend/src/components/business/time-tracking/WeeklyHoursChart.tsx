@@ -29,6 +29,10 @@ interface WeeklyHoursChartProps {
   timeEntries: TimeEntry[];
   /** Available projects */
   projects: Project[];
+  /** Week start date (YYYY-MM-DD) - defaults to current week's Monday */
+  weekStart?: string;
+  /** Week end date (YYYY-MM-DD) - defaults to current week's Sunday */
+  weekEnd?: string;
 }
 
 interface DailyHours {
@@ -71,6 +75,8 @@ function getProjectChartColor(projectName: string): string {
 export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
   timeEntries,
   projects,
+  weekStart,
+  weekEnd,
 }) => {
   const { t, i18n } = useTranslation('time-tracking');
   const [selectedProject, setSelectedProject] = useState<string>('all');
@@ -87,28 +93,39 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
     prefetchHolidays(currentYear, 'DE');
   }, []);
   
-  // Get current week range (Monday to Sunday) in Europe/Berlin timezone
+  // Get week range - use provided dates or calculate current week
   const currentWeekRange = useMemo(() => {
+    // If weekStart and weekEnd are provided, use them
+    if (weekStart && weekEnd) {
+      return { start: weekStart, end: weekEnd };
+    }
+    
+    // Default: current week (Monday to Sunday) in Europe/Berlin timezone
     const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Berlin' });
     const [year, month, day] = todayStr.split('-').map(Number);
     
-    // Create date in UTC to avoid timezone shifts
-    const today = new Date(Date.UTC(year, month - 1, day));
-    const dayOfWeek = today.getUTCDay();
+    // Create date in local time
+    const today = new Date(year, month - 1, day);
+    const dayOfWeek = today.getDay();
     
     // Calculate Monday (start of week)
     const monday = new Date(today);
-    monday.setUTCDate(today.getUTCDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+    monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
     
     // Calculate Sunday (end of week)
     const sunday = new Date(monday);
-    sunday.setUTCDate(monday.getUTCDate() + 6);
+    sunday.setDate(monday.getDate() + 6);
+    
+    // Format as YYYY-MM-DD without timezone conversion
+    const formatDate = (d: Date) => {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
     
     return {
-      start: monday.toISOString().split('T')[0],
-      end: sunday.toISOString().split('T')[0],
+      start: formatDate(monday),
+      end: formatDate(sunday),
     };
-  }, []);
+  }, [weekStart, weekEnd]);
   
   // Filter entries for current week only
   const weekEntries = useMemo(() => {
@@ -125,47 +142,56 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
     return weekEntries.filter(entry => entry.project_id === selectedProject);
   }, [weekEntries, selectedProject]);
   
-  // Calculate daily hours for days that have entries
+  // Calculate daily hours for all 7 days of the week (Monday to Sunday)
   const dailyHours = useMemo((): DailyHours[] => {
-    const daysMap = new Map<string, DailyHours>();
-    
     // Use weekEntries instead of filteredEntries for grouping modes
     const entriesToProcess = groupMode === 'none' ? filteredEntries : weekEntries;
     
+    // Create all 7 days of the week (Monday to Sunday)
+    const days: DailyHours[] = [];
+    const [startYear, startMonth, startDay] = currentWeekRange.start.split('-').map(Number);
+    const weekMonday = new Date(startYear, startMonth - 1, startDay);
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(weekMonday);
+      date.setDate(weekMonday.getDate() + i);
+      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      
+      days.push({
+        date: dateStr,
+        dayName: date.toLocaleDateString(i18n.language, { weekday: 'short' }),
+        hours: 0,
+        projectHours: {},
+        clientHours: {},
+        taskHours: {},
+      });
+    }
+    
+    // Fill in hours from entries
     entriesToProcess.forEach(entry => {
       if (!entry.entry_date) return;
       
       const dateStr = entry.entry_date.split('T')[0]; // Get YYYY-MM-DD
+      const day = days.find(d => d.date === dateStr);
       
-      if (!daysMap.has(dateStr)) {
-        const date = new Date(dateStr + 'T00:00:00');
-        daysMap.set(dateStr, {
-          date: dateStr,
-          dayName: date.toLocaleDateString(i18n.language, { weekday: 'short' }),
-          hours: 0,
-          projectHours: {},
-          clientHours: {},
-          taskHours: {},
-        });
-      }
-      
-      const day = daysMap.get(dateStr)!;
-      const hours = entry.duration_hours || 0;
-      day.hours += hours;
-      
-      if (entry.project_name) {
-        day.projectHours[entry.project_name] = (day.projectHours[entry.project_name] || 0) + hours;
-      }
-      if (entry.client_name) {
-        day.clientHours[entry.client_name] = (day.clientHours[entry.client_name] || 0) + hours;
-      }
-      if (entry.task_name) {
-        day.taskHours[entry.task_name] = (day.taskHours[entry.task_name] || 0) + hours;
+      if (day) {
+        const hours = entry.duration_hours || 0;
+        day.hours += hours;
+        
+        if (entry.project_name) {
+          day.projectHours[entry.project_name] = (day.projectHours[entry.project_name] || 0) + hours;
+        }
+        if (entry.client_name) {
+          day.clientHours[entry.client_name] = (day.clientHours[entry.client_name] || 0) + hours;
+        }
+        if (entry.task_name) {
+          day.taskHours[entry.task_name] = (day.taskHours[entry.task_name] || 0) + hours;
+        }
       }
     });
     
-    return Array.from(daysMap.values()).sort((a, b) => a.date.localeCompare(b.date));
-  }, [filteredEntries, weekEntries, groupMode, i18n.language]);
+    return days;
+  }, [filteredEntries, weekEntries, groupMode, i18n.language, currentWeekRange]);
   
   const totalWeekHours = useMemo(() => {
     return dailyHours.reduce((sum, day) => sum + day.hours, 0);

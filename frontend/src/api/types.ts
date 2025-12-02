@@ -215,6 +215,7 @@ export interface InvoicePayload {
   status?: InvoiceStatus;
   issue_date: string;
   due_date: string;
+  delivery_date?: string | null;
   sub_total?: number;
   notes?: string | null;
   currency?: string;

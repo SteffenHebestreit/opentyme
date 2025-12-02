@@ -27,6 +27,25 @@ export class TaxPrepaymentService {
    * Create a new tax prepayment
    */
   async createTaxPrepayment(userId: string, data: CreateTaxPrepaymentData): Promise<TaxPrepayment> {
+    // Calculate period_start and period_end if not provided
+    let periodStart = data.period_start;
+    let periodEnd = data.period_end;
+    
+    if (!periodStart || !periodEnd) {
+      const year = data.tax_year;
+      if (data.quarter) {
+        // Quarter-based period
+        const quarterStartMonths = [0, 3, 6, 9]; // Jan, Apr, Jul, Oct
+        const startMonth = quarterStartMonths[data.quarter - 1];
+        periodStart = new Date(year, startMonth, 1).toISOString().split('T')[0];
+        periodEnd = new Date(year, startMonth + 3, 0).toISOString().split('T')[0]; // Last day of quarter
+      } else {
+        // Full year period
+        periodStart = `${year}-01-01`;
+        periodEnd = `${year}-12-31`;
+      }
+    }
+
     const query = `
       INSERT INTO tax_prepayments (
         user_id, tax_type, amount, payment_date, period_start, period_end,
@@ -42,8 +61,8 @@ export class TaxPrepaymentService {
       data.tax_type,
       data.amount,
       data.payment_date,
-      data.period_start || null,
-      data.period_end || null,
+      periodStart,
+      periodEnd,
       data.tax_year,
       data.quarter || null,
       data.description || null,
