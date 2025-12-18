@@ -93,15 +93,21 @@ export class BillingValidationService {
       const currency = invoice.currency;
 
       // Calculate total paid (add payments, subtract refunds and expenses)
+      // Use amount from junction table if available, otherwise use payment amount
       const paymentsQuery = `
-        SELECT COALESCE(
-          SUM(CASE 
-            WHEN payment_type = 'payment' THEN amount
-            ELSE -amount
-          END), 0
-        ) as total_paid
-        FROM payments
-        WHERE invoice_id = $1
+        SELECT COALESCE(SUM(
+          CASE 
+            WHEN p.payment_type = 'payment' THEN COALESCE(pi.amount, p.amount)
+            ELSE -COALESCE(pi.amount, p.amount)
+          END
+        ), 0) as total_paid
+        FROM payments p
+        LEFT JOIN payment_invoices pi ON p.id = pi.payment_id AND pi.invoice_id = $1
+        WHERE 
+          -- Payment is linked via junction table to this invoice
+          pi.invoice_id = $1
+          -- OR payment uses legacy invoice_id AND has NO junction table entries
+          OR (p.invoice_id = $1 AND NOT EXISTS (SELECT 1 FROM payment_invoices WHERE payment_id = p.id))
       `;
       const paymentsResult = await this.db.query(paymentsQuery, [invoiceId]);
       const totalPaid = Number(paymentsResult.rows[0].total_paid);
@@ -186,11 +192,12 @@ export class BillingValidationService {
   }> {
     try {
       const query = `
-        SELECT amount, payment_date, COUNT(*) as count
-        FROM payments
-        WHERE invoice_id = $1
-        GROUP BY amount, payment_date
-        HAVING COUNT(*) > 1
+        SELECT p.amount, p.payment_date, COUNT(DISTINCT p.id) as count
+        FROM payments p
+        LEFT JOIN payment_invoices pi ON p.id = pi.payment_id
+        WHERE p.invoice_id = $1 OR pi.invoice_id = $1
+        GROUP BY p.amount, p.payment_date
+        HAVING COUNT(DISTINCT p.id) > 1
       `;
       const result = await this.db.query(query, [invoiceId]);
 

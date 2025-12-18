@@ -10,7 +10,9 @@
     "totalExpensesRefunds": "Gesamtausgaben / Rückerstattungen",
     "totalInvoiced": "Gesamt fakturiert",
     "netAmount": "Nettobetrag",
-    "netTax": "Netto / Steuer"
+    "netTax": "Netto / Steuer",
+    "paid": "Bezahlt",
+    "unpaid": "Offen"
   },
   "tabs": {
     "invoices": "Rechnungen",

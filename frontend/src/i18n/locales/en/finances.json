@@ -10,7 +10,9 @@
     "totalExpensesRefunds": "Total Expenses / Refunds",
     "totalInvoiced": "Total Invoiced",
     "netAmount": "Net Amount",
-    "netTax": "Net / Tax"
+    "netTax": "Net / Tax",
+    "paid": "Paid",
+    "unpaid": "Unpaid"
   },
   "tabs": {
     "invoices": "Invoices",

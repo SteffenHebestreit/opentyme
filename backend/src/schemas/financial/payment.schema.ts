@@ -12,6 +12,7 @@ export type PaymentType = typeof paymentTypes[number];
 // Schema for creating a payment (req.body)
 // Note: Amount is always stored as positive value; payment_type determines calculation sign
 // invoice_id is required for 'refund' types but optional for 'payment' (can be NULL for recurring project payments)
+// invoice_ids array is supported for payments covering multiple invoices
 export const createPaymentSchema = Joi.object({
   client_id: Joi.when('payment_type', {
     is: Joi.string().valid('payment', 'refund'),
@@ -23,6 +24,7 @@ export const createPaymentSchema = Joi.object({
     then: invoiceIdSchema.required(),
     otherwise: invoiceIdSchema.optional().allow(null),
   }),
+  invoice_ids: Joi.array().items(Joi.string().guid({ version: ['uuidv4'] })).optional(),
   project_id: Joi.string().guid({ version: ['uuidv4'] }).optional().allow(null),
   amount: Joi.number().positive().precision(2).required(),
   payment_type: Joi.string().valid(...paymentTypes).default('payment'),
@@ -35,8 +37,10 @@ export const createPaymentSchema = Joi.object({
 
 // Schema for updating a payment (req.body)
 // Note: Amount is always stored as positive value; payment_type determines calculation sign
+// invoice_ids array allows updating which invoices are linked to this payment
 export const updatePaymentSchema = Joi.object({
   client_id: clientIdSchema.required(), // Typically shouldn't change, but schema allows validation
+  invoice_ids: Joi.array().items(Joi.string().guid({ version: ['uuidv4'] })).optional(),
   amount: Joi.number().positive().precision(2).required(),
   payment_type: Joi.string().valid(...paymentTypes).optional(),
   payment_method: Joi.string().max(50).allow(null, '').optional(),

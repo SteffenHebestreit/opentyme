@@ -295,6 +295,11 @@ export interface DashboardData {
 
 export type PaymentType = 'payment' | 'refund' | 'expense';
 
+export interface LinkedInvoice {
+  invoice_id: string;
+  invoice_number: string;
+}
+
 export interface Payment {
   id: string;
   user_id: string;
@@ -302,6 +307,8 @@ export interface Payment {
   client_name?: string | null; // Joined from clients table
   invoice_id: string | null;
   invoice_number?: string | null; // Joined from invoices table
+  invoice_ids?: string[]; // Multiple linked invoices
+  linked_invoices?: LinkedInvoice[]; // Detailed info about linked invoices
   project_id?: string | null;
   amount: number;
   payment_type: PaymentType;
@@ -316,6 +323,7 @@ export interface Payment {
 export interface PaymentPayload {
   client_id?: string | null;
   invoice_id?: string | null;
+  invoice_ids?: string[]; // Support multiple invoices
   project_id?: string | null;
   amount: number;
   payment_type?: PaymentType;

@@ -144,12 +144,18 @@ export default function FinancesPage() {
     const invoiceTax = filteredInvoices
       .reduce((sum, inv) => sum + Number(inv.tax_amount), 0);
 
-    const paidInvoices = filteredInvoices
-      .filter(inv => inv.status === 'paid')
+    // Calculate paid invoices breakdown (for income card - shows what was actually paid)
+    const paidInvoicesList = filteredInvoices.filter(inv => inv.status === 'paid');
+    const paidInvoices = paidInvoicesList
       .reduce((sum, inv) => sum + Number(inv.total_amount), 0);
+    const paidInvoicesNet = paidInvoicesList
+      .reduce((sum, inv) => sum + Number(inv.sub_total), 0);
+    const paidInvoicesTax = paidInvoicesList
+      .reduce((sum, inv) => sum + Number(inv.tax_amount), 0);
 
+    // Calculate unpaid invoices (sent, overdue, partially_paid - not draft or cancelled)
     const unpaidInvoices = filteredInvoices
-      .filter(inv => inv.status !== 'paid' && inv.status !== 'draft')
+      .filter(inv => inv.status !== 'paid' && inv.status !== 'draft' && inv.status !== 'cancelled')
       .reduce((sum, inv) => sum + Number(inv.total_amount), 0);
 
     const netAmount = income - refunds - expenses;
@@ -165,6 +171,8 @@ export default function FinancesPage() {
       invoiceNet,
       invoiceTax,
       paidInvoices,
+      paidInvoicesNet,
+      paidInvoicesTax,
       unpaidInvoices,
     };
   }, [payments, invoices, expenseSummary, startDate, endDate]);
@@ -224,9 +232,9 @@ export default function FinancesPage() {
               <div className="text-2xl font-bold text-gray-900 dark:text-white">
                 {formatCurrency(totals.income)}
               </div>
-              {totals.invoiceNet > 0 && totals.invoiceTax > 0 && (
+              {totals.paidInvoicesNet > 0 && totals.paidInvoicesTax > 0 && (
                 <div className="mt-2 text-xs text-green-700 dark:text-green-300">
-                  {formatCurrency(totals.invoiceNet)} / {formatCurrency(totals.invoiceTax)}
+                  {formatCurrency(totals.paidInvoicesNet)} / {formatCurrency(totals.paidInvoicesTax)}
                   <div className="text-green-600/70 dark:text-green-400/70">
                     {t('summary.netTax')}
                   </div>
@@ -257,6 +265,16 @@ export default function FinancesPage() {
               </div>
               <div className="text-2xl font-bold text-gray-900 dark:text-white">
                 {formatCurrency(totals.totalInvoiced)}
+              </div>
+              <div className="mt-2 text-xs text-blue-700 dark:text-blue-300 space-y-0.5">
+                <div className="flex justify-between">
+                  <span>{t('summary.paid')}:</span>
+                  <span className="font-medium">{formatCurrency(totals.paidInvoices)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>{t('summary.unpaid')}:</span>
+                  <span className="font-medium">{formatCurrency(totals.unpaidInvoices)}</span>
+                </div>
               </div>
             </div>
 

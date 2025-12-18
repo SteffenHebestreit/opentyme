@@ -157,8 +157,35 @@ export function PaymentDetailModal({ payment, isOpen, onClose, onNavigateToInvoi
           </div>
         )}
 
-        {/* Invoice ID (if linked) */}
-        {payment.invoice_id && (
+        {/* Linked Invoices - supports both single invoice_id and multiple linked_invoices */}
+        {(payment.linked_invoices && payment.linked_invoices.length > 0) ? (
+          <div>
+            <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              {t('fields.linkedInvoices', { defaultValue: 'Linked Invoices' })}
+            </label>
+            <div className="mt-1 space-y-1">
+              {payment.linked_invoices.map((linkedInv) => (
+                onNavigateToInvoice ? (
+                  <button
+                    key={linkedInv.invoice_id}
+                    onClick={() => {
+                      onClose();
+                      onNavigateToInvoice(linkedInv.invoice_id);
+                    }}
+                    className="flex items-center gap-2 text-base text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline"
+                  >
+                    {linkedInv.invoice_number}
+                    <ExternalLink className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <p key={linkedInv.invoice_id} className="text-base text-gray-900 dark:text-white">
+                    {linkedInv.invoice_number}
+                  </p>
+                )
+              ))}
+            </div>
+          </div>
+        ) : payment.invoice_id && (
           <div>
             <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
               {t('fields.linkedInvoice')}

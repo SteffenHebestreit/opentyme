@@ -16,6 +16,7 @@
     "method": "Payment Method",
     "invoice": "Invoice",
     "linkedInvoice": "Linked Invoice",
+    "linkedInvoices": "Linked Invoices",
     "transactionId": "Transaction ID",
     "notes": "Notes",
     "type": "Type"

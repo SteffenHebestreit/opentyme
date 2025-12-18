@@ -811,6 +811,33 @@ COMMENT ON CONSTRAINT payments_payment_type_check ON public.payments IS 'Valid p
 
 
 --
+-- Name: payment_invoices; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.payment_invoices (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    payment_id uuid NOT NULL,
+    invoice_id uuid NOT NULL,
+    amount numeric(10,2),
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: TABLE payment_invoices; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.payment_invoices IS 'Junction table linking payments to multiple invoices';
+
+
+--
+-- Name: COLUMN payment_invoices.amount; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.payment_invoices.amount IS 'Optional: portion of payment allocated to this invoice. If NULL, the full payment amount applies.';
+
+
+--
 -- Name: projects; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1421,6 +1448,22 @@ ALTER TABLE ONLY public.payments
 
 
 --
+-- Name: payment_invoices payment_invoices_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_invoices
+    ADD CONSTRAINT payment_invoices_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: payment_invoices payment_invoices_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_invoices
+    ADD CONSTRAINT payment_invoices_unique UNIQUE (payment_id, invoice_id);
+
+
+--
 -- Name: projects projects_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1702,6 +1745,20 @@ CREATE INDEX idx_payments_invoice_id ON public.payments USING btree (invoice_id)
 --
 
 CREATE INDEX idx_payments_payment_date ON public.payments USING btree (payment_date);
+
+
+--
+-- Name: idx_payment_invoices_payment_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_payment_invoices_payment_id ON public.payment_invoices USING btree (payment_id);
+
+
+--
+-- Name: idx_payment_invoices_invoice_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_payment_invoices_invoice_id ON public.payment_invoices USING btree (invoice_id);
 
 
 --
@@ -2053,6 +2110,22 @@ ALTER TABLE ONLY public.payments
 
 ALTER TABLE ONLY public.payments
     ADD CONSTRAINT payments_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE SET NULL;
+
+
+--
+-- Name: payment_invoices payment_invoices_payment_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_invoices
+    ADD CONSTRAINT payment_invoices_payment_id_fkey FOREIGN KEY (payment_id) REFERENCES public.payments(id) ON DELETE CASCADE;
+
+
+--
+-- Name: payment_invoices payment_invoices_invoice_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.payment_invoices
+    ADD CONSTRAINT payment_invoices_invoice_id_fkey FOREIGN KEY (invoice_id) REFERENCES public.invoices(id) ON DELETE CASCADE;
 
 
 --

@@ -16,6 +16,7 @@
     "method": "Zahlungsmethode",
     "invoice": "Rechnung",
     "linkedInvoice": "Verknüpfte Rechnung",
+    "linkedInvoices": "Verknüpfte Rechnungen",
     "transactionId": "Transaktions-ID",
     "notes": "Notizen",
     "type": "Typ"
