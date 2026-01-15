@@ -89,10 +89,15 @@ export const getTimeTrend = async (days: number = 30): Promise<TimeTrendPoint[]>
  * Get revenue by top clients
  * 
  * @param limit - Maximum number of clients to return (1-20)
+ * @param year - Year to filter payments (optional)
  * @returns Promise with array of revenue by client data
  */
-export const getRevenueByClient = async (limit: number = 10): Promise<RevenueByClient[]> => {
-  const response = await api.get(`/analytics/revenue-by-client?limit=${limit}`);
+export const getRevenueByClient = async (limit: number = 10, year?: number): Promise<RevenueByClient[]> => {
+  let url = `/analytics/revenue-by-client?limit=${limit}`;
+  if (year) {
+    url += `&year=${year}`;
+  }
+  const response = await api.get(url);
   return response.data;
 };
 

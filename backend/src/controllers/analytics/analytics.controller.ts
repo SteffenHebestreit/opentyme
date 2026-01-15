@@ -65,12 +65,13 @@ export class AnalyticsController {
    * 
    * Query params:
    * - limit: Number of clients to return (default: 10, max: 20)
+   * - year: Year to filter payments (optional, defaults to all time)
    * 
    * @route GET /api/analytics/revenue-by-client
    * @access Protected
    * 
    * @example
-   * GET /api/analytics/revenue-by-client?limit=10
+   * GET /api/analytics/revenue-by-client?limit=10&year=2026
    * Response: [
    *   { client_id: 'uuid-1', client_name: 'Acme Corp', total_revenue: 15000, invoice_count: 5 },
    *   ...
@@ -92,7 +93,20 @@ export class AnalyticsController {
       // Cap limit at 20 to prevent excessive data
       const cappedLimit = Math.min(Math.max(limit, 1), 20);
 
-      const data = await analyticsService.getRevenueByClient(userId, cappedLimit);
+      // Parse optional year parameter
+      const yearParam = req.query.year as string;
+      let startDate: string | undefined;
+      let endDate: string | undefined;
+      
+      if (yearParam) {
+        const year = parseInt(yearParam, 10);
+        if (!isNaN(year) && year >= 2000 && year <= 2100) {
+          startDate = `${year}-01-01`;
+          endDate = `${year}-12-31`;
+        }
+      }
+
+      const data = await analyticsService.getRevenueByClient(userId, cappedLimit, startDate, endDate);
       
       res.status(200).json(data);
     } catch (error: any) {

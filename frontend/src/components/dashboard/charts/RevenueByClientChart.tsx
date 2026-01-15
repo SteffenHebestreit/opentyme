@@ -41,7 +41,8 @@ ChartJS.register(
  */
 const RevenueByClientChart: React.FC = () => {
   const { t } = useTranslation('dashboard');
-  const { data, isLoading, error } = useRevenueByClient(10);
+  const currentYear = new Date().getFullYear();
+  const { data, isLoading, error } = useRevenueByClient(10, currentYear);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<ChartJS | null>(null);
 

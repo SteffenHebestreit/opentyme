@@ -324,6 +324,41 @@ describe('AnalyticsService', () => {
       expect(revenue1.length).toBeLessThanOrEqual(1);
       expect(revenue5.length).toBeLessThanOrEqual(5);
     });
+
+    it('should filter by date range when provided', async () => {
+      const currentYear = new Date().getFullYear();
+      const revenue = await analyticsService.getRevenueByClient(
+        TEST_USER_ID, 
+        10, 
+        `${currentYear}-01-01`, 
+        `${currentYear}-12-31`
+      );
+
+      expect(revenue).toBeDefined();
+      expect(Array.isArray(revenue)).toBe(true);
+      
+      // Each entry should have required fields
+      revenue.forEach(entry => {
+        expect(entry).toHaveProperty('client_id');
+        expect(entry).toHaveProperty('client_name');
+        expect(entry).toHaveProperty('total_revenue');
+        expect(entry).toHaveProperty('invoice_count');
+      });
+    });
+
+    it('should return empty for year with no payments', async () => {
+      // Use a future year that should have no payments
+      const revenue = await analyticsService.getRevenueByClient(
+        TEST_USER_ID, 
+        10, 
+        '2099-01-01', 
+        '2099-12-31'
+      );
+
+      expect(revenue).toBeDefined();
+      expect(Array.isArray(revenue)).toBe(true);
+      expect(revenue.length).toBe(0);
+    });
   });
 
   describe('getProjectProfitability with limit', () => {

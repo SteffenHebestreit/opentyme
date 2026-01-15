@@ -193,17 +193,27 @@ export class AnalyticsService {
    * 
    * @param {string} userId - User ID (Keycloak UUID)
    * @param {number} limit - Maximum number of clients to return (default: 10)
+   * @param {string} startDate - Start date for filtering payments (YYYY-MM-DD, optional)
+   * @param {string} endDate - End date for filtering payments (YYYY-MM-DD, optional)
    * @returns {Promise<RevenueByClient[]>} Array of revenue by client data
    * 
    * @example
-   * const revenue = await analyticsService.getRevenueByClient(userId, 10);
+   * const revenue = await analyticsService.getRevenueByClient(userId, 10, '2026-01-01', '2026-12-31');
    * // Returns: [
    * //   { client_id: 'uuid-1', client_name: 'Acme Corp', total_revenue: 15000, invoice_count: 5 },
    * //   { client_id: 'uuid-2', client_name: 'TechCo', total_revenue: 12000, invoice_count: 3 },
    * //   ...
    * // ]
    */
-  async getRevenueByClient(userId: string, limit: number = 10): Promise<RevenueByClient[]> {
+  async getRevenueByClient(userId: string, limit: number = 10, startDate?: string, endDate?: string): Promise<RevenueByClient[]> {
+    let dateFilter = '';
+    const params: any[] = [userId];
+    
+    if (startDate && endDate) {
+      dateFilter = ' AND p.payment_date >= $3 AND p.payment_date <= $4';
+      params.push(startDate, endDate);
+    }
+    
     const query = `
       SELECT 
         c.id AS client_id,
@@ -211,15 +221,17 @@ export class AnalyticsService {
         COALESCE(SUM(p.amount), 0) AS total_revenue,
         COUNT(p.id) AS payment_count
       FROM clients c
-      LEFT JOIN payments p ON p.client_id = c.id AND p.payment_type = 'payment' AND p.user_id = $1
+      LEFT JOIN payments p ON p.client_id = c.id AND p.payment_type = 'payment' AND p.user_id = $1${dateFilter}
       WHERE c.user_id = $1
       GROUP BY c.id, c.name
       HAVING COUNT(p.id) > 0
       ORDER BY total_revenue DESC
       LIMIT $2
     `;
+    
+    params.splice(1, 0, limit); // Insert limit at position 1
 
-    const result = await this.db.query(query, [userId, limit]);
+    const result = await this.db.query(query, params);
     return result.rows.map(row => ({
       client_id: row.client_id,
       client_name: row.client_name,

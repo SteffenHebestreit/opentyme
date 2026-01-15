@@ -52,21 +52,23 @@ export const useTimeTrend = (
  * Fetch revenue by top clients
  * 
  * @param limit - Maximum number of clients to return (1-20)
+ * @param year - Year to filter payments (optional)
  * @param options - React Query options
  * @returns Query result with revenue by client data
  * 
  * @example
  * ```tsx
- * const { data, isLoading, error } = useRevenueByClient(10);
+ * const { data, isLoading, error } = useRevenueByClient(10, 2026);
  * ```
  */
 export const useRevenueByClient = (
   limit: number = 10,
+  year?: number,
   options?: { enabled?: boolean }
 ): UseQueryResult<RevenueByClient[], Error> => {
   return useQuery({
-    queryKey: ['analytics', 'revenue-by-client', limit],
-    queryFn: () => getRevenueByClient(limit),
+    queryKey: ['analytics', 'revenue-by-client', limit, year],
+    queryFn: () => getRevenueByClient(limit, year),
     staleTime: 5 * 60 * 1000,
     ...options,
   });
