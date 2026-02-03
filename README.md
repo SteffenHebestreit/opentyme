@@ -8,7 +8,7 @@
 
 [![Status](https://img.shields.io/badge/status-production%20ready-brightgreen)]()
 [![Backend Tests](https://img.shields.io/badge/tests-48%2F48%20passing-brightgreen)]()
-[![License](https://img.shields.io/badge/license-MIT-blue)]()
+[![License](https://img.shields.io/badge/license-CC%20BY--NC%204.0-blue)](LICENSE)
 [![Docker](https://img.shields.io/badge/docker-ready-blue)]()
 
 > A modern, full-stack application for freelance developers to track time, manage finances, generate invoices, and handle expenses, all with enterprise-grade security via Keycloak SSO.
