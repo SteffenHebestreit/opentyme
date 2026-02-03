@@ -95,87 +95,99 @@ class RecurringExpenseSchedulerService {
 
   /**
    * Generate a new expense instance from a recurring expense template
+   * This method now generates ALL missed occurrences up to today
    */
   private async generateExpenseInstance(client: any, template: any): Promise<void> {
-    const occurrenceDate = template.next_occurrence;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+    
+    let currentOccurrence = template.next_occurrence;
+    let generatedCount = 0;
+    
+    // Generate all missed occurrences up to today
+    while (currentOccurrence <= todayStr) {
+      // Check if we've exceeded end date
+      if (template.recurrence_end_date && currentOccurrence > template.recurrence_end_date) {
+        console.log(
+          `[RecurringExpenseScheduler] Recurring expense ${template.id} has reached end date, stopping generation`
+        );
+        // Set next_occurrence to null to stop processing
+        await client.query(
+          'UPDATE expenses SET next_occurrence = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+          [template.id]
+        );
+        return;
+      }
 
-    // Create new expense instance
-    const insertQuery = `
-      INSERT INTO expenses (
-        user_id,
-        project_id,
-        category,
-        description,
-        amount,
-        net_amount,
-        tax_rate,
-        tax_amount,
-        currency,
-        expense_date,
-        is_billable,
-        is_reimbursable,
-        status,
-        tags,
-        notes,
-        is_recurring,
-        parent_expense_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-      RETURNING id
-    `;
+      // Create new expense instance
+      const insertQuery = `
+        INSERT INTO expenses (
+          user_id,
+          project_id,
+          category,
+          description,
+          amount,
+          net_amount,
+          tax_rate,
+          tax_amount,
+          currency,
+          expense_date,
+          is_billable,
+          is_reimbursable,
+          status,
+          tags,
+          notes,
+          is_recurring,
+          parent_expense_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        RETURNING id
+      `;
 
-    const values = [
-      template.user_id,
-      template.project_id,
-      template.category,
-      `${template.description} (Auto-generated)`,
-      template.amount,
-      template.net_amount,
-      template.tax_rate,
-      template.tax_amount,
-      template.currency,
-      occurrenceDate, // Use the next_occurrence date as expense_date
-      template.is_billable,
-      template.is_reimbursable,
-      'approved', // Auto-approve generated expenses
-      template.tags,
-      template.notes,
-      false, // Generated expenses are not recurring themselves
-      template.id, // Link to parent template
-    ];
+      const values = [
+        template.user_id,
+        template.project_id,
+        template.category,
+        `${template.description} (Auto-generated)`,
+        template.amount,
+        template.net_amount,
+        template.tax_rate,
+        template.tax_amount,
+        template.currency,
+        currentOccurrence, // Use the occurrence date as expense_date
+        template.is_billable,
+        template.is_reimbursable,
+        'approved', // Auto-approve generated expenses
+        template.tags,
+        template.notes,
+        false, // Generated expenses are not recurring themselves
+        template.id, // Link to parent template
+      ];
 
-    const result = await client.query(insertQuery, values);
-    const newExpenseId = result.rows[0].id;
+      const result = await client.query(insertQuery, values);
+      const newExpenseId = result.rows[0].id;
+      generatedCount++;
 
-    console.log(
-      `[RecurringExpenseScheduler] Generated expense ${newExpenseId} from template ${template.id} for date ${occurrenceDate}`
-    );
-
-    // Calculate next occurrence
-    const nextOccurrence = this.calculateNextOccurrence(
-      occurrenceDate,
-      template.recurrence_frequency
-    );
-
-    // Check if next occurrence exceeds end date
-    let shouldContinue = true;
-    if (template.recurrence_end_date && nextOccurrence > template.recurrence_end_date) {
-      shouldContinue = false;
       console.log(
-        `[RecurringExpenseScheduler] Recurring expense ${template.id} has reached end date, stopping generation`
+        `[RecurringExpenseScheduler] Generated expense ${newExpenseId} from template ${template.id} for date ${currentOccurrence}`
+      );
+
+      // Calculate next occurrence
+      currentOccurrence = this.calculateNextOccurrence(
+        currentOccurrence,
+        template.recurrence_frequency
       );
     }
 
-    // Update parent template's next_occurrence
-    if (shouldContinue) {
-      await client.query(
-        'UPDATE expenses SET next_occurrence = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-        [nextOccurrence, template.id]
-      );
-    } else {
-      // Set next_occurrence to null to stop processing
-      await client.query(
-        'UPDATE expenses SET next_occurrence = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
-        [template.id]
+    // Update parent template's next_occurrence to the next future date
+    await client.query(
+      'UPDATE expenses SET next_occurrence = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [currentOccurrence, template.id]
+    );
+
+    if (generatedCount > 1) {
+      console.log(
+        `[RecurringExpenseScheduler] Caught up on ${generatedCount} missed occurrences for expense ${template.id}`
       );
     }
   }

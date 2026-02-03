@@ -66,7 +66,37 @@
       "title": "Client Revenue Report",
       "subtitle": "Kundenumsatz",
       "description": "Revenue analysis per client showing invoiced, paid, and outstanding amounts."
+    },
+    "taxPackage": {
+      "title": "Tax Package",
+      "subtitle": "Complete Tax Documents",
+      "description": "Download all tax-relevant documents as a ZIP file for your tax declaration. Includes reports, invoices, expense receipts, and more."
     }
+  },
+  "taxPackage": {
+    "title": "Tax Package",
+    "description": "Download all tax-related documents as a ZIP file",
+    "selectYear": "Select Year",
+    "noDataAvailable": "No tax data available",
+    "customDateRange": "Custom Date Range",
+    "contents": "Package Contents",
+    "reports": "Financial Reports (PDF)",
+    "reportsDesc": "Income/Expense Report, VAT Report",
+    "invoices": "Invoice PDFs",
+    "expenseReceipts": "Expense Receipts",
+    "prepaymentReceipts": "Tax Prepayment Receipts",
+    "excelExport": "Excel Export",
+    "excelDesc": "All data in spreadsheet format",
+    "files": "files",
+    "withReceipts": "with receipts",
+    "estimatedContents": "Estimated Package Contents",
+    "invoicesTotal": "invoices",
+    "expensesTotal": "expenses",
+    "paymentsTotal": "payments",
+    "prepaymentsTotal": "tax prepayments",
+    "filesInPackage": "files in package",
+    "generating": "Generating...",
+    "download": "Download ZIP"
   },
   "vat": {
     "title": "VAT Report (Umsatzsteuervoranmeldung)",

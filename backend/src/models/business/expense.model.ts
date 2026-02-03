@@ -233,6 +233,12 @@ export interface CreateExpenseData {
   recurrence_frequency?: RecurrenceFrequency | string | null;
   recurrence_start_date?: string | null;
   recurrence_end_date?: string | null;
+  // Depreciation fields
+  depreciation_type?: 'none' | 'immediate' | 'partial' | null;
+  depreciation_years?: number | null;
+  depreciation_start_date?: string | null;
+  depreciation_method?: 'linear' | 'degressive' | null;
+  useful_life_category?: string | null;
 }
 
 /**

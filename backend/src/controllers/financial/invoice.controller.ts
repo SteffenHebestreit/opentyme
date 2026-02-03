@@ -2038,6 +2038,57 @@ export class InvoiceController {
   }
 
   /**
+   * Generates an invoice PDF and returns it as a Buffer.
+   * This method is used for programmatic PDF generation (e.g., tax packages).
+   * Uses the same logic as generatePDF but returns a buffer instead of streaming to response.
+   * 
+   * @async
+   * @param {string} invoiceId - The ID of the invoice
+   * @param {string} userId - The ID of the user
+   * @param {boolean} enableZugferd - Whether to embed ZUGFeRD XML (default: false)
+   * @returns {Promise<Buffer | null>} PDF buffer or null if invoice not found
+   */
+  async generatePDFBuffer(invoiceId: string, userId: string, enableZugferd: boolean = false): Promise<Buffer | null> {
+    // Create a mock request and response to reuse the existing generatePDF logic
+    const mockReq = {
+      params: { id: invoiceId },
+      query: { zugferd: enableZugferd ? 'true' : 'false' },
+      user: { id: userId }
+    } as any;
+
+    return new Promise((resolve, reject) => {
+      let pdfBuffer: Buffer | null = null;
+      
+      const mockRes = {
+        headersSent: false,
+        statusCode: 200,
+        setHeader: () => {},
+        status: function(code: number) { 
+          this.statusCode = code; 
+          return this; 
+        },
+        json: (data: any) => {
+          if (data.message === 'Invoice not found') {
+            resolve(null);
+          } else {
+            reject(new Error(data.message || 'PDF generation failed'));
+          }
+        },
+        send: (buffer: Buffer) => {
+          pdfBuffer = buffer;
+          resolve(pdfBuffer);
+        },
+        destroy: () => {
+          reject(new Error('PDF generation failed - response destroyed'));
+        }
+      } as any;
+
+      // Call the existing generatePDF method with mock request/response
+      this.generatePDF(mockReq, mockRes).catch(reject);
+    });
+  }
+
+  /**
    * Gets the billing validation status for an invoice.
    * Checks for overbilling, underbilling, and potential duplicate payments.
    * 

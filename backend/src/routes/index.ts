@@ -26,6 +26,7 @@ import settingsRoutes from './system/settings.routes';
 // Analytics routes
 import analyticsRoutes from './analytics/analytics.routes';
 import reportRoutes from './analytics/report.routes';
+import taxPackageRoutes from './analytics/tax-package.routes';
 
 export default function setupRoutes(app: Application) {
   // Auth endpoints
@@ -85,4 +86,8 @@ export default function setupRoutes(app: Application) {
   // Report endpoints
   app.use('/api/reports', reportRoutes);
   console.log('Report routes registered under /api/reports');
+
+  // Tax package endpoints
+  app.use('/api/tax-package', taxPackageRoutes);
+  console.log('Tax package routes registered under /api/tax-package');
 }

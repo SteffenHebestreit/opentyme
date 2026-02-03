@@ -192,9 +192,12 @@ export const approveExpense = async (
 export const fetchExpenseSummary = async (filters?: ExpenseFilters): Promise<ExpenseSummary> => {
   const params = new URLSearchParams();
   
+  // Only pass supported parameters to the summary endpoint
+  const supportedParams = ['date_from', 'date_to', 'project_id', 'group_by', 'search'];
+  
   if (filters) {
     Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
+      if (supportedParams.includes(key) && value !== undefined && value !== null && value !== '') {
         params.append(key, String(value));
       }
     });
@@ -202,5 +205,16 @@ export const fetchExpenseSummary = async (filters?: ExpenseFilters): Promise<Exp
 
   const url = `/expenses/summary${params.toString() ? `?${params.toString()}` : ''}`;
   const response = await api.get<ExpenseSummary>(url);
+  return response.data;
+};
+
+/**
+ * Trigger recurring expense processing manually
+ * Useful for catching up on missed recurring expense generations
+ * 
+ * @returns {Promise<{success: boolean, message: string}>} Result of trigger
+ */
+export const triggerRecurringExpenses = async (): Promise<{ success: boolean; message: string }> => {
+  const response = await api.post<{ success: boolean; message: string }>('/expenses/recurring/trigger');
   return response.data;
 };

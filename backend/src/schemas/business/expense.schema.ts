@@ -41,6 +41,12 @@ export const createExpenseSchema = Joi.object({
   recurrence_end_date: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow(null).messages({
     'string.pattern.base': 'End date must be in YYYY-MM-DD format',
   }),
+  // Depreciation fields
+  depreciation_type: Joi.string().valid('none', 'immediate', 'partial').optional().allow(null),
+  depreciation_years: Joi.number().integer().min(1).max(50).optional().allow(null),
+  depreciation_start_date: Joi.date().iso().optional().allow(null),
+  depreciation_method: Joi.string().valid('linear', 'degressive').optional().allow(null),
+  useful_life_category: Joi.string().max(100).optional().allow(null),
 }).custom((value, helpers) => {
   // Validate that amount = net_amount + tax_amount (within 0.01 tolerance)
   const { amount, net_amount, tax_amount } = value;

@@ -73,9 +73,11 @@ export class ExpenseService {
           user_id, project_id, category, description, amount, net_amount, 
           tax_rate, tax_amount, currency, expense_date, is_billable, 
           is_reimbursable, tags, notes, is_recurring, recurrence_frequency,
-          recurrence_start_date, recurrence_end_date, next_occurrence
+          recurrence_start_date, recurrence_end_date, next_occurrence,
+          depreciation_type, depreciation_years, depreciation_start_date,
+          depreciation_method, useful_life_category
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
         RETURNING *
       `;
 
@@ -99,6 +101,11 @@ export class ExpenseService {
         data.recurrence_start_date || null,
         data.recurrence_end_date || null,
         nextOccurrence,
+        data.depreciation_type || null,
+        data.depreciation_years || null,
+        data.depreciation_start_date || null,
+        data.depreciation_method || null,
+        data.useful_life_category || null,
       ];
 
       const result = await client.query(query, values);
@@ -126,8 +133,6 @@ export class ExpenseService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    // Start from the expense_date, not recurrence_start_date
-    // If expense_date is before recurrence_start_date in the same month, skip it
     const expenseDate = new Date(template.expense_date);
     const startDate = new Date(template.recurrence_start_date);
     expenseDate.setHours(0, 0, 0, 0);
@@ -136,33 +141,25 @@ export class ExpenseService {
     const endDate = template.recurrence_end_date ? new Date(template.recurrence_end_date) : null;
     if (endDate) endDate.setHours(0, 0, 0, 0);
 
-    // If the expense_date is before the recurrence_start_date, adjust to start from the first valid occurrence
-    let currentDate = new Date(expenseDate);
-    if (currentDate < startDate) {
-      // Move to the same day in the month/quarter/year of the start date
-      currentDate = new Date(startDate);
-      currentDate.setUTCDate(expenseDate.getUTCDate());
-    }
+    // Start from the recurrence_start_date, which is when the recurring expense should begin
+    let currentDate = new Date(startDate);
 
-    // Generate expenses for all past occurrences
-    // IMPORTANT: Skip any occurrence that falls in the same month/year as the template expense_date
-    // because the template itself represents that occurrence
-    
-    while (currentDate < today) {
+    // Generate expenses for all past occurrences up to and including today
+    while (currentDate <= today) {
       // Check if we've exceeded end date
       if (endDate && currentDate > endDate) {
         break;
       }
 
       // Check if this occurrence is in the same month/year as the template expense_date
+      // The template expense itself represents this occurrence, so skip it
       const isSameMonth = (
         currentDate.getFullYear() === expenseDate.getFullYear() &&
         currentDate.getMonth() === expenseDate.getMonth()
       );
 
-      // Check if this occurrence is after the recurrence_start_date
-      // Skip occurrences that match the template's month to avoid duplicating
-      if (currentDate >= startDate && !isSameMonth) {
+      // Generate expense if not the same month as the template
+      if (!isSameMonth) {
         const insertQuery = `
           INSERT INTO expenses (
             user_id, project_id, category, description, amount, net_amount,
@@ -170,6 +167,16 @@ export class ExpenseService {
             is_reimbursable, status, tags, notes, is_recurring, parent_expense_id
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
         `;
+
+        // Use the day from expense_date but the month/year from currentDate
+        const generatedDate = new Date(currentDate);
+        generatedDate.setDate(expenseDate.getDate());
+        
+        // Handle edge case where the day doesn't exist in the month (e.g., Jan 31 -> Feb 28)
+        if (generatedDate.getMonth() !== currentDate.getMonth()) {
+          // Day overflowed to next month, use last day of intended month
+          generatedDate.setDate(0); // Goes to last day of previous month
+        }
 
         const values = [
           template.user_id,
@@ -181,7 +188,7 @@ export class ExpenseService {
           template.tax_rate,
           template.tax_amount,
           template.currency,
-          currentDate.toISOString().split('T')[0],
+          generatedDate.toISOString().split('T')[0],
           template.is_billable,
           template.is_reimbursable,
           'approved', // Auto-approve generated expenses

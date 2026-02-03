@@ -66,7 +66,37 @@
       "title": "Kundenumsatz",
       "subtitle": "Umsatz pro Kunde",
       "description": "Umsatzanalyse pro Kunde mit in Rechnung gestellten, bezahlten und offenen Beträgen."
+    },
+    "taxPackage": {
+      "title": "Steuerpaket",
+      "subtitle": "Komplette Steuerunterlagen",
+      "description": "Laden Sie alle steuerrelevanten Dokumente als ZIP-Datei für Ihre Steuererklärung herunter. Enthält Berichte, Rechnungen, Ausgabenbelege und mehr."
     }
+  },
+  "taxPackage": {
+    "title": "Steuerpaket",
+    "description": "Alle steuerrelevanten Dokumente als ZIP-Datei herunterladen",
+    "selectYear": "Jahr auswählen",
+    "noDataAvailable": "Keine Steuerdaten verfügbar",
+    "customDateRange": "Benutzerdefinierter Zeitraum",
+    "contents": "Paketinhalt",
+    "reports": "Finanzberichte (PDF)",
+    "reportsDesc": "Einnahmen-/Ausgabenbericht, USt-Bericht",
+    "invoices": "Rechnungs-PDFs",
+    "expenseReceipts": "Ausgabenbelege",
+    "prepaymentReceipts": "Steuervorauszahlungsbelege",
+    "excelExport": "Excel-Export",
+    "excelDesc": "Alle Daten im Tabellenformat",
+    "files": "Dateien",
+    "withReceipts": "mit Belegen",
+    "estimatedContents": "Geschätzter Paketinhalt",
+    "invoicesTotal": "Rechnungen",
+    "expensesTotal": "Ausgaben",
+    "paymentsTotal": "Zahlungen",
+    "prepaymentsTotal": "Steuervorauszahlungen",
+    "filesInPackage": "Dateien im Paket",
+    "generating": "Wird erstellt...",
+    "download": "ZIP herunterladen"
   },
   "vat": {
     "title": "Umsatzsteuervoranmeldung",

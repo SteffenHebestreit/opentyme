@@ -24,6 +24,7 @@ import {
   deleteReceipt,
   approveExpense,
   fetchExpenseSummary,
+  triggerRecurringExpenses,
 } from '@/api/services/expense.service';
 import type {
   Expense,
@@ -207,5 +208,26 @@ export const useRecurringGeneratedExpenses = (expenseId: string, enabled: boolea
     },
     enabled,
     staleTime: 30000, // 30 seconds
+  });
+};
+/**
+ * Hook to manually trigger recurring expense processing
+ * Useful for catching up on missed recurring expense generations
+ * 
+ * @returns {UseMutationResult} Mutation result for triggering
+ */
+export const useTriggerRecurringExpenses = (): UseMutationResult<
+  { success: boolean; message: string },
+  Error,
+  void
+> => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: triggerRecurringExpenses,
+    onSuccess: () => {
+      // Invalidate all expense queries to refresh the list
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+    },
   });
 };

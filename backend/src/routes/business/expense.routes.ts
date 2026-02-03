@@ -101,6 +101,13 @@ router.patch('/:id/reimburse', expenseController.reimburseExpense);
 router.get('/project/:projectId/billable', expenseController.getBillableExpenses);
 
 /**
+ * Recurring expense routes
+ */
+
+// Manually trigger recurring expense processing (to catch up on missed occurrences)
+router.post('/recurring/trigger', expenseController.triggerRecurringExpenses);
+
+/**
  * Depreciation routes
  */
 

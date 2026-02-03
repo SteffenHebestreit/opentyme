@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useExpenses, useExpenseSummary } from '@/hooks/api/useExpenses';
+import { useExpenses, useExpenseSummary, useTriggerRecurringExpenses } from '@/hooks/api/useExpenses';
 import { useQuery } from '@tanstack/react-query';
 import { getDepreciationSummary } from '@/api/services/depreciation.service';
 import { ExpenseCategory, ExpenseStatus } from '@/api/types';
 import { AddExpenseModal } from '@/components/business/expenses/AddExpenseModal';
 import { ExpenseDetailModal } from '@/components/business/expenses/ExpenseDetailModal';
+import { RecurringExpensesManager } from '@/components/business/expenses/RecurringExpensesManager';
 import { CustomSelect } from '@/components/forms';
 import { formatCurrency } from '@/utils/currency';
 import { Table, Column } from '@/components/common/Table';
@@ -59,6 +60,7 @@ interface ExpensesPageProps {
 
 export default function ExpensesPage({ startDate: propStartDate, endDate: propEndDate }: ExpensesPageProps = {}) {
   const { t } = useTranslation('expenses');
+  const [activeTab, setActiveTab] = useState<'expenses' | 'recurring'>('expenses');
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -81,6 +83,7 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
 
   const { data: expenses = [], isLoading, error, refetch } = useExpenses(filters);
   const { data: summary } = useExpenseSummary(filters);
+  const triggerRecurring = useTriggerRecurringExpenses();
   
   // Fetch depreciation summary for current year
   const currentYear = new Date().getFullYear();
@@ -529,39 +532,87 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
           </p>
         </div>
         
-        <button
-          onClick={() => setShowExpenseModal(true)}
-          className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 font-medium text-white transition-colors hover:bg-purple-700"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          {t('addExpense')}
-        </button>
+        <div className="flex items-center gap-2">
+          {activeTab === 'expenses' && (
+            <>
+              <button
+                onClick={() => triggerRecurring.mutate()}
+                disabled={triggerRecurring.isPending}
+                className="flex items-center gap-2 rounded-lg bg-gray-600 px-4 py-2 font-medium text-white transition-colors hover:bg-gray-700 disabled:opacity-50"
+                title={t('syncRecurringTooltip', 'Generate any missed recurring expenses')}
+              >
+                <svg className={`w-5 h-5 ${triggerRecurring.isPending ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                {triggerRecurring.isPending ? t('syncing', 'Syncing...') : t('syncRecurring', 'Sync Recurring')}
+              </button>
+              <button
+                onClick={() => setShowExpenseModal(true)}
+                className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 font-medium text-white transition-colors hover:bg-purple-700"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                {t('addExpense')}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div className="flex w-full flex-1 items-center gap-3">
-          <div className="relative w-full xl:max-w-sm">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <svg className="h-4 w-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+      {/* Tabs */}
+      <div className="border-b border-gray-200 dark:border-gray-700">
+        <nav className="flex gap-4" aria-label="Tabs">
+          <button
+            onClick={() => setActiveTab('expenses')}
+            className={`py-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'expenses'
+                ? 'border-purple-500 text-purple-600 dark:text-purple-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            }`}
+          >
+            📋 {t('tabs.allExpenses', 'All Expenses')}
+          </button>
+          <button
+            onClick={() => setActiveTab('recurring')}
+            className={`py-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'recurring'
+                ? 'border-purple-500 text-purple-600 dark:text-purple-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            }`}
+          >
+            🔄 {t('tabs.recurring', 'Recurring Templates')}
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'recurring' ? (
+        <RecurringExpensesManager />
+      ) : (
+        <>
+          {/* Filters */}
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div className="flex w-full flex-1 items-center gap-3">
+              <div className="relative w-full xl:max-w-sm">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                  <svg className="h-4 w-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <input
+                  type="search"
+                  placeholder={t('searchPlaceholder')}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="block w-full bg-transparent border-0 border-b-2 border-gray-600 dark:border-gray-400 focus:outline-none focus:border-purple-500 dark:focus:border-purple-400 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200 ease-in-out accent-purple-500 py-2 pl-10 pr-3 text-sm"
+                  autoComplete="off"
+                />
+              </div>
             </div>
-            <input
-              type="search"
-              placeholder={t('searchPlaceholder')}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full bg-transparent border-0 border-b-2 border-gray-600 dark:border-gray-400 focus:outline-none focus:border-purple-500 dark:focus:border-purple-400 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200 ease-in-out accent-purple-500 py-2 pl-10 pr-3 text-sm"
-              autoComplete="off"
-            />
-          </div>
-        </div>
-        <div className="flex gap-3">
-          <CustomSelect
-            label={t('fields.category')}
+            <div className="flex gap-3">
+              <CustomSelect
+                label={t('fields.category')}
             value={categoryFilter}
             onChange={setCategoryFilter}
             options={categoryOptions}
@@ -770,6 +821,8 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
           onClose={() => setSelectedExpenseId(null)}
           onExpenseUpdated={() => refetch()}
         />
+      )}
+        </>
       )}
     </div>
   );

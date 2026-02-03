@@ -784,4 +784,30 @@ export class ExpenseController {
       res.status(500).json({ error: 'Internal server error', message: error.message });
     }
   };
+
+  /**
+   * Manually trigger recurring expense processing
+   * POST /api/expenses/recurring/trigger
+   */
+  triggerRecurringExpenses = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      // Import and trigger the scheduler
+      const recurringExpenseScheduler = (await import('../../services/financial/recurring-expense-scheduler.service')).default;
+      await recurringExpenseScheduler.triggerManually();
+
+      res.status(200).json({ 
+        success: true, 
+        message: 'Recurring expense processing triggered successfully' 
+      });
+    } catch (error: any) {
+      logger.error('[Recurring] Trigger error:', error);
+      res.status(500).json({ error: 'Internal server error', message: error.message });
+    }
+  };
 }

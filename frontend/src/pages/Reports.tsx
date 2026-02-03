@@ -8,6 +8,7 @@
  * - Expense Report
  * - Time Tracking Report
  * - Client Revenue Report
+ * - Tax Package Download
  * 
  * Reports are generated on-the-fly based on selected date range.
  * 
@@ -22,14 +23,16 @@ import {
   Users,
   Calendar,
   Download,
+  FolderArchive,
 } from 'lucide-react';
 import ExportModal, { ExportFormat } from '../components/reports/ExportModal';
+import TaxPackageDownload from '../components/reports/TaxPackageDownload';
 import { exportAsJSON, exportAsCSV, exportAsExcel } from '../utils/reportExport';
 import apiClient from '../api/services/client';
 import { useClients } from '../hooks/api/useClients';
 import { useProjects } from '../hooks/api/useProjects';
 
-type ReportType = 'incomeExpense' | 'timeTracking';
+type ReportType = 'incomeExpense' | 'timeTracking' | 'taxPackage';
 
 interface QuickPeriod {
   key: string;
@@ -47,6 +50,7 @@ export default function Reports() {
   const [reportData, setReportData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showTaxPackage, setShowTaxPackage] = useState(false);
   const [includeTaxExcluded, setIncludeTaxExcluded] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
@@ -120,6 +124,11 @@ export default function Reports() {
       key: 'timeTracking' as ReportType,
       icon: Clock,
       color: 'bg-indigo-500',
+    },
+    {
+      key: 'taxPackage' as ReportType,
+      icon: FolderArchive,
+      color: 'bg-blue-500',
     },
   ];
 
@@ -283,7 +292,14 @@ export default function Reports() {
             return (
               <button
                 key={type.key}
-                onClick={() => setSelectedReport(type.key)}
+                onClick={() => {
+                  if (type.key === 'taxPackage') {
+                    setShowTaxPackage(true);
+                  } else {
+                    setSelectedReport(type.key);
+                    setShowTaxPackage(false);
+                  }
+                }}
                 className={`
                   p-6 rounded-lg border-2 text-left transition-all
                   ${isSelected
@@ -489,6 +505,13 @@ export default function Reports() {
               <code>frontend/src/components/reports/</code> to format each report type properly.
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Tax Package Section */}
+      {showTaxPackage && (
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+          <TaxPackageDownload onClose={() => setShowTaxPackage(false)} />
         </div>
       )}
 
