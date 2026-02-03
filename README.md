@@ -1,7 +1,7 @@
 # OpenTYME - Track Your Money & Effort
 
 <div align="center">
-  <img src="tyme_purple.svg" alt="OpenTYME Logo" width="120" height="120"/>
+  <img src="opentyme_purple.svg" alt="OpenTYME Logo" width="120" height="120"/>
   <br />
   <br />
 </div>
