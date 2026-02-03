@@ -13,6 +13,7 @@
 
 > A modern, full-stack application for freelance developers to track time, manage finances, generate invoices, and handle expenses, all with enterprise-grade security via Keycloak SSO.
 
+
 ---
 
 ## 📋 Table of Contents
