@@ -72,12 +72,12 @@ z"/>
                 </svg>
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                tyme
+                OpenTYME
               </span>
             </div>
             <div className="text-gray-400 text-center md:text-right">
               <p className="font-semibold text-gray-300">Track Your Money & Effort</p>
-              <p className="text-sm mt-2">&copy; 2025 tyme. All rights reserved.</p>
+              <p className="text-sm mt-2">&copy; 2026 OpenTYME. All rights reserved.</p>
             </div>
           </div>
         </div>

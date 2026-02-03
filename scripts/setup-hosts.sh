@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Tyme - Hosts File Setup Script
+# OpenTYME - Hosts File Setup Script
 # =============================================================================
 # This script adds the required local domain entries to your hosts file.
 # Run with sudo/administrator privileges.
@@ -99,7 +99,7 @@ add_host_entry() {
 main() {
     echo ""
     echo "==========================================="
-    echo "  Tyme - Local Domain Setup"
+    echo "  OpenTYME - Local Domain Setup"
     echo "==========================================="
     echo ""
     
@@ -149,9 +149,9 @@ main() {
     fi
     
     # Check if our comment marker exists
-    if ! grep -q "# Tyme Development" "$HOSTS_FILE" 2>/dev/null; then
+    if ! grep -q "# OpenTYME Development" "$HOSTS_FILE" 2>/dev/null; then
         echo "" >> "$HOSTS_FILE"
-        echo "# Tyme Development - Local Domains (IP: $LOCAL_IP)" >> "$HOSTS_FILE"
+        echo "# OpenTYME Development - Local Domains (IP: $LOCAL_IP)" >> "$HOSTS_FILE"
     fi
     
     for domain in "${DOMAINS[@]}"; do
@@ -162,7 +162,7 @@ main() {
     echo -e "${GREEN}✓ Hosts file updated successfully!${NC}"
     echo ""
     echo -e "${CYAN}You can now access:${NC}"
-    echo "  - http://localhost          (Tyme App)"
+    echo "  - http://localhost          (OpenTYME App)"
     echo "  - http://auth.localhost     (Keycloak)"
     echo "  - http://traefik.localhost  (Traefik Dashboard)"
     echo "  - http://mail.localhost     (MailHog)"

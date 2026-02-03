@@ -1,6 +1,6 @@
 @echo off
 :: =============================================================================
-:: Tyme - Hosts File Setup Script (Windows Batch)
+:: OpenTYME - Hosts File Setup Script (Windows Batch)
 :: =============================================================================
 :: This script will launch the PowerShell setup script with Administrator rights.
 :: Simply double-click this file to run.
@@ -8,7 +8,7 @@
 
 echo.
 echo ==========================================
-echo   Tyme - Local Domain Setup
+echo   OpenTYME - Local Domain Setup
 echo ==========================================
 echo.
 

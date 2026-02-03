@@ -1,4 +1,4 @@
-# tyme - Frontend
+# OpenTYME - Frontend
 
 > React 18 + TypeScript + Vite SPA with TailwindCSS, React Query, and Keycloak authentication.
 
@@ -523,8 +523,8 @@ VITE_API_BASE_URL=http://localhost:8000
 
 # Keycloak Configuration
 VITE_KEYCLOAK_URL=http://localhost:8080
-VITE_KEYCLOAK_REALM=tyme
-VITE_KEYCLOAK_CLIENT_ID=tyme-frontend
+VITE_KEYCLOAK_REALM=opentyme
+VITE_KEYCLOAK_CLIENT_ID=opentyme-frontend
 
 # Feature Flags
 VITE_ENABLE_ANALYTICS=true
@@ -566,13 +566,13 @@ npm run build
 
 ```bash
 # Development image (hot reload)
-docker build -f Dockerfile.dev -t tyme-frontend:dev .
+docker build -f Dockerfile.dev -t opentyme-frontend:dev .
 
 # Production image (nginx)
-docker build -t tyme-frontend:prod .
+docker build -t opentyme-frontend:prod .
 
 # Run production container
-docker run -p 80:80 tyme-frontend:prod
+docker run -p 80:80 opentyme-frontend:prod
 ```
 
 ### Production Configuration (nginx)
@@ -780,7 +780,7 @@ export const ClientCard: React.FC<ClientCardProps> = ({ ... }) => { ... }
 
 ## 📄 License
 
-MIT License - See root LICENSE file
+CC BY-NC 4.0 License - See root LICENSE file
 
 ---
 

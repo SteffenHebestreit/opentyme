@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-# Backup script for tyme application
+# Backup script for OpenTYME application
 # This script backs up all critical data needed to restore the system:
-# - PostgreSQL main database (tyme)
+# - PostgreSQL main database (opentyme)
 # - PostgreSQL Keycloak database (authentication)
 # - MinIO object storage (receipts, documents, user files)
 
@@ -19,7 +19,7 @@ DB_HOST="${DB_HOST:-db}"
 DB_PORT="${DB_PORT:-5432}"
 DB_USER="${DB_USER:-postgres}"
 DB_PASSWORD="${POSTGRES_PASSWORD:-password}"
-DB_NAME="${POSTGRES_DB:-tyme}"
+DB_NAME="${POSTGRES_DB:-opentyme}"
 
 # Keycloak Database configuration
 KEYCLOAK_DB_HOST="${KEYCLOAK_DB_HOST:-keycloak-db}"
@@ -52,10 +52,10 @@ echo "[BACKUP] Include Storage (MinIO): $INCLUDE_STORAGE"
 echo "[BACKUP] Include Config: $INCLUDE_CONFIG"
 echo "[BACKUP] ============================================"
 
-# Backup main tyme database
+# Backup main opentyme database
 if [ "$INCLUDE_DB" = "true" ]; then
     echo ""
-    echo "[BACKUP] === Main Database (tyme) ==="
+    echo "[BACKUP] === Main Database (opentyme) ==="
     echo "[BACKUP] Host: $DB_HOST:$DB_PORT"
     
     PGPASSWORD="$DB_PASSWORD" pg_dump \
@@ -64,11 +64,11 @@ if [ "$INCLUDE_DB" = "true" ]; then
         -U "$DB_USER" \
         -d "$DB_NAME" \
         -F c \
-        -f "$TEMP_DIR/tyme_database.dump" 2>&1
+        -f "$TEMP_DIR/opentyme_database.dump" 2>&1
     
     if [ $? -eq 0 ]; then
-        TYME_DB_SIZE=$(stat -c%s "$TEMP_DIR/tyme_database.dump" 2>/dev/null || stat -f%z "$TEMP_DIR/tyme_database.dump" 2>/dev/null || echo "0")
-        echo "[BACKUP] ✓ Main database backup completed ($TYME_DB_SIZE bytes)"
+        OPENTYME_DB_SIZE=$(stat -c%s "$TEMP_DIR/opentyme_database.dump" 2>/dev/null || stat -f%z "$TEMP_DIR/opentyme_database.dump" 2>/dev/null || echo "0")
+        echo "[BACKUP] ✓ Main database backup completed ($OPENTYME_DB_SIZE bytes)"
     else
         echo "[BACKUP] ✗ Main database backup failed!"
         rm -rf "$TEMP_DIR"
@@ -158,13 +158,13 @@ cat > "$TEMP_DIR/manifest.json" << EOF
   "backup_timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "backup_version": "2.0",
   "includes": {
-    "tyme_database": $INCLUDE_DB,
+    "opentyme_database": $INCLUDE_DB,
     "keycloak_database": $INCLUDE_DB,
     "minio_storage": $INCLUDE_STORAGE,
     "config_files": $INCLUDE_CONFIG
   },
   "databases": {
-    "tyme": {
+    "opentyme": {
       "host": "$DB_HOST",
       "name": "$DB_NAME"
     },

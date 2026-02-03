@@ -1,8 +1,8 @@
 {
-  "name": "tyme-frontend",
+  "name": "opentyme-frontend",
   "version": "1.0.0",
   "private": true,
-  "description": "Frontend application for tyme - Time Tracking & Invoicing System",
+  "description": "Frontend application for OpenTYME - Time Tracking & Invoicing System",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

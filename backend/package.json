@@ -1,7 +1,7 @@
 {
-  "name": "tyme-backend",
+  "name": "opentyme-backend",
   "version": "1.0.0",
-  "description": "Backend API service for tyme - Time Tracking & Invoicing System",
+  "description": "Backend API service for OpenTYME - Time Tracking & Invoicing System",
   "main": "index.js",
   "scripts": {
     "start": "node dist/index.ts",
@@ -17,10 +17,10 @@
     "test:integration": "NODE_ENV=test jest --testPathPattern=tests/integration",
     "lint": "eslint . --ext .ts,.js",
     "lint:fix": "eslint . --ext .ts,.js --fix",
-    "pretest": "echo 'Ensure tyme-test-db container is running: docker compose up -d tyme-test-db'"
+    "pretest": "echo 'Ensure opentyme-test-db container is running: docker compose up -d opentyme-test-db'"
   },
   "keywords": [
-    "tyme",
+    "opentyme",
     "time-tracking",
     "invoicing",
     "zugferd",

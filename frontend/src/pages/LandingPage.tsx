@@ -293,7 +293,7 @@ const LandingPage: React.FC = () => {
             <h2 className="text-5xl font-bold mb-4 text-gray-900 dark:bg-gradient-to-r dark:from-purple-200 dark:to-pink-200 dark:bg-clip-text dark:text-transparent">
               Everything You Need
             </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-400">Focus on creating. Let tyme handle the admin.</p>
+            <p className="text-xl text-gray-600 dark:text-gray-400">Focus on creating. Let OpenTYME handle the admin.</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">

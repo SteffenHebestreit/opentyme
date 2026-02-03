@@ -27,7 +27,7 @@
 
 ## Overview
 
-The tyme project has a multi-layered AI integration architecture designed for:
+The OpenTYME project has a multi-layered AI integration architecture designed for:
 
 1. **Receipt/Expense PDF Extraction** - Using MCP (Model Context Protocol) server with file-to-markdown conversion
 2. **Structured Expense Data Extraction** - Using OpenAI-compatible LLM APIs
@@ -47,7 +47,7 @@ The MCP (Model Context Protocol) server handles PDF-to-text extraction.
 ```yaml
 mcp-server:
   image: fastapi_mcp_template
-  container: tyme-mcp-server
+  container: opentyme-mcp-server
   port: 8001 (external) → 8000 (internal)
   url: http://mcp-server:8000
   traefik: mcp.localhost

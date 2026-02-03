@@ -1,4 +1,4 @@
-# tyme Backend - Test Runner Dockerfile
+# OpenTYME Backend - Test Runner Dockerfile
 # Used for running tests inside containers for CI/CD
 
 FROM node:20-alpine

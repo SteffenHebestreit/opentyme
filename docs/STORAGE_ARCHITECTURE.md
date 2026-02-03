@@ -20,7 +20,7 @@
 
 ## Overview
 
-The tyme application uses **MinIO** (S3-compatible object storage) with a **per-user bucket architecture** for file storage. Each user gets their own isolated bucket for better data isolation, GDPR compliance, and simplified management.
+The OpenTYME application uses **MinIO** (S3-compatible object storage) with a **per-user bucket architecture** for file storage. Each user gets their own isolated bucket for better data isolation, GDPR compliance, and simplified management.
 
 ## Bucket Structure
 
@@ -150,17 +150,17 @@ Each file includes:
 
 ### List User Buckets
 ```bash
-docker exec tyme-minio mc ls minio/ | grep "user-"
+docker exec opentyme-minio mc ls minio/ | grep "user-"
 ```
 
 ### Check Bucket Size
 ```bash
-docker exec tyme-minio mc du minio/user-{userId}
+docker exec opentyme-minio mc du minio/user-{userId}
 ```
 
 ### Delete User Bucket
 ```bash
-docker exec tyme-minio mc rb --force minio/user-{userId}
+docker exec opentyme-minio mc rb --force minio/user-{userId}
 ```
 
 ## Backward Compatibility

@@ -27,13 +27,13 @@ export interface KeycloakConfig {
  * 
  * Environment Variables:
  * - VITE_KEYCLOAK_URL: Keycloak server URL (default: http://localhost:8080)
- * - VITE_KEYCLOAK_REALM: Keycloak realm name (default: tyme)
- * - VITE_KEYCLOAK_CLIENT_ID: Keycloak client ID (default: tyme-frontend)
+ * - VITE_KEYCLOAK_REALM: Keycloak realm name (default: opentyme)
+ * - VITE_KEYCLOAK_CLIENT_ID: Keycloak client ID (default: opentyme-frontend)
  */
 export const keycloakConfig: KeycloakConfig = {
   url: import.meta.env.VITE_KEYCLOAK_URL || 'http://localhost:8080',
-  realm: import.meta.env.VITE_KEYCLOAK_REALM || 'tyme',
-  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'tyme-frontend',
+  realm: import.meta.env.VITE_KEYCLOAK_REALM || 'opentyme',
+  clientId: import.meta.env.VITE_KEYCLOAK_CLIENT_ID || 'opentyme-frontend',
 };
 
 /**

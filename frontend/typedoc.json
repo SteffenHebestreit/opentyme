@@ -3,7 +3,7 @@
   "entryPoints": ["./src"],
   "entryPointStrategy": "expand",
   "out": "docs",
-  "name": "tyme - Frontend Documentation",
+  "name": "OpenTYME - Frontend Documentation",
   "includeVersion": true,
   "readme": "none",
   "plugin": [],

@@ -1,9 +1,9 @@
 #!/bin/bash
 
 ###############################################################################
-# tyme Restore Script (Host-side)
+# OpenTYME Restore Script (Host-side)
 # Restores:
-# - Tyme PostgreSQL database
+# - OpenTYME PostgreSQL database
 # - Keycloak PostgreSQL database
 # - MinIO object storage (all user buckets)
 # - Configuration files (optional)
@@ -16,7 +16,7 @@
 # Usage: ./restore.sh <backup_path>
 #
 # Environment variables:
-#   RESTORE_DATABASE    - Restore Tyme database (default: true)
+#   RESTORE_DATABASE    - Restore OpenTYME database (default: true)
 #   RESTORE_KEYCLOAK    - Restore Keycloak database (default: true)
 #   RESTORE_MINIO       - Restore MinIO storage (default: true)
 #   RESTORE_CONFIG      - Restore configuration files (default: false)
@@ -87,10 +87,10 @@ if ! command -v docker-compose &> /dev/null; then
 fi
 
 log "=============================================="
-log "Tyme System Restore"
+log "OpenTYME System Restore"
 log "=============================================="
 log "Backup path: $BACKUP_PATH"
-log "Restore Tyme DB: $RESTORE_DATABASE"
+log "Restore OpenTYME DB: $RESTORE_DATABASE"
 log "Restore Keycloak DB: $RESTORE_KEYCLOAK"
 log "Restore MinIO: $RESTORE_MINIO"
 log "Restore Config: $RESTORE_CONFIG"
@@ -105,7 +105,7 @@ echo ""
 if [ "$DRY_RUN" = "true" ]; then
     warn "DRY RUN MODE - No changes will be made"
     log "Would restore from: $BACKUP_PATH"
-    [ -f "$BACKUP_PATH/tyme_database.dump" ] || [ -f "$BACKUP_PATH/database.dump" ] && log "  - Tyme database: YES"
+    [ -f "$BACKUP_PATH/opentyme_database.dump" ] || [ -f "$BACKUP_PATH/tyme_database.dump" ] || [ -f "$BACKUP_PATH/database.dump" ] && log "  - OpenTYME database: YES"
     [ -f "$BACKUP_PATH/keycloak_database.dump" ] && log "  - Keycloak database: YES"
     [ -d "$BACKUP_PATH/minio_backup" ] && log "  - MinIO storage: YES"
     exit 0
@@ -127,10 +127,10 @@ if [ "$SKIP_PRE_BACKUP" != "true" ]; then
     log "============================================="
     mkdir -p "$PRE_RESTORE_BACKUP_DIR"
     
-    # Backup current Tyme database
+    # Backup current OpenTYME database
     if [ "$RESTORE_DATABASE" = "true" ]; then
-        log "Backing up current Tyme database..."
-        $DOCKER_COMPOSE exec -T db pg_dump -U postgres -d tyme -Fc > "$PRE_RESTORE_BACKUP_DIR/tyme_database.dump" 2>/dev/null || warn "Could not backup Tyme database (may not exist)"
+        log "Backing up current OpenTYME database..."
+        $DOCKER_COMPOSE exec -T db pg_dump -U postgres -d opentyme -Fc > "$PRE_RESTORE_BACKUP_DIR/opentyme_database.dump" 2>/dev/null || warn "Could not backup OpenTYME database (may not exist)"
     fi
     
     # Backup current Keycloak database
@@ -146,11 +146,13 @@ else
     warn "Skipping pre-restore backup (SKIP_PRE_BACKUP=true)"
 fi
 
-# Restore Tyme database
+# Restore OpenTYME database
 if [ "$RESTORE_DATABASE" = "true" ]; then
     # Check for both new and legacy formats
     DB_FILE=""
-    if [ -f "$BACKUP_PATH/tyme_database.dump" ]; then
+    if [ -f "$BACKUP_PATH/opentyme_database.dump" ]; then
+        DB_FILE="$BACKUP_PATH/opentyme_database.dump"
+    elif [ -f "$BACKUP_PATH/tyme_database.dump" ]; then
         DB_FILE="$BACKUP_PATH/tyme_database.dump"
     elif [ -f "$BACKUP_PATH/database.dump" ]; then
         DB_FILE="$BACKUP_PATH/database.dump"
@@ -160,23 +162,23 @@ if [ "$RESTORE_DATABASE" = "true" ]; then
     fi
     
     if [ -n "$DB_FILE" ] && [ -f "$DB_FILE" ]; then
-        log "Restoring Tyme database from: $DB_FILE"
+        log "Restoring OpenTYME database from: $DB_FILE"
         
         # Drop and recreate database
-        $DOCKER_COMPOSE exec -T db psql -U postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='tyme' AND pid <> pg_backend_pid();" 2>/dev/null || true
-        $DOCKER_COMPOSE exec -T db psql -U postgres -c "DROP DATABASE IF EXISTS tyme;" 2>/dev/null || true
-        $DOCKER_COMPOSE exec -T db psql -U postgres -c "CREATE DATABASE tyme;"
+        $DOCKER_COMPOSE exec -T db psql -U postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='opentyme' AND pid <> pg_backend_pid();" 2>/dev/null || true
+        $DOCKER_COMPOSE exec -T db psql -U postgres -c "DROP DATABASE IF EXISTS opentyme;" 2>/dev/null || true
+        $DOCKER_COMPOSE exec -T db psql -U postgres -c "CREATE DATABASE opentyme;"
         
         # Restore from backup (handle both formats)
         if [[ "$DB_FILE" == *.sql.gz ]]; then
-            gunzip -c "$DB_FILE" | $DOCKER_COMPOSE exec -T db psql -U postgres -d tyme
+            gunzip -c "$DB_FILE" | $DOCKER_COMPOSE exec -T db psql -U postgres -d opentyme
         else
-            cat "$DB_FILE" | $DOCKER_COMPOSE exec -T db pg_restore -U postgres -d tyme -v --no-owner --no-privileges 2>&1 || true
+            cat "$DB_FILE" | $DOCKER_COMPOSE exec -T db pg_restore -U postgres -d opentyme -v --no-owner --no-privileges 2>&1 || true
         fi
         
-        log "Tyme database restored successfully"
+        log "OpenTYME database restored successfully"
     else
-        warn "Tyme database backup file not found"
+        warn "OpenTYME database backup file not found"
     fi
 fi
 

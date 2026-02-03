@@ -1,7 +1,7 @@
-# tyme - Track Your Money & Effort
+# OpenTYME - Track Your Money & Effort
 
 <div align="center">
-  <img src="tyme_purple.svg" alt="Tyme Logo" width="120" height="120"/>
+  <img src="tyme_purple.svg" alt="OpenTYME Logo" width="120" height="120"/>
   <br />
   <br />
 </div>
@@ -38,9 +38,9 @@
 
 ## 🎯 Overview
 
-**tyme (Track Your Money & Effort)** is a comprehensive financial and time management system designed for freelance developers, consultants, and digital nomads. Built with modern technologies and enterprise-grade security, it provides everything you need to track billable time, manage client relationships, generate professional invoices, and track business expenses.
+**OpenTYME (Track Your Money & Effort)** is a comprehensive financial and time management system designed for freelance developers, consultants, and digital nomads. Built with modern technologies and enterprise-grade security, it provides everything you need to track billable time, manage client relationships, generate professional invoices, and track business expenses.
 
-### Why tyme?
+### Why OpenTYME?
 
 - **Enterprise Authentication**: Keycloak SSO with OAuth 2.0/OIDC
 - **Complete Multi-Tenancy**: Full data isolation per user
@@ -323,8 +323,8 @@ expenses (project-level or general)
 
 ```bash
 # Clone the repository
-git clone https://github.com/SteffenHebestreit/tyme.git
-cd tyme
+git clone https://github.com/SteffenHebestreit/opentyme.git
+cd opentyme
 
 # Create environment file (optional - defaults work for development)
 cp .env.example .env
@@ -332,7 +332,7 @@ cp .env.example .env
 
 ### 2. Configure Local Domains (Required)
 
-Tyme uses subdomains for its services (e.g., `auth.localhost` for Keycloak). You need to add these to your hosts file:
+OpenTYME uses subdomains for its services (e.g., `auth.localhost` for Keycloak). You need to add these to your hosts file:
 
 **Windows (PowerShell as Administrator):**
 ```powershell
@@ -388,7 +388,7 @@ Once all services are running:
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| **Tyme App** | http://localhost | admin / Admin123! |
+| **OpenTYME App** | http://localhost | admin / Admin123! |
 | **Backend API** | http://localhost/api | (via token) |
 | **Keycloak Admin** | http://auth.localhost | admin / admin |
 | **Traefik Dashboard** | http://traefik.localhost | (no auth required) |
@@ -415,7 +415,7 @@ Once all services are running:
 
 ### 7. Enable AI Features (Optional)
 
-Tyme includes AI-powered features that enhance productivity:
+OpenTYME includes AI-powered features that enhance productivity:
 
 - **Receipt Extraction** - Automatically extract expense data from uploaded PDFs (vendor, amount, date, tax)
 - **Depreciation Research** - AI-assisted lookup of German AfA tables (useful life periods, depreciation methods)
@@ -498,7 +498,7 @@ Create a `.env` file in the project root (or use defaults):
 # ============================================
 # DATABASE CONFIGURATION
 # ============================================
-POSTGRES_DB=tyme_db
+POSTGRES_DB=opentyme_db
 POSTGRES_PASSWORD=password
 
 # Keycloak Database (Isolated)
@@ -523,10 +523,10 @@ KEYCLOAK_ADMIN_PASSWORD=admin
 KEYCLOAK_PORT=8080
 KEYCLOAK_URL=http://keycloak:8080
 KEYCLOAK_PUBLIC_URL=http://auth.localhost
-KEYCLOAK_REALM=tyme
-KEYCLOAK_CLIENT_ID=tyme-app
-KEYCLOAK_CLIENT_SECRET=tyme-secret-change-in-production
-KEYCLOAK_ADMIN_CLIENT_ID=tyme-admin-service
+KEYCLOAK_REALM=opentyme
+KEYCLOAK_CLIENT_ID=opentyme-app
+KEYCLOAK_CLIENT_SECRET=opentyme-secret-change-in-production
+KEYCLOAK_ADMIN_CLIENT_ID=opentyme-admin-service
 KEYCLOAK_ADMIN_CLIENT_SECRET=admin-service-secret-change-in-production
 KEYCLOAK_ENABLED=true
 
@@ -538,8 +538,8 @@ VITE_APP_ENVIRONMENT=development
 VITE_API_BASE_URL=http://backend:8000
 VITE_API_URL=http://backend:8000
 VITE_KEYCLOAK_URL=http://auth.localhost
-VITE_KEYCLOAK_REALM=tyme
-VITE_KEYCLOAK_CLIENT_ID=tyme-frontend
+VITE_KEYCLOAK_REALM=opentyme
+VITE_KEYCLOAK_CLIENT_ID=opentyme-frontend
 VITE_KEYCLOAK_ENABLED=true
 
 # ============================================
@@ -556,7 +556,7 @@ SMTP_HOST=mailhog
 SMTP_PORT=1025
 SMTP_USER=
 SMTP_PASS=
-EMAIL_FROM=noreply@tyme.local
+EMAIL_FROM=noreply@opentyme.local
 
 # ============================================
 # PROXY CONFIGURATION
@@ -568,11 +568,11 @@ NGINX_PORT=8888
 
 The Keycloak realm is automatically imported from `keycloak/realm-import.json` on first startup. It includes:
 
-- **Realm**: `tyme`
+- **Realm**: `opentyme`
 - **Clients**:
-  - `tyme-app` - Backend service client (confidential)
-  - `tyme-frontend` - Frontend SPA client (public with PKCE)
-  - `tyme-admin-service` - Admin service client
+  - `opentyme-app` - Backend service client (confidential)
+  - `opentyme-frontend` - Frontend SPA client (public with PKCE)
+  - `opentyme-admin-service` - Admin service client
   - `minio` - MinIO integration
 - **Default Users**:
   - `admin` (role: admin)
@@ -1077,8 +1077,8 @@ Set up automated backups:
 # Daily backup script
 #!/bin/bash
 DATE=$(date +%Y%m%d_%H%M%S)
-docker exec tyme-db pg_dump \
-  -U postgres tyme_db \
+docker exec opentyme-db pg_dump \
+  -U postgres opentyme_db \
   > backups/backup_$DATE.sql
 
 # Keep only last 30 days
@@ -1168,10 +1168,10 @@ brew install postgresql redis  # macOS
 sudo apt install postgresql redis-server  # Ubuntu
 
 # 2. Create database
-createdb tyme_db
+createdb opentyme_db
 
 # 3. Initialize database
-psql tyme_db < init.sql
+psql opentyme_db < init.sql
 
 # 4. Backend setup
 cd backend
@@ -1197,7 +1197,7 @@ docker-compose up -d
 ### Project Structure
 
 ```
-tyme/
+opentyme/
 ├── frontend/                   # React frontend
 │   ├── src/
 │   │   ├── api/               # API client services
@@ -1243,7 +1243,7 @@ tyme/
 ├── backups/                    # Backup storage
 ├── init.sql                   # Database schema
 ├── docker-compose.yml         # Service orchestration
-├── LICENSE                    # MIT License
+├── LICENSE                    # CC BY-NC 4.0 License
 └── README.md                  # This file
 ```
 
@@ -1362,7 +1362,7 @@ docker-compose logs db
 docker-compose restart db
 
 # Verify database initialization
-docker exec -it tyme-db psql -U postgres -d tyme_db -c "\dt"
+docker exec -it opentyme-db psql -U postgres -d opentyme_db -c "\dt"
 ```
 
 #### Keycloak not accessible
@@ -1426,7 +1426,7 @@ open http://minio.localhost
 docker-compose down -v --rmi all
 
 # Remove database volumes
-docker volume rm $(docker volume ls -q | grep tyme)
+docker volume rm $(docker volume ls -q | grep opentyme)
 
 # Start fresh
 docker-compose up -d
@@ -1456,7 +1456,7 @@ docker stats
 # Settings > Resources > Memory > 4GB+
 
 # Optimize database
-docker exec -it tyme-db psql -U postgres -d tyme_db
+docker exec -it opentyme-db psql -U postgres -d opentyme_db
 # Run: VACUUM ANALYZE;
 ```
 
@@ -1525,31 +1525,21 @@ We welcome contributions! Please follow these guidelines:
 
 ## 📝 License
 
-This project is licensed under the **MIT License**.
+This project is licensed under the **Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0)**.
 
-```
-MIT License
+**You are free to:**
+- Share — copy and redistribute the material in any medium or format
+- Adapt — remix, transform, and build upon the material
 
-Copyright (c) 2025 tyme Contributors
+**Under the following terms:**
+- **Attribution** — You must give appropriate credit and indicate if changes were made.
+- **NonCommercial** — You may not use the material for commercial purposes.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+For commercial licensing inquiries, please contact the copyright holder.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Full license: https://creativecommons.org/licenses/by-nc/4.0/
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
+Copyright (c) 2025-2026 Steffen Hebestreit
 
 ---
 
@@ -1571,8 +1561,8 @@ SOFTWARE.
 ### Getting Help
 
 - **Documentation**: You're reading it!
-- **GitHub Issues**: https://github.com/SteffenHebestreit/tyme/issues
-- **Discussions**: https://github.com/SteffenHebestreit/tyme/discussions
+- **GitHub Issues**: https://github.com/SteffenHebestreit/opentyme/issues
+- **Discussions**: https://github.com/SteffenHebestreit/opentyme/discussions
 
 ### Reporting Bugs
 

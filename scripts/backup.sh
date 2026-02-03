@@ -1,9 +1,9 @@
 #!/bin/bash
 
 ###############################################################################
-# tyme Backup Script (Host-side)
+# OpenTYME Backup Script (Host-side)
 # Backs up:
-# - Tyme PostgreSQL database
+# - OpenTYME PostgreSQL database
 # - Keycloak PostgreSQL database
 # - MinIO object storage (all user buckets)
 # - Configuration files (optional)
@@ -12,7 +12,7 @@
 #
 # Environment variables:
 #   BACKUP_DIR          - Base backup directory (default: ./backups)
-#   INCLUDE_DATABASE    - Include Tyme database (default: true)
+#   INCLUDE_DATABASE    - Include OpenTYME database (default: true)
 #   INCLUDE_KEYCLOAK    - Include Keycloak database (default: true)
 #   INCLUDE_MINIO       - Include MinIO storage (default: true)
 #   INCLUDE_CONFIG      - Include configuration files (default: false)
@@ -64,27 +64,27 @@ fi
 # Create backup directory
 mkdir -p "$BACKUP_DIR"
 log "=============================================="
-log "Tyme System Backup"
+log "OpenTYME System Backup"
 log "=============================================="
 log "Backup name: $BACKUP_NAME"
 log "Backup directory: $BACKUP_DIR"
-log "Include Tyme DB: $INCLUDE_DATABASE"
+log "Include OpenTYME DB: $INCLUDE_DATABASE"
 log "Include Keycloak DB: $INCLUDE_KEYCLOAK"
 log "Include MinIO: $INCLUDE_MINIO"
 log "Include Config: $INCLUDE_CONFIG"
 log "=============================================="
 
-# Backup Tyme database
+# Backup OpenTYME database
 if [ "$INCLUDE_DATABASE" = "true" ]; then
-    log "Backing up Tyme database..."
-    DB_FILE="$BACKUP_DIR/tyme_database.dump"
+    log "Backing up OpenTYME database..."
+    DB_FILE="$BACKUP_DIR/opentyme_database.dump"
     
-    $DOCKER_COMPOSE exec -T db pg_dump -U postgres -d tyme -Fc > "$DB_FILE"
+    $DOCKER_COMPOSE exec -T db pg_dump -U postgres -d opentyme -Fc > "$DB_FILE"
     
     if [ $? -eq 0 ] && [ -s "$DB_FILE" ]; then
-        log "Tyme database backup completed: $(du -h "$DB_FILE" | cut -f1)"
+        log "OpenTYME database backup completed: $(du -h "$DB_FILE" | cut -f1)"
     else
-        error "Tyme database backup failed"
+        error "OpenTYME database backup failed"
         rm -f "$DB_FILE"
         exit 1
     fi
@@ -161,7 +161,7 @@ cat > "$BACKUP_DIR/manifest.json" <<EOF
   "backup_name": "$BACKUP_NAME",
   "timestamp": "$(date -Iseconds)",
   "includes": {
-    "tyme_database": $INCLUDE_DATABASE,
+    "opentyme_database": $INCLUDE_DATABASE,
     "keycloak_database": $INCLUDE_KEYCLOAK,
     "minio_storage": $INCLUDE_MINIO,
     "config": $INCLUDE_CONFIG

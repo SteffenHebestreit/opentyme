@@ -1,6 +1,6 @@
-# tyme - Time Tracking & Invoicing System - Docker Compose Configuration
+# OpenTYME - Time Tracking & Invoicing System - Docker Compose Configuration
 
-name: tyme
+name: opentyme
 
 services:
   # Backend API Service
@@ -8,30 +8,30 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: tyme-backend
+    container_name: opentyme-backend
     command: npm run dev  # Use dev-watch wrapper (node --watch + restart loop) for development
     restart: always
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
       - NODE_ENV=${NODE_ENV:-development}
-      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-tyme}
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-opentyme}
       - BACKEND_SECRET_KEY=${BACKEND_SECRET_KEY:-your-super-secret-key-here}
       - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-here}
       - DEBUG=${DEBUG:-true}
       - KEYCLOAK_URL=http://keycloak:8080
       - KEYCLOAK_PUBLIC_URL=http://auth.localhost
-      - KEYCLOAK_REALM=tyme
-      - KEYCLOAK_CLIENT_ID=tyme-app
-      - KEYCLOAK_CLIENT_SECRET=tyme-secret-change-in-production
-      - KEYCLOAK_ADMIN_CLIENT_ID=tyme-admin-service
+      - KEYCLOAK_REALM=opentyme
+      - KEYCLOAK_CLIENT_ID=opentyme-app
+      - KEYCLOAK_CLIENT_SECRET=opentyme-secret-change-in-production
+      - KEYCLOAK_ADMIN_CLIENT_ID=opentyme-admin-service
       - KEYCLOAK_ADMIN_CLIENT_SECRET=admin-service-secret-change-in-production
       - KEYCLOAK_ENABLED=true
       - SMTP_HOST=mailhog
       - SMTP_PORT=1025
       - SMTP_USER=
       - SMTP_PASS=
-      - EMAIL_FROM=noreply@tyme.local
+      - EMAIL_FROM=noreply@opentyme.local
       # MinIO Object Storage
       - MINIO_ENDPOINT=minio
       - MINIO_PORT=9000
@@ -74,7 +74,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
-    container_name: tyme-frontend
+    container_name: opentyme-frontend
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
       - "4173:4173"
@@ -83,8 +83,8 @@ services:
       - VITE_API_BASE_URL=http://backend:8000
       - VITE_API_URL=http://backend:8000
       - VITE_KEYCLOAK_URL=http://auth.localhost
-      - VITE_KEYCLOAK_REALM=tyme
-      - VITE_KEYCLOAK_CLIENT_ID=tyme-frontend
+      - VITE_KEYCLOAK_REALM=opentyme
+      - VITE_KEYCLOAK_CLIENT_ID=opentyme-frontend
       - VITE_KEYCLOAK_ENABLED=true
     volumes:
       - ./frontend:/app
@@ -127,9 +127,9 @@ services:
   # PostgreSQL Database for Application
   db:
     image: postgres:17-alpine
-    container_name: tyme-db
+    container_name: opentyme-db
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-tyme}
+      - POSTGRES_DB=${POSTGRES_DB:-opentyme}
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
     volumes:
@@ -149,7 +149,7 @@ services:
   # PostgreSQL Database for Keycloak (isolated)
   keycloak-db:
     image: postgres:17-alpine
-    container_name: tyme-keycloak-db
+    container_name: opentyme-keycloak-db
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_USER=keycloak_user
@@ -168,11 +168,11 @@ services:
       - project-network
 
   # PostgreSQL Database for Testing
-  tyme-test-db:
+  opentyme-test-db:
     image: postgres:17-alpine
-    container_name: tyme-test-db
+    container_name: opentyme-test-db
     environment:
-      - POSTGRES_DB=tyme_test
+      - POSTGRES_DB=opentyme_test
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=testpass
     ports:
@@ -180,7 +180,7 @@ services:
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d tyme_test"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d opentyme_test"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -193,17 +193,17 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.test
-    container_name: tyme-backend-tests
+    container_name: opentyme-backend-tests
     environment:
       - NODE_ENV=test
       - DOCKER_ENV=true
-      - DATABASE_URL=postgresql://postgres:testpass@tyme-test-db:5432/tyme_test
+      - DATABASE_URL=postgresql://postgres:testpass@opentyme-test-db:5432/opentyme_test
       - JWT_SECRET=test-jwt-secret-for-testing-only
       - SECRET_KEY=test-secret-key-for-testing-only
     volumes:
       - ./backend/coverage:/usr/src/app/coverage  # Mount coverage output
     depends_on:
-      tyme-test-db:
+      opentyme-test-db:
         condition: service_healthy
     networks:
       - project-network
@@ -215,18 +215,18 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.test
-    container_name: tyme-backend-tests-coverage
+    container_name: opentyme-backend-tests-coverage
     command: npm run test:coverage
     environment:
       - NODE_ENV=test
       - DOCKER_ENV=true
-      - DATABASE_URL=postgresql://postgres:testpass@tyme-test-db:5432/tyme_test
+      - DATABASE_URL=postgresql://postgres:testpass@opentyme-test-db:5432/opentyme_test
       - JWT_SECRET=test-jwt-secret-for-testing-only
       - SECRET_KEY=test-secret-key-for-testing-only
     volumes:
       - ./backend/coverage:/usr/src/app/coverage  # Mount coverage output
     depends_on:
-      tyme-test-db:
+      opentyme-test-db:
         condition: service_healthy
     networks:
       - project-network
@@ -236,7 +236,7 @@ services:
   # Redis Cache Session Store
   redis:
     image: redis:7.4-alpine
-    container_name: tyme-redis
+    container_name: opentyme-redis
     volumes:
       - redis_data:/data
     ports:
@@ -253,7 +253,7 @@ services:
   # Keycloak Identity and Access Management
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.7
-    container_name: tyme-keycloak
+    container_name: opentyme-keycloak
     environment:
       - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
@@ -298,7 +298,7 @@ services:
   # Traefik Reverse Proxy & Load Balancer
   traefik:
     image: traefik:v2.11
-    container_name: tyme-traefik
+    container_name: opentyme-traefik
     command:
       - "--configFile=/etc/traefik/traefik.yml"
     ports:
@@ -322,7 +322,7 @@ services:
   # Mailhog - Email Testing (SMTP server with web UI)
   mailhog:
     image: mailhog/mailhog:v1.0.1
-    container_name: tyme-mailhog
+    container_name: opentyme-mailhog
     ports:
       - "1025:1025"  # SMTP server
       - "8025:8025"  # Web UI
@@ -342,7 +342,7 @@ services:
       dockerfile: Dockerfile
       args:
         - ENABLED_TOOLS=file_converter
-    container_name: tyme-mcp-server
+    container_name: opentyme-mcp-server
     environment:
       - HOST=0.0.0.0
       - PORT=8000
@@ -374,7 +374,7 @@ services:
   # MinIO Object Storage for File Uploads (Receipts, Documents)
   minio:
     image: minio/minio:RELEASE.2024-10-13T13-34-11Z
-    container_name: tyme-minio
+    container_name: opentyme-minio
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin123}
@@ -407,7 +407,7 @@ services:
   # Docker MCP Gateway - Aggregates MCP servers from Docker Desktop
   mcp-gateway:
     image: alpine/socat:latest
-    container_name: tyme-mcp-gateway
+    container_name: opentyme-mcp-gateway
     command: >
       TCP-LISTEN:3100,fork,reuseaddr
       EXEC:"docker mcp gateway run --enable-all-servers",pty,stderr
@@ -422,7 +422,7 @@ services:
   # Nginx Reverse Proxy (kept for gradual migration - will be removed after Traefik testing)
   nginx:
     image: nginx:1.27-alpine
-    container_name: tyme-nginx
+    container_name: opentyme-nginx
     ports:
       - "${NGINX_PORT:-8888}:80"  # Changed to avoid conflict with Traefik
     volumes:
@@ -436,7 +436,7 @@ services:
   # ClamAV Virus Scanner for File Uploads (commented out due to image issues)
   # clamav:
   #   image: mkodockx/clamav:latest
-  #   container_name: tyme-clamav
+  #   container_name: opentyme-clamav
   #   environment:
   #     - ENABLE_DNS=false
   #     - ENABLE_MILTER=false

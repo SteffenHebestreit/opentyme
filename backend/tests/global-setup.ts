@@ -33,9 +33,9 @@ export default async function globalSetup(): Promise<void> {
     console.log(`✅ Test database connection verified at ${result.rows[0].time}\n`);
   } catch (error: any) {
     console.error('❌ Test database not accessible:', error.message);
-    console.error('\n📋 Make sure tyme-test-db container is running:');
-    console.error('   docker compose up -d tyme-test-db\n');
-    throw new Error('Test database not accessible. Is the tyme-test-db container running?');
+    console.error('\n📋 Make sure opentyme-test-db container is running:');
+    console.error('   docker compose up -d opentyme-test-db\n');
+    throw new Error('Test database not accessible. Is the opentyme-test-db container running?');
   } finally {
     await pool.end();
   }

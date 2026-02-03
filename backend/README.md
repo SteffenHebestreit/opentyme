@@ -1,4 +1,4 @@
-# tyme - Backend API
+# OpenTYME - Backend API
 
 > Node.js + Express + TypeScript backend service with PostgreSQL, Keycloak authentication, and comprehensive business logic.
 
@@ -445,7 +445,7 @@ npm run dev
 
 ```bash
 # Database
-DATABASE_URL=postgresql://postgres:password@localhost:5432/tyme
+DATABASE_URL=postgresql://postgres:password@localhost:5432/opentyme
 
 # Server
 NODE_ENV=development
@@ -457,10 +457,10 @@ BACKEND_SECRET_KEY=your-backend-secret
 
 # Keycloak
 KEYCLOAK_URL=http://keycloak:8080
-KEYCLOAK_REALM=tyme
-KEYCLOAK_CLIENT_ID=tyme-app
+KEYCLOAK_REALM=opentyme
+KEYCLOAK_CLIENT_ID=opentyme-app
 KEYCLOAK_CLIENT_SECRET=your-client-secret
-KEYCLOAK_ADMIN_CLIENT_ID=tyme-admin-service
+KEYCLOAK_ADMIN_CLIENT_ID=opentyme-admin-service
 KEYCLOAK_ADMIN_CLIENT_SECRET=your-admin-secret
 
 # Email (MailHog for dev)
@@ -493,13 +493,13 @@ node dist/index.js
 
 ```bash
 # Build image
-docker build -t tyme-backend .
+docker build -t opentyme-backend .
 
 # Run container
 docker run -p 8000:8000 \
   -e DATABASE_URL=postgresql://... \
   -e JWT_SECRET=... \
-  tyme-backend
+  opentyme-backend
 ```
 
 ### Health Checks
@@ -626,7 +626,7 @@ logger.error('Database connection failed', { error });
 
 ## 📄 License
 
-MIT License - See root LICENSE file
+CC BY-NC 4.0 License - See root LICENSE file
 
 ---
 

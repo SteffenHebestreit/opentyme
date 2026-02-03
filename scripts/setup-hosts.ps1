@@ -94,7 +94,7 @@ $hostEntries = @(
 
 Write-Host ""
 Write-Host "===========================================" -ForegroundColor Cyan
-Write-Host "  Tyme - Local Domain Setup" -ForegroundColor Cyan
+Write-Host "  OpenTYME - Local Domain Setup" -ForegroundColor Cyan
 Write-Host "===========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Hosts file: $hostsFile"
@@ -111,8 +111,8 @@ $entriesAdded = 0
 $entriesSkipped = 0
 
 # Check if our marker exists, if not add it
-if ($hostsContent -notmatch "# Tyme Development") {
-    Add-Content -Path $hostsFile -Value "`n# Tyme Development - Local Domains"
+if ($hostsContent -notmatch "# OpenTYME Development") {
+    Add-Content -Path $hostsFile -Value "`n# OpenTYME Development - Local Domains"
 }
 
 Write-Host "Adding host entries..." -ForegroundColor White
@@ -144,7 +144,7 @@ Write-Host "  Entries added:   $entriesAdded" -ForegroundColor White
 Write-Host "  Entries skipped: $entriesSkipped" -ForegroundColor White
 Write-Host ""
 Write-Host "You can now access:" -ForegroundColor Cyan
-Write-Host "  - http://localhost          (Tyme App)"
+Write-Host "  - http://localhost          (OpenTYME App)"
 Write-Host "  - http://auth.localhost     (Keycloak)"
 Write-Host "  - http://traefik.localhost  (Traefik Dashboard)"
 Write-Host "  - http://mail.localhost     (MailHog)"

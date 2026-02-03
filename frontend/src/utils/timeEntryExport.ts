@@ -267,7 +267,7 @@ export async function exportTimeEntriesAsExcel(
   const dailySummary = generateDailySummary(entries);
   
   // Metadata
-  workbook.creator = 'tyme - Time Tracking System';
+  workbook.creator = 'OpenTYME - Time Tracking System';
   workbook.created = new Date();
   workbook.modified = new Date();
   

@@ -1,8 +1,8 @@
 {
-  "realm": "tyme",
+  "realm": "opentyme",
   "enabled": true,
-  "displayName": "tyme - Time Tracking & Invoicing",
-  "displayNameHtml": "<div class=\"kc-logo-text\"><span>tyme</span></div>",
+  "displayName": "OpenTYME - Time Tracking & Invoicing",
+  "displayNameHtml": "<div class=\"kc-logo-text\"><span>OpenTYME</span></div>",
   "accessTokenLifespan": 900,
   "accessTokenLifespanForImplicitFlow": 900,
   "ssoSessionIdleTimeout": 1800,
@@ -56,8 +56,8 @@
   "defaultRoles": ["user"],
   "clients": [
     {
-      "clientId": "tyme-frontend",
-      "name": "tyme Frontend",
+      "clientId": "opentyme-frontend",
+      "name": "OpenTYME Frontend",
       "description": "Public client for frontend SPA with PKCE authentication",
       "enabled": true,
       "publicClient": true,
@@ -148,8 +148,8 @@
       ]
     },
     {
-      "clientId": "tyme-admin-service",
-      "name": "tyme Admin Service",
+      "clientId": "opentyme-admin-service",
+      "name": "OpenTYME Admin Service",
       "description": "Backend admin service client for user management and admin operations",
       "enabled": true,
       "clientAuthenticatorType": "client-secret",
@@ -166,12 +166,12 @@
       "attributes": {}
     },
     {
-      "clientId": "tyme-app",
-      "name": "tyme Application",
+      "clientId": "opentyme-app",
+      "name": "OpenTYME Application",
       "description": "Backend confidential client for token-based operations",
       "enabled": true,
       "clientAuthenticatorType": "client-secret",
-      "secret": "tyme-secret-change-in-production",
+      "secret": "opentyme-secret-change-in-production",
       "publicClient": false,
       "protocol": "openid-connect",
       "bearerOnly": false,
@@ -186,8 +186,8 @@
       "attributes": {}
     },
     {
-      "clientId": "tyme-backend",
-      "name": "tyme Backend Service",
+      "clientId": "opentyme-backend",
+      "name": "OpenTYME Backend Service",
       "description": "Backend service client for token validation",
       "enabled": true,
       "bearerOnly": true,
@@ -241,7 +241,7 @@
   "users": [
     {
       "username": "admin",
-      "email": "admin@tyme.local",
+      "email": "admin@opentyme.local",
       "emailVerified": true,
       "enabled": true,
       "firstName": "System",
@@ -262,7 +262,7 @@
     },
     {
       "username": "manager",
-      "email": "manager@tyme.local",
+      "email": "manager@opentyme.local",
       "emailVerified": true,
       "enabled": true,
       "firstName": "Jane",
@@ -283,7 +283,7 @@
     },
     {
       "username": "testuser",
-      "email": "user@tyme.local",
+      "email": "user@opentyme.local",
       "emailVerified": true,
       "enabled": true,
       "firstName": "John",
@@ -304,7 +304,7 @@
     },
     {
       "username": "demo",
-      "email": "demo@tyme.local",
+      "email": "demo@opentyme.local",
       "emailVerified": true,
       "enabled": true,
       "firstName": "Demo",
@@ -324,11 +324,11 @@
       }
     },
     {
-      "username": "service-account-tyme-admin-service",
-      "email": "service-account-tyme-admin-service@placeholder.org",
+      "username": "service-account-opentyme-admin-service",
+      "email": "service-account-opentyme-admin-service@placeholder.org",
       "emailVerified": false,
       "enabled": true,
-      "serviceAccountClientId": "tyme-admin-service",
+      "serviceAccountClientId": "opentyme-admin-service",
       "clientRoles": {
         "realm-management": [
           "manage-users",
@@ -352,8 +352,8 @@
   "smtpServer": {
     "host": "mailhog",
     "port": "1025",
-    "from": "noreply@tyme.local",
-    "fromDisplayName": "tyme - Time Tracking",
+    "from": "noreply@opentyme.local",
+    "fromDisplayName": "OpenTYME - Time Tracking",
     "ssl": "false",
     "starttls": "false",
     "auth": "false"
