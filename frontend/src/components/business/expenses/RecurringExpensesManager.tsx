@@ -280,17 +280,18 @@ export function RecurringExpensesManager() {
       </div>
 
       {/* Table */}
-      {recurringExpenses.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-          <p className="text-gray-500 dark:text-gray-400">
-            {t('recurring.noRecurring', 'No recurring expenses configured')}
-          </p>
-          <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-            {t('recurring.createHint', 'Create a new expense and enable the "Recurring" option')}
-          </p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
+      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        {recurringExpenses.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 dark:text-gray-400">
+              {t('recurring.noRecurring', 'No recurring expenses configured')}
+            </p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+              {t('recurring.createHint', 'Create a new expense and enable the "Recurring" option')}
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-700">
@@ -374,7 +375,8 @@ export function RecurringExpensesManager() {
             </tbody>
           </table>
         </div>
-      )}
+        )}
+      </div>
 
       {/* Edit Modal */}
       {editingExpense && (

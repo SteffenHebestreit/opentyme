@@ -27,7 +27,9 @@ import {
 import { backupService } from '../api/services/backup.service';
 import Modal from '../components/ui/Modal';
 import { Input } from '../components/forms/Input';
-import { Table, Column } from '../components/common/Table';
+import { Table, Column, Badge, Tabs, TabPanel, PageHeader, LoadingSpinner, EmptyState } from '../components/common';
+import type { Tab } from '../components/common/Tabs';
+import type { BadgeVariant } from '../components/common/Badge';
 
 interface Backup {
   id: string;
@@ -281,15 +283,16 @@ export default function SystemAdmin() {
       key: 'type',
       accessorKey: 'backup_type',
       header: t('backups.table.type'),
-      render: (backup) => (
-        <span className={`px-2 py-1 rounded-full text-xs ${
-          backup.backup_type === 'manual' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
-          backup.backup_type === 'scheduled' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-          'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400'
-        }`}>
-          {t(`backups.types.${backup.backup_type}`)}
-        </span>
-      ),
+      render: (backup) => {
+        const variant: BadgeVariant = 
+          backup.backup_type === 'manual' ? 'blue' :
+          backup.backup_type === 'scheduled' ? 'green' : 'gray';
+        return (
+          <Badge variant={variant}>
+            {t(`backups.types.${backup.backup_type}`)}
+          </Badge>
+        );
+      },
       sortable: true,
     },
     {
@@ -298,19 +301,19 @@ export default function SystemAdmin() {
       render: (backup) => (
         <div className="flex space-x-2">
           {backup.includes_database && (
-            <span className="px-2 py-1 bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 rounded text-xs">
+            <Badge variant="purple" size="sm">
               {t('backups.includes.database')}
-            </span>
+            </Badge>
           )}
           {backup.includes_storage && (
-            <span className="px-2 py-1 bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 rounded text-xs">
+            <Badge variant="orange" size="sm">
               {t('backups.includes.storage')}
-            </span>
+            </Badge>
           )}
           {backup.includes_config && (
-            <span className="px-2 py-1 bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400 rounded text-xs">
+            <Badge variant="teal" size="sm">
               {t('backups.includes.config')}
-            </span>
+            </Badge>
           )}
         </div>
       ),
@@ -387,35 +390,17 @@ export default function SystemAdmin() {
       )}
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-gray-700">
-        <div className="flex space-x-8">
-          <button
-            onClick={() => setActiveTab('backups')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'backups'
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-            }`}
-          >
-            <Database className="w-5 h-5 inline mr-2" />
-            {t('tabs.backups')}
-          </button>
-          <button
-            onClick={() => setActiveTab('schedules')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'schedules'
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-            }`}
-          >
-            <Calendar className="w-5 h-5 inline mr-2" />
-            {t('tabs.schedules')}
-          </button>
-        </div>
-      </div>
+      <Tabs
+        tabs={[
+          { id: 'backups', label: t('tabs.backups'), icon: Database },
+          { id: 'schedules', label: t('tabs.schedules'), icon: Calendar }
+        ]}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+      />
 
       {/* Backups Tab */}
-      {activeTab === 'backups' && (
+      <TabPanel tabId="backups" activeTab={activeTab}>
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -442,10 +427,10 @@ export default function SystemAdmin() {
             />
           </div>
         </div>
-      )}
+      </TabPanel>
 
       {/* Schedules Tab */}
-      {activeTab === 'schedules' && (
+      <TabPanel tabId="schedules" activeTab={activeTab}>
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -479,13 +464,9 @@ export default function SystemAdmin() {
                       {schedule.cron_expression}
                     </p>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    schedule.is_enabled
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                      : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400'
-                  }`}>
+                  <Badge variant={schedule.is_enabled ? 'green' : 'gray'}>
                     {schedule.is_enabled ? t('schedules.enabled') : t('schedules.disabled')}
-                  </span>
+                  </Badge>
                 </div>
 
                 <div className="space-y-2 text-sm">
@@ -543,7 +524,7 @@ export default function SystemAdmin() {
             ))}
           </div>
         </div>
-      )}
+      </TabPanel>
 
       {/* Create Backup Modal */}
       <Modal

@@ -704,8 +704,8 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
       )}
 
       {/* Expense Trend Line Chart */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-lg">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
           Ausgaben über Zeit
         </h3>
         <div className="relative" style={{ height: '300px' }}>
