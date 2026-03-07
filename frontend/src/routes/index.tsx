@@ -8,7 +8,8 @@
  * @module routes
  */
 
-import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
+import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { frontendPluginRegistry } from '@/plugins/plugin-registry';
 
 // Layout
 import Layout from '@/components/common/Layout';
@@ -35,11 +36,42 @@ import FinancesPage from '@/pages/finances/FinancesPage';
 import AdminPage from '@/pages/admin/AdminPage';
 import SystemAdmin from '@/pages/SystemAdmin';
 
+// Communication pages
+import EmailTemplateBuilder from '@/pages/email-templates/EmailTemplateBuilder';
+import ComposeEmailPage from '@/pages/email/ComposeEmailPage';
+
 // Reports page
 import Reports from '@/pages/Reports';
 
 // Auth guard loader
 import { authGuardLoader } from './loaders/authGuardLoader';
+
+/**
+ * Renders the component registered by an addon for the current path.
+ * Placed before the 404 catch-all so addon routes resolve correctly.
+ */
+function PluginRoute() {
+  const { pathname } = useLocation();
+  const routes = frontendPluginRegistry.getAllRoutes();
+  const match = routes.find((r) => pathname === r.path || pathname.startsWith(r.path + '/'));
+
+  if (!match) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">404</h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">Page not found</p>
+          <a href="/dashboard" className="text-purple-600 hover:text-purple-700 dark:text-purple-400">
+            Return to Dashboard
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  const Component = match.component;
+  return <Component />;
+}
 
 /**
  * Root layout component that renders Layout with Outlet for nested routes
@@ -122,12 +154,30 @@ export const router = createBrowserRouter([
       {
         path: 'config',
         loader: authGuardLoader,
-        Component: AdminPage,
+        children: [
+          { index: true, element: <Navigate to="general" replace /> },
+          { path: ':tab', loader: authGuardLoader, Component: AdminPage },
+        ],
       },
       {
         path: 'system-admin',
         loader: authGuardLoader,
         Component: SystemAdmin,
+      },
+      {
+        path: 'email/compose',
+        loader: authGuardLoader,
+        Component: ComposeEmailPage,
+      },
+      {
+        path: 'email-templates/new',
+        loader: authGuardLoader,
+        Component: EmailTemplateBuilder,
+      },
+      {
+        path: 'email-templates/:id',
+        loader: authGuardLoader,
+        Component: EmailTemplateBuilder,
       },
 
       // Backward compatibility redirects
@@ -140,27 +190,12 @@ export const router = createBrowserRouter([
         element: <Navigate to="/finances" replace />,
       },
 
-      // 404 catch-all
+      // Addon routes + 404 catch-all
+      // PluginRoute resolves paths registered by addons; falls back to 404
       {
         path: '*',
-        element: (
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="text-center">
-              <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-                404
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
-                Page not found
-              </p>
-              <a
-                href="/dashboard"
-                className="text-purple-600 hover:text-purple-700 dark:text-purple-400"
-              >
-                Return to Dashboard
-              </a>
-            </div>
-          </div>
-        ),
+        loader: authGuardLoader,
+        Component: PluginRoute,
       },
     ],
   },

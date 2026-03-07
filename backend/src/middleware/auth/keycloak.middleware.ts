@@ -2,6 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { kcAdminClient } from '../../config/keycloak.config';
 import axios from 'axios';
+import { logger } from '../../utils/logger';
 
 // Use the public URL that matches the token issuer
 const KEYCLOAK_URL = process.env.KEYCLOAK_PUBLIC_URL || 'http://auth.localhost';
@@ -39,7 +40,7 @@ async function introspectToken(token: string): Promise<any> {
   const now = Date.now();
   
   if (cached && cached.expiry > now) {
-    console.debug('[Keycloak] Token introspection cache hit');
+    logger.debug('[Keycloak] Token introspection cache hit');
     return cached.data;
   }
   
@@ -67,12 +68,12 @@ async function introspectToken(token: string): Promise<any> {
         data,
         expiry: now + CACHE_TTL_MS,
       });
-      console.debug('[Keycloak] Token introspection cached');
+      logger.debug('[Keycloak] Token introspection cached');
     }
     
     return data;
   } catch (error: any) {
-    console.error('[Keycloak] Token introspection error:', error.response?.data || error.message);
+    logger.error('[Keycloak] Token introspection error:', error.response?.data || error.message);
     throw new Error('Failed to introspect token');
   }
 }
@@ -118,10 +119,10 @@ export const authenticateKeycloak = async (req: Request, res: Response, next: Ne
       }
     };
 
-    console.info(`[Keycloak] Token validated for user: ${tokenInfo.preferred_username}`);
+    logger.info(`[Keycloak] Token validated for user: ${tokenInfo.preferred_username}`);
     next();
   } catch (error: any) {
-    console.error('[Keycloak] Authentication error:', error.message);
+    logger.error('[Keycloak] Authentication error:', error.message);
     res.status(403).json({ 
       error: 'Forbidden',
       message: 'Token validation failed' 
@@ -161,11 +162,11 @@ export const extractKeycloakUser = (req: Request, res: Response, next: NextFunct
       emailVerified: token.email_verified || false
     };
 
-    console.info(`[Keycloak] Authenticated user: ${req.user.username} (${req.user.email}) with roles: ${req.user.roles?.join(', ')}`);
+    logger.info(`[Keycloak] Authenticated user: ${req.user.username} (${req.user.email}) with roles: ${req.user.roles?.join(', ')}`);
     
     next();
   } catch (error) {
-    console.error('[Keycloak] Error extracting user from token:', error);
+    logger.error('[Keycloak] Error extracting user from token:', error);
     res.status(500).json({ 
       error: 'Internal Server Error',
       message: 'Failed to process authentication token' 
@@ -200,7 +201,7 @@ export const requireRole = (roles: string | string[]) => {
     const hasRequiredRole = requiredRoles.some(role => userRoles.includes(role));
 
     if (!hasRequiredRole) {
-      console.warn(`[Keycloak] Access denied for user ${req.user.username}. Required roles: ${requiredRoles.join(' or ')}, User roles: ${userRoles.join(', ')}`);
+      logger.warn(`[Keycloak] Access denied for user ${req.user.username}. Required roles: ${requiredRoles.join(' or ')}, User roles: ${userRoles.join(', ')}`);
       
       res.status(403).json({ 
         error: 'Forbidden',
@@ -211,7 +212,7 @@ export const requireRole = (roles: string | string[]) => {
       return;
     }
 
-    console.info(`[Keycloak] Role check passed for user ${req.user.username}`);
+    logger.info(`[Keycloak] Role check passed for user ${req.user.username}`);
     next();
   };
 };
@@ -254,7 +255,7 @@ export const requireOwnership = (paramName: string = 'user_id', allowAdmin: bool
 
     // Admin bypass
     if (allowAdmin && req.user.roles?.includes('admin')) {
-      console.info(`[Keycloak] Admin bypass for ownership check: ${req.user.username}`);
+      logger.info(`[Keycloak] Admin bypass for ownership check: ${req.user.username}`);
       next();
       return;
     }
@@ -271,7 +272,7 @@ export const requireOwnership = (paramName: string = 'user_id', allowAdmin: bool
     }
 
     if (req.user.id !== resourceUserId && req.user.keycloakId !== resourceUserId) {
-      console.warn(`[Keycloak] Ownership check failed. User ${req.user.username} (${req.user.id}) attempted to access resource owned by ${resourceUserId}`);
+      logger.warn(`[Keycloak] Ownership check failed. User ${req.user.username} (${req.user.id}) attempted to access resource owned by ${resourceUserId}`);
       
       res.status(403).json({ 
         error: 'Forbidden',
@@ -280,7 +281,7 @@ export const requireOwnership = (paramName: string = 'user_id', allowAdmin: bool
       return;
     }
 
-    console.info(`[Keycloak] Ownership check passed for user ${req.user.username}`);
+    logger.info(`[Keycloak] Ownership check passed for user ${req.user.username}`);
     next();
   };
 };
@@ -309,12 +310,12 @@ export const optionalAuth = (req: Request, res: Response, next: NextFunction): v
         roles: token.realm_access?.roles || [],
         emailVerified: token.email_verified || false
       };
-      console.info(`[Keycloak] Optional auth: User identified as ${req.user.username}`);
+      logger.info(`[Keycloak] Optional auth: User identified as ${req.user.username}`);
     } catch (error) {
-      console.warn('[Keycloak] Optional auth: Failed to extract user, continuing as anonymous');
+      logger.warn('[Keycloak] Optional auth: Failed to extract user, continuing as anonymous');
     }
   } else {
-    console.info('[Keycloak] Optional auth: No token present, continuing as anonymous');
+    logger.info('[Keycloak] Optional auth: No token present, continuing as anonymous');
   }
   
   next();
@@ -325,11 +326,11 @@ export const optionalAuth = (req: Request, res: Response, next: NextFunction): v
  * Use sparingly in production due to performance impact
  */
 export const logAuthDetails = (req: Request, res: Response, next: NextFunction): void => {
-  console.debug('[Keycloak] Auth Details:');
-  console.debug(`  - Has kauth: ${!!req.kauth}`);
-  console.debug(`  - Has grant: ${!!req.kauth?.grant}`);
-  console.debug(`  - Has token: ${!!req.kauth?.grant?.access_token}`);
-  console.debug(`  - User: ${req.user?.username || 'anonymous'}`);
-  console.debug(`  - Roles: ${req.user?.roles?.join(', ') || 'none'}`);
+  logger.debug('[Keycloak] Auth Details:');
+  logger.debug(`  - Has kauth: ${!!req.kauth}`);
+  logger.debug(`  - Has grant: ${!!req.kauth?.grant}`);
+  logger.debug(`  - Has token: ${!!req.kauth?.grant?.access_token}`);
+  logger.debug(`  - User: ${req.user?.username || 'anonymous'}`);
+  logger.debug(`  - Roles: ${req.user?.roles?.join(', ') || 'none'}`);
   next();
 };

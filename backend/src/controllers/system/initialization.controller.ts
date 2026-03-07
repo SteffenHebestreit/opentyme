@@ -16,7 +16,7 @@ import { logger } from '../../utils/logger';
 
 /**
  * Initialize all existing Keycloak users
- * Creates MinIO buckets for users that don't have them yet
+ * Creates storage buckets for users that don't have them yet
  * 
  * POST /api/system/initialize-users
  * 

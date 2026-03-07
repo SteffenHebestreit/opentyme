@@ -5,8 +5,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { router } from './routes';
 import { AppProvider } from './store/AppContext';
 import { AuthProvider } from './contexts/AuthContext';
+import { SlotProvider } from './plugins/slots';
+import { frontendPluginLoader } from './plugins/plugin-loader';
 import './i18n/config'; // Initialize i18n
 import './index.css';
+
+// Load all frontend plugins before rendering
+// Non-fatal: app still runs if plugin loading fails
+frontendPluginLoader.loadAll().catch((err) => {
+  console.error('[Plugin] Failed to load plugins:', err);
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,7 +40,9 @@ ReactDOM.createRoot(rootElement).render(
     <QueryClientProvider client={queryClient}>
       <AppProvider>
         <AuthProvider>
-          <RouterProvider router={router} />
+          <SlotProvider>
+            <RouterProvider router={router} />
+          </SlotProvider>
         </AuthProvider>
       </AppProvider>
     </QueryClientProvider>

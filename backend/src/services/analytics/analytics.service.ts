@@ -13,6 +13,7 @@
  */
 
 import { getDbClient } from '../../utils/database';
+import { logger } from '../../utils/logger';
 
 /**
  * Time trend data point for line charts.
@@ -167,16 +168,16 @@ export class AnalyticsService {
       ORDER BY ds.date ASC
     `;
 
-    console.log('[Analytics] getTimeTrend called for userId:', userId, 'days:', days);
+    logger.debug(`[Analytics] getTimeTrend called for userId: ${userId}, days: ${days}`);
     const result = await this.db.query(query, [userId]);
-    console.log('[Analytics] Query returned', result.rows.length, 'rows');
-    
+    logger.debug(`[Analytics] Query returned ${result.rows.length} rows`);
+
     // Log some sample data
     const sampleRows = result.rows.filter(row => Number(row.total_hours) > 0).slice(0, 5);
     if (sampleRows.length > 0) {
-      console.log('[Analytics] Sample rows with hours:', JSON.stringify(sampleRows, null, 2));
+      logger.debug('[Analytics] Sample rows with hours:', JSON.stringify(sampleRows, null, 2));
     } else {
-      console.log('[Analytics] No rows with hours > 0 found');
+      logger.debug('[Analytics] No rows with hours > 0 found');
     }
     
     return result.rows.map(row => ({

@@ -3,6 +3,7 @@ import { InvoiceService } from '../../services/financial/invoice.service';
 import { BillingValidationService } from '../../services/financial/billing-validation.service';
 import { getDbClient } from '../../utils/database'; // Import the DB client utility
 import PDFDocument from 'pdfkit';
+import { logger } from '../../utils/logger';
 import { ZugferdService } from '../../services/external/zugferd.service';
 import { processPlaceholders, PlaceholderContext, getAvailablePlaceholders } from '../../utils/placeholder';
 
@@ -195,7 +196,7 @@ export class InvoiceController {
         invoice,
       });
     } catch (err: any) {
-      console.error('Create invoice error:', err);
+      logger.error('Create invoice error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -224,7 +225,7 @@ export class InvoiceController {
       const invoices = await this.invoiceService.findAll(userId);
       res.status(200).json(invoices);
     } catch (err: any) {
-      console.error('Find all invoices error:', err);
+      logger.error('Find all invoices error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -259,7 +260,7 @@ export class InvoiceController {
         res.status(404).json({ message: 'Invoice not found' });
       }
     } catch (err: any) {
-      console.error('Find invoice by ID error:', err);
+      logger.error('Find invoice by ID error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -380,7 +381,7 @@ export class InvoiceController {
         res.status(404).json({ message: 'Invoice not found' });
       }
     } catch (err: any) {
-      console.error('Update invoice error:', err);
+      logger.error('Update invoice error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -428,7 +429,7 @@ export class InvoiceController {
         invoice: cancelledInvoice,
       });
     } catch (err: any) {
-      console.error('Cancel invoice error:', err);
+      logger.error('Cancel invoice error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -512,7 +513,7 @@ export class InvoiceController {
       let paramIndex = 3;
 
       // Add any provided update fields (due_date, issue_date, notes, etc.)
-      const allowedFields = ['due_date', 'issue_date', 'delivery_date', 'notes', 'invoice_headline', 'invoice_text', 'footer_text'];
+      const allowedFields = ['invoice_number', 'due_date', 'issue_date', 'delivery_date', 'notes', 'invoice_headline', 'invoice_text', 'footer_text'];
       for (const field of allowedFields) {
         if (updateFields[field] !== undefined) {
           updateParts.push(`${field} = $${paramIndex}`);
@@ -565,7 +566,7 @@ export class InvoiceController {
         invoice: updatedInvoice,
       });
     } catch (err: any) {
-      console.error('Create correction error:', err);
+      logger.error('Create correction error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -601,7 +602,7 @@ export class InvoiceController {
         res.status(404).json({ message: 'Invoice not found or already deleted' });
       }
     } catch (err: any) {
-      console.error('Delete invoice error:', err);
+      logger.error('Delete invoice error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -650,7 +651,7 @@ export class InvoiceController {
         invoice: updatedInvoice,
       });
     } catch (err: any) {
-      console.error('Add line items error:', err);
+      logger.error('Add line items error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -695,7 +696,7 @@ export class InvoiceController {
         invoice: updatedInvoice,
       });
     } catch (err: any) {
-      console.error('Replace line items error:', err);
+      logger.error('Replace line items error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -905,7 +906,7 @@ export class InvoiceController {
       });
 
     } catch (err: any) {
-      console.error('Generate invoice from time entries error:', err);
+      logger.error('Generate invoice from time entries error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -974,7 +975,7 @@ export class InvoiceController {
       const result = await this.db.query(queryText, [client_id]);
       res.status(200).json(result.rows);
     } catch (err: any) {
-      console.error('Get billing history error:', err);
+      logger.error('Get billing history error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -1012,7 +1013,7 @@ export class InvoiceController {
       // Since we can't access db directly, let's just return a placeholder or remove this functionality for now
       res.status(501).json({ message: 'Find by number not yet fully implemented' });
     } catch (err: any) {
-      console.error('Find invoice by number error:', err);
+      logger.error('Find invoice by number error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -1262,7 +1263,7 @@ export class InvoiceController {
               lineBreak: false
             });
           } catch (footerError: any) {
-            console.error('Footer text error, using fallback:', footerError);
+            logger.error('Footer text error, using fallback:', footerError);
             doc.text('Bank Details Available', 50, footerY, { width: 495, align: 'center', lineBreak: false });
           }
         } else if (settings.bank_iban) {
@@ -1275,7 +1276,7 @@ export class InvoiceController {
               lineBreak: false
             });
           } catch (footerError: any) {
-            console.error('Footer text error:', footerError);
+            logger.error('Footer text error:', footerError);
           }
         }
         
@@ -1291,7 +1292,7 @@ export class InvoiceController {
                  lineBreak: false
                });
           } catch (addressError: any) {
-            console.error('Footer address error:', addressError);
+            logger.error('Footer address error:', addressError);
           }
         }
       };
@@ -1307,7 +1308,7 @@ export class InvoiceController {
       
       // Handle PDF document errors
       doc.on('error', (docError: any) => {
-        console.error('PDFDocument error:', docError);
+        logger.error('PDFDocument error:', docError);
         bufferStream.destroy(docError);
       });
       
@@ -1715,7 +1716,7 @@ export class InvoiceController {
             ? JSON.parse(invoice.original_data) 
             : invoice.original_data;
         } catch (e) {
-          console.error('Failed to parse original_data:', e);
+          logger.error('Failed to parse original_data:', e);
         }
 
         if (originalData) {
@@ -1951,13 +1952,13 @@ export class InvoiceController {
             ? (zugferd === 'true' || zugferd === '1')
             : invoice.enable_zugferd;
           
-          console.log('ZUGFeRD debug - zugferd param:', zugferd);
-          console.log('ZUGFeRD debug - invoice.enable_zugferd:', invoice.enable_zugferd);
-          console.log('ZUGFeRD debug - enableZugferd:', enableZugferd);
+          logger.debug('ZUGFeRD debug - zugferd param:', zugferd);
+          logger.debug('ZUGFeRD debug - invoice.enable_zugferd:', invoice.enable_zugferd);
+          logger.debug('ZUGFeRD debug - enableZugferd:', enableZugferd);
           
           if (enableZugferd) {
-            console.log('ZUGFeRD: Generating XML...');
-            console.log('ZUGFeRD debug - invoice values:', {
+            logger.debug('ZUGFeRD: Generating XML...');
+            logger.debug('ZUGFeRD debug - invoice values:', {
               sub_total: invoice.sub_total,
               tax_rate: invoice.tax_rate,
               tax_amount: invoice.tax_amount,
@@ -1991,24 +1992,24 @@ export class InvoiceController {
               }
             );
             
-            console.log('ZUGFeRD: Embedding XML in PDF...');
+            logger.debug('ZUGFeRD: Embedding XML in PDF...');
             // Embed ZUGFeRD XML in PDF
             const zugferdPdf = await ZugferdService.embedZugferdInPDF(pdfBuffer, zugferdXml);
-            console.log('ZUGFeRD: Successfully embedded, sending PDF');
+            logger.debug('ZUGFeRD: Successfully embedded, sending PDF');
             
             // Send ZUGFeRD-compliant PDF
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename=rechnung-${invoice.invoice_number}.pdf`);
             res.send(zugferdPdf);
           } else {
-            console.log('ZUGFeRD: Disabled, sending regular PDF');
+            logger.debug('ZUGFeRD: Disabled, sending regular PDF');
             // Send regular PDF
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename=rechnung-${invoice.invoice_number}.pdf`);
             res.send(pdfBuffer);
           }
         } catch (sendError: any) {
-          console.error('PDF send error:', sendError);
+          logger.error('PDF send error:', sendError);
           if (!res.headersSent) {
             res.status(500).json({ message: sendError.message || 'Failed to send PDF' });
           }
@@ -2017,21 +2018,21 @@ export class InvoiceController {
       
       // Handle PDF generation errors
       bufferStream.on('error', (streamError: any) => {
-        console.error('PDF stream error:', streamError);
+        logger.error('PDF stream error:', streamError);
         if (!res.headersSent) {
           res.status(500).json({ message: streamError.message || 'PDF generation stream error' });
         }
       });
 
     } catch (err: any) {
-      console.error('Generate PDF error:', err);
+      logger.error('Generate PDF error:', err);
       
       // Check if response headers have already been sent
       if (!res.headersSent) {
         res.status(500).json({ message: err.message || 'Failed to generate PDF' });
       } else {
         // Headers already sent - destroy the response to prevent hanging
-        console.error('PDF generation failed after headers sent - destroying response');
+        logger.error('PDF generation failed after headers sent - destroying response');
         res.destroy();
       }
     }
@@ -2119,7 +2120,7 @@ export class InvoiceController {
 
       res.status(200).json(validationResult);
     } catch (err: any) {
-      console.error('Get billing status error:', err);
+      logger.error('Get billing status error:', err);
       if (err.message.includes('not found')) {
         res.status(404).json({ message: err.message });
       } else {
@@ -2165,7 +2166,7 @@ export class InvoiceController {
 
       res.status(200).json(validationResult);
     } catch (err: any) {
-      console.error('Validate proposed payment error:', err);
+      logger.error('Validate proposed payment error:', err);
       res.status(500).json({ message: err.message || 'Failed to validate proposed payment' });
     }
   }
@@ -2196,7 +2197,7 @@ export class InvoiceController {
       
       res.status(200).json(placeholders);
     } catch (err: any) {
-      console.error('Get placeholders error:', err);
+      logger.error('Get placeholders error:', err);
       res.status(500).json({ message: err.message || 'Failed to get placeholders' });
     }
   }
@@ -2299,7 +2300,7 @@ export class InvoiceController {
       bufferStream.on('data', (chunk: Buffer) => pdfBuffers.push(chunk));
       
       doc.on('error', (docError: any) => {
-        console.error('PDFDocument error:', docError);
+        logger.error('PDFDocument error:', docError);
         bufferStream.destroy(docError);
       });
       
@@ -2497,7 +2498,7 @@ export class InvoiceController {
           res.setHeader('Content-Disposition', `attachment; filename=storno-${invoice.invoice_number}.pdf`);
           res.send(pdfBuffer);
         } catch (sendError: any) {
-          console.error('Storno PDF send error:', sendError);
+          logger.error('Storno PDF send error:', sendError);
           if (!res.headersSent) {
             res.status(500).json({ message: sendError.message || 'Failed to send Storno PDF' });
           }
@@ -2505,7 +2506,7 @@ export class InvoiceController {
       });
 
     } catch (err: any) {
-      console.error('Generate Storno PDF error:', err);
+      logger.error('Generate Storno PDF error:', err);
       if (!res.headersSent) {
         res.status(500).json({ message: err.message || 'Failed to generate Storno PDF' });
       }
@@ -2610,7 +2611,7 @@ export class InvoiceController {
       bufferStream.on('data', (chunk: Buffer) => pdfBuffers.push(chunk));
       
       doc.on('error', (docError: any) => {
-        console.error('PDFDocument error:', docError);
+        logger.error('PDFDocument error:', docError);
         bufferStream.destroy(docError);
       });
       
@@ -2760,7 +2761,7 @@ export class InvoiceController {
             ? JSON.parse(invoice.original_data) 
             : invoice.original_data;
         } catch (e) {
-          console.error('Failed to parse original_data:', e);
+          logger.error('Failed to parse original_data:', e);
         }
       }
 
@@ -2991,7 +2992,7 @@ export class InvoiceController {
           res.setHeader('Content-Disposition', `attachment; filename=korrektur-${invoice.invoice_number}.pdf`);
           res.send(pdfBuffer);
         } catch (sendError: any) {
-          console.error('Correction PDF send error:', sendError);
+          logger.error('Correction PDF send error:', sendError);
           if (!res.headersSent) {
             res.status(500).json({ message: sendError.message || 'Failed to send Correction PDF' });
           }
@@ -2999,7 +3000,7 @@ export class InvoiceController {
       });
 
     } catch (err: any) {
-      console.error('Generate Correction PDF error:', err);
+      logger.error('Generate Correction PDF error:', err);
       if (!res.headersSent) {
         res.status(500).json({ message: err.message || 'Failed to generate Correction PDF' });
       }

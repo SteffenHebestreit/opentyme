@@ -36,12 +36,6 @@ interface Backup {
   error_message?: string;
 }
 
-interface BackupListResponse {
-  backups: Backup[];
-  total: number;
-  limit: number;
-  offset: number;
-}
 
 interface CreateScheduleRequest {
   schedule_name: string;
@@ -71,9 +65,6 @@ interface Schedule {
   created_by?: string;
 }
 
-interface ScheduleListResponse {
-  schedules: Schedule[];
-}
 
 /**
  * Create a new manual backup
@@ -86,7 +77,7 @@ export const createBackup = async (data: CreateBackupRequest): Promise<Backup> =
 /**
  * List all backups with pagination
  */
-export const listBackups = async (limit = 50, offset = 0): Promise<BackupListResponse> => {
+export const listBackups = async (limit = 50, offset = 0): Promise<Backup[]> => {
   const response = await apiClient.get('/system/backups', {
     params: { limit, offset },
   });
@@ -136,7 +127,7 @@ export const createSchedule = async (data: CreateScheduleRequest): Promise<Sched
 /**
  * List all backup schedules
  */
-export const listSchedules = async (): Promise<ScheduleListResponse> => {
+export const listSchedules = async (): Promise<Schedule[]> => {
   const response = await apiClient.get('/system/backups/schedules');
   return response.data;
 };

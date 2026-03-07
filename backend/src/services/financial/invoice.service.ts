@@ -6,6 +6,7 @@ import {
   InvoiceItem,
   BaseInvoice
 } from '../../models/financial/invoice.model';
+import { logger } from '../../utils/logger';
 
 const db = getDbClient();
 
@@ -116,7 +117,7 @@ export class InvoiceService {
       const result = await db.query(queryText, values);
       return result.rows[0] as IInvoice;
     } catch (error) {
-        console.error('Error creating invoice:', error);
+        logger.error('Error creating invoice:', error);
         throw new Error(`Failed to create invoice: ${(error as any).message}`);
     }
   }
@@ -156,7 +157,7 @@ export class InvoiceService {
       const result = await db.query(queryText, [userId]);
       return result.rows as IInvoice[];
     } catch (error) {
-        console.error('Error fetching all invoices:', error);
+        logger.error('Error fetching all invoices:', error);
         throw new Error(`Failed to fetch invoices: ${(error as any).message}`);
     }
   }
@@ -239,7 +240,7 @@ export class InvoiceService {
       
       return invoice;
     } catch (error) {
-        console.error('Error fetching invoice by ID:', error);
+        logger.error('Error fetching invoice by ID:', error);
         throw new Error(`Failed to fetch invoice: ${(error as any).message}`);
     }
   }
@@ -438,7 +439,7 @@ export class InvoiceService {
       if (result.rows.length === 0) return null;
       return result.rows[0] as IInvoice;
     } catch (error) {
-        console.error('Error updating invoice:', error);
+        logger.error('Error updating invoice:', error);
         throw new Error(`Failed to update invoice: ${(error as any).message}`);
     }
   }
@@ -467,7 +468,7 @@ export class InvoiceService {
       const result = await db.query(queryText, [id]);
       return (result.rowCount ?? 0) > 0;
     } catch (error) {
-        console.error('Error deleting invoice:', error);
+        logger.error('Error deleting invoice:', error);
         throw new Error(`Failed to delete invoice: ${(error as any).message}`);
     }
   }
@@ -516,7 +517,7 @@ export class InvoiceService {
         [subTotalNum, taxAmountNum, subTotalNum + taxAmountNum, invoiceId]
       );
     } catch (error) {
-      console.error('Error calculating invoice totals:', error);
+      logger.error('Error calculating invoice totals:', error);
       throw new Error(`Failed to calculate totals: ${(error as any).message}`);
     }
   }
@@ -545,7 +546,7 @@ export class InvoiceService {
       // Recalculate totals after adding items
       await this.calculateInvoiceTotals(invoiceId);
     } catch (error) {
-      console.error('Error adding line items:', error);
+      logger.error('Error adding line items:', error);
       throw new Error(`Failed to add line items: ${(error as any).message}`);
     }
   }
@@ -578,7 +579,7 @@ export class InvoiceService {
       // Recalculate totals after replacing items
       await this.calculateInvoiceTotals(invoiceId);
     } catch (error) {
-      console.error('Error replacing line items:', error);
+      logger.error('Error replacing line items:', error);
       throw new Error(`Failed to replace line items: ${(error as any).message}`);
     }
   }

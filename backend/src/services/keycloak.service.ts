@@ -10,6 +10,7 @@
 
 import KcAdminClient from '@keycloak/keycloak-admin-client';
 import axios from 'axios';
+import { logger } from '../utils/logger';
 
 interface KeycloakConfig {
   baseUrl: string;
@@ -121,9 +122,9 @@ class KeycloakService {
           clientSecret: this.config.adminClientSecret,
         });
         this.authenticated = true;
-        console.log('[Keycloak Service] ✅ Authenticated with service account');
+        logger.info('[Keycloak Service] Authenticated with service account');
       } catch (error) {
-        console.error('[Keycloak Service] ❌ Authentication failed:', error);
+        logger.error('[Keycloak Service] Authentication failed:', error);
         throw error;
       } finally {
         this.authPromise = null;
@@ -158,7 +159,7 @@ class KeycloakService {
       );
 
       if (!response.ok) {
-        console.error('[Keycloak Service] Token introspection failed:', response.status);
+        logger.error('[Keycloak Service] Token introspection failed:', response.status);
         return null;
       }
 
@@ -170,7 +171,7 @@ class KeycloakService {
 
       return introspection;
     } catch (error) {
-      console.error('[Keycloak Service] Token verification error:', error);
+      logger.error('[Keycloak Service] Token verification error:', error);
       return null;
     }
   }
@@ -207,7 +208,7 @@ class KeycloakService {
       });
       return user;
     } catch (error) {
-      console.error('[Keycloak Service] Error fetching user:', error);
+      logger.error('[Keycloak Service] Error fetching user:', error);
       return null;
     }
   }
@@ -226,7 +227,7 @@ class KeycloakService {
       });
       return users || [];
     } catch (error) {
-      console.error('[Keycloak Service] Error fetching all users:', error);
+      logger.error('[Keycloak Service] Error fetching all users:', error);
       return [];
     }
   }
@@ -261,7 +262,7 @@ class KeycloakService {
           },
         ],
         attributes: {
-          policy: ['readonly'], // MinIO policy for new users
+          policy: ['readonly'], // Keycloak attribute for new users
         },
       });
 
@@ -278,11 +279,11 @@ class KeycloakService {
             });
           }
         } catch (roleError) {
-          console.error('[Keycloak Service] Error assigning default role:', roleError);
+          logger.error('[Keycloak Service] Error assigning default role:', roleError);
         }
       }
 
-      console.log('[Keycloak Service] ✅ User created:', response.id);
+      logger.info('[Keycloak Service] User created:', response.id);
 
       // Send email verification
       if (response.id) {
@@ -295,16 +296,16 @@ class KeycloakService {
             lifespan: 43200, // 12 hours
             redirectUri: 'http://localhost:3000/login',
           });
-          console.log('[Keycloak Service] ✅ Verification email sent to:', userData.email);
+          logger.info('[Keycloak Service] Verification email sent to:', userData.email);
         } catch (emailError) {
-          console.error('[Keycloak Service] ❌ Failed to send verification email:', emailError);
+          logger.error('[Keycloak Service] Failed to send verification email:', emailError);
           // Don't fail user creation if email fails
         }
       }
 
       return { id: response.id };
     } catch (error) {
-      console.error('[Keycloak Service] Error creating user:', error);
+      logger.error('[Keycloak Service] Error creating user:', error);
       return null;
     }
   }
@@ -332,10 +333,10 @@ class KeycloakService {
         userData
       );
 
-      console.log('[Keycloak Service] ✅ User updated:', userId);
+      logger.info('[Keycloak Service] User updated:', userId);
       return true;
     } catch (error) {
-      console.error('[Keycloak Service] Error updating user:', error);
+      logger.error('[Keycloak Service] Error updating user:', error);
       return false;
     }
   }
@@ -352,10 +353,10 @@ class KeycloakService {
         id: userId,
       });
 
-      console.log('[Keycloak Service] ✅ User deleted:', userId);
+      logger.info('[Keycloak Service] User deleted:', userId);
       return true;
     } catch (error) {
-      console.error('[Keycloak Service] Error deleting user:', error);
+      logger.error('[Keycloak Service] Error deleting user:', error);
       return false;
     }
   }
@@ -395,7 +396,7 @@ class KeycloakService {
             });
           }
         } catch (roleError) {
-          console.error('[Keycloak Service] Error assigning role:', roleError);
+          logger.error('[Keycloak Service] Error assigning role:', roleError);
         }
       }
 
@@ -407,7 +408,7 @@ class KeycloakService {
       if (error.response?.status === 409) {
         throw new Error('Username or email already exists');
       }
-      console.error('[Keycloak Service] Registration error:', error);
+      logger.error('[Keycloak Service] Registration error:', error);
       throw new Error('Failed to register user in Keycloak');
     }
   }
@@ -439,13 +440,13 @@ class KeycloakService {
         }
       );
 
-      console.log(`[Keycloak Service] User ${emailOrUsername} logged in successfully`);
+      logger.info(`[Keycloak Service] User ${emailOrUsername} logged in successfully`);
       return response.data;
     } catch (error: any) {
       if (error.response?.status === 401) {
         throw new Error('Invalid credentials');
       }
-      console.error('[Keycloak Service] Login error:', error.response?.data || error.message);
+      logger.error('[Keycloak Service] Login error:', error.response?.data || error.message);
       throw new Error('Authentication failed');
     }
   }
@@ -475,7 +476,7 @@ class KeycloakService {
 
       return response.data;
     } catch (error: any) {
-      console.error('[Keycloak Service] Token refresh error:', error.response?.data || error.message);
+      logger.error('[Keycloak Service] Token refresh error:', error.response?.data || error.message);
       throw new Error('Failed to refresh token');
     }
   }
@@ -501,9 +502,9 @@ class KeycloakService {
         }
       );
 
-      console.log('[Keycloak Service] User logged out successfully');
+      logger.info('[Keycloak Service] User logged out successfully');
     } catch (error: any) {
-      console.error('[Keycloak Service] Logout error:', error.response?.data || error.message);
+      logger.error('[Keycloak Service] Logout error:', error.response?.data || error.message);
       throw new Error('Failed to logout');
     }
   }
@@ -527,7 +528,7 @@ class KeycloakService {
 
       return response.data;
     } catch (error: any) {
-      console.error('[Keycloak Service] Get user info error:', error.response?.data || error.message);
+      logger.error('[Keycloak Service] Get user info error:', error.response?.data || error.message);
       throw new Error('Failed to get user information');
     }
   }

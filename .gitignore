@@ -128,7 +128,7 @@ acme.json
 
 # Data Volumes
 keycloak_postgres_data/
-minio_data/
+seaweedfs_data/
 clamav_data/
 
 # Generated Content
@@ -142,4 +142,14 @@ tests/*.png
 frontend/test-results/
 frontend/playwright-report/
 *.backup
+
+# Addon source directories — addons live in their own repos, cloned at build/startup
+opentyme-addon-*/
+
+# Runtime-installed addon plugin directories (installed at build/startup from GitHub)
+# Core plugin infrastructure files (plugin-loader.ts, plugin-registry.ts, slots/) are committed
+backend/src/plugins/ai-expense-analysis/
+backend/src/plugins/email-builder/
+frontend/src/plugins/ai-expense-analysis/
+frontend/src/plugins/email-builder/
 

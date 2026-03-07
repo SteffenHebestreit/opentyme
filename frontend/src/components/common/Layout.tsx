@@ -44,7 +44,9 @@ export default function Layout({ children }: LayoutProps) {
 
       <Header />
       <main className="flex-grow relative z-10 pt-24">
-        {children}
+        <div className="max-w-[1920px] mx-auto w-full">
+          {children}
+        </div>
       </main>
       <footer className="py-8 text-center border-t border-purple-500/20 backdrop-blur-sm relative z-10">
         <div className="container mx-auto px-6">

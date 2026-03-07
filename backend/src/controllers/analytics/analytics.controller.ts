@@ -14,6 +14,7 @@
 
 import { Request, Response } from 'express';
 import { analyticsService } from '../../services/analytics/analytics.service';
+import { logger } from '../../utils/logger';
 
 export class AnalyticsController {
   /**
@@ -55,7 +56,7 @@ export class AnalyticsController {
       
       res.status(200).json(data);
     } catch (error: any) {
-      console.error('Get time trend error:', error);
+      logger.error('Get time trend error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }
@@ -110,7 +111,7 @@ export class AnalyticsController {
       
       res.status(200).json(data);
     } catch (error: any) {
-      console.error('Get revenue by client error:', error);
+      logger.error('Get revenue by client error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }
@@ -149,7 +150,7 @@ export class AnalyticsController {
       
       res.status(200).json(data);
     } catch (error: any) {
-      console.error('Get billable ratio error:', error);
+      logger.error('Get billable ratio error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }
@@ -197,7 +198,7 @@ export class AnalyticsController {
       
       res.status(200).json(data);
     } catch (error: any) {
-      console.error('Get project profitability error:', error);
+      logger.error('Get project profitability error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }
@@ -242,7 +243,7 @@ export class AnalyticsController {
       
       res.status(200).json(data);
     } catch (error: any) {
-      console.error('Get yearly financial summary error:', error);
+      logger.error('Get yearly financial summary error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }

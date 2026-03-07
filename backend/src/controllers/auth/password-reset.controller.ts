@@ -9,6 +9,7 @@ import { Request, Response } from 'express';
 import { UserService } from '../../services/auth/user.service';
 import { EmailService } from '../../services/external/email.service'; // We will create this service later
 import crypto from 'crypto';
+import { logger } from '../../utils/logger';
 
 /**
  * Controller for handling password reset operations.
@@ -67,7 +68,7 @@ export class PasswordResetController {
 
             res.status(200).json({ message: 'If your email address exists in our database, you will receive a password reset link shortly.' });
         } catch (error) {
-            console.error('Error requesting password reset:', error);
+            logger.error('Error requesting password reset:', error);
             res.status(500).json({ message: 'An internal server occurred. Please try again later.' });
         }
     };
@@ -119,7 +120,7 @@ export class PasswordResetController {
 
             res.status(200).json({ message: 'Password has been successfully reset. You can now log in with your new password.' });
         } catch (error) {
-            console.error('Error resetting password:', error);
+            logger.error('Error resetting password:', error);
             // Handle specific cases like expired token more gracefully if needed
             if (error instanceof Error && error.message.includes('expired')) {
                  res.status(400).json({ message: 'Invalid or expired token.' });

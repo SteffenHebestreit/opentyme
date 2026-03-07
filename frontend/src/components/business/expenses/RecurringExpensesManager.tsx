@@ -314,7 +314,7 @@ export function RecurringExpensesManager() {
                   {t('recurring.generated', 'Generated')}
                 </th>
                 <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400">
-                  {t('status', 'Status')}
+                  {t('fields.status', 'Status')}
                 </th>
                 <th className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400">
                   {t('actions', 'Actions')}

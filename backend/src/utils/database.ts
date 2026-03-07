@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
 import path from 'path';
+import { logger } from './logger';
 
 // Load environment-specific .env file
 const envFile = process.env.NODE_ENV === 'test' 
@@ -55,9 +56,9 @@ const testConnection = async (): Promise<void> => {
   try {
     const db = getPool();
     await db.query('SELECT NOW()');
-    console.log('✅ Database connection successful.');
+    logger.info('Database connection successful.');
   } catch (err) {
-    console.error('❌ Database connection failed:', err);
+    logger.error('Database connection failed:', err);
     throw err; // Rethrow to be caught by the caller
   }
 };
@@ -87,8 +88,8 @@ const closeDbConnection = async (): Promise<void> => {
   if (pool) {
     await pool.end();
     pool = null;
-    console.log('✅ Database connection closed.');
+    logger.info('Database connection closed.');
   }
 };
 
-export { testConnection, getDbClient, closeDbConnection };
+export { testConnection, getDbClient, closeDbConnection, getPool as pool };

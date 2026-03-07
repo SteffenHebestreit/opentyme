@@ -47,6 +47,7 @@
     "node_modules",
     "**/*.test.ts",
     "**/*.spec.ts",
-    "dist"
+    "dist",
+    "src/plugins"
   ]
 }

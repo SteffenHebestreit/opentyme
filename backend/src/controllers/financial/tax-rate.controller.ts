@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { TaxRateService } from '../../services/financial/tax-rate.service';
+import { logger } from '../../utils/logger';
 import {
   createTaxRateSchema,
   updateTaxRateSchema,
@@ -61,7 +62,7 @@ export class TaxRateController {
         taxRate: newTaxRate
       });
     } catch (err: any) {
-      console.error('Create tax rate error:', err);
+      logger.error('Create tax rate error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -91,7 +92,7 @@ export class TaxRateController {
       const taxRates = await this.taxRateService.findAllByUser(userId, activeOnly);
       res.status(200).json(taxRates);
     } catch (err: any) {
-      console.error('Find all tax rates error:', err);
+      logger.error('Find all tax rates error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -131,7 +132,7 @@ export class TaxRateController {
         res.status(404).json({ message: 'Tax rate not found' });
       }
     } catch (err: any) {
-      console.error('Find tax rate by ID error:', err);
+      logger.error('Find tax rate by ID error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -163,7 +164,7 @@ export class TaxRateController {
         res.status(404).json({ message: 'No default tax rate set' });
       }
     } catch (err: any) {
-      console.error('Find default tax rate error:', err);
+      logger.error('Find default tax rate error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -215,7 +216,7 @@ export class TaxRateController {
         res.status(404).json({ message: 'Tax rate not found' });
       }
     } catch (err: any) {
-      console.error('Update tax rate error:', err);
+      logger.error('Update tax rate error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -258,7 +259,7 @@ export class TaxRateController {
         res.status(404).json({ message: 'Tax rate not found' });
       }
     } catch (err: any) {
-      console.error('Set default tax rate error:', err);
+      logger.error('Set default tax rate error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -298,7 +299,7 @@ export class TaxRateController {
         res.status(404).json({ message: 'Tax rate not found' });
       }
     } catch (err: any) {
-      console.error('Delete tax rate error:', err);
+      logger.error('Delete tax rate error:', err);
       
       // Check if it's a "in use" error
       if (err.message && err.message.includes('currently used by invoices')) {

@@ -192,32 +192,21 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
 
   // Create Chart.js donut chart
   useEffect(() => {
-    console.log('[Chart] useEffect triggered', {
-      hasChartRef: !!chartRef.current,
-      categoryBreakdownKeys: Object.keys(categoryBreakdown).length,
-      categoryTotal,
-      categoryBreakdown
-    });
-
     if (!chartRef.current || Object.keys(categoryBreakdown).length === 0 || !categoryTotal) {
-      console.log('[Chart] Skipping chart creation - missing requirements');
       return;
     }
 
     // Destroy existing chart
     if (chartInstanceRef.current) {
-      console.log('[Chart] Destroying existing chart');
       chartInstanceRef.current.destroy();
     }
 
     const ctx = chartRef.current.getContext('2d');
     if (!ctx) {
-      console.log('[Chart] Failed to get 2d context');
       return;
     }
 
     const sortedCategories = Object.entries(categoryBreakdown).sort(([, a], [, b]) => b.total - a.total);
-    console.log('[Chart] Creating chart with data:', sortedCategories);
     
     chartInstanceRef.current = new Chart(ctx, {
       type: 'doughnut',

@@ -1,18 +1,10 @@
-import { test, expect, Page } from '@playwright/test';
-
-// Helper function to login
-async function login(page: Page) {
-  await page.goto('/');
-  await page.getByLabel(/email/i).fill('admin@example.com');
-  await page.getByLabel(/password/i).fill('admin123');
-  await page.getByRole('button', { name: /sign in/i }).click();
-  await expect(page).toHaveURL('/dashboard');
-}
+import { test, expect } from '@playwright/test';
+import { loginViaKeycloak } from './helpers/auth';
 
 test.describe('Time Tracking Timer', () => {
   test.beforeEach(async ({ page }) => {
-    await login(page);
-    await page.goto('/time-tracking');
+    await loginViaKeycloak(page);
+    await page.goto('/time-entries');
   });
 
   test('should display timer interface', async ({ page }) => {

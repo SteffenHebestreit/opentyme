@@ -37,8 +37,17 @@ backend/
 │   │   │   ├── invoice-text-template.controller.ts
 │   │   │   ├── payment.controller.ts
 │   │   │   └── tax-rate.controller.ts
+│   │   ├── communication/
+│   │   │   └── email-template.controller.ts
 │   │   └── system/
-│   │       └── backup.controller.ts
+│   │       ├── backup.controller.ts
+│   │       ├── plugins.controller.ts
+│   │       └── settings.controller.ts
+│   │
+│   ├── plugins/                    # Addon plugin system
+│   │   ├── plugin-loader.ts       # Discovers and loads addons
+│   │   ├── plugin-registry.ts     # In-memory plugin registry
+│   │   └── ai-expense-analysis/   # Installed addon (example)
 │   │
 │   ├── middleware/                 # Express middleware
 │   │   ├── auth/
@@ -78,8 +87,13 @@ backend/
 │   │   │   ├── invoice-text-template.routes.ts
 │   │   │   ├── payment.routes.ts
 │   │   │   └── tax-rate.routes.ts
+│   │   ├── communication/
+│   │   │   └── email-template.routes.ts
 │   │   └── system/
-│   │       └── backup.routes.ts
+│   │       ├── backup.routes.ts
+│   │       ├── plugins.routes.ts
+│   │       ├── settings.routes.ts
+│   │       └── initialization.routes.ts
 │   │
 │   ├── schemas/                    # Joi validation schemas
 │   │   ├── business/
@@ -101,6 +115,8 @@ backend/
 │   │   │   ├── expense.service.ts
 │   │   │   ├── project.service.ts
 │   │   │   └── time-entry.service.ts
+│   │   ├── communication/
+│   │   │   └── email-template.service.ts
 │   │   ├── external/
 │   │   │   └── email.service.ts
 │   │   ├── financial/
@@ -109,7 +125,7 @@ backend/
 │   │   │   ├── invoice-text-template.service.ts
 │   │   │   └── tax-rate.service.ts
 │   │   ├── storage/
-│   │   │   └── minio.service.ts
+│   │   │   └── storage.service.ts
 │   │   └── keycloak.service.ts    # Keycloak integration
 │   │
 │   ├── types/                      # Custom TypeScript types
@@ -125,6 +141,7 @@ backend/
 │   │   └── test-db.ts            # Test database utilities
 │   ├── unit/                      # Unit tests
 │   │   ├── client.service.test.ts
+│   │   ├── email-template.service.test.ts
 │   │   ├── expense.service.test.ts
 │   │   ├── invoice.service.test.ts
 │   │   ├── project.service.test.ts
@@ -133,7 +150,8 @@ backend/
 │   │   ├── time-entry.service.test.ts
 │   │   └── user.service.test.ts
 │   └── integration/               # Integration tests
-│       └── auth.test.ts
+│       ├── auth.test.ts
+│       └── email-template.routes.test.ts
 │
 ├── dist/                           # Compiled JavaScript output
 ├── .dockerignore                   # Docker ignore patterns
@@ -279,12 +297,18 @@ const result = await db.query(
 ### External Services
 
 - **`external/email.service.ts`**: Email notifications (SMTP)
-- **`storage/minio.service.ts`**: Object storage (S3-compatible)
+- **`storage/storage.service.ts`**: S3-compatible object storage (SeaweedFS / AWS S3)
 
 ### System Services
 
+- **`system/backup.service.ts`**: Database and storage backup operations
+- **`system/backup-scheduler.service.ts`**: Scheduled backup management with cron
+- **`system/plugin-settings.service.ts`**: Per-user plugin configuration CRUD
 - **`analytics/analytics.service.ts`**: Business metrics and reports
 - **`analytics/report.service.ts`**: German tax reports (VAT, EÜR) and financial reporting
+- **`analytics/audit.service.ts`**: Report export audit trail
+- **`analytics/tax-package.service.ts`**: Tax package export for advisors
+- **`financial/tax-prepayment.service.ts`**: VAT and income tax prepayment tracking
   - VAT Report (Umsatzsteuervoranmeldung) - Quarterly VAT pre-registration
   - Income/Expense Report (EÜR) - Einnahmen-Überschuss-Rechnung for tax declaration
   - Invoice Report - Comprehensive invoice listing with payment status
@@ -433,7 +457,8 @@ cp .env.example .env
 # Edit .env with your settings
 
 # Run database migrations
-# (handled automatically by init.sql in docker-compose)
+# (handled automatically on startup via startup.ts migration runner)
+# Manual: migration files in backend/migrations/ are auto-applied
 
 # Start development server
 npm run dev
@@ -467,12 +492,11 @@ KEYCLOAK_ADMIN_CLIENT_SECRET=your-admin-secret
 SMTP_HOST=mailhog
 SMTP_PORT=1025
 
-# MinIO Object Storage
-MINIO_ENDPOINT=minio
-MINIO_PORT=9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin123
-MINIO_BUCKET=receipts
+# S3-compatible Object Storage (SeaweedFS)
+STORAGE_ENDPOINT=seaweedfs
+STORAGE_PORT=8333
+STORAGE_ACCESS_KEY=admin
+STORAGE_SECRET_KEY=password
 ```
 
 ---
@@ -630,7 +654,7 @@ CC BY-NC 4.0 License - See root LICENSE file
 
 ---
 
-**Backend Version**: 1.0.0  
+**Backend Version**: 1.0.0
 **Node.js**: 18+  
 **TypeScript**: 5.1+  
-**Last Updated**: October 17, 2025
+**Last Updated**: March 2026

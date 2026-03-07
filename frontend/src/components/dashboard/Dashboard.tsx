@@ -13,6 +13,7 @@ import TimeTrendChart from './charts/TimeTrendChart';
 import RevenueByClientChart from './charts/RevenueByClientChart';
 import DepreciationScheduleChart from './charts/DepreciationScheduleChart';
 import AssetRegisterTable from './AssetRegisterTable';
+import { Slot } from '../../plugins/slots';
 
 /**
  * Main Dashboard component displaying application overview and key metrics.
@@ -114,6 +115,9 @@ export default function Dashboard() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('recentInvoices.title')}</h2>
             <RecentInvoices invoices={data.recentInvoices} />
           </div>
+
+          {/* Addon-contributed dashboard widgets */}
+          <Slot name="dashboard-widgets" context={{ metrics: data.metrics }} />
         </Fragment>
       )}
     </div>

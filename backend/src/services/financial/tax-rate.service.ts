@@ -4,6 +4,7 @@ import {
   UpdateTaxRateDto,
   TaxRate
 } from '../../models/financial/tax-rate.model';
+import { logger } from '../../utils/logger';
 
 const db = getDbClient();
 
@@ -70,7 +71,7 @@ export class TaxRateService {
       const result = await db.query(queryText, values);
       return result.rows[0] as TaxRate;
     } catch (error) {
-      console.error('Error creating tax rate:', error);
+      logger.error('Error creating tax rate:', error);
       throw new Error(`Failed to create tax rate: ${(error as any).message}`);
     }
   }
@@ -108,7 +109,7 @@ export class TaxRateService {
       const result = await db.query(queryText, [userId]);
       return result.rows as TaxRate[];
     } catch (error) {
-      console.error('Error fetching tax rates:', error);
+      logger.error('Error fetching tax rates:', error);
       throw new Error(`Failed to fetch tax rates: ${(error as any).message}`);
     }
   }
@@ -141,7 +142,7 @@ export class TaxRateService {
       if (result.rows.length === 0) return null;
       return result.rows[0] as TaxRate;
     } catch (error) {
-      console.error('Error fetching tax rate by ID:', error);
+      logger.error('Error fetching tax rate by ID:', error);
       throw new Error(`Failed to fetch tax rate: ${(error as any).message}`);
     }
   }
@@ -174,7 +175,7 @@ export class TaxRateService {
       if (result.rows.length === 0) return null;
       return result.rows[0] as TaxRate;
     } catch (error) {
-      console.error('Error fetching default tax rate:', error);
+      logger.error('Error fetching default tax rate:', error);
       throw new Error(`Failed to fetch default tax rate: ${(error as any).message}`);
     }
   }
@@ -265,7 +266,7 @@ export class TaxRateService {
       if (result.rows.length === 0) return null;
       return result.rows[0] as TaxRate;
     } catch (error) {
-      console.error('Error updating tax rate:', error);
+      logger.error('Error updating tax rate:', error);
       throw new Error(`Failed to update tax rate: ${(error as any).message}`);
     }
   }
@@ -318,7 +319,7 @@ export class TaxRateService {
       const result = await db.query(queryText, [id, userId]);
       return (result.rowCount ?? 0) > 0;
     } catch (error) {
-      console.error('Error deleting tax rate:', error);
+      logger.error('Error deleting tax rate:', error);
       throw new Error(`Failed to delete tax rate: ${(error as any).message}`);
     }
   }

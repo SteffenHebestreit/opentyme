@@ -11,6 +11,7 @@ import { sanitizeRequestBody } from './middleware/sanitize.middleware';
 import { sessionConfig, isKeycloakConfigured, logKeycloakConfig } from './config/keycloak.config';
 import { swaggerSpec } from './config/swagger.config';
 import recurringExpenseScheduler from './services/financial/recurring-expense-scheduler.service';
+import { pluginLoader } from './plugins/plugin-loader';
 
 // Load environment variables
 dotenv.config();
@@ -71,6 +72,13 @@ if (isKeycloakConfigured()) {
 
 // Setup routes
 setupRoutes(app);
+
+// Load and initialize plugins after core routes are set up
+// This allows plugins to add their routes and features
+pluginLoader.loadAll(app).catch((error) => {
+  logger.error('Failed to load plugins:', error.message);
+  // Continue running even if plugin loading fails
+});
 
 // Health check endpoints (both /health and /api/health for compatibility)
 app.get('/health', (req: Request, res: Response) => {

@@ -11,6 +11,7 @@
  */
 
 import { getDbClient } from '../../utils/database';
+import { logger } from '../../utils/logger';
 import {
   TaxPrepayment,
   CreateTaxPrepaymentData,
@@ -266,10 +267,10 @@ export class TaxPrepaymentService {
     // Delete receipt if exists
     if (prepayment.receipt_url) {
       try {
-        const { minioService } = await import('../storage/minio.service');
-        await minioService.deleteFileFromPath(prepayment.receipt_url);
+        const { storageService } = await import('../storage/storage.service');
+        await storageService.deleteFileFromPath(prepayment.receipt_url);
       } catch (error) {
-        console.error('Failed to delete receipt file:', error);
+        logger.error('Failed to delete receipt file:', error);
         // Continue with deletion even if file deletion fails
       }
     }
@@ -301,16 +302,16 @@ export class TaxPrepaymentService {
     // Delete old receipt if exists
     if (prepayment.receipt_url) {
       try {
-        const { minioService } = await import('../storage/minio.service');
-        await minioService.deleteFileFromPath(prepayment.receipt_url);
+        const { storageService } = await import('../storage/storage.service');
+        await storageService.deleteFileFromPath(prepayment.receipt_url);
       } catch (error) {
-        console.error('Failed to delete old receipt:', error);
+        logger.error('Failed to delete old receipt:', error);
       }
     }
 
     // Upload new receipt
-    const { minioService } = await import('../storage/minio.service');
-    const { url, filename } = await minioService.uploadFile(
+    const { storageService } = await import('../storage/storage.service');
+    const { url, filename } = await storageService.uploadFile(
       userId,
       fileBuffer,
       originalFilename,
@@ -349,8 +350,8 @@ export class TaxPrepaymentService {
     }
 
     // Delete file from storage
-    const { minioService } = await import('../storage/minio.service');
-    await minioService.deleteFileFromPath(prepayment.receipt_url);
+    const { storageService } = await import('../storage/storage.service');
+    await storageService.deleteFileFromPath(prepayment.receipt_url);
 
     // Update prepayment
     const query = `
@@ -386,12 +387,12 @@ export class TaxPrepaymentService {
       throw new Error('No receipt found for this tax prepayment');
     }
 
-    const { minioService } = await import('../storage/minio.service');
+    const { storageService } = await import('../storage/storage.service');
     const urlParts = prepayment.receipt_url.replace(/^\//, '').split('/');
     const bucket = urlParts[0];
     const objectName = urlParts.slice(1).join('/');
 
-    const stream = await minioService.getFileStream(bucket, objectName);
+    const stream = await storageService.getFileStream(bucket, objectName);
 
     return {
       stream,

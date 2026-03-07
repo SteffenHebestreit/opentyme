@@ -4,7 +4,7 @@
  */
 
 import { Router } from 'express';
-import { getSettings, updateSettings } from '../../controllers/system/settings.controller';
+import { getSettings, updateSettings, testSmtp } from '../../controllers/system/settings.controller';
 import { authenticateKeycloak, extractKeycloakUser } from '../../middleware/auth/keycloak.middleware';
 
 const router = Router();
@@ -26,5 +26,12 @@ router.get('/', getSettings);
  * @access  Protected
  */
 router.put('/', updateSettings);
+
+/**
+ * @route   POST /api/settings/test-smtp
+ * @desc    Send a test email to verify SMTP configuration
+ * @access  Protected
+ */
+router.post('/test-smtp', testSmtp);
 
 export default router;

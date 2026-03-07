@@ -12,6 +12,7 @@
  */
 
 import { getDbClient } from '../../utils/database';
+import { logger } from '../../utils/logger';
 import {
   Expense,
   ExpenseWithProject,
@@ -672,16 +673,16 @@ export class ExpenseService {
       throw new Error('Expense not found or unauthorized');
     }
 
-    // Import MinIO service dynamically to avoid circular dependencies
-    const { minioService } = await import('../storage/minio.service');
+    // Import storage service dynamically to avoid circular dependencies
+    const { storageService } = await import('../storage/storage.service');
 
     // Delete old receipt if exists
     if (expense.receipt_url) {
       await this.deleteReceiptFile(expense.receipt_url);
     }
 
-    // Upload to MinIO
-    const uploadResult = await minioService.uploadFile(
+    // Upload to storage
+    const uploadResult = await storageService.uploadFile(
       userId,
       file.buffer,
       file.originalname,
@@ -689,7 +690,7 @@ export class ExpenseService {
       'receipts'
     );
 
-    // Update database with MinIO URL and file metadata
+    // Update database with storage URL and file metadata
     const query = `
       UPDATE expenses
       SET receipt_url = $1, 
@@ -715,18 +716,17 @@ export class ExpenseService {
   /**
    * Delete receipt file
    * 
-   * @param {string} receiptUrl - Receipt URL path from MinIO
+   * @param {string} receiptUrl - Receipt URL path
    * @returns {Promise<void>}
    */
   private async deleteReceiptFile(receiptUrl: string): Promise<void> {
     try {
-      // Import MinIO service dynamically
-      const { minioService } = await import('../storage/minio.service');
-      
-      // Delete from MinIO
-      await minioService.deleteFileFromPath(receiptUrl);
+      // Import storage service dynamically
+      const { storageService } = await import('../storage/storage.service');
+
+      await storageService.deleteFileFromPath(receiptUrl);
     } catch (error) {
-      console.error('Error deleting receipt file:', error);
+      logger.error('Error deleting receipt file:', error);
       // Don't throw - file might already be deleted
     }
   }
@@ -783,18 +783,16 @@ export class ExpenseService {
       throw new Error('No receipt found for this expense');
     }
 
-    // Import MinIO service dynamically
-    const { minioService } = await import('../storage/minio.service');
+    // Import storage service dynamically
+    const { storageService } = await import('../storage/storage.service');
 
     // Extract bucket and object name from URL
-    // URL format: /receipts/userid/receipts/filename or /bucket/objectName
-    // We need to parse this correctly
+    // URL format: /user-{id}/category/filename
     const urlParts = expense.receipt_url.replace(/^\//, '').split('/');
     const bucket = urlParts[0]; // First part is the bucket name
     const objectName = urlParts.slice(1).join('/'); // Rest is the object name
 
-    // Get file stream from MinIO
-    const stream = await minioService.getFileStream(bucket, objectName);
+    const stream = await storageService.getFileStream(bucket, objectName);
 
     return {
       stream,
@@ -1480,6 +1478,6 @@ export class ExpenseService {
     values.push(parentId);
     
     const result = await this.db.query(query, values);
-    console.log(`[UpdateChildExpenses] Updated ${result.rowCount} child expenses for parent ${parentId}`);
+    logger.info(`[UpdateChildExpenses] Updated ${result.rowCount} child expenses for parent ${parentId}`);
   }
 }

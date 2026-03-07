@@ -103,8 +103,6 @@ export default function SystemAdmin() {
       setIsLoading(true);
       setError(null);
       const data = await backupService.listBackups();
-      console.log('Loaded backups:', data);
-      // API returns array directly, not wrapped in an object
       setBackups(Array.isArray(data) ? data : []);
     } catch (err: any) {
       setError(err.message || t('errors.loadBackups'));

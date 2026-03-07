@@ -32,6 +32,8 @@ const TABLES_TO_CLEAN = [
   'projects',
   'clients',
   'tax_prepayments',
+  'email_templates',
+  'invoice_text_templates',
   // Don't clean settings as we need it for the test user FK reference
 ];
 
@@ -95,13 +97,6 @@ beforeAll(async () => {
 // Each test file starts fresh due to the beforeAll cleanup
 
 // Clean up after all tests in this file
-afterAll(async () => {
-  await cleanDatabase();
-  await closeDbConnection();
-});
-
-
-// Global teardown: Close database connection after all tests
 afterAll(async () => {
   await cleanDatabase();
   await closeDbConnection();
