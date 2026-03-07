@@ -1,0 +1,44 @@
+{
+  "title": "E-Mail-Vorlagen",
+  "subtitle": "Verwalten Sie MJML-E-Mail-Vorlagen mit Platzhalter-Unterstützung.",
+  "newTemplate": "Neue Vorlage",
+  "noTemplates": "Noch keine Vorlagen vorhanden.",
+  "createFirst": "Erste Vorlage erstellen",
+  "loadError": "Fehler beim Laden der E-Mail-Vorlagen.",
+  "col": {
+    "name": "Name",
+    "subject": "Betreff",
+    "category": "Kategorie",
+    "language": "Spr.",
+    "default": "Standard",
+    "updated": "Aktualisiert",
+    "actions": "Aktionen"
+  },
+  "action": {
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "confirmDelete": "Löschen bestätigen",
+    "cancel": "Abbrechen"
+  },
+  "builder": {
+    "back": "Zurück zu Vorlagen",
+    "newTitle": "Neue E-Mail-Vorlage",
+    "editTitle": "E-Mail-Vorlage bearbeiten",
+    "name": "Vorlagenname",
+    "namePlaceholder": "z.B. Rechnungsbenachrichtigung",
+    "subject": "E-Mail-Betreff",
+    "subjectPlaceholder": "z.B. Ihre Rechnung {{invoice.number}} ist bereit",
+    "category": "Kategorie",
+    "language": "Sprache",
+    "default": "Als Standard setzen",
+    "insertPlaceholder": "Platzhalter einfügen",
+    "uploadFile": "HTML/MJML hochladen",
+    "tabCode": "Code",
+    "tabPreview": "Vorschau",
+    "save": "Speichern",
+    "saving": "Wird gespeichert...",
+    "saveSuccess": "Vorlage erfolgreich gespeichert.",
+    "saveError": "Fehler beim Speichern der Vorlage.",
+    "validationError": "Bitte Name und Betreff der Vorlage angeben."
+  }
+}

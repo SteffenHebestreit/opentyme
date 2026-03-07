@@ -8,6 +8,7 @@
 
 import { Request, Response } from 'express';
 import { TaxPrepaymentService } from '../../services/financial/tax-prepayment.service';
+import { logger } from '../../utils/logger';
 import {
   createTaxPrepaymentSchema,
   updateTaxPrepaymentSchema,
@@ -42,7 +43,7 @@ export class TaxPrepaymentController {
 
       res.status(200).json(result);
     } catch (error: any) {
-      console.error('Get tax prepayments error:', error);
+      logger.error('Get tax prepayments error:', error);
       res.status(500).json({ error: 'Internal server error', message: error.message });
     }
   };
@@ -74,7 +75,7 @@ export class TaxPrepaymentController {
 
       res.status(200).json(prepayment);
     } catch (error: any) {
-      console.error('Get tax prepayment by ID error:', error);
+      logger.error('Get tax prepayment by ID error:', error);
       res.status(500).json({ error: 'Internal server error', message: error.message });
     }
   };
@@ -96,7 +97,7 @@ export class TaxPrepaymentController {
 
       res.status(200).json(summary);
     } catch (error: any) {
-      console.error('Get tax prepayment summary error:', error);
+      logger.error('Get tax prepayment summary error:', error);
       res.status(500).json({ error: 'Internal server error', message: error.message });
     }
   };
@@ -124,7 +125,7 @@ export class TaxPrepaymentController {
 
       res.status(201).json(prepayment);
     } catch (error: any) {
-      console.error('Create tax prepayment error:', error);
+      logger.error('Create tax prepayment error:', error);
       res.status(500).json({ error: 'Internal server error', message: error.message });
     }
   };
@@ -159,7 +160,7 @@ export class TaxPrepaymentController {
 
       res.status(200).json(prepayment);
     } catch (error: any) {
-      console.error('Update tax prepayment error:', error);
+      logger.error('Update tax prepayment error:', error);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         res.status(404).json({ error: 'Not found', message: error.message });
       } else {
@@ -191,7 +192,7 @@ export class TaxPrepaymentController {
 
       res.status(204).send();
     } catch (error: any) {
-      console.error('Delete tax prepayment error:', error);
+      logger.error('Delete tax prepayment error:', error);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         res.status(404).json({ error: 'Not found', message: error.message });
       } else {
@@ -236,7 +237,7 @@ export class TaxPrepaymentController {
 
       res.status(200).json(prepayment);
     } catch (error: any) {
-      console.error('Upload receipt error:', error);
+      logger.error('Upload receipt error:', error);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         res.status(404).json({ error: 'Not found', message: error.message });
       } else {
@@ -276,7 +277,7 @@ export class TaxPrepaymentController {
       // Pipe stream to response
       stream.pipe(res);
     } catch (error: any) {
-      console.error('Download receipt error:', error);
+      logger.error('Download receipt error:', error);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         res.status(404).json({ error: 'Not found', message: error.message });
       } else {
@@ -308,7 +309,7 @@ export class TaxPrepaymentController {
 
       res.status(200).json(prepayment);
     } catch (error: any) {
-      console.error('Delete receipt error:', error);
+      logger.error('Delete receipt error:', error);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         res.status(404).json({ error: 'Not found', message: error.message });
       } else {

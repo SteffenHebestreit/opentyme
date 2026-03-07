@@ -1,105 +1,215 @@
 /**
- * Email Service
+ * @fileoverview Email Service
  * Handles sending emails via SMTP using Nodemailer.
- * Provides functions for password reset emails and general notification emails.
- * Configuration is loaded from environment variables (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS).
+ * Supports both env-var config (system emails) and per-user DB SMTP config.
  */
 
-// This is a placeholder for the Email Service.
-// In a real application, this would use something like Nodemailer, SendGrid, etc.
+import nodemailer from 'nodemailer';
+import { getDbClient } from '../../utils/database';
+import { logger } from '../../utils/logger';
+import { renderTemplateForSend } from '../communication/email-template.service';
 
-import nodemailer from 'nodemailer'; // We'll assume nodemailer is installed
-
-const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: false, // true for 465, false for other ports
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-    },
+/** System transporter using env-var config (for password resets etc.) */
+const systemTransporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: false,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
 });
+
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  user?: string;
+  pass?: string;
+  from: string;
+}
+
+/**
+ * Fetches the user's SMTP configuration from the settings table.
+ * Returns null if SMTP is not enabled for the user.
+ */
+export async function getUserSmtpConfig(userId: string): Promise<SmtpConfig | null> {
+  const pool = getDbClient();
+  const result = await pool.query(
+    `SELECT smtp_enabled, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from, smtp_secure
+     FROM settings WHERE user_id = $1`,
+    [userId]
+  );
+  const row = result.rows[0];
+  if (!row || !row.smtp_enabled || !row.smtp_host) return null;
+
+  return {
+    host: row.smtp_host,
+    port: row.smtp_port ?? 587,
+    secure: row.smtp_secure ?? false,
+    user: row.smtp_user ?? undefined,
+    pass: row.smtp_pass ?? undefined,
+    from: row.smtp_from || row.smtp_user || process.env.EMAIL_FROM || 'noreply@opentyme.local',
+  };
+}
+
+function createUserTransporter(config: SmtpConfig) {
+  return nodemailer.createTransport({
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    auth: config.user
+      ? { user: config.user, pass: config.pass }
+      : undefined,
+  });
+}
 
 /**
  * Service for sending emails via SMTP.
- * Uses Nodemailer with configuration from environment variables.
  */
 export class EmailService {
   /**
-   * Sends a password reset email to a user.
-   * Email contains a reset link that expires in 1 hour.
-   * Uses both plain text and HTML formats for compatibility.
-   * 
-   * @async
-   * @param {string} email - Recipient email address
-   * @param {string} resetLink - Password reset link (should include token)
-   * @returns {Promise<void>}
-   * @throws {Error} If email sending fails
-   * 
-   * @example
-   * const resetToken = crypto.randomBytes(32).toString('hex');
-   * const resetLink = `https://example.com/reset-password?token=${resetToken}`;
-   * await emailService.sendPasswordResetEmail('user@example.com', resetLink);
+   * Sends a password reset email using system SMTP config.
    */
   async sendPasswordResetEmail(email: string, resetLink: string): Promise<void> {
-    console.log(`Attempting to send password reset email to ${email}. Link: ${resetLink}`);
-    
     try {
-      const mailOptions = {
-        from: process.env.EMAIL_FROM || 'noreply@yourdomain.com',
+      await systemTransporter.sendMail({
+        from: process.env.EMAIL_FROM || 'noreply@opentyme.local',
         to: email,
         subject: 'Password Reset Request',
-        text: `You requested a password reset. Please click the following link or paste it into your browser to proceed: ${resetLink}\n\nIf you did not request this, please ignore this email.`,
-        html: `<p>You requested a password reset. Please click the following link or paste it into your browser to proceed:</p><a href="${resetLink}">Reset Password</a><br><br>If you did not request this, please ignore this email.`,
-      };
-
-      await transporter.sendMail(mailOptions);
-      console.log(`Password reset email sent successfully to ${email}`);
+        text: `You requested a password reset. Click the link: ${resetLink}\n\nIf you did not request this, please ignore this email.`,
+        html: `<p>You requested a password reset. Please click the link below:</p><a href="${resetLink}">Reset Password</a><br><br><p>If you did not request this, please ignore this email.</p>`,
+      });
+      logger.debug('Password reset email sent', { to: email });
     } catch (error) {
-        console.error('Error sending password reset email:', error);
-        // In a real app, you might want to handle specific nodemailer errors
-        throw new Error('Failed to send password reset email.');
+      logger.error('Error sending password reset email', { error, to: email });
+      throw new Error('Failed to send password reset email.');
     }
   }
 
   /**
-   * Sends a general notification email.
-   * Supports both plain text and HTML body formats.
-   * If HTML body is not provided, converts plain text to basic HTML.
-   * 
-   * @async
-   * @param {string} email - Recipient email address
-   * @param {string} subject - Email subject line
-   * @param {string} textBody - Plain text email body
-   * @param {string} [htmlBody] - Optional HTML email body (auto-generated from textBody if omitted)
-   * @returns {Promise<void>}
-   * @throws {Error} If email sending fails
-   * 
-   * @example
-   * await emailService.sendNotificationEmail(
-   *   'user@example.com',
-   *   'Invoice Generated',
-   *   'Your invoice #INV-20240115-001 has been generated.\nTotal: $1,000.00',
-   *   '<p>Your invoice <strong>#INV-20240115-001</strong> has been generated.</p><p>Total: $1,000.00</p>'
-   * );
+   * Sends a general notification email using system SMTP config.
    */
-  async sendNotificationEmail(email: string, subject: string, textBody: string, htmlBody?: string): Promise<void> {
-      console.log(`Attempting to send notification email to ${email}. Subject: ${subject}`);
-      
-      try {
-        const mailOptions = {
-            from: process.env.EMAIL_FROM || 'noreply@yourdomain.com',
-            to: email,
-            subject: subject,
-            text: textBody,
-            html: htmlBody || `<p>${textBody.replace(/\n/g, '<br>')}</p>`, // Basic HTML conversion if not provided
-        };
+  async sendNotificationEmail(
+    email: string,
+    subject: string,
+    textBody: string,
+    htmlBody?: string
+  ): Promise<void> {
+    try {
+      await systemTransporter.sendMail({
+        from: process.env.EMAIL_FROM || 'noreply@opentyme.local',
+        to: email,
+        subject,
+        text: textBody,
+        html: htmlBody || `<p>${textBody.replace(/\n/g, '<br>')}</p>`,
+      });
+      logger.debug('Notification email sent', { to: email, subject });
+    } catch (error) {
+      logger.error('Error sending notification email', { error, to: email });
+      throw new Error('Failed to send notification email.');
+    }
+  }
 
-        await transporter.sendMail(mailOptions);
-        console.log(`Notification email sent successfully to ${email}`);
-      } catch (error) {
-          console.error('Error sending notification email:', error);
-          throw new Error('Failed to send notification email.');
-      }
+  /**
+   * Sends an email using a user's MJML template with placeholder substitution.
+   * Uses the user's configured SMTP server (falls back to system SMTP if not configured).
+   */
+  async sendWithTemplate(
+    userId: string,
+    to: string,
+    templateId: string,
+    variables: Record<string, string>
+  ): Promise<void> {
+    const rendered = await renderTemplateForSend(templateId, userId, variables);
+    if (!rendered) {
+      throw new Error('Email template not found.');
+    }
+
+    const userConfig = await getUserSmtpConfig(userId);
+    let transporter = systemTransporter;
+    let from = process.env.EMAIL_FROM || 'noreply@opentyme.local';
+
+    if (userConfig) {
+      transporter = createUserTransporter(userConfig);
+      from = userConfig.from;
+    }
+
+    try {
+      await transporter.sendMail({
+        from,
+        to,
+        subject: rendered.subject,
+        html: rendered.html,
+      });
+      logger.debug('Template email sent', { to, templateId });
+    } catch (error) {
+      logger.error('Error sending template email', { error, to, templateId });
+      throw new Error('Failed to send email.');
+    }
+  }
+
+  /**
+   * Sends an email using pre-rendered HTML/subject with optional file attachments.
+   * Uses the user's configured SMTP server (falls back to system SMTP if not configured).
+   * Returns the Nodemailer message ID.
+   */
+  async sendEmail({
+    userId,
+    to,
+    subject,
+    html,
+    attachments,
+  }: {
+    userId: string;
+    to: string;
+    subject: string;
+    html: string;
+    attachments?: Array<{ filename: string; content: Buffer; contentType: string }>;
+  }): Promise<string | undefined> {
+    const userConfig = await getUserSmtpConfig(userId);
+    let transporter = systemTransporter;
+    let from = process.env.EMAIL_FROM || 'noreply@opentyme.local';
+
+    if (userConfig) {
+      transporter = createUserTransporter(userConfig);
+      from = userConfig.from;
+    }
+
+    try {
+      const info = await transporter.sendMail({
+        from,
+        to,
+        subject,
+        html,
+        attachments: attachments?.map((a) => ({
+          filename: a.filename,
+          content: a.content,
+          contentType: a.contentType,
+        })),
+      });
+      logger.debug('Email sent', { to, subject, messageId: info.messageId });
+      return info.messageId;
+    } catch (error) {
+      logger.error('Error sending email', { error, to, subject });
+      throw new Error('Failed to send email.');
+    }
+  }
+
+  /**
+   * Sends a test email to verify SMTP configuration.
+   * Uses the provided config directly without persisting it.
+   */
+  async sendTestEmail(config: SmtpConfig, to: string): Promise<void> {
+    const transporter = createUserTransporter(config);
+    await transporter.sendMail({
+      from: config.from,
+      to,
+      subject: 'OpenTYME — SMTP Test',
+      text: 'This is a test email from OpenTYME to verify your SMTP configuration.',
+      html: '<p>This is a test email from <strong>OpenTYME</strong> to verify your SMTP configuration.</p>',
+    });
   }
 }
+
+export const emailService = new EmailService();

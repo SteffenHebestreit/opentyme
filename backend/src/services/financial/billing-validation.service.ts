@@ -1,4 +1,5 @@
 import { getDbClient } from '../../utils/database';
+import { logger } from '../../utils/logger';
 
 /**
  * Billing validation status indicating the payment state of an invoice.
@@ -167,7 +168,7 @@ export class BillingValidationService {
       };
 
     } catch (error) {
-      console.error('Billing validation error:', error);
+      logger.error('Billing validation error:', error);
       throw new Error(`Failed to validate invoice billing: ${(error as any).message}`);
     }
   }
@@ -208,7 +209,7 @@ export class BillingValidationService {
         duplicateCount: duplicateCount
       };
     } catch (error) {
-      console.error('Duplicate payment check error:', error);
+      logger.error('Duplicate payment check error:', error);
       return { hasDuplicates: false, duplicateCount: 0 };
     }
   }
@@ -284,7 +285,7 @@ export class BillingValidationService {
       };
 
     } catch (error) {
-      console.error('Proposed payment validation error:', error);
+      logger.error('Proposed payment validation error:', error);
       throw new Error(`Failed to validate proposed payment: ${(error as any).message}`);
     }
   }
@@ -314,7 +315,7 @@ export class BillingValidationService {
       const result = await this.db.query(query, [invoiceId]);
       return result.rows;
     } catch (error) {
-      console.error('Payment breakdown error:', error);
+      logger.error('Payment breakdown error:', error);
       return [];
     }
   }

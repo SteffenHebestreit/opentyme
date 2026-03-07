@@ -5,7 +5,7 @@ set -e
 # This script backs up all critical data needed to restore the system:
 # - PostgreSQL main database (opentyme)
 # - PostgreSQL Keycloak database (authentication)
-# - MinIO object storage (receipts, documents, user files)
+# - S3-compatible object storage (SeaweedFS — receipts, documents, user files)
 
 BACKUP_DIR="${BACKUP_DIR:-/usr/src/app/backups}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
@@ -28,11 +28,12 @@ KEYCLOAK_DB_USER="${KEYCLOAK_DB_USER:-keycloak_user}"
 KEYCLOAK_DB_PASSWORD="${KEYCLOAK_DB_PASSWORD:-keycloak_password}"
 KEYCLOAK_DB_NAME="${KEYCLOAK_DB_NAME:-postgres}"
 
-# MinIO configuration
-MINIO_HOST="${MINIO_ENDPOINT:-minio}"
-MINIO_PORT="${MINIO_PORT:-9000}"
-MINIO_ACCESS_KEY="${MINIO_ACCESS_KEY:-minioadmin}"
-MINIO_SECRET_KEY="${MINIO_SECRET_KEY:-minioadmin123}"
+# S3-compatible storage configuration (SeaweedFS)
+STORAGE_HOST="${STORAGE_ENDPOINT:-${MINIO_ENDPOINT:-seaweedfs}}"
+STORAGE_S3_PORT="${STORAGE_PORT:-${MINIO_PORT:-8333}}"
+STORAGE_ACCESS_KEY="${STORAGE_ACCESS_KEY:-${MINIO_ACCESS_KEY:-admin}}"
+STORAGE_SECRET_KEY="${STORAGE_SECRET_KEY:-${MINIO_SECRET_KEY:-password}}"
+STORAGE_ENDPOINT_URL="http://${STORAGE_HOST}:${STORAGE_S3_PORT}"
 
 # Create backup directory if it doesn't exist
 mkdir -p "$BACKUP_DIR"
@@ -48,7 +49,7 @@ echo "[BACKUP] Starting full system backup: $BACKUP_NAME"
 echo "[BACKUP] ============================================"
 echo "[BACKUP] Backup directory: $BACKUP_DIR"
 echo "[BACKUP] Include Databases: $INCLUDE_DB"
-echo "[BACKUP] Include Storage (MinIO): $INCLUDE_STORAGE"
+echo "[BACKUP] Include Storage (SeaweedFS): $INCLUDE_STORAGE"
 echo "[BACKUP] Include Config: $INCLUDE_CONFIG"
 echo "[BACKUP] ============================================"
 
@@ -57,7 +58,7 @@ if [ "$INCLUDE_DB" = "true" ]; then
     echo ""
     echo "[BACKUP] === Main Database (opentyme) ==="
     echo "[BACKUP] Host: $DB_HOST:$DB_PORT"
-    
+
     PGPASSWORD="$DB_PASSWORD" pg_dump \
         -h "$DB_HOST" \
         -p "$DB_PORT" \
@@ -65,7 +66,7 @@ if [ "$INCLUDE_DB" = "true" ]; then
         -d "$DB_NAME" \
         -F c \
         -f "$TEMP_DIR/opentyme_database.dump" 2>&1
-    
+
     if [ $? -eq 0 ]; then
         OPENTYME_DB_SIZE=$(stat -c%s "$TEMP_DIR/opentyme_database.dump" 2>/dev/null || stat -f%z "$TEMP_DIR/opentyme_database.dump" 2>/dev/null || echo "0")
         echo "[BACKUP] ✓ Main database backup completed ($OPENTYME_DB_SIZE bytes)"
@@ -74,12 +75,12 @@ if [ "$INCLUDE_DB" = "true" ]; then
         rm -rf "$TEMP_DIR"
         exit 1
     fi
-    
+
     # Backup Keycloak database
     echo ""
     echo "[BACKUP] === Keycloak Database ==="
     echo "[BACKUP] Host: $KEYCLOAK_DB_HOST:$KEYCLOAK_DB_PORT"
-    
+
     PGPASSWORD="$KEYCLOAK_DB_PASSWORD" pg_dump \
         -h "$KEYCLOAK_DB_HOST" \
         -p "$KEYCLOAK_DB_PORT" \
@@ -87,7 +88,7 @@ if [ "$INCLUDE_DB" = "true" ]; then
         -d "$KEYCLOAK_DB_NAME" \
         -F c \
         -f "$TEMP_DIR/keycloak_database.dump" 2>&1
-    
+
     if [ $? -eq 0 ]; then
         KC_DB_SIZE=$(stat -c%s "$TEMP_DIR/keycloak_database.dump" 2>/dev/null || stat -f%z "$TEMP_DIR/keycloak_database.dump" 2>/dev/null || echo "0")
         echo "[BACKUP] ✓ Keycloak database backup completed ($KC_DB_SIZE bytes)"
@@ -98,32 +99,41 @@ if [ "$INCLUDE_DB" = "true" ]; then
     fi
 fi
 
-# Backup MinIO storage
+# Backup S3 object storage (SeaweedFS)
 if [ "$INCLUDE_STORAGE" = "true" ]; then
     echo ""
-    echo "[BACKUP] === MinIO Object Storage ==="
-    echo "[BACKUP] Host: $MINIO_HOST:$MINIO_PORT"
-    
-    mkdir -p "$TEMP_DIR/minio"
-    
-    # Configure mc (MinIO client) alias
-    mc alias set backup_minio http://$MINIO_HOST:$MINIO_PORT $MINIO_ACCESS_KEY $MINIO_SECRET_KEY --api S3v4 2>/dev/null || true
-    
-    # List and backup all buckets
-    BUCKETS=$(mc ls backup_minio 2>/dev/null | awk '{print $NF}' | tr -d '/')
-    
-    if [ -n "$BUCKETS" ]; then
-        for bucket in $BUCKETS; do
-            echo "[BACKUP] Backing up bucket: $bucket"
-            mc cp --recursive backup_minio/$bucket "$TEMP_DIR/minio/$bucket" 2>/dev/null || {
-                echo "[BACKUP] Warning: Could not backup bucket $bucket"
-            }
-        done
-        
-        MINIO_SIZE=$(du -sb "$TEMP_DIR/minio" 2>/dev/null | cut -f1 || echo "0")
-        echo "[BACKUP] ✓ MinIO storage backup completed ($MINIO_SIZE bytes)"
+    echo "[BACKUP] === S3 Object Storage (SeaweedFS) ==="
+    echo "[BACKUP] Endpoint: $STORAGE_ENDPOINT_URL"
+
+    mkdir -p "$TEMP_DIR/storage"
+
+    if command -v aws >/dev/null 2>&1; then
+        # List all buckets
+        BUCKETS=$(AWS_ACCESS_KEY_ID="$STORAGE_ACCESS_KEY" \
+                  AWS_SECRET_ACCESS_KEY="$STORAGE_SECRET_KEY" \
+                  aws s3 ls --endpoint-url "$STORAGE_ENDPOINT_URL" 2>/dev/null \
+                  | awk '{print $3}') || true
+
+        if [ -n "$BUCKETS" ]; then
+            for bucket in $BUCKETS; do
+                echo "[BACKUP] Syncing bucket: $bucket"
+                AWS_ACCESS_KEY_ID="$STORAGE_ACCESS_KEY" \
+                AWS_SECRET_ACCESS_KEY="$STORAGE_SECRET_KEY" \
+                aws s3 sync "s3://$bucket" "$TEMP_DIR/storage/$bucket" \
+                    --endpoint-url "$STORAGE_ENDPOINT_URL" \
+                    --no-progress 2>/dev/null || {
+                    echo "[BACKUP] Warning: Could not sync bucket $bucket"
+                }
+            done
+
+            STORAGE_SIZE=$(du -sb "$TEMP_DIR/storage" 2>/dev/null | cut -f1 || echo "0")
+            echo "[BACKUP] ✓ Storage backup completed ($STORAGE_SIZE bytes)"
+        else
+            echo "[BACKUP] Warning: No storage buckets found or endpoint not accessible"
+        fi
     else
-        echo "[BACKUP] Warning: No MinIO buckets found or MinIO not accessible"
+        echo "[BACKUP] Warning: AWS CLI not found — skipping storage backup"
+        echo "[BACKUP] Install awscli in the backend image to enable storage backups"
     fi
 fi
 
@@ -131,21 +141,19 @@ fi
 if [ "$INCLUDE_CONFIG" = "true" ]; then
     echo ""
     echo "[BACKUP] === Configuration Files ==="
-    
+
     mkdir -p "$TEMP_DIR/config"
-    
-    # Backup .env if exists
+
     if [ -f "/usr/src/app/.env" ]; then
         cp "/usr/src/app/.env" "$TEMP_DIR/config/.env"
         echo "[BACKUP] ✓ Backed up .env"
     fi
-    
-    # Backup keycloak realm export if exists
+
     if [ -f "/keycloak/realm-import.json" ]; then
         cp "/keycloak/realm-import.json" "$TEMP_DIR/config/realm-import.json"
         echo "[BACKUP] ✓ Backed up Keycloak realm config"
     fi
-    
+
     echo "[BACKUP] ✓ Configuration backup completed"
 fi
 
@@ -156,26 +164,20 @@ cat > "$TEMP_DIR/manifest.json" << EOF
 {
   "backup_name": "$BACKUP_NAME",
   "backup_timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "backup_version": "2.0",
+  "backup_version": "2.1",
+  "storage_type": "seaweedfs_s3",
   "includes": {
     "opentyme_database": $INCLUDE_DB,
     "keycloak_database": $INCLUDE_DB,
-    "minio_storage": $INCLUDE_STORAGE,
+    "s3_storage": $INCLUDE_STORAGE,
     "config_files": $INCLUDE_CONFIG
   },
   "databases": {
-    "opentyme": {
-      "host": "$DB_HOST",
-      "name": "$DB_NAME"
-    },
-    "keycloak": {
-      "host": "$KEYCLOAK_DB_HOST",
-      "name": "$KEYCLOAK_DB_NAME"
-    }
+    "opentyme": { "host": "$DB_HOST", "name": "$DB_NAME" },
+    "keycloak": { "host": "$KEYCLOAK_DB_HOST", "name": "$KEYCLOAK_DB_NAME" }
   },
-  "minio": {
-    "host": "$MINIO_HOST",
-    "port": "$MINIO_PORT"
+  "storage": {
+    "endpoint": "$STORAGE_ENDPOINT_URL"
   }
 }
 EOF
@@ -211,4 +213,3 @@ cat <<EOF
   "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 EOF
-

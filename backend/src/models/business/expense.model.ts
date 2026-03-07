@@ -85,7 +85,7 @@ export enum ExpenseStatus {
  * @property {number} amount - Expense amount
  * @property {string} currency - ISO 4217 currency code (EUR, USD, etc.)
  * @property {string} expense_date - Date expense was incurred (YYYY-MM-DD)
- * @property {string | null} receipt_url - Path to receipt file in MinIO
+ * @property {string | null} receipt_url - Path to receipt file in object storage
  * @property {string | null} receipt_filename - Original receipt filename
  * @property {number | null} receipt_size - Receipt file size in bytes
  * @property {string | null} receipt_mimetype - Receipt file MIME type

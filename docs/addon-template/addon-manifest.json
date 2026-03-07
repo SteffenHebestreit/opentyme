@@ -1,0 +1,78 @@
+{
+  "$schema": "https://opentyme.dev/schemas/addon-manifest.v1.json",
+  "name": "example-addon",
+  "displayName": "Example Addon",
+  "version": "1.0.0",
+  "description": "A template addon demonstrating OpenTYME plugin development",
+  "author": "Your Name",
+  "license": "MIT",
+  
+  "compatibility": {
+    "opentyme": ">=1.0.0 <2.0.0"
+  },
+  
+  "backend": {
+    "entryPoint": "index.ts",
+    "routes": {
+      "prefix": "/api/addons/example",
+      "file": "routes/index.ts"
+    },
+    "services": [
+      "services/example.service.ts"
+    ],
+    "migrations": [],
+    "dependencies": {}
+  },
+  
+  "frontend": {
+    "entryPoint": "index.ts",
+    "routes": [
+      {
+        "path": "/example-addon",
+        "component": "pages/ExamplePage.tsx",
+        "protected": true,
+        "menuItem": {
+          "label": "Example",
+          "icon": "Sparkles",
+          "section": "tools",
+          "order": 100
+        }
+      }
+    ],
+    "slots": [
+      {
+        "name": "expense-form-actions",
+        "component": "components/ExampleButton.tsx",
+        "order": 10
+      }
+    ],
+    "dependencies": {}
+  },
+  
+  "settings": {
+    "schema": {
+      "enabled": {
+        "type": "boolean",
+        "default": false,
+        "label": "Enable Example Addon",
+        "description": "Enable or disable the example addon functionality"
+      },
+      "apiKey": {
+        "type": "string",
+        "secret": true,
+        "label": "API Key",
+        "description": "Your API key for external service"
+      },
+      "timeout": {
+        "type": "number",
+        "default": 5000,
+        "label": "Timeout (ms)",
+        "description": "Request timeout in milliseconds"
+      }
+    },
+    "ui": {
+      "section": "Example Addon",
+      "icon": "Sparkles"
+    }
+  }
+}

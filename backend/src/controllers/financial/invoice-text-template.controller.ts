@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { InvoiceTextTemplateService } from '../../services/financial/invoice-text-template.service';
+import { logger } from '../../utils/logger';
 import {
   createInvoiceTextTemplateSchema,
   updateInvoiceTextTemplateSchema,
@@ -63,7 +64,7 @@ export class InvoiceTextTemplateController {
         template: newTemplate
       });
     } catch (err: any) {
-      console.error('Create invoice text template error:', err);
+      logger.error('Create invoice text template error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -102,7 +103,7 @@ export class InvoiceTextTemplateController {
       const templates = await this.templateService.findAllByUser(userId, category, activeOnly);
       res.status(200).json(templates);
     } catch (err: any) {
-      console.error('Find all invoice text templates error:', err);
+      logger.error('Find all invoice text templates error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -142,7 +143,7 @@ export class InvoiceTextTemplateController {
         res.status(404).json({ message: 'Template not found' });
       }
     } catch (err: any) {
-      console.error('Find template by ID error:', err);
+      logger.error('Find template by ID error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -171,7 +172,7 @@ export class InvoiceTextTemplateController {
       const defaults = await this.templateService.findAllDefaultsByUser(userId);
       res.status(200).json(defaults);
     } catch (err: any) {
-      console.error('Find default templates error:', err);
+      logger.error('Find default templates error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -223,7 +224,7 @@ export class InvoiceTextTemplateController {
         res.status(404).json({ message: 'Template not found' });
       }
     } catch (err: any) {
-      console.error('Update template error:', err);
+      logger.error('Update template error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -262,7 +263,7 @@ export class InvoiceTextTemplateController {
         res.status(404).json({ message: 'Template not found' });
       }
     } catch (err: any) {
-      console.error('Delete template error:', err);
+      logger.error('Delete template error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }

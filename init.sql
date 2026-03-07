@@ -183,6 +183,37 @@ COMMENT ON COLUMN public.clients.user_id IS 'Keycloak user ID (sub claim from JW
 
 
 --
+-- Name: email_templates; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.email_templates (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid NOT NULL,
+    name character varying(255) NOT NULL,
+    subject character varying(512) NOT NULL,
+    category character varying(50) NOT NULL DEFAULT 'custom',
+    mjml_content text NOT NULL DEFAULT '<mjml><mj-body><mj-section><mj-column><mj-text>Hello!</mj-text></mj-column></mj-section></mj-body></mjml>',
+    html_content text,
+    variables jsonb DEFAULT '[]'::jsonb,
+    is_default boolean DEFAULT false,
+    language character varying(10) DEFAULT 'de',
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: TABLE email_templates; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.email_templates IS 'User-created MJML email templates with {{placeholder}} variable support';
+
+COMMENT ON COLUMN public.email_templates.mjml_content IS 'Raw MJML template content including {{variable}} placeholders';
+COMMENT ON COLUMN public.email_templates.html_content IS 'Cached compiled HTML (placeholders NOT substituted, done at send time)';
+COMMENT ON COLUMN public.email_templates.variables IS 'JSON array of detected placeholder variable names';
+
+
+--
 -- Name: expense_depreciation_schedule; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -811,6 +842,57 @@ COMMENT ON CONSTRAINT payments_payment_type_check ON public.payments IS 'Valid p
 
 
 --
+-- Name: plugins; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.plugins (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    name character varying(100) NOT NULL,
+    version character varying(20) NOT NULL,
+    manifest jsonb NOT NULL,
+    enabled boolean DEFAULT true,
+    installed_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT plugins_name_check CHECK (((name)::text ~ '^[a-z0-9-]+$'::text))
+);
+
+
+--
+-- Name: TABLE plugins; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON TABLE public.plugins IS 'Registry of installed OpenTYME addon plugins';
+
+
+--
+-- Name: COLUMN plugins.name; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.plugins.name IS 'Unique plugin identifier (kebab-case)';
+
+
+--
+-- Name: COLUMN plugins.version; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.plugins.version IS 'Plugin version (semver)';
+
+
+--
+-- Name: COLUMN plugins.manifest; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.plugins.manifest IS 'Complete addon manifest as JSON';
+
+
+--
+-- Name: COLUMN plugins.enabled; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.plugins.enabled IS 'Whether the plugin is globally enabled';
+
+
+--
 -- Name: payment_invoices; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -964,7 +1046,19 @@ CREATE TABLE public.settings (
     ai_model character varying(255),
     mcp_server_url character varying(512),
     mcp_server_api_key character varying(512),
-    user_region character varying(2)
+    user_region character varying(2),
+    plugins_config jsonb DEFAULT '{}'::jsonb,
+    smtp_enabled boolean DEFAULT false,
+    smtp_host character varying(255),
+    smtp_port integer DEFAULT 587,
+    smtp_user character varying(255),
+    smtp_pass character varying(512),
+    smtp_from character varying(255),
+    smtp_secure boolean DEFAULT false,
+    theme_primary_color character varying(7) DEFAULT '#7c3aed',
+    theme_secondary_color character varying(7) DEFAULT '#5b21b6',
+    theme_accent_color character varying(7) DEFAULT '#f59e0b',
+    theme_background_image_url text
 );
 
 
@@ -994,6 +1088,13 @@ COMMENT ON COLUMN public.settings.company_subline IS 'Company tagline or subline
 --
 
 COMMENT ON COLUMN public.settings.user_region IS 'User region/state code (e.g., DE state code like BW, BY) for timezone and holiday handling';
+
+
+--
+-- Name: COLUMN settings.plugins_config; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.settings.plugins_config IS 'Per-user plugin configurations and settings (JSONB format: {plugin_name: {enabled: boolean, config: {...}}})';
 
 
 --
@@ -1097,44 +1198,6 @@ COMMENT ON COLUMN public.system_backups.backup_path IS 'Full path to backup file
 --
 
 COMMENT ON COLUMN public.system_backups.started_by IS 'Keycloak user ID who triggered the backup';
-
-
---
--- Name: system_migrations; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.system_migrations (
-    id integer NOT NULL,
-    migration_name character varying(255) NOT NULL,
-    executed_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
-
-
---
--- Name: TABLE system_migrations; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON TABLE public.system_migrations IS 'Tracks database migrations that have been applied';
-
-
---
--- Name: system_migrations_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.system_migrations_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: system_migrations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.system_migrations_id_seq OWNED BY public.system_migrations.id;
 
 
 --
@@ -1369,13 +1432,6 @@ COMMENT ON VIEW public.v_expenses_with_depreciation IS 'Expenses joined with the
 
 
 --
--- Name: system_migrations id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.system_migrations ALTER COLUMN id SET DEFAULT nextval('public.system_migrations_id_seq'::regclass);
-
-
---
 -- Name: clients clients_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1448,6 +1504,22 @@ ALTER TABLE ONLY public.payments
 
 
 --
+-- Name: plugins plugins_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.plugins
+    ADD CONSTRAINT plugins_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: plugins plugins_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.plugins
+    ADD CONSTRAINT plugins_name_key UNIQUE (name);
+
+
+--
 -- Name: payment_invoices payment_invoices_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1512,19 +1584,11 @@ ALTER TABLE ONLY public.system_backups
 
 
 --
--- Name: system_migrations system_migrations_migration_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: email_templates email_templates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.system_migrations
-    ADD CONSTRAINT system_migrations_migration_name_key UNIQUE (migration_name);
-
-
---
--- Name: system_migrations system_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.system_migrations
-    ADD CONSTRAINT system_migrations_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.email_templates
+    ADD CONSTRAINT email_templates_pkey PRIMARY KEY (id);
 
 
 --
@@ -1762,6 +1826,41 @@ CREATE INDEX idx_payment_invoices_invoice_id ON public.payment_invoices USING bt
 
 
 --
+-- Name: idx_plugins_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_plugins_name ON public.plugins USING btree (name);
+
+
+--
+-- Name: idx_plugins_enabled; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_plugins_enabled ON public.plugins USING btree (enabled);
+
+
+--
+-- Name: idx_settings_plugins_config; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_settings_plugins_config ON public.settings USING gin (plugins_config);
+
+
+--
+-- Name: idx_email_templates_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_email_templates_user_id ON public.email_templates USING btree (user_id);
+
+
+--
+-- Name: idx_email_templates_category; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_email_templates_category ON public.email_templates USING btree (category);
+
+
+--
 -- Name: idx_projects_client_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1971,6 +2070,13 @@ CREATE TRIGGER set_timestamp BEFORE UPDATE ON public.payments FOR EACH ROW EXECU
 --
 
 CREATE TRIGGER set_timestamp BEFORE UPDATE ON public.settings FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
+
+
+--
+-- Name: email_templates set_timestamp; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER set_timestamp BEFORE UPDATE ON public.email_templates FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
 
 
 --

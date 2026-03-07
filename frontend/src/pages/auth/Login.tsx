@@ -32,14 +32,12 @@ const Login = (): JSX.Element => {
       const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
       if (redirectAfterLogin) {
         sessionStorage.removeItem('redirectAfterLogin');
-        console.log('[Login] User is already authenticated, redirecting to stored path:', redirectAfterLogin);
         navigate(redirectAfterLogin, { replace: true });
         return;
       }
       
       // Otherwise get the page user was trying to access from location state
       const from = (location.state as any)?.from?.pathname || '/dashboard';
-      console.log('[Login] User is already authenticated, redirecting to:', from);
       navigate(from, { replace: true });
     }
   }, [isAuthenticated, isLoadingAuth, navigate, location]);
@@ -51,7 +49,6 @@ const Login = (): JSX.Element => {
    * After successful authentication, user is redirected back to the app.
    */
   const handleLogin = () => {
-    console.log('[Login] Redirecting to Keycloak login...');
     login();
   };
 

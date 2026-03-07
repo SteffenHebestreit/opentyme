@@ -186,9 +186,28 @@ export default function Reports() {
 
     try {
       const lang = i18n.language === 'de' ? 'de' : 'en';
-      
+
+      // Handle email format: generate + send as PDF via backend
+      if (format === 'email') {
+        const reportTypeMap: Partial<Record<ReportType, string>> = {
+          incomeExpense: 'income-expense',
+          timeTracking: 'time-tracking',
+        };
+        const backendReportType = reportTypeMap[selectedReport];
+        if (!backendReportType) return;
+        await apiClient.post('/reports/email', {
+          reportType: backendReportType,
+          dateFrom: startDate,
+          dateTo: endDate,
+          to: metadata.emailTo,
+          lang,
+          currency: 'EUR',
+        });
+        return;
+      }
+
       // Map report type and format to endpoint
-      const endpointMap: Record<ReportType, Record<ExportFormat, string>> = {
+      const endpointMap: Partial<Record<ReportType, Partial<Record<ExportFormat, string>>>> = {
         incomeExpense: {
           pdf: '/reports/income-expense/pdf',
           excel: '/reports/income-expense', // JSON endpoint - will handle client-side
@@ -203,7 +222,7 @@ export default function Reports() {
         },
       };
 
-      const endpoint = endpointMap[selectedReport][format];
+      const endpoint = endpointMap[selectedReport]?.[format];
       
       // Build params
       const params: any = {
@@ -215,6 +234,7 @@ export default function Reports() {
         headline: metadata.headline,
         description: metadata.description,
         footer: metadata.footer,
+        hide_prices: metadata.hidePrices || false,
       };
       
       // Add filters for time tracking report
@@ -224,7 +244,7 @@ export default function Reports() {
       }
 
       // For PDF and Excel/CSV formats with backend support, download from backend
-      if (format === 'pdf' || (selectedReport === 'timeTracking' && (format === 'excel' || format === 'csv'))) {
+      if (endpoint && (format === 'pdf' || (selectedReport === 'timeTracking' && (format === 'excel' || format === 'csv')))) {
         const mimeTypes: Record<string, string> = {
           pdf: 'application/pdf',
           excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

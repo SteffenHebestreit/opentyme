@@ -65,7 +65,7 @@ export class ExpenseExtractionService {
       // Create axios client for OpenAI-compatible API
       this.client = axios.create({
         baseURL: this.apiUrl,
-        timeout: 60000, // 60 seconds
+        timeout: 180000, // 3 minutes — large local models can be slow
         headers: {
           'Content-Type': 'application/json',
           ...(this.apiKey && { 'Authorization': `Bearer ${this.apiKey}` }),
@@ -158,36 +158,35 @@ export class ExpenseExtractionService {
 
       // Call OpenAI-compatible API
       try {
+        const isQwen3 = this.model.toLowerCase().includes('qwen3') ||
+                         this.model.toLowerCase().includes('qwen/qwen3');
+
         const response = await this.client!.post('/chat/completions', {
           model: this.model,
           messages: [
             {
               role: 'system',
-              content: 'You are an expert at extracting structured data from receipts and invoices. Extract information accurately and return it in JSON format.',
+              content: 'You are an expert at extracting structured data from receipts and invoices. Extract information accurately and return it as a JSON object only, with no extra text.',
             },
             {
               role: 'user',
-              content: prompt,
+              // /no_think disables thinking tokens for Qwen3 models in LM Studio
+              content: isQwen3 ? prompt + '\n/no_think' : prompt,
             },
           ],
-          temperature: 0.1, // Low temperature for consistent extraction
-          max_tokens: 500,
-          // response_format: { type: 'json_object' }, // Commented out - not all models/APIs support this
+          temperature: 0.1,
+          max_tokens: 4000, // Qwen3 thinking models consume tokens for reasoning before producing output
         });
 
-        const completion = response.data.choices[0].message.content;
-        logger.info('AI response:', completion);
-        
-        // Parse JSON response (handle markdown code blocks)
-        let jsonString = completion.trim();
-        
-        // Remove markdown code blocks if present
-        if (jsonString.startsWith('```json')) {
-          jsonString = jsonString.replace(/^```json\n/, '').replace(/\n```$/, '');
-        } else if (jsonString.startsWith('```')) {
-          jsonString = jsonString.replace(/^```\n/, '').replace(/\n```$/, '');
-        }
-        
+        const message = response.data.choices[0].message;
+        // Qwen3 splits output: reasoning goes into reasoning_content, answer into content.
+        // If content is empty (model ran out of tokens mid-think), fall back to reasoning_content.
+        const completion = message.content || message.reasoning_content || '';
+        logger.info('AI response raw length:', completion?.length);
+
+        // Robustly extract JSON — strip <think> blocks, markdown fences, and any leading/trailing text
+        const jsonString = this.extractJsonFromResponse(completion);
+
         const extractedData = JSON.parse(jsonString);
 
         // Add confidence score and raw text
@@ -207,6 +206,44 @@ export class ExpenseExtractionService {
       logger.error('Failed to extract expense data:', error.message);
       throw new Error(`AI extraction failed: ${error.message}`);
     }
+  }
+
+  /**
+   * Robustly extract a JSON object from an AI response.
+   * Handles: <think>...</think> blocks, ```json fences, leading prose.
+   */
+  private extractJsonFromResponse(raw: string): string {
+    if (!raw || !raw.trim()) {
+      throw new Error('Empty response from AI model');
+    }
+
+    let text = raw;
+
+    // Strip <think>...</think> blocks (Qwen3 / chain-of-thought models)
+    text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+    // Strip markdown code fences
+    text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+
+    // Find the first complete JSON object {…} or array […]
+    const openBrace = text.indexOf('{');
+    const openBracket = text.indexOf('[');
+    const start = openBrace === -1 ? openBracket
+                : openBracket === -1 ? openBrace
+                : Math.min(openBrace, openBracket);
+
+    if (start === -1) {
+      throw new Error(`No JSON object found in AI response: ${text.substring(0, 200)}`);
+    }
+
+    const closeChar = text[start] === '{' ? '}' : ']';
+    const end = text.lastIndexOf(closeChar);
+
+    if (end === -1 || end <= start) {
+      throw new Error(`Malformed JSON in AI response: ${text.substring(0, 200)}`);
+    }
+
+    return text.substring(start, end + 1);
   }
 
   /**

@@ -30,7 +30,7 @@ router.use(authenticateToken);
  * Initialize all existing Keycloak users
  * POST /api/system/initialize-users
  * 
- * Creates MinIO buckets for all users in Keycloak
+ * Creates storage buckets for all users in Keycloak
  * @security Admin only (add role check in production)
  */
 router.post('/initialize-users', initializeUsers);
@@ -39,7 +39,7 @@ router.post('/initialize-users', initializeUsers);
  * Initialize a specific user
  * POST /api/system/initialize-user/:userId
  * 
- * Creates MinIO bucket for a specific user
+ * Creates storage bucket for a specific user
  * @security Admin only (add role check in production)
  */
 router.post('/initialize-user/:userId', initializeUser);
