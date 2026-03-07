@@ -5,6 +5,7 @@ import {
   Client as IClient,
   ClientStatus // Import the type if needed directly
 } from '../../models/business/client.model';
+import { logger } from '../../utils/logger';
 
 /**
  * Service for managing client-related business logic and database operations.
@@ -67,7 +68,7 @@ export class ClientService {
       const result = await db.query(queryText, values);
       return result.rows[0] as IClient;
     } catch (error) {
-        console.error('Error creating client:', error);
+        logger.error('Error creating client:', error);
         // Handle specific errors like unique constraint violations if necessary
         throw new Error(`Failed to create client: ${(error as any).message}`);
     }
@@ -132,7 +133,7 @@ export class ClientService {
       const result = await db.query(queryText, values);
       return result.rows as IClient[];
     } catch (error) {
-        console.error('Error fetching all clients:', error);
+        logger.error('Error fetching all clients:', error);
         throw new Error(`Failed to fetch clients: ${(error as any).message}`);
     }
   }
@@ -166,7 +167,7 @@ export class ClientService {
       if (result.rows.length === 0) return null;
       return result.rows[0] as IClient;
     } catch (error) {
-        console.error('Error fetching client by ID:', error);
+        logger.error('Error fetching client by ID:', error);
         throw new Error(`Failed to fetch client: ${(error as any).message}`);
     }
   }
@@ -259,7 +260,7 @@ export class ClientService {
         if (result.rows.length === 0) return null; // Client not found or no changes applied
         return result.rows[0] as IClient;
     } catch (error) {
-        console.error('Error updating client:', error);
+        logger.error('Error updating client:', error);
         throw new Error(`Failed to update client: ${(error as any).message}`);
     }
   }
@@ -287,7 +288,7 @@ export class ClientService {
       const result = await db.query(queryText, [id]);
       return (result.rowCount ?? 0) > 0;
     } catch (error) {
-        console.error('Error deleting client:', error);
+        logger.error('Error deleting client:', error);
         // Handle foreign key constraint violation if a project exists for this client
         if ((error as any).code === '23503') { // PostgreSQL foreign_key_violation code
             throw new Error('Cannot delete client. There are projects associated with it.');

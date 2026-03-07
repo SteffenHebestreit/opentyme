@@ -20,11 +20,17 @@
     "footer": "Footer",
     "footerPlaceholder": "Enter footer text (e.g., company info, page numbers)",
     "exportButton": "Export",
+    "hidePrices": "Hide prices",
+    "hidePricesHelp": "Export only hours without hourly rates and monetary values",
+    "emailButton": "Send Email",
+    "emailTo": "Send to",
+    "emailToHelp": "The report PDF will be generated and emailed to this address.",
     "formats": {
       "jsonDescription": "Raw data in JSON format for further processing",
       "csvDescription": "Spreadsheet-compatible format for Excel/Numbers",
       "excelDescription": "Excel workbook with formatting, multiple sheets, and filters",
-      "pdfDescription": "Print-ready document with formatting"
+      "pdfDescription": "Print-ready document with formatting",
+      "emailDescription": "Send as PDF attachment via email"
     }
   },
   "quickPeriods": {

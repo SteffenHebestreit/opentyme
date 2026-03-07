@@ -9,6 +9,8 @@ import { Button } from '@/components/common/Button';
 import { useUploadReceipt } from '@/hooks/api/useExpenses';
 import { analyzeReceipt } from '@/api/services/expense.service';
 import { DepreciationSettings } from '@/components/business/expenses/DepreciationSettings';
+import { Slot } from '@/plugins/slots';
+import { usePlugins } from '@/api/hooks/usePlugins';
 
 interface AddExpenseModalProps {
   isOpen: boolean;
@@ -18,6 +20,8 @@ interface AddExpenseModalProps {
 
 export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseModalProps) {
   const { t } = useTranslation('expenses');
+  const { data: pluginsData } = usePlugins();
+  const aiAddonEnabled = pluginsData?.plugins?.find((p) => p.name === 'ai-expense-analysis')?.userEnabled ?? false;
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [taxRate, setTaxRate] = useState('0');
@@ -492,7 +496,7 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
                                 dark:hover:file:bg-purple-900/50
                                 cursor-pointer"
                     />
-                    {receiptFile && receiptFile.type.includes('pdf') && (
+                    {receiptFile && receiptFile.type.includes('pdf') && aiAddonEnabled && (
                       <button
                         type="button"
                         onClick={handleAnalyzeReceipt}
@@ -547,6 +551,21 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
                     </p>
                   </div>
                 </div>
+
+        {/* Addon injection point: expense form actions
+            Addons can render buttons or sections here (e.g., AI receipt scan).
+            Context provides form field setters so addons can pre-fill the form. */}
+        <Slot
+          name="expense-form-actions"
+          context={{
+            setDescription,
+            setAmount,
+            setCurrency,
+            setCategory,
+            setExpenseDate,
+            setNotes,
+          }}
+        />
       </form>
     </Modal>
   );

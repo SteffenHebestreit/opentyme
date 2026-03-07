@@ -12,6 +12,7 @@
 
 import { PDFDocument } from 'pdf-lib';
 import { InvoiceWithItems } from '../../models/financial/invoice.model';
+import { logger } from '../../utils/logger';
 
 /**
  * Client information for ZUGFeRD generation
@@ -52,7 +53,7 @@ export class ZugferdService {
   private static formatAmount(value: any, decimals: number = 2): string {
     const num = typeof value === 'string' ? parseFloat(value) : Number(value);
     if (isNaN(num)) {
-      console.error('ZUGFeRD formatAmount received NaN:', value);
+      logger.error('ZUGFeRD formatAmount received NaN:', value);
       return '0.00';
     }
     return num.toFixed(decimals);
@@ -64,7 +65,7 @@ export class ZugferdService {
   private static formatTaxRate(value: any): string {
     const num = typeof value === 'string' ? parseFloat(value) : Number(value);
     if (isNaN(num)) {
-      console.error('ZUGFeRD formatTaxRate received NaN:', value);
+      logger.error('ZUGFeRD formatTaxRate received NaN:', value);
       return '0.00';
     }
     return (num * 100).toFixed(2);
@@ -300,7 +301,7 @@ export class ZugferdService {
       
       return Buffer.from(modifiedPdfBytes);
     } catch (error) {
-      console.error('Error embedding ZUGFeRD XML in PDF:', error);
+      logger.error('Error embedding ZUGFeRD XML in PDF:', error);
       throw new Error('Failed to embed ZUGFeRD XML in PDF');
     }
   }

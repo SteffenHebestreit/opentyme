@@ -65,8 +65,6 @@ export const DepreciationAnalysisSection: React.FC<DepreciationAnalysisSectionPr
   const analysis = analysisData || (!hasAnalyzed && parsedExisting ? { analysis: parsedExisting } : null);
 
   const handleAnalyze = () => {
-    console.log('[DepreciationAnalysis] ANALYZE BUTTON CLICKED - Expense ID:', expenseId);
-    console.log('[DepreciationAnalysis] Making API call to /expenses/' + expenseId + '/analyze-depreciation');
     setHasAnalyzed(true); // Mark that user has clicked analyze
     resetAnalysis(); // Reset previous mutation data
     analyze();
@@ -85,10 +83,6 @@ export const DepreciationAnalysisSection: React.FC<DepreciationAnalysisSectionPr
       tax_deductible_percentage: analysis.analysis.tax_deductible_percentage,
       tax_deductibility_reasoning: analysis.analysis.tax_deductibility_reasoning,
     };
-
-    console.log('[DepreciationAnalysis] Applying AI recommendation:', settings);
-    console.log('[DepreciationAnalysis] Category from AI:', analysis.analysis.suggested_category);
-    console.log('[DepreciationAnalysis] Full analysis object:', analysis.analysis);
 
     // If in edit mode, apply to form instead of saving immediately
     if (isEditing && onApplyToForm) {

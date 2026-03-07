@@ -6,6 +6,7 @@
 import { Request, Response } from 'express';
 import { getDbClient } from '../../utils/database';
 import { logger } from '../../utils/logger';
+import { emailService, getUserSmtpConfig, SmtpConfig } from '../../services/external/email.service';
 
 /**
  * Get current user's settings
@@ -57,9 +58,19 @@ export const getSettings = async (req: Request, res: Response): Promise<void> =>
         ai_model,
         mcp_server_url,
         mcp_server_api_key,
+        smtp_enabled,
+        smtp_host,
+        smtp_port,
+        smtp_user,
+        smtp_from,
+        smtp_secure,
+        theme_primary_color,
+        theme_secondary_color,
+        theme_accent_color,
+        theme_background_image_url,
         created_at,
         updated_at
-      FROM settings 
+      FROM settings
       WHERE user_id = $1`,
       [userId]
     );
@@ -79,9 +90,6 @@ export const getSettings = async (req: Request, res: Response): Promise<void> =>
     res.json(result.rows[0]);
   } catch (error) {
     logger.error('Failed to get settings', { error, userId });
-    // Extra debug output
-    // eslint-disable-next-line no-console
-    console.error('Settings GET error:', error);
     res.status(500).json({ error: 'Failed to retrieve settings' });
   }
 };
@@ -133,6 +141,17 @@ export const updateSettings = async (req: Request, res: Response): Promise<void>
       ai_model,
       mcp_server_url,
       mcp_server_api_key,
+      smtp_enabled,
+      smtp_host,
+      smtp_port,
+      smtp_user,
+      smtp_pass,
+      smtp_from,
+      smtp_secure,
+      theme_primary_color,
+      theme_secondary_color,
+      theme_accent_color,
+      theme_background_image_url,
     } = req.body;
 
     // Build dynamic update query based on provided fields
@@ -171,6 +190,17 @@ export const updateSettings = async (req: Request, res: Response): Promise<void>
       ai_model,
       mcp_server_url,
       mcp_server_api_key,
+      smtp_enabled,
+      smtp_host,
+      smtp_port,
+      smtp_user,
+      smtp_pass,
+      smtp_from,
+      smtp_secure,
+      theme_primary_color,
+      theme_secondary_color,
+      theme_accent_color,
+      theme_background_image_url,
     };
 
     Object.entries(fieldMap).forEach(([field, value]) => {
@@ -217,5 +247,47 @@ export const updateSettings = async (req: Request, res: Response): Promise<void>
   } catch (error) {
     logger.error('Failed to update settings', { error, userId });
     res.status(500).json({ error: 'Failed to update settings' });
+  }
+};
+
+/**
+ * Test SMTP configuration by sending a test email.
+ *
+ * @route POST /api/settings/test-smtp
+ * @access Protected (requires authentication)
+ */
+export const testSmtp = async (req: Request, res: Response): Promise<void> => {
+  const userId = req.user?.id;
+  if (!userId) { res.status(401).json({ error: 'User not authenticated' }); return; }
+
+  const { to, host, port, user, pass, from, secure } = req.body;
+  if (!to) { res.status(400).json({ error: 'Recipient email (to) is required' }); return; }
+
+  try {
+    // Use provided config if given, otherwise load from DB
+    let config: SmtpConfig | null = null;
+    if (host) {
+      config = {
+        host,
+        port: port ?? 587,
+        secure: secure ?? false,
+        user: user || undefined,
+        pass: pass || undefined,
+        from: from || user || 'noreply@opentyme.local',
+      };
+    } else {
+      config = await getUserSmtpConfig(userId);
+    }
+
+    if (!config) {
+      res.status(400).json({ error: 'No SMTP configuration found. Please configure SMTP settings first.' });
+      return;
+    }
+
+    await emailService.sendTestEmail(config, to);
+    res.json({ success: true, message: `Test email sent to ${to}` });
+  } catch (error) {
+    logger.error('SMTP test failed', { error, userId });
+    res.status(500).json({ error: `SMTP test failed: ${(error as Error).message}` });
   }
 };

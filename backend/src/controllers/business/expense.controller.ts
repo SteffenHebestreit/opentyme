@@ -59,7 +59,7 @@ export class ExpenseController {
 
       res.status(201).json(expense);
     } catch (error: any) {
-      console.error('Create expense error:', error);
+      logger.error('Create expense error:', error);
       res.status(500).json({ error: 'Internal server error', message: error.message });
     }
   };
@@ -105,7 +105,7 @@ export class ExpenseController {
         offset: filters.offset,
       });
     } catch (error: any) {
-      console.error('Get expenses error:', error);
+      logger.error('Get expenses error:', error);
       res.status(500).json({ error: 'Internal server error', message: error.message });
     }
   };
@@ -139,7 +139,7 @@ export class ExpenseController {
 
       res.status(200).json(expense);
     } catch (error: any) {
-      console.error('Get expense by ID error:', error);
+      logger.error('Get expense by ID error:', error);
       res.status(500).json({ error: 'Internal server error', message: error.message });
     }
   };
@@ -175,7 +175,7 @@ export class ExpenseController {
 
       res.status(200).json(expense);
     } catch (error: any) {
-      console.error('Update expense error:', error);
+      logger.error('Update expense error:', error);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         res.status(404).json({ error: 'Not found', message: error.message });
       } else {
@@ -208,7 +208,7 @@ export class ExpenseController {
 
       res.status(204).send();
     } catch (error: any) {
-      console.error('Delete expense error:', error);
+      logger.error('Delete expense error:', error);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         res.status(404).json({ error: 'Not found', message: error.message });
       } else {
@@ -319,7 +319,7 @@ export class ExpenseController {
 
       res.status(200).json(expense);
     } catch (error: any) {
-      console.error('Upload receipt error:', error);
+      logger.error('Upload receipt error:', error);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         res.status(404).json({ error: 'Not found', message: error.message });
       } else {
@@ -352,7 +352,7 @@ export class ExpenseController {
 
       res.status(200).json(expense);
     } catch (error: any) {
-      console.error('Delete receipt error:', error);
+      logger.error('Delete receipt error:', error);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         res.status(404).json({ error: 'Not found', message: error.message });
       } else {
@@ -393,7 +393,7 @@ export class ExpenseController {
       // Pipe stream to response
       stream.pipe(res);
     } catch (error: any) {
-      console.error('Download receipt error:', error);
+      logger.error('Download receipt error:', error);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         res.status(404).json({ error: 'Not found', message: error.message });
       } else {
@@ -444,7 +444,7 @@ export class ExpenseController {
 
       res.status(200).json(expense);
     } catch (error: any) {
-      console.error('Approve expense error:', error);
+      logger.error('Approve expense error:', error);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         res.status(404).json({ error: 'Not found', message: error.message });
       } else {
@@ -477,7 +477,7 @@ export class ExpenseController {
 
       res.status(200).json(expense);
     } catch (error: any) {
-      console.error('Reimburse expense error:', error);
+      logger.error('Reimburse expense error:', error);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         res.status(404).json({ error: 'Not found', message: error.message });
       } else {
@@ -514,7 +514,7 @@ export class ExpenseController {
 
       res.status(200).json(summary);
     } catch (error: any) {
-      console.error('Get expense summary error:', error);
+      logger.error('Get expense summary error:', error);
       res.status(500).json({ error: 'Internal server error', message: error.message });
     }
   };
@@ -543,7 +543,7 @@ export class ExpenseController {
 
       res.status(200).json(expenses);
     } catch (error: any) {
-      console.error('Get billable expenses error:', error);
+      logger.error('Get billable expenses error:', error);
       res.status(500).json({ error: 'Internal server error', message: error.message });
     }
   };
@@ -566,7 +566,7 @@ export class ExpenseController {
 
       res.status(200).json(expenses);
     } catch (error: any) {
-      console.error('Get recurring generated expenses error:', error);
+      logger.error('Get recurring generated expenses error:', error);
       res.status(500).json({ error: 'Internal server error', message: error.message });
     }
   };

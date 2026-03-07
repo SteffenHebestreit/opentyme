@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { ClientService } from '../../services/business/client.service';
 import Joi from 'joi';
+import { logger } from '../../utils/logger';
 
 const clientService = new ClientService();
 
@@ -69,8 +70,8 @@ export class ClientController {
         user_id: (req as any).user?.id
       };
       
-      console.log('[DEBUG] Creating client with user_id:', clientData.user_id);
-      console.log('[DEBUG] Full req.user:', (req as any).user);
+      logger.debug('[DEBUG] Creating client with user_id:', clientData.user_id);
+      logger.debug('[DEBUG] Full req.user:', (req as any).user);
       
       if (!clientData.user_id) {
         res.status(401).json({ error: 'User not authenticated' });
@@ -80,7 +81,7 @@ export class ClientController {
       const client = await clientService.create(clientData);
       res.status(201).json(client);
     } catch (err: any) {
-      console.error('Create client error:', err);
+      logger.error('Create client error:', err);
       // Handle specific errors like unique constraint violations if necessary
       res.status(500).json({ error: err.message || 'Internal server error' });
     }
@@ -131,7 +132,7 @@ export class ClientController {
       const clients = await clientService.findAll(userId, filters);
       res.status(200).json(clients);
     } catch (err: any) {
-      console.error('Find all clients error:', err);
+      logger.error('Find all clients error:', err);
       res.status(500).json({ error: err.message || 'Internal server error' });
     }
   }
@@ -165,7 +166,7 @@ export class ClientController {
         res.status(404).json({ error: 'Client not found' });
       }
     } catch (err: any) {
-      console.error('Find client by ID error:', err);
+      logger.error('Find client by ID error:', err);
       res.status(500).json({ error: err.message || 'Internal server error' });
     }
   }
@@ -211,7 +212,7 @@ export class ClientController {
         res.status(404).json({ error: 'Client not found' });
       }
     } catch (err: any) {
-      console.error('Update client error:', err);
+      logger.error('Update client error:', err);
       res.status(500).json({ error: err.message || 'Internal server error' });
     }
   }
@@ -246,7 +247,7 @@ export class ClientController {
         res.status(404).json({ error: 'Client not found or already deleted' });
       }
     } catch (err: any) {
-        console.error('Delete client error:', err);
+        logger.error('Delete client error:', err);
         // If the error is about foreign key constraint, send a specific message
         if(err.message.includes("Cannot delete client. There are projects associated with it.")){
             res.status(409).json({ error: err.message }); // 409 Conflict

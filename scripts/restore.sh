@@ -5,7 +5,7 @@
 # Restores:
 # - OpenTYME PostgreSQL database
 # - Keycloak PostgreSQL database
-# - MinIO object storage (all user buckets)
+# - S3-compatible object storage (SeaweedFS — all user buckets)
 # - Configuration files (optional)
 #
 # SAFETY FEATURES:
@@ -18,15 +18,10 @@
 # Environment variables:
 #   RESTORE_DATABASE    - Restore OpenTYME database (default: true)
 #   RESTORE_KEYCLOAK    - Restore Keycloak database (default: true)
-#   RESTORE_MINIO       - Restore MinIO storage (default: true)
+#   RESTORE_STORAGE     - Restore S3 storage (default: true)
 #   RESTORE_CONFIG      - Restore configuration files (default: false)
 #   SKIP_PRE_BACKUP     - Skip automatic pre-restore backup (default: false)
 #   DRY_RUN             - Show what would be restored without changes (default: false)
-#
-# Examples:
-#   ./restore.sh ./backups/my_backup           # Normal restore with safety backup
-#   DRY_RUN=true ./restore.sh ./backups/my_backup  # Preview only
-#   SKIP_PRE_BACKUP=true ./restore.sh ./backups/my_backup  # Skip safety backup
 ###############################################################################
 
 set -e
@@ -36,13 +31,20 @@ set -o pipefail
 BACKUP_PATH="${BACKUP_PATH:-$1}"
 RESTORE_DATABASE="${RESTORE_DATABASE:-true}"
 RESTORE_KEYCLOAK="${RESTORE_KEYCLOAK:-true}"
-RESTORE_MINIO="${RESTORE_MINIO:-true}"
+RESTORE_STORAGE="${RESTORE_STORAGE:-true}"
 RESTORE_CONFIG="${RESTORE_CONFIG:-false}"
 SKIP_PRE_BACKUP="${SKIP_PRE_BACKUP:-false}"
 DRY_RUN="${DRY_RUN:-false}"
 
 # Pre-restore backup directory
 PRE_RESTORE_BACKUP_DIR="./backups/pre_restore_$(date +%Y%m%d_%H%M%S)"
+
+# S3-compatible storage configuration (SeaweedFS)
+STORAGE_HOST="${STORAGE_ENDPOINT:-seaweedfs}"
+STORAGE_S3_PORT="${STORAGE_PORT:-8333}"
+STORAGE_ACCESS_KEY="${STORAGE_ACCESS_KEY:-admin}"
+STORAGE_SECRET_KEY="${STORAGE_SECRET_KEY:-password}"
+STORAGE_ENDPOINT_URL="http://${STORAGE_HOST}:${STORAGE_S3_PORT}"
 
 # Colors
 GREEN='\033[0;32m'
@@ -80,7 +82,6 @@ if ! command -v docker-compose &> /dev/null && ! command -v docker &> /dev/null;
     exit 1
 fi
 
-# Use docker compose if docker-compose is not available
 DOCKER_COMPOSE="docker-compose"
 if ! command -v docker-compose &> /dev/null; then
     DOCKER_COMPOSE="docker compose"
@@ -92,22 +93,23 @@ log "=============================================="
 log "Backup path: $BACKUP_PATH"
 log "Restore OpenTYME DB: $RESTORE_DATABASE"
 log "Restore Keycloak DB: $RESTORE_KEYCLOAK"
-log "Restore MinIO: $RESTORE_MINIO"
+log "Restore S3 Storage: $RESTORE_STORAGE"
 log "Restore Config: $RESTORE_CONFIG"
 log "=============================================="
 
-# Warning
 warn "⚠️  This will overwrite existing data!"
 warn "⚠️  Make sure you have a recent backup before proceeding"
 echo ""
 
-# Dry run mode - just show what would be done
+# Dry run mode
 if [ "$DRY_RUN" = "true" ]; then
     warn "DRY RUN MODE - No changes will be made"
     log "Would restore from: $BACKUP_PATH"
-    [ -f "$BACKUP_PATH/opentyme_database.dump" ] || [ -f "$BACKUP_PATH/tyme_database.dump" ] || [ -f "$BACKUP_PATH/database.dump" ] && log "  - OpenTYME database: YES"
+    { [ -f "$BACKUP_PATH/opentyme_database.dump" ] || \
+      [ -f "$BACKUP_PATH/tyme_database.dump" ] || \
+      [ -f "$BACKUP_PATH/database.dump" ]; } && log "  - OpenTYME database: YES"
     [ -f "$BACKUP_PATH/keycloak_database.dump" ] && log "  - Keycloak database: YES"
-    [ -d "$BACKUP_PATH/minio_backup" ] && log "  - MinIO storage: YES"
+    { [ -d "$BACKUP_PATH/storage" ] || [ -d "$BACKUP_PATH/minio_backup" ]; } && log "  - S3 storage: YES"
     exit 0
 fi
 
@@ -126,19 +128,21 @@ if [ "$SKIP_PRE_BACKUP" != "true" ]; then
     log "Creating safety backup before restore..."
     log "============================================="
     mkdir -p "$PRE_RESTORE_BACKUP_DIR"
-    
-    # Backup current OpenTYME database
+
     if [ "$RESTORE_DATABASE" = "true" ]; then
         log "Backing up current OpenTYME database..."
-        $DOCKER_COMPOSE exec -T db pg_dump -U postgres -d opentyme -Fc > "$PRE_RESTORE_BACKUP_DIR/opentyme_database.dump" 2>/dev/null || warn "Could not backup OpenTYME database (may not exist)"
+        $DOCKER_COMPOSE exec -T db pg_dump -U postgres -d opentyme -Fc \
+            > "$PRE_RESTORE_BACKUP_DIR/opentyme_database.dump" 2>/dev/null || \
+            warn "Could not backup OpenTYME database (may not exist)"
     fi
-    
-    # Backup current Keycloak database
+
     if [ "$RESTORE_KEYCLOAK" = "true" ]; then
         log "Backing up current Keycloak database..."
-        $DOCKER_COMPOSE exec -T keycloak-db pg_dump -U keycloak_user -d keycloak -Fc > "$PRE_RESTORE_BACKUP_DIR/keycloak_database.dump" 2>/dev/null || warn "Could not backup Keycloak database (may not exist)"
+        $DOCKER_COMPOSE exec -T keycloak-db pg_dump -U keycloak_user -d keycloak -Fc \
+            > "$PRE_RESTORE_BACKUP_DIR/keycloak_database.dump" 2>/dev/null || \
+            warn "Could not backup Keycloak database (may not exist)"
     fi
-    
+
     log "Safety backup created: $PRE_RESTORE_BACKUP_DIR"
     log "If restore fails, you can recover from this backup"
     log "============================================="
@@ -148,7 +152,6 @@ fi
 
 # Restore OpenTYME database
 if [ "$RESTORE_DATABASE" = "true" ]; then
-    # Check for both new and legacy formats
     DB_FILE=""
     if [ -f "$BACKUP_PATH/opentyme_database.dump" ]; then
         DB_FILE="$BACKUP_PATH/opentyme_database.dump"
@@ -157,25 +160,24 @@ if [ "$RESTORE_DATABASE" = "true" ]; then
     elif [ -f "$BACKUP_PATH/database.dump" ]; then
         DB_FILE="$BACKUP_PATH/database.dump"
     elif [ -f "$BACKUP_PATH/database.sql.gz" ]; then
-        # Legacy format
         DB_FILE="$BACKUP_PATH/database.sql.gz"
     fi
-    
+
     if [ -n "$DB_FILE" ] && [ -f "$DB_FILE" ]; then
         log "Restoring OpenTYME database from: $DB_FILE"
-        
-        # Drop and recreate database
-        $DOCKER_COMPOSE exec -T db psql -U postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='opentyme' AND pid <> pg_backend_pid();" 2>/dev/null || true
+
+        $DOCKER_COMPOSE exec -T db psql -U postgres \
+            -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='opentyme' AND pid <> pg_backend_pid();" 2>/dev/null || true
         $DOCKER_COMPOSE exec -T db psql -U postgres -c "DROP DATABASE IF EXISTS opentyme;" 2>/dev/null || true
         $DOCKER_COMPOSE exec -T db psql -U postgres -c "CREATE DATABASE opentyme;"
-        
-        # Restore from backup (handle both formats)
+
         if [[ "$DB_FILE" == *.sql.gz ]]; then
             gunzip -c "$DB_FILE" | $DOCKER_COMPOSE exec -T db psql -U postgres -d opentyme
         else
-            cat "$DB_FILE" | $DOCKER_COMPOSE exec -T db pg_restore -U postgres -d opentyme -v --no-owner --no-privileges 2>&1 || true
+            cat "$DB_FILE" | $DOCKER_COMPOSE exec -T db pg_restore \
+                -U postgres -d opentyme -v --no-owner --no-privileges 2>&1 || true
         fi
-        
+
         log "OpenTYME database restored successfully"
     else
         warn "OpenTYME database backup file not found"
@@ -185,71 +187,80 @@ fi
 # Restore Keycloak database
 if [ "$RESTORE_KEYCLOAK" = "true" ]; then
     KC_DB_FILE="$BACKUP_PATH/keycloak_database.dump"
-    
+
     if [ -f "$KC_DB_FILE" ]; then
         log "Restoring Keycloak database..."
-        
-        # Drop and recreate database
-        $DOCKER_COMPOSE exec -T keycloak-db psql -U keycloak_user -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='keycloak' AND pid <> pg_backend_pid();" 2>/dev/null || true
-        $DOCKER_COMPOSE exec -T keycloak-db psql -U keycloak_user -d postgres -c "DROP DATABASE IF EXISTS keycloak;" 2>/dev/null || true
-        $DOCKER_COMPOSE exec -T keycloak-db psql -U keycloak_user -d postgres -c "CREATE DATABASE keycloak OWNER keycloak_user;"
-        
-        # Restore from backup
-        cat "$KC_DB_FILE" | $DOCKER_COMPOSE exec -T keycloak-db pg_restore -U keycloak_user -d keycloak -v --no-owner --no-privileges 2>&1 || true
-        
+
+        $DOCKER_COMPOSE exec -T keycloak-db psql -U keycloak_user -d postgres \
+            -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='keycloak' AND pid <> pg_backend_pid();" 2>/dev/null || true
+        $DOCKER_COMPOSE exec -T keycloak-db psql -U keycloak_user -d postgres \
+            -c "DROP DATABASE IF EXISTS keycloak;" 2>/dev/null || true
+        $DOCKER_COMPOSE exec -T keycloak-db psql -U keycloak_user -d postgres \
+            -c "CREATE DATABASE keycloak OWNER keycloak_user;"
+
+        cat "$KC_DB_FILE" | $DOCKER_COMPOSE exec -T keycloak-db pg_restore \
+            -U keycloak_user -d keycloak -v --no-owner --no-privileges 2>&1 || true
+
         log "Keycloak database restored successfully"
     else
         warn "Keycloak database backup file not found: $KC_DB_FILE"
     fi
 fi
 
-# Restore MinIO storage
-if [ "$RESTORE_MINIO" = "true" ]; then
-    MINIO_DIR="$BACKUP_PATH/minio_backup"
-    
-    if [ -d "$MINIO_DIR" ] && [ "$(ls -A "$MINIO_DIR" 2>/dev/null)" ]; then
-        log "Restoring MinIO storage..."
-        
-        # Copy backup to container
-        docker cp "$MINIO_DIR" $(docker-compose ps -q backend):/tmp/minio_restore
-        
-        # Restore using mc inside backend container
-        $DOCKER_COMPOSE exec -T backend sh -c '
-            if command -v mc >/dev/null 2>&1; then
-                mc alias set restore-minio http://minio:9000 minioadmin minioadmin123 2>/dev/null || true
-                # Restore all buckets
-                for bucket_dir in /tmp/minio_restore/*; do
-                    if [ -d "$bucket_dir" ]; then
-                        bucket=$(basename "$bucket_dir")
-                        echo "Restoring bucket: $bucket"
-                        mc mb restore-minio/$bucket 2>/dev/null || true
-                        mc mirror --overwrite $bucket_dir restore-minio/$bucket 2>/dev/null || true
-                    fi
-                done
-                rm -rf /tmp/minio_restore
-            else
-                echo "MinIO client not available"
+# Restore S3 object storage (SeaweedFS)
+if [ "$RESTORE_STORAGE" = "true" ]; then
+    # Try new-format directory first, then legacy MinIO format
+    STORAGE_DIR=""
+    if [ -d "$BACKUP_PATH/storage" ] && [ "$(ls -A "$BACKUP_PATH/storage" 2>/dev/null)" ]; then
+        STORAGE_DIR="$BACKUP_PATH/storage"
+    elif [ -d "$BACKUP_PATH/minio_backup" ] && [ "$(ls -A "$BACKUP_PATH/minio_backup" 2>/dev/null)" ]; then
+        STORAGE_DIR="$BACKUP_PATH/minio_backup"
+    fi
+
+    if [ -n "$STORAGE_DIR" ] && command -v aws &> /dev/null; then
+        log "Restoring S3 storage from: $STORAGE_DIR"
+
+        for bucket_dir in "$STORAGE_DIR"/*/; do
+            if [ -d "$bucket_dir" ]; then
+                bucket=$(basename "$bucket_dir")
+                log "Restoring bucket: $bucket"
+
+                # Create bucket if it doesn't exist
+                AWS_ACCESS_KEY_ID="$STORAGE_ACCESS_KEY" \
+                AWS_SECRET_ACCESS_KEY="$STORAGE_SECRET_KEY" \
+                aws s3 mb "s3://$bucket" \
+                    --endpoint-url "$STORAGE_ENDPOINT_URL" 2>/dev/null || true
+
+                # Sync files into bucket
+                AWS_ACCESS_KEY_ID="$STORAGE_ACCESS_KEY" \
+                AWS_SECRET_ACCESS_KEY="$STORAGE_SECRET_KEY" \
+                aws s3 sync "$bucket_dir" "s3://$bucket" \
+                    --endpoint-url "$STORAGE_ENDPOINT_URL" \
+                    --no-progress 2>/dev/null || warn "Some files in $bucket may have failed"
             fi
-        '
-        
-        log "MinIO storage restored successfully"
+        done
+
+        log "S3 storage restored successfully"
+    elif [ -n "$STORAGE_DIR" ]; then
+        warn "AWS CLI not found — cannot restore S3 storage automatically"
+        warn "Storage backup files are at: $STORAGE_DIR"
+        warn "Install awscli and re-run: https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html"
     else
-        warn "MinIO backup directory not found or empty: $MINIO_DIR"
+        warn "S3 storage backup directory not found or empty: $BACKUP_PATH/storage"
     fi
 fi
 
 # Restore configuration
 if [ "$RESTORE_CONFIG" = "true" ]; then
     CONFIG_FILE="$BACKUP_PATH/config.tar.gz"
-    
+
     if [ -f "$CONFIG_FILE" ]; then
         log "Restoring configuration..."
         warn "Configuration restore requires manual review"
-        
-        # Extract to temp directory
+
         TEMP_DIR=$(mktemp -d)
         tar -xzf "$CONFIG_FILE" -C "$TEMP_DIR"
-        
+
         log "Configuration files extracted to: $TEMP_DIR"
         log "Please review and apply configuration changes manually"
     else
@@ -260,4 +271,4 @@ fi
 log "=============================================="
 log "Restore completed successfully!"
 log "=============================================="
-warn "⚠️  Please restart services: docker-compose restart"
+warn "⚠️  Please restart services: $DOCKER_COMPOSE restart"

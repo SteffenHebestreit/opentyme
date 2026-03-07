@@ -1,8 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 // Assuming we will have a PaymentService
-// import { PaymentService } from '../services/payment.service'; 
+// import { PaymentService } from '../services/payment.service';
 import { getDbClient } from '../../utils/database';
 import { BillingValidationService } from '../../services/financial/billing-validation.service';
+import { logger } from '../../utils/logger';
 
 // Joi Validation Schemas
 import {
@@ -50,13 +51,13 @@ export class PaymentController {
   async create(req: Request, res: Response) {
     const validatedBody = req.body; // Joi schema will validate all required fields
     
-    console.log('=== Payment Creation Debug ===');
-    console.log('Request body:', JSON.stringify(validatedBody, null, 2));
-    console.log('client_id:', validatedBody.client_id);
-    console.log('invoice_id:', validatedBody.invoice_id);
-    console.log('invoice_ids:', validatedBody.invoice_ids);
-    console.log('project_id:', validatedBody.project_id);
-    console.log('payment_type:', validatedBody.payment_type);
+    logger.debug('=== Payment Creation Debug ===');
+    logger.debug('Request body:', JSON.stringify(validatedBody, null, 2));
+    logger.debug('client_id:', validatedBody.client_id);
+    logger.debug('invoice_id:', validatedBody.invoice_id);
+    logger.debug('invoice_ids:', validatedBody.invoice_ids);
+    logger.debug('project_id:', validatedBody.project_id);
+    logger.debug('payment_type:', validatedBody.payment_type);
     
     // Manual validation specific to this endpoint's logic
     if (!validatedBody.client_id) {
@@ -102,7 +103,7 @@ export class PaymentController {
       // Automatically use the first invoice's project_id if not explicitly provided
       if (!invoiceProjectId && validateInvoices.rows[0].project_id) {
         invoiceProjectId = validateInvoices.rows[0].project_id;
-        console.log('Auto-assigned project_id from first invoice:', invoiceProjectId);
+        logger.debug('Auto-assigned project_id from first invoice:', invoiceProjectId);
       }
     }
 
@@ -181,8 +182,8 @@ export class PaymentController {
 
     } catch (err: any) {
       await this.db.query('ROLLBACK');
-      console.error('Create payment error:', err);
-      console.error('Error details:', {
+      logger.error('Create payment error:', err);
+      logger.error('Error details:', {
         code: err.code,
         detail: err.detail,
         constraint: err.constraint,
@@ -277,7 +278,7 @@ export class PaymentController {
         const result = await this.db.query(queryText, [(req as any).user?.id]);
         res.status(200).json(result.rows);
     } catch (err: any) {
-      console.error('Find all payments error:', err);
+      logger.error('Find all payments error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -312,7 +313,7 @@ export class PaymentController {
       res.status(200).json(result.rows[0]);
 
     } catch (err: any) {
-      console.error('Find payment by ID error:', err);
+      logger.error('Find payment by ID error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -446,7 +447,7 @@ export class PaymentController {
         });
     } catch (err: any) {
       await this.db.query('ROLLBACK');
-      console.error('Update payment error:', err);
+      logger.error('Update payment error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -479,7 +480,7 @@ export class PaymentController {
         res.status(404).json({ message: 'Payment not found or no access.' });
       }
     } catch (err: any) {
-      console.error('Delete payment error:', err);
+      logger.error('Delete payment error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -522,7 +523,7 @@ export class PaymentController {
       const result = await this.db.query(queryText, [invoice_id, (req as any).user?.id]);
       res.status(200).json(result.rows);
     } catch (err: any) {
-      console.error('Get payments by invoice error:', err);
+      logger.error('Get payments by invoice error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }

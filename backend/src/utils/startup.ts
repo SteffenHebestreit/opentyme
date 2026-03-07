@@ -2,8 +2,7 @@
  * @fileoverview Startup Initialization Script
  * 
  * Runs on application startup to initialize system resources
- * - Initialize existing Keycloak users (create buckets)
- * - Run database migrations
+ * - Initialize existing Keycloak users (create storage buckets)
  * - Verify system health
  * 
  * @module utils/startup
@@ -18,7 +17,7 @@ import path from 'path';
 
 /**
  * Initialize all existing users from Keycloak
- * Creates MinIO buckets for users who don't have them yet
+ * Creates storage buckets for users who don't have them yet
  */
 async function initializeExistingUsers(): Promise<void> {
   try {

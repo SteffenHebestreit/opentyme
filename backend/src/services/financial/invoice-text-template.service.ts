@@ -5,6 +5,7 @@ import {
   InvoiceTextTemplate,
   TemplateCategory
 } from '../../models/financial/invoice-text-template.model';
+import { logger } from '../../utils/logger';
 
 const db = getDbClient();
 
@@ -71,7 +72,7 @@ export class InvoiceTextTemplateService {
       const result = await db.query(queryText, values);
       return result.rows[0] as InvoiceTextTemplate;
     } catch (error) {
-      console.error('Error creating invoice text template:', error);
+      logger.error('Error creating invoice text template:', error);
       throw new Error(`Failed to create invoice text template: ${(error as any).message}`);
     }
   }
@@ -122,7 +123,7 @@ export class InvoiceTextTemplateService {
       const result = await db.query(queryText, values);
       return result.rows as InvoiceTextTemplate[];
     } catch (error) {
-      console.error('Error fetching invoice text templates:', error);
+      logger.error('Error fetching invoice text templates:', error);
       throw new Error(`Failed to fetch invoice text templates: ${(error as any).message}`);
     }
   }
@@ -155,7 +156,7 @@ export class InvoiceTextTemplateService {
       if (result.rows.length === 0) return null;
       return result.rows[0] as InvoiceTextTemplate;
     } catch (error) {
-      console.error('Error fetching invoice text template by ID:', error);
+      logger.error('Error fetching invoice text template by ID:', error);
       throw new Error(`Failed to fetch invoice text template: ${(error as any).message}`);
     }
   }
@@ -189,7 +190,7 @@ export class InvoiceTextTemplateService {
       if (result.rows.length === 0) return null;
       return result.rows[0] as InvoiceTextTemplate;
     } catch (error) {
-      console.error('Error fetching default template:', error);
+      logger.error('Error fetching default template:', error);
       throw new Error(`Failed to fetch default template: ${(error as any).message}`);
     }
   }
@@ -221,7 +222,7 @@ export class InvoiceTextTemplateService {
       const result = await db.query(queryText, [userId]);
       return result.rows as InvoiceTextTemplate[];
     } catch (error) {
-      console.error('Error fetching default templates:', error);
+      logger.error('Error fetching default templates:', error);
       throw new Error(`Failed to fetch default templates: ${(error as any).message}`);
     }
   }
@@ -319,7 +320,7 @@ export class InvoiceTextTemplateService {
       if (result.rows.length === 0) return null;
       return result.rows[0] as InvoiceTextTemplate;
     } catch (error) {
-      console.error('Error updating invoice text template:', error);
+      logger.error('Error updating invoice text template:', error);
       throw new Error(`Failed to update invoice text template: ${(error as any).message}`);
     }
   }
@@ -344,7 +345,7 @@ export class InvoiceTextTemplateService {
       const result = await db.query(queryText, [id, userId]);
       return (result.rowCount ?? 0) > 0;
     } catch (error) {
-      console.error('Error deleting invoice text template:', error);
+      logger.error('Error deleting invoice text template:', error);
       throw new Error(`Failed to delete invoice text template: ${(error as any).message}`);
     }
   }

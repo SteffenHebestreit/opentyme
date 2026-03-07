@@ -9,6 +9,7 @@ import { Request, Response } from 'express';
 import { UserService } from '../../services/auth/user.service';
 import { KeycloakService } from '../../services/keycloak.service';
 import Joi from 'joi';
+import { logger } from '../../utils/logger';
 
 const userService = new UserService();
 const keycloakService = new KeycloakService();
@@ -98,7 +99,7 @@ export class UserController {
       if (err.message === 'Username or email already exists') {
         res.status(409).json({ message: err.message }); // 409 Conflict
       } else {
-        console.error('Registration error:', err);
+        logger.error('Registration error:', err);
         res.status(500).json({ message: 'Internal server error' });
       }
     }
@@ -139,7 +140,7 @@ export class UserController {
         ...tokens
       });
     } catch (err: any) {
-      console.error('Login error:', err);
+      logger.error('Login error:', err);
       res.status(401).json({ message: err.message || 'Invalid credentials' }); // 401 Unauthorized
     }
   }
@@ -175,7 +176,7 @@ export class UserController {
       }
       res.status(200).json(user);
     } catch (err) {
-      console.error('Get profile error:', err);
+      logger.error('Get profile error:', err);
       res.status(500).json({ message: 'Internal server error' });
     }
   }
@@ -227,7 +228,7 @@ export class UserController {
       if (err.message === 'Username or email already exists.') {
         res.status(409).json({ message: err.message });
       } else {
-        console.error('Update profile error:', err);
+        logger.error('Update profile error:', err);
         res.status(500).json({ message: 'Internal server error' });
       }
     }
@@ -272,7 +273,7 @@ export class UserController {
           res.status(404).json({ message: 'User not found, or already deleted' });
         }
     } catch (err) {
-        console.error('Delete account error:', err);
+        logger.error('Delete account error:', err);
         res.status(500).json({ message: 'Internal server error' });
     }
   }
@@ -303,7 +304,7 @@ export class UserController {
       // Return Keycloak user data directly
       res.status(200).json(user);
     } catch (err) {
-      console.error('Get my profile error:', err);
+      logger.error('Get my profile error:', err);
       res.status(500).json({ message: 'Internal server error' });
     }
   }
@@ -336,7 +337,7 @@ export class UserController {
       }
       res.status(200).json(users);
     } catch (err: any) {
-      console.error('Get all users error:', err);
+      logger.error('Get all users error:', err);
       res.status(500).json({ message: 'Internal server error' });
     }
   }

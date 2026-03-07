@@ -2,7 +2,7 @@
  * @fileoverview User Initialization Service
  * 
  * Handles initialization tasks when a new user is created:
- * - Create MinIO bucket for user storage
+ * - Create storage bucket for user files
  * - Set up default user preferences
  * - Initialize user-specific resources
  * - Send welcome email (future)
@@ -10,7 +10,7 @@
  * @module services/auth/user-initialization
  */
 
-import { minioService } from '../storage/minio.service';
+import { storageService } from '../storage/storage.service';
 import { logger } from '../../utils/logger';
 
 /**
@@ -31,7 +31,7 @@ export class UserInitializationService {
     try {
       logger.info(`[UserInit] Initializing user: ${username} (${userId})`);
 
-      // 1. Create MinIO bucket for user storage
+      // 1. Create storage bucket for user files
       await this.createUserBucket(userId);
 
       // 2. Initialize user preferences (future enhancement)
@@ -49,7 +49,7 @@ export class UserInitializationService {
   }
 
   /**
-   * Create MinIO bucket for user
+   * Create storage bucket for user
    * Bucket will be created lazily if this fails
    * 
    * @param {string} userId - User ID
@@ -73,7 +73,7 @@ All files are private and encrypted. Only you can access them.
 For support, visit: https://tyme.example.com/support
 `;
 
-      await minioService.uploadFile(
+      await storageService.uploadFile(
         userId,
         Buffer.from(welcomeMessage, 'utf-8'),
         'welcome.txt',
@@ -81,7 +81,7 @@ For support, visit: https://tyme.example.com/support
         'documents'
       );
 
-      logger.info(`[UserInit] Created MinIO bucket for user: ${userId}`);
+      logger.info(`[UserInit] Created storage bucket for user: ${userId}`);
     } catch (error) {
       logger.error(`[UserInit] Error creating bucket for user ${userId}:`, error);
       // Bucket will be created lazily on first real upload
@@ -129,7 +129,7 @@ For support, visit: https://tyme.example.com/support
   async isUserInitialized(userId: string): Promise<boolean> {
     try {
       // Try to list files in user bucket
-      await minioService.listUserFiles(userId);
+      await storageService.listUserFiles(userId);
       return true;
     } catch (error) {
       return false;
@@ -148,7 +148,7 @@ For support, visit: https://tyme.example.com/support
       logger.info(`[UserInit] Cleaning up user resources: ${userId}`);
 
       // Delete user bucket and all files
-      await minioService.deleteUserBucket(userId);
+      await storageService.deleteUserBucket(userId);
 
       // Future: Delete user preferences, cache, etc.
 

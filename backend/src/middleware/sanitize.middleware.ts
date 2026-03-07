@@ -8,6 +8,7 @@
 import { Request, Response, NextFunction } from 'express';
 import DOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
+import { logger } from '../utils/logger';
 
 // Initialize DOMPurify with a window from JSDOM
 const window = new JSDOM('').window;
@@ -118,7 +119,7 @@ export const sanitizeRequestBody = (req: Request, res: Response, next: NextFunct
     // Continue to the next middleware or route handler
     next();
   } catch (error) {
-    console.error('Sanitization error:', error);
+    logger.error('Sanitization error:', error);
     res.status(500).json({ message: 'Internal server error during data sanitization' });
   }
 };

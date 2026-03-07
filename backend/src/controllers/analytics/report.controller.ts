@@ -17,6 +17,7 @@ import { Request, Response } from 'express';
 import { reportService } from '../../services/analytics/report.service';
 import reportPDFService from '../../services/analytics/report-pdf.service';
 import * as ExcelJS from 'exceljs';
+import { logger } from '../../utils/logger';
 
 export class ReportController {
   /**
@@ -53,7 +54,7 @@ export class ReportController {
       
       res.status(200).json(report);
     } catch (error: any) {
-      console.error('Generate VAT report error:', error);
+      logger.error('Generate VAT report error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }
@@ -97,7 +98,7 @@ export class ReportController {
       
       res.status(200).json(report);
     } catch (error: any) {
-      console.error('Generate income/expense report error:', error);
+      logger.error('Generate income/expense report error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }
@@ -136,7 +137,7 @@ export class ReportController {
       
       res.status(200).json(report);
     } catch (error: any) {
-      console.error('Generate invoice report error:', error);
+      logger.error('Generate invoice report error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }
@@ -175,7 +176,7 @@ export class ReportController {
       
       res.status(200).json(report);
     } catch (error: any) {
-      console.error('Generate expense report error:', error);
+      logger.error('Generate expense report error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }
@@ -216,7 +217,7 @@ export class ReportController {
       
       res.status(200).json(report);
     } catch (error: any) {
-      console.error('Generate time tracking report error:', error);
+      logger.error('Generate time tracking report error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }
@@ -255,7 +256,7 @@ export class ReportController {
       
       res.status(200).json(report);
     } catch (error: any) {
-      console.error('Generate client revenue report error:', error);
+      logger.error('Generate client revenue report error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }
@@ -295,12 +296,19 @@ export class ReportController {
         end_date as string
       );
 
-      // Generate PDF
-      const pdfBuffer = await reportPDFService.generateVATReportPDF(
-        report,
-        currency as string,
-        lang as 'en' | 'de'
-      );
+      // Apply user theme and generate PDF
+      const vatTheme = await reportPDFService.getUserPdfTheme(userId);
+      const restoreVat = reportPDFService.applyTheme(vatTheme);
+      let pdfBuffer: Buffer;
+      try {
+        pdfBuffer = await reportPDFService.generateVATReportPDF(
+          report,
+          currency as string,
+          lang as 'en' | 'de'
+        );
+      } finally {
+        restoreVat();
+      }
 
       // Set response headers
       res.setHeader('Content-Type', 'application/pdf');
@@ -312,7 +320,7 @@ export class ReportController {
       // Send PDF buffer
       res.send(pdfBuffer);
     } catch (error: any) {
-      console.error('Generate VAT report PDF error:', error);
+      logger.error('Generate VAT report PDF error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }
@@ -345,11 +353,18 @@ export class ReportController {
         excludeTaxExcluded
       );
 
-      const pdfBuffer = await reportPDFService.generateIncomeExpenseReportPDF(
-        report,
-        currency as string,
-        lang as 'en' | 'de'
-      );
+      const ieTheme = await reportPDFService.getUserPdfTheme(userId);
+      const restoreIe = reportPDFService.applyTheme(ieTheme);
+      let pdfBuffer: Buffer;
+      try {
+        pdfBuffer = await reportPDFService.generateIncomeExpenseReportPDF(
+          report,
+          currency as string,
+          lang as 'en' | 'de'
+        );
+      } finally {
+        restoreIe();
+      }
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader(
@@ -359,7 +374,7 @@ export class ReportController {
 
       res.send(pdfBuffer);
     } catch (error: any) {
-      console.error('Generate income/expense report PDF error:', error);
+      logger.error('Generate income/expense report PDF error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }
@@ -389,11 +404,18 @@ export class ReportController {
         end_date as string
       );
 
-      const pdfBuffer = await reportPDFService.generateInvoiceReportPDF(
-        report,
-        currency as string,
-        lang as 'en' | 'de'
-      );
+      const invTheme = await reportPDFService.getUserPdfTheme(userId);
+      const restoreInv = reportPDFService.applyTheme(invTheme);
+      let pdfBuffer: Buffer;
+      try {
+        pdfBuffer = await reportPDFService.generateInvoiceReportPDF(
+          report,
+          currency as string,
+          lang as 'en' | 'de'
+        );
+      } finally {
+        restoreInv();
+      }
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader(
@@ -403,7 +425,7 @@ export class ReportController {
 
       res.send(pdfBuffer);
     } catch (error: any) {
-      console.error('Generate invoice report PDF error:', error);
+      logger.error('Generate invoice report PDF error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }
@@ -433,11 +455,18 @@ export class ReportController {
         end_date as string
       );
 
-      const pdfBuffer = await reportPDFService.generateExpenseReportPDF(
-        report,
-        currency as string,
-        lang as 'en' | 'de'
-      );
+      const expTheme = await reportPDFService.getUserPdfTheme(userId);
+      const restoreExp = reportPDFService.applyTheme(expTheme);
+      let pdfBuffer: Buffer;
+      try {
+        pdfBuffer = await reportPDFService.generateExpenseReportPDF(
+          report,
+          currency as string,
+          lang as 'en' | 'de'
+        );
+      } finally {
+        restoreExp();
+      }
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader(
@@ -447,7 +476,7 @@ export class ReportController {
 
       res.send(pdfBuffer);
     } catch (error: any) {
-      console.error('Generate expense report PDF error:', error);
+      logger.error('Generate expense report PDF error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }
@@ -464,7 +493,7 @@ export class ReportController {
         return;
       }
 
-      const { start_date, end_date, lang = 'de', currency = 'EUR', project_id, client_id, headline, description, footer } = req.query;
+      const { start_date, end_date, lang = 'de', currency = 'EUR', project_id, client_id, headline, description, footer, hide_prices } = req.query;
 
       if (!start_date || !end_date) {
         res.status(400).json({ message: 'start_date and end_date are required' });
@@ -485,12 +514,20 @@ export class ReportController {
         client_id as string | undefined
       );
 
-      const pdfBuffer = await reportPDFService.generateTimeTrackingReportPDF(
-        report,
-        lang as 'en' | 'de',
-        currency as string,
-        metadata
-      );
+      const ttTheme = await reportPDFService.getUserPdfTheme(userId);
+      const restoreTt = reportPDFService.applyTheme(ttTheme);
+      let pdfBuffer: Buffer;
+      try {
+        pdfBuffer = await reportPDFService.generateTimeTrackingReportPDF(
+          report,
+          lang as 'en' | 'de',
+          currency as string,
+          metadata,
+          hide_prices === 'true'
+        );
+      } finally {
+        restoreTt();
+      }
 
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader(
@@ -500,7 +537,7 @@ export class ReportController {
 
       res.send(pdfBuffer);
     } catch (error: any) {
-      console.error('Generate time tracking report PDF error:', error);
+      logger.error('Generate time tracking report PDF error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }
@@ -651,7 +688,7 @@ export class ReportController {
 
       res.send('\uFEFF' + csv); // BOM for Excel UTF-8 support
     } catch (error: any) {
-      console.error('Generate time tracking report CSV error:', error);
+      logger.error('Generate time tracking report CSV error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }
@@ -849,7 +886,7 @@ export class ReportController {
 
       res.send(Buffer.from(buffer));
     } catch (error: any) {
-      console.error('Generate time tracking report Excel error:', error);
+      logger.error('Generate time tracking report Excel error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }

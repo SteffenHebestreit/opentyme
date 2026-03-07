@@ -1,0 +1,44 @@
+{
+  "title": "Email Templates",
+  "subtitle": "Manage MJML email templates with placeholder support.",
+  "newTemplate": "New Template",
+  "noTemplates": "No templates yet.",
+  "createFirst": "Create your first template",
+  "loadError": "Failed to load email templates.",
+  "col": {
+    "name": "Name",
+    "subject": "Subject",
+    "category": "Category",
+    "language": "Lang",
+    "default": "Default",
+    "updated": "Updated",
+    "actions": "Actions"
+  },
+  "action": {
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirmDelete": "Confirm delete",
+    "cancel": "Cancel"
+  },
+  "builder": {
+    "back": "Back to templates",
+    "newTitle": "New Email Template",
+    "editTitle": "Edit Email Template",
+    "name": "Template Name",
+    "namePlaceholder": "e.g. Invoice Notification",
+    "subject": "Email Subject",
+    "subjectPlaceholder": "e.g. Your invoice {{invoice.number}} is ready",
+    "category": "Category",
+    "language": "Language",
+    "default": "Set as default",
+    "insertPlaceholder": "Insert placeholder",
+    "uploadFile": "Upload HTML/MJML",
+    "tabCode": "Code",
+    "tabPreview": "Preview",
+    "save": "Save",
+    "saving": "Saving...",
+    "saveSuccess": "Template saved successfully.",
+    "saveError": "Failed to save template.",
+    "validationError": "Please fill in template name and subject."
+  }
+}

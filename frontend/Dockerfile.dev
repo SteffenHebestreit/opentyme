@@ -1,17 +1,51 @@
-# Development Dockerfile for frontend
+# Stage 1: Install Addons
+FROM alpine:latest AS addon-installer
+
+# Install required tools
+RUN apk add --no-cache bash git jq
+
+# Build args for addon installation — passed from docker-compose build.args
+# (or via: docker build --build-arg GITHUB_ADDON_TOKEN=ghp_... )
+ARG GITHUB_ADDON_TOKEN=""
+ARG GITLAB_ADDON_TOKEN=""
+ARG OPENTYME_ADDONS=""
+
+# Set working directory
+WORKDIR /app
+
+# Copy addon configuration and installation script
+# Addons are cloned from GitHub by install-addons.sh during the build
+COPY addons.config.json ./
+COPY scripts/install-addons.sh ./scripts/
+
+# Ensure plugins directory always exists even if installs fail
+RUN mkdir -p /app/frontend/src/plugins
+
+# Make script executable and run frontend addon installation
+RUN chmod +x ./scripts/install-addons.sh
+RUN GITHUB_ADDON_TOKEN="${GITHUB_ADDON_TOKEN}" \
+    GITLAB_ADDON_TOKEN="${GITLAB_ADDON_TOKEN}" \
+    OPENTYME_ADDONS="${OPENTYME_ADDONS}" \
+    ./scripts/install-addons.sh frontend || true
+
+# Stage 2: Development Environment
 FROM node:24-alpine
 
 # Set working directory
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY frontend/package*.json ./
 
 # Install dependencies
 RUN npm install
 
 # Copy source code (will be overridden by volume mount in docker-compose.yml)
-COPY . .
+COPY frontend/ .
+
+# Copy installed plugins from addon-installer stage (trailing slash = copy contents)
+RUN mkdir -p ./src/plugins
+COPY --from=addon-installer /app/frontend/src/plugins/ ./src/plugins/
 
 # Expose development port
 EXPOSE 3000

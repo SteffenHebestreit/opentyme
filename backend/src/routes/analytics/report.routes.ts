@@ -17,6 +17,7 @@
 
 import { Router } from 'express';
 import { ReportController } from '../../controllers/analytics/report.controller';
+import { emailReport } from '../../controllers/communication/report-email.controller';
 import { authenticateKeycloak, extractKeycloakUser } from '../../middleware/auth/keycloak.middleware';
 
 const router = Router();
@@ -120,5 +121,8 @@ router.get('/time-tracking/csv', reportController.generateTimeTrackingReportCSV.
  * Query params: start_date, end_date, project_id (optional), client_id (optional)
  */
 router.get('/time-tracking/excel', reportController.generateTimeTrackingReportExcel.bind(reportController));
+
+// Email a report as PDF attachment
+router.post('/email', emailReport);
 
 export default router;

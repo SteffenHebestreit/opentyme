@@ -11,6 +11,7 @@
 
 import { Request, Response } from 'express';
 import { taxPackageService, TaxPackageOptions } from '../../services/analytics/tax-package.service';
+import { logger } from '../../utils/logger';
 
 export class TaxPackageController {
   /**
@@ -87,7 +88,7 @@ export class TaxPackageController {
         includeExcelExport: include_excel !== 'false',
       };
 
-      console.log(`[TaxPackage] Generating tax package for user ${userId}, year ${yearNum}`);
+      logger.info(`[TaxPackage] Generating tax package for user ${userId}, year ${yearNum}`);
 
       // Generate the package
       const zipStream = await taxPackageService.generateTaxPackage(options);
@@ -104,14 +105,14 @@ export class TaxPackageController {
       zipStream.pipe(res);
 
       zipStream.on('error', (err) => {
-        console.error('[TaxPackage] Stream error:', err);
+        logger.error('[TaxPackage] Stream error:', err);
         if (!res.headersSent) {
           res.status(500).json({ message: 'Error generating tax package' });
         }
       });
 
     } catch (error: any) {
-      console.error('[TaxPackage] Generate tax package error:', error);
+      logger.error('[TaxPackage] Generate tax package error:', error);
       if (!res.headersSent) {
         res.status(500).json({ message: error.message || 'Internal server error' });
       }
@@ -137,7 +138,7 @@ export class TaxPackageController {
       
       res.status(200).json({ years });
     } catch (error: any) {
-      console.error('[TaxPackage] Get available years error:', error);
+      logger.error('[TaxPackage] Get available years error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }
@@ -189,7 +190,7 @@ export class TaxPackageController {
         ...estimate,
       });
     } catch (error: any) {
-      console.error('[TaxPackage] Get package estimate error:', error);
+      logger.error('[TaxPackage] Get package estimate error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }

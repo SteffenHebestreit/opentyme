@@ -8,6 +8,7 @@ import api from '@/api/services/client';
 import { useTranslation } from 'react-i18next';
 import { DepreciationSettings } from '@/components/business/expenses/DepreciationSettings';
 import { DepreciationAnalysisSection } from '@/components/business/expenses/DepreciationAnalysisSection';
+import { Slot } from '@/plugins/slots';
 
 interface ExpenseDetailModalProps {
   expenseId: string;
@@ -889,6 +890,16 @@ export function ExpenseDetailModal({
                   </div>
                 )}
             </div>
+
+            {/* Addon injection point: expense detail actions
+                Addons receive the full expense object and update callback.
+                Use this slot for per-expense analysis buttons, export actions, etc. */}
+            {expense && (
+              <Slot
+                name="expense-detail-actions"
+                context={{ expense, onExpenseUpdated, isEditing }}
+              />
+            )}
           </div>
         ) : (
           <div className="p-8 text-center text-gray-500 dark:text-gray-400">

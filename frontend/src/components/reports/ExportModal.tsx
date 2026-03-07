@@ -11,15 +11,17 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, FileJson, FileSpreadsheet, FileText, Table } from 'lucide-react';
+import { Download, FileJson, FileSpreadsheet, FileText, Table, Mail } from 'lucide-react';
 import Modal from '../ui/Modal';
 
-export type ExportFormat = 'json' | 'csv' | 'pdf' | 'excel';
+export type ExportFormat = 'json' | 'csv' | 'pdf' | 'excel' | 'email';
 
 interface ExportMetadata {
   headline: string;
   description: string;
   footer: string;
+  hidePrices: boolean;
+  emailTo: string;
 }
 
 interface ExportModalProps {
@@ -36,6 +38,8 @@ export default function ExportModal({ isOpen, onClose, onExport, reportType }: E
     headline: '',
     description: '',
     footer: '',
+    hidePrices: false,
+    emailTo: '',
   });
 
   // Update headline when reportType changes
@@ -78,6 +82,12 @@ export default function ExportModal({ isOpen, onClose, onExport, reportType }: E
       label: 'PDF',
       description: t('export.formats.pdfDescription'),
     },
+    {
+      value: 'email',
+      icon: Mail,
+      label: 'Email',
+      description: t('export.formats.emailDescription', { defaultValue: 'Send as PDF attachment via email' }),
+    },
   ];
 
   const footer = (
@@ -92,8 +102,8 @@ export default function ExportModal({ isOpen, onClose, onExport, reportType }: E
         onClick={handleExport}
         className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center space-x-2"
       >
-        <Download className="w-4 h-4" />
-        <span>{t('export.exportButton')}</span>
+        {format === 'email' ? <Mail className="w-4 h-4" /> : <Download className="w-4 h-4" />}
+        <span>{format === 'email' ? t('export.emailButton', { defaultValue: 'Send Email' }) : t('export.exportButton')}</span>
       </button>
     </>
   );
@@ -143,7 +153,27 @@ export default function ExportModal({ isOpen, onClose, onExport, reportType }: E
           </div>
         </div>
 
-        {/* Metadata Fields */}
+        {/* Email recipient (only for email format) */}
+        {format === 'email' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              {t('export.emailTo', { defaultValue: 'Send to' })}
+            </label>
+            <input
+              type="email"
+              value={metadata.emailTo}
+              onChange={(e) => setMetadata({ ...metadata, emailTo: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="recipient@example.com"
+            />
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {t('export.emailToHelp', { defaultValue: 'The report PDF will be generated and emailed to this address.' })}
+            </p>
+          </div>
+        )}
+
+        {/* Metadata Fields (not shown for email) */}
+        {format !== 'email' && (
         <div className="space-y-4">
           {/* Headline */}
           <div>
@@ -188,7 +218,31 @@ export default function ExportModal({ isOpen, onClose, onExport, reportType }: E
               />
             </div>
           )}
+
+          {/* Hide Prices Toggle (only for Time Tracking + PDF) */}
+          {reportType === 'timeTracking' && format === 'pdf' && (
+            <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={metadata.hidePrices}
+                  onChange={(e) => setMetadata({ ...metadata, hidePrices: e.target.checked })}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded
+                           focus:ring-blue-500 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {t('export.hidePrices')}
+                  </span>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {t('export.hidePricesHelp')}
+                  </p>
+                </div>
+              </label>
+            </div>
+          )}
         </div>
+        )}
       </div>
     </Modal>
   );

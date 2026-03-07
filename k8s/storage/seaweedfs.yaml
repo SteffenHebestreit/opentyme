@@ -1,0 +1,412 @@
+# =============================================================================
+# SeaweedFS Deployment on Kubernetes
+# =============================================================================
+# 4-component architecture:
+#   1. seaweedfs-master    — cluster coordination (StatefulSet)
+#   2. seaweedfs-volume    — file data storage   (StatefulSet, Longhorn PVC)
+#   3. seaweedfs-filer     — metadata store       (StatefulSet, Longhorn PVC)
+#   4. seaweedfs-s3        — S3 gateway           (Deployment + Service)
+#
+# Prerequisites:
+#   - namespace 'opentyme' exists
+#   - Longhorn PVCs created (kubectl apply -f k8s/storage/longhorn-pvc.yaml)
+#   - Secret 'seaweedfs-credentials' created (see bottom of this file)
+#
+# Apply with:
+#   kubectl apply -f k8s/storage/longhorn-pvc.yaml
+#   kubectl apply -f k8s/storage/seaweedfs.yaml
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Namespace (create if it doesn't exist)
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opentyme
+
+---
+# ---------------------------------------------------------------------------
+# Secret: S3 credentials
+# Create before applying:
+#   kubectl create secret generic seaweedfs-credentials \
+#     --from-literal=access-key=<your-key> \
+#     --from-literal=secret-key=<your-secret> \
+#     -n opentyme
+# ---------------------------------------------------------------------------
+# Uncomment and fill in values to create inline (base64-encode them first):
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: seaweedfs-credentials
+#   namespace: opentyme
+# type: Opaque
+# data:
+#   access-key: <base64-encoded-access-key>
+#   secret-key: <base64-encoded-secret-key>
+
+---
+# ---------------------------------------------------------------------------
+# ConfigMap: S3 identity configuration
+# ---------------------------------------------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: seaweedfs-s3-config
+  namespace: opentyme
+data:
+  s3.json: |
+    {
+      "identities": [
+        {
+          "name": "admin",
+          "credentials": [
+            {
+              "accessKey": "$(STORAGE_ACCESS_KEY)",
+              "secretKey": "$(STORAGE_SECRET_KEY)"
+            }
+          ],
+          "actions": ["Admin", "Read", "ReadAcp", "Write", "WriteAcp", "List", "Tagging"]
+        }
+      ]
+    }
+
+---
+# ---------------------------------------------------------------------------
+# SeaweedFS Master — cluster coordination
+# ---------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: seaweedfs-master
+  namespace: opentyme
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: master
+spec:
+  serviceName: seaweedfs-master
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/component: master
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seaweedfs
+        app.kubernetes.io/component: master
+    spec:
+      containers:
+        - name: master
+          image: chrislusf/seaweedfs:latest
+          command: ["weed", "master", "-dir=/data", "-port=9333"]
+          ports:
+            - containerPort: 9333
+              name: master
+          volumeMounts:
+            - name: master-data
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /cluster/status
+              port: 9333
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: master-data
+          persistentVolumeClaim:
+            claimName: seaweedfs-master-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-master
+  namespace: opentyme
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: master
+  ports:
+    - name: master
+      port: 9333
+      targetPort: 9333
+
+---
+# ---------------------------------------------------------------------------
+# SeaweedFS Volume — file data storage
+# ---------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: seaweedfs-volume
+  namespace: opentyme
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: volume
+spec:
+  serviceName: seaweedfs-volume
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/component: volume
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seaweedfs
+        app.kubernetes.io/component: volume
+    spec:
+      containers:
+        - name: volume
+          image: chrislusf/seaweedfs:latest
+          command:
+            - weed
+            - volume
+            - -dir=/data
+            - -mserver=seaweedfs-master:9333
+            - -port=8080
+          ports:
+            - containerPort: 8080
+              name: volume
+          volumeMounts:
+            - name: volume-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+      volumes:
+        - name: volume-data
+          persistentVolumeClaim:
+            claimName: seaweedfs-volume-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-volume
+  namespace: opentyme
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: volume
+  ports:
+    - name: volume
+      port: 8080
+      targetPort: 8080
+
+---
+# ---------------------------------------------------------------------------
+# SeaweedFS Filer — metadata / directory service
+# ---------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: seaweedfs-filer
+  namespace: opentyme
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: filer
+spec:
+  serviceName: seaweedfs-filer
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/component: filer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seaweedfs
+        app.kubernetes.io/component: filer
+    spec:
+      containers:
+        - name: filer
+          image: chrislusf/seaweedfs:latest
+          command:
+            - weed
+            - filer
+            - -master=seaweedfs-master:9333
+            - -port=8888
+            - -dataCenter=dc1
+          ports:
+            - containerPort: 8888
+              name: filer
+          volumeMounts:
+            - name: filer-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: filer-data
+          persistentVolumeClaim:
+            claimName: seaweedfs-filer-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-filer
+  namespace: opentyme
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: filer
+  ports:
+    - name: filer
+      port: 8888
+      targetPort: 8888
+
+---
+# ---------------------------------------------------------------------------
+# SeaweedFS S3 Gateway — S3-compatible API (port 8333)
+# This is what the backend and backup scripts connect to.
+# ---------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: seaweedfs-s3
+  namespace: opentyme
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: s3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/component: s3
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seaweedfs
+        app.kubernetes.io/component: s3
+    spec:
+      initContainers:
+        # Render credentials into s3.json before starting the gateway
+        - name: render-s3-config
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - |
+              sed "s/\$(STORAGE_ACCESS_KEY)/${STORAGE_ACCESS_KEY}/g;
+                   s/\$(STORAGE_SECRET_KEY)/${STORAGE_SECRET_KEY}/g" \
+                /config/s3.json > /rendered/s3.json
+          env:
+            - name: STORAGE_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: seaweedfs-credentials
+                  key: access-key
+            - name: STORAGE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: seaweedfs-credentials
+                  key: secret-key
+          volumeMounts:
+            - name: s3-config-template
+              mountPath: /config
+            - name: s3-config-rendered
+              mountPath: /rendered
+      containers:
+        - name: s3
+          image: chrislusf/seaweedfs:latest
+          command:
+            - weed
+            - s3
+            - -filer=seaweedfs-filer:8888
+            - -port=8333
+            - -config=/config/s3.json
+          ports:
+            - containerPort: 8333
+              name: s3
+          env:
+            - name: STORAGE_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: seaweedfs-credentials
+                  key: access-key
+            - name: STORAGE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: seaweedfs-credentials
+                  key: secret-key
+          volumeMounts:
+            - name: s3-config-rendered
+              mountPath: /config
+          livenessProbe:
+            tcpSocket:
+              port: 8333
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: s3-config-template
+          configMap:
+            name: seaweedfs-s3-config
+        - name: s3-config-rendered
+          emptyDir: {}
+
+---
+# S3 Service — ClusterIP for in-cluster access from the backend
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-s3
+  namespace: opentyme
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: s3
+spec:
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: s3
+  ports:
+    - name: s3
+      port: 8333
+      targetPort: 8333
+  type: ClusterIP
+
+---
+# Optional: NodePort or LoadBalancer for external access
+# Uncomment if you need the S3 API accessible outside the cluster
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: seaweedfs-s3-external
+#   namespace: opentyme
+# spec:
+#   selector:
+#     app.kubernetes.io/name: seaweedfs
+#     app.kubernetes.io/component: s3
+#   ports:
+#     - port: 8333
+#       targetPort: 8333
+#       nodePort: 30333
+#   type: NodePort

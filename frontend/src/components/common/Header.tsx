@@ -1,8 +1,10 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useApp } from '../../store/AppContext'
 import { useAuth } from '../../contexts/AuthContext'
+import { frontendPluginRegistry } from '../../plugins/plugin-registry'
+import { usePlugins } from '../../api/hooks/usePlugins'
 
 /**
  * Application header component with navigation and theme toggle.
@@ -26,6 +28,35 @@ export default function Header() {
   const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [addonMenuOpen, setAddonMenuOpen] = useState(false)
+  const addonMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!addonMenuOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (addonMenuRef.current && !addonMenuRef.current.contains(e.target as Node)) {
+        setAddonMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [addonMenuOpen])
+
+  const { data: pluginsData } = usePlugins();
+
+  // Build set of user-enabled plugin names. While loading (null) show nothing
+  // to avoid flash; once resolved filter to only userEnabled plugins.
+  const userEnabledSet = useMemo(() => {
+    if (!pluginsData?.plugins) return null;
+    return new Set(pluginsData.plugins.filter((p) => p.userEnabled).map((p) => p.name));
+  }, [pluginsData]);
+
+  // Plugin routes that declare a nav menu item, filtered by userEnabled, sorted by order
+  const pluginNavItems = frontendPluginRegistry
+    .getAllRoutes()
+    .filter((r) => r.menuItem)
+    .filter((r) => !userEnabledSet || (r.pluginName ? userEnabledSet.has(r.pluginName) : true))
+    .sort((a, b) => (a.menuItem!.order ?? 99) - (b.menuItem!.order ?? 99))
 
   const toggleTheme = () => {
     dispatch({ type: 'SET_THEME', payload: state.theme === 'light' ? 'dark' : 'light' })
@@ -119,6 +150,52 @@ export default function Header() {
               } transition-colors font-medium`}>
                 {t('navigation.reports')}
               </Link>
+              {/* Addons dropdown — always visible; includes core features + installed addon nav items */}
+              <div ref={addonMenuRef} className="relative">
+                <button
+                  onClick={() => setAddonMenuOpen(!addonMenuOpen)}
+                  className={`flex items-center gap-1.5 transition-colors font-medium ${
+                    state.theme === 'light'
+                      ? 'text-gray-700 hover:text-purple-600'
+                      : 'text-gray-300 hover:text-purple-400'
+                  }`}
+                >
+                  <span>Addons</span>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d={addonMenuOpen ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'} />
+                  </svg>
+                </button>
+                {addonMenuOpen && (
+                  <div className={`absolute left-0 top-full mt-2 w-60 rounded-xl shadow-lg overflow-hidden border z-50 ${
+                    state.theme === 'light'
+                      ? 'bg-white border-purple-300/30'
+                      : 'bg-gray-800 border-purple-500/20'
+                  }`}>
+                    {/* Installed addon nav items */}
+                    {pluginNavItems.length > 0 ? (
+                      pluginNavItems.map((route) => (
+                        <Link
+                          key={route.path}
+                          to={route.path}
+                          onClick={() => setAddonMenuOpen(false)}
+                          className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                            state.theme === 'light'
+                              ? 'text-gray-700 hover:bg-purple-50 hover:text-purple-600'
+                              : 'text-gray-300 hover:bg-purple-500/10 hover:text-purple-400'
+                          }`}
+                        >
+                          <span className="text-lg">{route.menuItem!.icon}</span>
+                          <span className="font-medium text-sm">{route.menuItem!.label}</span>
+                        </Link>
+                      ))
+                    ) : (
+                      <div className={`px-4 py-3 text-xs ${state.theme === 'light' ? 'text-gray-400' : 'text-gray-500'}`}>
+                        No addons installed
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </nav>
           )}
 
@@ -213,7 +290,18 @@ export default function Header() {
                     >
                       {t('navigation.settings')}
                     </Link>
-                    
+                    <Link
+                      to="/email/compose"
+                      className={`block px-4 py-3 transition-colors ${
+                        state.theme === 'light'
+                          ? 'text-gray-700 hover:bg-purple-100 hover:text-purple-600'
+                          : 'text-gray-300 hover:bg-purple-500/10 hover:text-purple-400'
+                      }`}
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      {t('navigation.sendEmail', 'Send Email')}
+                    </Link>
+
                     {isAdmin && (
                       <Link
                         to="/system-admin"
@@ -403,8 +491,8 @@ export default function Header() {
             >
               {t('navigation.finances')}
             </Link>
-            <Link 
-              to="/reports" 
+            <Link
+              to="/reports"
               className={`block px-4 py-3 rounded-lg transition-all font-medium ${
                 state.theme === 'light'
                   ? 'text-gray-700 hover:text-purple-600 hover:bg-purple-100'
@@ -414,7 +502,32 @@ export default function Header() {
             >
               {t('navigation.reports')}
             </Link>
-            
+            {/* Addons section — always visible */}
+            <div className={`border-t pt-3 pb-1 ${
+              state.theme === 'light' ? 'border-purple-300/30' : 'border-purple-500/20'
+            }`}>
+              <div className={`px-4 pb-1 text-xs font-semibold uppercase tracking-wider ${
+                state.theme === 'light' ? 'text-purple-600' : 'text-purple-400'
+              }`}>
+                Addons
+              </div>
+            </div>
+            {pluginNavItems.map((route) => (
+              <Link
+                key={route.path}
+                to={route.path}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all font-medium ${
+                  state.theme === 'light'
+                    ? 'text-gray-700 hover:text-purple-600 hover:bg-purple-100'
+                    : 'text-gray-300 hover:text-purple-400 hover:bg-purple-500/10'
+                }`}
+                onClick={closeMobileMenu}
+              >
+                <span>{route.menuItem!.icon}</span>
+                <span>{route.menuItem!.label}</span>
+              </Link>
+            ))}
+
             {/* User menu items */}
             <div className={`border-t pt-2 ${
               state.theme === 'light'
@@ -432,8 +545,8 @@ export default function Header() {
               >
                 {t('navigation.profile')}
               </Link>
-              <Link 
-                to="/config" 
+              <Link
+                to="/config"
                 className={`block px-4 py-3 rounded-lg transition-all font-medium ${
                   state.theme === 'light'
                     ? 'text-gray-700 hover:text-purple-600 hover:bg-purple-100'
@@ -443,7 +556,18 @@ export default function Header() {
               >
                 {t('navigation.settings')}
               </Link>
-              
+              <Link
+                to="/email/compose"
+                className={`block px-4 py-3 rounded-lg transition-all font-medium ${
+                  state.theme === 'light'
+                    ? 'text-gray-700 hover:text-purple-600 hover:bg-purple-100'
+                    : 'text-gray-300 hover:text-purple-400 hover:bg-purple-500/10'
+                }`}
+                onClick={closeMobileMenu}
+              >
+                {t('navigation.sendEmail', 'Send Email')}
+              </Link>
+
               {isAdmin && (
                 <Link 
                   to="/system-admin" 

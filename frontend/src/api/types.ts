@@ -153,6 +153,7 @@ export interface Invoice {
   created_at: string;
   updated_at: string;
   client_name?: string;
+  client_email?: string;
   project_name?: string;
 }
 

@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://opentyme.dev/schemas/addons-config.v1.json",
+  "title": "OpenTYME Addons Configuration",
+  "description": "Configuration file for managing OpenTYME addons/plugins",
+  "type": "object",
+  "required": ["addons"],
+  "properties": {
+    "addons": {
+      "type": "array",
+      "description": "List of addons to install and configure",
+      "items": {
+        "type": "object",
+        "required": ["name", "source"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "description": "Unique addon identifier (kebab-case)"
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether the addon is installed. Set to false to skip installation without removing the entry."
+          },
+          "source": {
+            "type": "object",
+            "required": ["type"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["github", "gitlab", "local"],
+                "description": "Source type"
+              },
+              "repo": {
+                "type": "string",
+                "description": "Repository identifier — required for github/gitlab (e.g., 'owner/repo')"
+              },
+              "ref": {
+                "type": "string",
+                "description": "Branch, tag, or commit reference",
+                "default": "main"
+              },
+              "private": {
+                "type": "boolean",
+                "description": "Whether the repository is private (github/gitlab only)",
+                "default": false
+              },
+              "path": {
+                "type": "string",
+                "description": "Local filesystem path — required for type=local (relative to project root)"
+              }
+            },
+            "if": {
+              "properties": { "type": { "enum": ["github", "gitlab"] } }
+            },
+            "then": {
+              "required": ["repo"]
+            }
+          }
+        }
+      }
+    },
+    "privateRepoCredentials": {
+      "type": "object",
+      "description": "Credentials for accessing private repositories",
+      "properties": {
+        "github": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string", "enum": ["env", "file"] },
+            "variable": { "type": "string", "description": "Environment variable name (for type=env)" },
+            "file": { "type": "string", "description": "File path containing token (for type=file)" }
+          }
+        },
+        "gitlab": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string", "enum": ["env", "file"] },
+            "variable": { "type": "string" },
+            "file": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

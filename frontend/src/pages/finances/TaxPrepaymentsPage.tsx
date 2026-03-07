@@ -6,7 +6,9 @@ import { AddEditTaxPrepaymentModal } from '@/components/business/tax-prepayments
 import { TaxPrepaymentDetailModal } from '@/components/business/tax-prepayments/TaxPrepaymentDetailModal';
 import { CustomSelect } from '@/components/forms';
 import { formatCurrency } from '@/utils/currency';
-import { Table, Column } from '@/components/common/Table';
+import { Table, Column, LoadingSpinner, PageHeader, StatCard, EmptyState, Badge } from '@/components/common';
+import { BadgeVariant } from '@/components/common/Badge';
+import { Plus, Wallet, TrendingUp, FileText } from 'lucide-react';
 
 /**
  * Tax Prepayments page component for tracking VAT and income tax prepayments.
@@ -98,14 +100,14 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
     { value: 'cancelled', label: t('status.cancelled') },
   ];
 
-  // Get status badge color
-  const getStatusBadgeColor = (status: TaxPrepaymentStatus) => {
-    const colors = {
-      paid: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-      planned: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-      cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  // Get status badge variant
+  const getStatusBadgeVariant = (status: TaxPrepaymentStatus): BadgeVariant => {
+    const variants: Record<TaxPrepaymentStatus, BadgeVariant> = {
+      paid: 'green',
+      planned: 'yellow',
+      cancelled: 'red',
     };
-    return colors[status] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
+    return variants[status] || 'gray';
   };
 
   // Handle delete
@@ -201,9 +203,9 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
       accessorKey: 'status',
       header: t('table.status'),
       render: (prepayment) => (
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusBadgeColor(prepayment.status)}`}>
+        <Badge variant={getStatusBadgeVariant(prepayment.status)}>
           {t(`status.${prepayment.status}`)}
-        </span>
+        </Badge>
       ),
       sortable: true,
     },
@@ -255,47 +257,35 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
   ], [t]);
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
-      </div>
-    );
+    return <LoadingSpinner size="lg" fullScreen text={t('messages.loading', { defaultValue: 'Loading tax prepayments...' })} />;
   }
 
   if (error) {
     return (
-      <div className="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900/20 dark:text-red-300">
-        <p className="font-semibold">{t('messages.errorLoading')}</p>
-        <p className="text-sm mt-1">
-          {error instanceof Error ? error.message : 'An unknown error occurred'}
-        </p>
-      </div>
+      <Alert
+        type="error"
+        title={t('messages.errorLoading')}
+        message={error instanceof Error ? error.message : 'An unknown error occurred'}
+      />
     );
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">
-            {t('title')}
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {t('subtitle')}
-          </p>
-        </div>
-        
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 font-medium text-white transition-colors hover:bg-purple-700"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          {t('actions.add')}
-        </button>
-      </div>
+      <PageHeader
+        title={t('title')}
+        subtitle={t('subtitle')}
+        actions={
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 font-medium text-white transition-colors hover:bg-purple-700"
+          >
+            <Plus className="w-5 h-5" />
+            {t('actions.add')}
+          </button>
+        }
+      />
 
       {/* Filters */}
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -352,35 +342,31 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
       {summary && (
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="rounded-lg border border-purple-200 bg-purple-50 p-4 dark:border-purple-900/30 dark:bg-purple-900/20">
-              <div className="text-sm font-medium text-purple-600 dark:text-purple-400 mb-1">
-                {t('summary.totalPrepayments')}
-              </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatCurrency(summary.total_vat + summary.total_income_tax)}
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {summary.count} {t('summary.transactions')}
-              </div>
-            </div>
+            <StatCard
+              label={t('summary.totalPrepayments')}
+              value={formatCurrency(summary.total_vat + summary.total_income_tax)}
+              variant="purple"
+              icon={Wallet}
+              footer={
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {summary.count} {t('summary.transactions')}
+                </span>
+              }
+            />
 
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/30 dark:bg-blue-900/20">
-              <div className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-1">
-                {t('summary.vatAmount')}
-              </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatCurrency(summary.total_vat)}
-              </div>
-            </div>
+            <StatCard
+              label={t('summary.vatAmount')}
+              value={formatCurrency(summary.total_vat)}
+              variant="blue"
+              icon={TrendingUp}
+            />
 
-            <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900/30 dark:bg-green-900/20">
-              <div className="text-sm font-medium text-green-600 dark:text-green-400 mb-1">
-                {t('summary.incomeTaxAmount')}
-              </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatCurrency(summary.total_income_tax)}
-              </div>
-            </div>
+            <StatCard
+              label={t('summary.incomeTaxAmount')}
+              value={formatCurrency(summary.total_income_tax)}
+              variant="green"
+              icon={FileText}
+            />
 
             <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-900/30 dark:bg-orange-900/20">
               <div className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-1">
@@ -400,36 +386,22 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
       )}
 
       {/* Tax Prepayments Table */}
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <Table
           data={prepayments}
           columns={columns}
           pageSize={10}
           onRowClick={(prepayment) => handleViewDetails(prepayment.id)}
           emptyMessage={
-            <div className="p-6 text-center">
-              <svg
-                className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
-                {t('messages.noPrepayments')}
-              </h3>
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                {searchTerm || taxTypeFilter !== 'all' || yearFilter !== 'all' || quarterFilter !== 'all' || statusFilter !== 'all'
+            <EmptyState
+              icon={FileText}
+              title={t('messages.noPrepayments')}
+              description={
+                searchTerm || taxTypeFilter !== 'all' || yearFilter !== 'all' || quarterFilter !== 'all' || statusFilter !== 'all'
                   ? t('messages.tryAdjustingFilters')
-                  : t('messages.noPrepaymentsMessage')}
-              </p>
-            </div>
+                  : t('messages.noPrepaymentsMessage')
+              }
+            />
           }
           className="border-0 shadow-none"
         />

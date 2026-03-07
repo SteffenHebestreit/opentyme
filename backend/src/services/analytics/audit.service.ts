@@ -8,6 +8,7 @@
  */
 
 import { getDbClient } from '../../utils/database';
+import { logger } from '../../utils/logger';
 
 export interface ReportExportAuditLog {
   id?: string;
@@ -87,7 +88,7 @@ export class AuditService {
       const result = await this.db.query(query, values);
       return result.rows[0].id;
     } catch (error) {
-      console.error('Error logging report export:', error);
+      logger.error('Error logging report export:', error);
       throw error;
     }
   }
@@ -190,7 +191,7 @@ export class AuditService {
       const result = await this.db.query(query, values);
       return result.rows;
     } catch (error) {
-      console.error('Error fetching audit logs:', error);
+      logger.error('Error fetching audit logs:', error);
       throw error;
     }
   }
@@ -216,7 +217,7 @@ export class AuditService {
       const result = await this.db.query(query, [userId]);
       return result.rows;
     } catch (error) {
-      console.error('Error fetching export stats:', error);
+      logger.error('Error fetching export stats:', error);
       throw error;
     }
   }
@@ -242,7 +243,7 @@ export class AuditService {
       const result = await this.db.query(query);
       return result.rows;
     } catch (error) {
-      console.error('Error fetching system export stats:', error);
+      logger.error('Error fetching system export stats:', error);
       throw error;
     }
   }

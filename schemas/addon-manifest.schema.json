@@ -1,0 +1,182 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://opentyme.dev/schemas/addon-manifest.v1.json",
+  "title": "OpenTYME Addon Manifest",
+  "description": "Manifest file for OpenTYME addon/plugin packages",
+  "type": "object",
+  "required": ["name", "version", "displayName", "description", "author", "compatibility"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "Unique addon identifier in kebab-case"
+    },
+    "displayName": {
+      "type": "string",
+      "description": "Human-readable addon name"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Addon version following semantic versioning"
+    },
+    "description": {
+      "type": "string",
+      "description": "Brief description of the addon's functionality"
+    },
+    "author": {
+      "type": "string",
+      "description": "Addon author name or organization"
+    },
+    "license": {
+      "type": "string",
+      "description": "License type (e.g., MIT, GPL-3.0)"
+    },
+    "compatibility": {
+      "type": "object",
+      "required": ["opentyme"],
+      "properties": {
+        "opentyme": {
+          "type": "string",
+          "description": "Compatible OpenTYME version range (semver)"
+        }
+      }
+    },
+    "backend": {
+      "type": "object",
+      "properties": {
+        "entryPoint": {
+          "type": "string",
+          "description": "Backend entry point file path"
+        },
+        "routes": {
+          "type": "object",
+          "properties": {
+            "prefix": {
+              "type": "string",
+              "pattern": "^/api/",
+              "description": "API route prefix"
+            },
+            "file": {
+              "type": "string",
+              "description": "Routes file path"
+            }
+          }
+        },
+        "services": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of service file paths"
+        },
+        "migrations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of database migration file paths"
+        },
+        "dependencies": {
+          "type": "object",
+          "description": "NPM dependencies required by the addon"
+        }
+      }
+    },
+    "frontend": {
+      "type": "object",
+      "properties": {
+        "entryPoint": {
+          "type": "string",
+          "description": "Frontend entry point file path"
+        },
+        "routes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "component"],
+            "properties": {
+              "path": {
+                "type": "string",
+                "description": "Route path"
+              },
+              "component": {
+                "type": "string",
+                "description": "Component file path"
+              },
+              "protected": {
+                "type": "boolean",
+                "description": "Whether route requires authentication"
+              },
+              "menuItem": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string"
+                  },
+                  "section": {
+                    "type": "string",
+                    "enum": ["main", "tools", "admin", "reports"]
+                  },
+                  "order": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "component"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Slot name to inject into"
+              },
+              "component": {
+                "type": "string",
+                "description": "Component file path"
+              },
+              "order": {
+                "type": "number",
+                "description": "Rendering order (lower = earlier)"
+              }
+            }
+          }
+        },
+        "dependencies": {
+          "type": "object",
+          "description": "NPM dependencies required by the addon"
+        }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "schema": {
+          "type": "object",
+          "description": "Settings schema definition"
+        },
+        "ui": {
+          "type": "object",
+          "properties": {
+            "section": {
+              "type": "string",
+              "description": "Settings UI section title"
+            },
+            "icon": {
+              "type": "string",
+              "description": "Icon name for settings section"
+            }
+          }
+        }
+      }
+    }
+  }
+}

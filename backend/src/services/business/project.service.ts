@@ -6,6 +6,7 @@ import {
   ProjectStatus  // Import the type if needed directly
 } from '../../models/business/project.model';
 import { BaseClient } from '../../models/business/client.model'; // Explicitly import BaseClient
+import { logger } from '../../utils/logger';
 
 const db = getDbClient();
 
@@ -67,7 +68,7 @@ export class ProjectService {
       // Fetch associated client details
       return await this.getProjectWithClient(result.rows[0]);
     } catch (error) {
-        console.error('Error creating project:', error);
+        logger.error('Error creating project:', error);
         if ((error as any).code === '23503') { // foreign_key_violation for client_id
             throw new Error('Invalid client ID specified.');
         }
@@ -145,7 +146,7 @@ export class ProjectService {
       const projects: IProject[] = await Promise.all(projectPromises);
       return projects;
     } catch (error) {
-        console.error('Error fetching all projects:', error);
+        logger.error('Error fetching all projects:', error);
         throw new Error(`Failed to fetch projects: ${(error as any).message}`);
     }
   }
@@ -177,7 +178,7 @@ export class ProjectService {
       if (result.rows.length === 0) return null;
       return this.getProjectWithClient(result.rows[0]);
     } catch (error) {
-        console.error('Error fetching project by ID:', error);
+        logger.error('Error fetching project by ID:', error);
         throw new Error(`Failed to fetch project: ${(error as any).message}`);
     }
   }
@@ -239,7 +240,7 @@ export class ProjectService {
         if (result.rows.length === 0) return null;
         return this.getProjectWithClient(result.rows[0]);
     } catch (error) {
-        console.error('Error updating project:', error);
+        logger.error('Error updating project:', error);
          if ((error as any).code === '23503') { // foreign_key_violation for client_id
             throw new Error('Invalid client ID specified.');
         }
@@ -272,7 +273,7 @@ export class ProjectService {
       const result = await db.query(queryText, [id]);
       return (result.rowCount ?? 0) > 0;
     } catch (error) {
-        console.error('Error deleting project:', error);
+        logger.error('Error deleting project:', error);
         throw new Error(`Failed to delete project: ${(error as any).message}`);
     }
   }

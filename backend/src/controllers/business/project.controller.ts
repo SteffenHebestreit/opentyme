@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import { ProjectService } from '../../services/business/project.service';
 // Joi is already imported in client.controller if we want to keep it central, or import here
-import Joi from 'joi'; 
+import Joi from 'joi';
+import { logger } from '../../utils/logger';
 
 const projectService = new ProjectService();
 
@@ -164,7 +165,7 @@ export class ProjectController {
         ...value,
         user_id: (req as any).user?.id
       };
-      console.log('[DEBUG] Creating project with user_id:', projectData.user_id);
+      logger.debug('[DEBUG] Creating project with user_id:', projectData.user_id);
       
       const project = await projectService.create(projectData);
       res.status(201).json({
@@ -172,7 +173,7 @@ export class ProjectController {
         project,
       });
     } catch (err: any) {
-      console.error('Create project error:', err);
+      logger.error('Create project error:', err);
       // Handle specific errors like foreign key violation for client_id
       if(err.message.includes("Invalid client ID specified.")) {
           res.status(400).json({ message: "Validation failed: Invalid 'client_id' provided." });
@@ -229,7 +230,7 @@ export class ProjectController {
       const projects = await projectService.findAll(userId, filters);
       res.status(200).json(projects);
     } catch (err: any) {
-      console.error('Find all projects error:', err);
+      logger.error('Find all projects error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -263,7 +264,7 @@ export class ProjectController {
         res.status(404).json({ message: 'Project not found' });
       }
     } catch (err: any) {
-      console.error('Find project by ID error:', err);
+      logger.error('Find project by ID error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -310,7 +311,7 @@ export class ProjectController {
         res.status(404).json({ message: 'Project not found' });
       }
     } catch (err: any) {
-      console.error('Update project error:', err);
+      logger.error('Update project error:', err);
        if(err.message.includes("Invalid client ID specified.")) {
            res.status(400).json({ message: "Validation failed: Invalid 'client_id' provided for update." });
         } else {
@@ -348,7 +349,7 @@ export class ProjectController {
         res.status(404).json({ message: 'Project not found or already deleted' });
       }
     } catch (err: any) {
-      console.error('Delete project error:', err);
+      logger.error('Delete project error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }

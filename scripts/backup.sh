@@ -5,7 +5,7 @@
 # Backs up:
 # - OpenTYME PostgreSQL database
 # - Keycloak PostgreSQL database
-# - MinIO object storage (all user buckets)
+# - S3-compatible object storage (SeaweedFS — all user buckets)
 # - Configuration files (optional)
 #
 # Usage: ./backup.sh [backup_name]
@@ -14,7 +14,7 @@
 #   BACKUP_DIR          - Base backup directory (default: ./backups)
 #   INCLUDE_DATABASE    - Include OpenTYME database (default: true)
 #   INCLUDE_KEYCLOAK    - Include Keycloak database (default: true)
-#   INCLUDE_MINIO       - Include MinIO storage (default: true)
+#   INCLUDE_STORAGE     - Include S3 storage (default: true)
 #   INCLUDE_CONFIG      - Include configuration files (default: false)
 ###############################################################################
 
@@ -28,8 +28,15 @@ BACKUP_BASE_DIR="${BACKUP_DIR:-./backups}"
 BACKUP_DIR="$BACKUP_BASE_DIR/$BACKUP_NAME"
 INCLUDE_DATABASE="${INCLUDE_DATABASE:-true}"
 INCLUDE_KEYCLOAK="${INCLUDE_KEYCLOAK:-true}"
-INCLUDE_MINIO="${INCLUDE_MINIO:-true}"
+INCLUDE_STORAGE="${INCLUDE_STORAGE:-true}"
 INCLUDE_CONFIG="${INCLUDE_CONFIG:-false}"
+
+# S3-compatible storage configuration (SeaweedFS)
+STORAGE_HOST="${STORAGE_ENDPOINT:-seaweedfs}"
+STORAGE_S3_PORT="${STORAGE_PORT:-8333}"
+STORAGE_ACCESS_KEY="${STORAGE_ACCESS_KEY:-admin}"
+STORAGE_SECRET_KEY="${STORAGE_SECRET_KEY:-password}"
+STORAGE_ENDPOINT_URL="http://${STORAGE_HOST}:${STORAGE_S3_PORT}"
 
 # Colors
 GREEN='\033[0;32m'
@@ -70,7 +77,7 @@ log "Backup name: $BACKUP_NAME"
 log "Backup directory: $BACKUP_DIR"
 log "Include OpenTYME DB: $INCLUDE_DATABASE"
 log "Include Keycloak DB: $INCLUDE_KEYCLOAK"
-log "Include MinIO: $INCLUDE_MINIO"
+log "Include S3 Storage: $INCLUDE_STORAGE"
 log "Include Config: $INCLUDE_CONFIG"
 log "=============================================="
 
@@ -78,9 +85,9 @@ log "=============================================="
 if [ "$INCLUDE_DATABASE" = "true" ]; then
     log "Backing up OpenTYME database..."
     DB_FILE="$BACKUP_DIR/opentyme_database.dump"
-    
+
     $DOCKER_COMPOSE exec -T db pg_dump -U postgres -d opentyme -Fc > "$DB_FILE"
-    
+
     if [ $? -eq 0 ] && [ -s "$DB_FILE" ]; then
         log "OpenTYME database backup completed: $(du -h "$DB_FILE" | cut -f1)"
     else
@@ -94,9 +101,9 @@ fi
 if [ "$INCLUDE_KEYCLOAK" = "true" ]; then
     log "Backing up Keycloak database..."
     KC_DB_FILE="$BACKUP_DIR/keycloak_database.dump"
-    
+
     $DOCKER_COMPOSE exec -T keycloak-db pg_dump -U keycloak_user -d keycloak -Fc > "$KC_DB_FILE"
-    
+
     if [ $? -eq 0 ] && [ -s "$KC_DB_FILE" ]; then
         log "Keycloak database backup completed: $(du -h "$KC_DB_FILE" | cut -f1)"
     else
@@ -105,33 +112,40 @@ if [ "$INCLUDE_KEYCLOAK" = "true" ]; then
     fi
 fi
 
-# Backup MinIO storage
-if [ "$INCLUDE_MINIO" = "true" ]; then
-    log "Backing up MinIO storage..."
-    MINIO_DIR="$BACKUP_DIR/minio_backup"
-    mkdir -p "$MINIO_DIR"
-    
-    # Configure mc inside the backend container (which has mc installed)
-    $DOCKER_COMPOSE exec -T backend sh -c '
-        if command -v mc >/dev/null 2>&1; then
-            mc alias set backup-minio http://minio:9000 minioadmin minioadmin123 2>/dev/null || true
-            # List and export all buckets
-            for bucket in $(mc ls backup-minio/ 2>/dev/null | awk "{print \$NF}" | sed "s/\/$//"); do
-                echo "Exporting bucket: $bucket"
-                mc mirror backup-minio/$bucket /tmp/minio_backup/$bucket 2>/dev/null || true
+# Backup S3 object storage (SeaweedFS)
+if [ "$INCLUDE_STORAGE" = "true" ]; then
+    log "Backing up S3 object storage (SeaweedFS)..."
+    STORAGE_DIR="$BACKUP_DIR/storage"
+    mkdir -p "$STORAGE_DIR"
+
+    if command -v aws &> /dev/null; then
+        # List and sync all buckets via AWS CLI against the SeaweedFS S3 endpoint
+        BUCKETS=$(AWS_ACCESS_KEY_ID="$STORAGE_ACCESS_KEY" \
+                  AWS_SECRET_ACCESS_KEY="$STORAGE_SECRET_KEY" \
+                  aws s3 ls --endpoint-url "$STORAGE_ENDPOINT_URL" 2>/dev/null \
+                  | awk '{print $3}') || true
+
+        if [ -n "$BUCKETS" ]; then
+            for bucket in $BUCKETS; do
+                log "Syncing bucket: $bucket"
+                AWS_ACCESS_KEY_ID="$STORAGE_ACCESS_KEY" \
+                AWS_SECRET_ACCESS_KEY="$STORAGE_SECRET_KEY" \
+                aws s3 sync "s3://$bucket" "$STORAGE_DIR/$bucket" \
+                    --endpoint-url "$STORAGE_ENDPOINT_URL" \
+                    --no-progress 2>/dev/null || warn "Could not sync bucket $bucket"
             done
+
+            if [ -d "$STORAGE_DIR" ] && [ "$(ls -A "$STORAGE_DIR" 2>/dev/null)" ]; then
+                log "S3 storage backup completed: $(du -sh "$STORAGE_DIR" | cut -f1)"
+            else
+                warn "S3 storage backup: No data found or backup failed"
+            fi
         else
-            echo "MinIO client not available in backend container"
+            warn "No buckets found or SeaweedFS not accessible at $STORAGE_ENDPOINT_URL"
         fi
-    ' 2>/dev/null || true
-    
-    # Copy the exported data from container
-    docker cp $(docker-compose ps -q backend):/tmp/minio_backup/. "$MINIO_DIR/" 2>/dev/null || true
-    
-    if [ -d "$MINIO_DIR" ] && [ "$(ls -A "$MINIO_DIR" 2>/dev/null)" ]; then
-        log "MinIO storage backup completed: $(du -sh "$MINIO_DIR" | cut -f1)"
     else
-        warn "MinIO storage backup: No data found or backup failed"
+        warn "AWS CLI not found — skipping S3 storage backup"
+        warn "Install awscli to enable storage backups: https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html"
     fi
 fi
 
@@ -139,15 +153,16 @@ fi
 if [ "$INCLUDE_CONFIG" = "true" ]; then
     log "Backing up configuration..."
     CONFIG_FILE="$BACKUP_DIR/config.tar.gz"
-    
+
     tar -czf "$CONFIG_FILE" \
         docker-compose.yml \
         init.sql \
         keycloak/realm-import.json \
         traefik/*.yml \
+        config/seaweedfs/s3.json \
         .env \
         2>/dev/null || true
-    
+
     if [ -f "$CONFIG_FILE" ]; then
         log "Configuration backup completed: $(du -h "$CONFIG_FILE" | cut -f1)"
     else
@@ -160,10 +175,11 @@ cat > "$BACKUP_DIR/manifest.json" <<EOF
 {
   "backup_name": "$BACKUP_NAME",
   "timestamp": "$(date -Iseconds)",
+  "storage_type": "seaweedfs_s3",
   "includes": {
     "opentyme_database": $INCLUDE_DATABASE,
     "keycloak_database": $INCLUDE_KEYCLOAK,
-    "minio_storage": $INCLUDE_MINIO,
+    "s3_storage": $INCLUDE_STORAGE,
     "config": $INCLUDE_CONFIG
   },
   "files": [

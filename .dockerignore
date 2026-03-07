@@ -1,0 +1,8 @@
+**/node_modules
+**/dist
+**/.env.local
+**/*.log
+**/coverage
+.git
+docs/
+opentyme-addon-*/
