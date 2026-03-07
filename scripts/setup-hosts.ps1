@@ -1,5 +1,5 @@
 # =============================================================================
-# Tyme - Hosts File Setup Script (Windows PowerShell)
+# OpenTYME - Hosts File Setup Script (Windows PowerShell)
 # =============================================================================
 # This script adds the required local domain entries to your hosts file.
 # Run PowerShell as Administrator to execute this script.
@@ -87,7 +87,6 @@ $hostEntries = @(
     @{ IP = $localIP; Domain = "auth.localhost" },
     @{ IP = $localIP; Domain = "traefik.localhost" },
     @{ IP = $localIP; Domain = "mail.localhost" },
-    @{ IP = $localIP; Domain = "minio.localhost" },
     @{ IP = $localIP; Domain = "s3.localhost" },
     @{ IP = $localIP; Domain = "mcp.localhost" }
 )
@@ -148,7 +147,7 @@ Write-Host "  - http://localhost          (OpenTYME App)"
 Write-Host "  - http://auth.localhost     (Keycloak)"
 Write-Host "  - http://traefik.localhost  (Traefik Dashboard)"
 Write-Host "  - http://mail.localhost     (MailHog)"
-Write-Host "  - http://minio.localhost    (MinIO Console)"
+Write-Host ""
 Write-Host "  - http://mcp.localhost      (MCP Server)"
 Write-Host ""
 

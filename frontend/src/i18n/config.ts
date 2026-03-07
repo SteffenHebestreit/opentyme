@@ -47,6 +47,8 @@ import systemEN from './locales/en/system.json';
 import systemDE from './locales/de/system.json';
 import taxPrepaymentsEN from './locales/en/tax-prepayments.json';
 import taxPrepaymentsDE from './locales/de/tax-prepayments.json';
+import emailTemplatesEN from './locales/en/email-templates.json';
+import emailTemplatesDE from './locales/de/email-templates.json';
 
 // Language resources
 const resources = {
@@ -67,6 +69,7 @@ const resources = {
     errors: errorsEN,
     system: systemEN,
     'tax-prepayments': taxPrepaymentsEN,
+    'email-templates': emailTemplatesEN,
   },
   de: {
     common: commonDE,
@@ -85,6 +88,7 @@ const resources = {
     errors: errorsDE,
     system: systemDE,
     'tax-prepayments': taxPrepaymentsDE,
+    'email-templates': emailTemplatesDE,
   },
 };
 
@@ -116,6 +120,7 @@ i18n
       'errors',
       'system',
       'tax-prepayments',
+      'email-templates',
     ],
 
     interpolation: {

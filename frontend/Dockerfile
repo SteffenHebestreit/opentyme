@@ -1,22 +1,46 @@
-# Stage 1: Build the application
+# Stage 1: Install Addons
+FROM alpine:latest AS addon-installer
+
+# Install required tools
+RUN apk add --no-cache bash git jq
+
+# Set working directory
+WORKDIR /app
+
+# Copy addon configuration and installation script
+COPY addons.config.json ./
+COPY scripts/install-addons.sh ./scripts/
+COPY opentyme-addon-ai-analysis ./opentyme-addon-ai-analysis
+COPY opentyme-addon-email-builder ./opentyme-addon-email-builder
+
+# Make script executable
+RUN chmod +x ./scripts/install-addons.sh
+
+# Run addon installation (frontend only)
+RUN ./scripts/install-addons.sh frontend || true
+
+# Stage 2: Build the application
 FROM node:20-alpine AS build
 
 # Set working directory
 WORKDIR /usr/src/app
 
 # Copy package files
-COPY package*.json ./
+COPY frontend/package*.json ./
 
 # Install dependencies
 RUN npm install
 
 # Copy source code
-COPY . .
+COPY frontend/ .
+
+# Copy installed plugins from addon-installer stage
+COPY --from=addon-installer /app/frontend/src/plugins ./src/plugins
 
 # Build the application
 RUN npm run build
 
-# Stage 2: Production environment
+# Stage 3: Production environment
 FROM nginx:1.27-alpine AS production
 
 # Remove default Nginx config
@@ -30,7 +54,7 @@ RUN addgroup -g 1001 -S nodejs && \
 COPY --from=build /usr/src/app/dist /usr/share/nginx/html
 
 # Copy Nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Switch to non-root user
 USER frontend

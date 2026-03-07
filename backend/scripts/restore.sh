@@ -2,12 +2,12 @@
 set -e
 
 # =============================================================================
-# Tyme System Restore Script
+# OpenTYME System Restore Script
 # =============================================================================
 # Restores a complete system backup including:
-# - Tyme PostgreSQL database
-# - Keycloak PostgreSQL database  
-# - MinIO object storage (user buckets)
+# - OpenTYME PostgreSQL database
+# - Keycloak PostgreSQL database
+# - S3-compatible object storage (SeaweedFS — user buckets)
 #
 # SAFETY FEATURES:
 # - Automatic backup of current data BEFORE restore (pre_restore_*)
@@ -18,10 +18,9 @@ set -e
 #   ./restore.sh <backup_path> [options]
 #
 # Options via environment variables:
-#   RESTORE_DATABASE=true|false   - Restore Tyme database (default: true)
+#   RESTORE_DATABASE=true|false   - Restore OpenTYME database (default: true)
 #   RESTORE_KEYCLOAK=true|false   - Restore Keycloak database (default: true)
-#   RESTORE_STORAGE=true|false    - Restore storage files (default: true)
-#   RESTORE_MINIO=true|false      - Restore MinIO data (default: true)
+#   RESTORE_STORAGE=true|false    - Restore S3 storage files (default: true)
 #   SKIP_PRE_BACKUP=true|false    - Skip automatic pre-restore backup (default: false)
 #
 # Recovery:
@@ -33,19 +32,18 @@ BACKUP_FILE="${BACKUP_PATH:-$1}"
 RESTORE_DB="${RESTORE_DATABASE:-true}"
 RESTORE_KEYCLOAK="${RESTORE_KEYCLOAK:-true}"
 RESTORE_STORAGE="${RESTORE_STORAGE:-true}"
-RESTORE_MINIO="${RESTORE_MINIO:-true}"
 RESTORE_CONFIG="${RESTORE_CONFIG:-false}"
 SKIP_PRE_BACKUP="${SKIP_PRE_BACKUP:-false}"
 
 # Pre-restore backup directory
 PRE_RESTORE_BACKUP_DIR="${PRE_RESTORE_BACKUP_DIR:-/app/backups/pre_restore_$(date +%Y%m%d_%H%M%S)}"
 
-# Tyme Database configuration
+# OpenTYME Database configuration
 DB_HOST="${DB_HOST:-db}"
 DB_PORT="${DB_PORT:-5432}"
 DB_USER="${DB_USER:-postgres}"
 DB_PASSWORD="${DB_PASSWORD:-password}"
-DB_NAME="${DB_NAME:-tyme}"
+DB_NAME="${DB_NAME:-opentyme}"
 
 # Keycloak Database configuration
 KC_DB_HOST="${KC_DB_HOST:-keycloak-db}"
@@ -54,13 +52,14 @@ KC_DB_USER="${KC_DB_USER:-keycloak_user}"
 KC_DB_PASSWORD="${KC_DB_PASSWORD:-keycloak_password}"
 KC_DB_NAME="${KC_DB_NAME:-keycloak}"
 
-# MinIO configuration
-MINIO_HOST="${MINIO_HOST:-minio}"
-MINIO_PORT="${MINIO_PORT:-9000}"
-MINIO_ROOT_USER="${MINIO_ROOT_USER:-minioadmin}"
-MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-minioadmin123}"
+# S3-compatible storage configuration (SeaweedFS)
+STORAGE_HOST="${STORAGE_ENDPOINT:-${MINIO_ENDPOINT:-seaweedfs}}"
+STORAGE_S3_PORT="${STORAGE_PORT:-${MINIO_PORT:-8333}}"
+STORAGE_ACCESS_KEY="${STORAGE_ACCESS_KEY:-${MINIO_ACCESS_KEY:-admin}}"
+STORAGE_SECRET_KEY="${STORAGE_SECRET_KEY:-${MINIO_SECRET_KEY:-password}}"
+STORAGE_ENDPOINT_URL="http://${STORAGE_HOST}:${STORAGE_S3_PORT}"
 
-# Storage paths
+# Legacy paths
 STORAGE_PATH="${STORAGE_PATH:-/usr/src/app/uploads}"
 CONFIG_PATH="${CONFIG_PATH:-/usr/src/app/.env}"
 BACKUPS_DIR="${BACKUPS_DIR:-/app/backups}"
@@ -92,13 +91,12 @@ TEMP_DIR="/tmp/restore_$TIMESTAMP"
 mkdir -p "$TEMP_DIR"
 
 echo "=============================================="
-echo "[RESTORE] Tyme System Restore"
+echo "[RESTORE] OpenTYME System Restore"
 echo "=============================================="
 echo "[RESTORE] Backup file: $BACKUP_FILE"
-echo "[RESTORE] Restore Tyme DB: $RESTORE_DB"
+echo "[RESTORE] Restore DB: $RESTORE_DB"
 echo "[RESTORE] Restore Keycloak DB: $RESTORE_KEYCLOAK"
 echo "[RESTORE] Restore Storage: $RESTORE_STORAGE"
-echo "[RESTORE] Restore MinIO: $RESTORE_MINIO"
 echo "=============================================="
 
 # Extract backup
@@ -111,7 +109,6 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Show what's in the backup
 echo "[RESTORE] Backup contents:"
 ls -la "$TEMP_DIR"
 
@@ -123,41 +120,38 @@ if [ "$SKIP_PRE_BACKUP" != "true" ]; then
     echo "[RESTORE] Creating safety backup before restore..."
     echo "[RESTORE] ============================================="
     mkdir -p "$PRE_RESTORE_BACKUP_DIR"
-    
-    # Backup current Tyme database
+
     if [ "$RESTORE_DB" = "true" ]; then
-        echo "[RESTORE] Backing up current Tyme database..."
+        echo "[RESTORE] Backing up current OpenTYME database..."
         PGPASSWORD="$DB_PASSWORD" pg_dump \
-            -h "$DB_HOST" \
-            -p "$DB_PORT" \
-            -U "$DB_USER" \
-            -d "$DB_NAME" \
-            -Fc \
-            > "$PRE_RESTORE_BACKUP_DIR/tyme_database.dump" 2>/dev/null || echo "[RESTORE] Warning: Could not backup Tyme database (may not exist)"
+            -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -Fc \
+            > "$PRE_RESTORE_BACKUP_DIR/opentyme_database.dump" 2>/dev/null || \
+            echo "[RESTORE] Warning: Could not backup OpenTYME database"
     fi
-    
-    # Backup current Keycloak database
+
     if [ "$RESTORE_KEYCLOAK" = "true" ]; then
         echo "[RESTORE] Backing up current Keycloak database..."
         PGPASSWORD="$KC_DB_PASSWORD" pg_dump \
-            -h "$KC_DB_HOST" \
-            -p "$KC_DB_PORT" \
-            -U "$KC_DB_USER" \
-            -d "$KC_DB_NAME" \
-            -Fc \
-            > "$PRE_RESTORE_BACKUP_DIR/keycloak_database.dump" 2>/dev/null || echo "[RESTORE] Warning: Could not backup Keycloak database (may not exist)"
+            -h "$KC_DB_HOST" -p "$KC_DB_PORT" -U "$KC_DB_USER" -d "$KC_DB_NAME" -Fc \
+            > "$PRE_RESTORE_BACKUP_DIR/keycloak_database.dump" 2>/dev/null || \
+            echo "[RESTORE] Warning: Could not backup Keycloak database"
     fi
-    
-    # Backup current MinIO storage
-    if [ "$RESTORE_MINIO" = "true" ] && command -v mc >/dev/null 2>&1; then
-        echo "[RESTORE] Backing up current MinIO storage..."
-        mkdir -p "$PRE_RESTORE_BACKUP_DIR/minio_backup"
-        mc alias set pre-restore-minio "http://${MINIO_HOST}:${MINIO_PORT}" "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" 2>/dev/null || true
-        for bucket in $(mc ls pre-restore-minio/ 2>/dev/null | awk '{print $NF}' | sed 's/\/$//'); do
-            mc mirror "pre-restore-minio/$bucket" "$PRE_RESTORE_BACKUP_DIR/minio_backup/$bucket" 2>/dev/null || true
+
+    if [ "$RESTORE_STORAGE" = "true" ] && command -v aws >/dev/null 2>&1; then
+        echo "[RESTORE] Backing up current S3 storage..."
+        mkdir -p "$PRE_RESTORE_BACKUP_DIR/storage"
+        BUCKETS=$(AWS_ACCESS_KEY_ID="$STORAGE_ACCESS_KEY" \
+                  AWS_SECRET_ACCESS_KEY="$STORAGE_SECRET_KEY" \
+                  aws s3 ls --endpoint-url "$STORAGE_ENDPOINT_URL" 2>/dev/null \
+                  | awk '{print $3}') || true
+        for bucket in $BUCKETS; do
+            AWS_ACCESS_KEY_ID="$STORAGE_ACCESS_KEY" \
+            AWS_SECRET_ACCESS_KEY="$STORAGE_SECRET_KEY" \
+            aws s3 sync "s3://$bucket" "$PRE_RESTORE_BACKUP_DIR/storage/$bucket" \
+                --endpoint-url "$STORAGE_ENDPOINT_URL" --no-progress 2>/dev/null || true
         done
     fi
-    
+
     echo "[RESTORE] Safety backup created: $PRE_RESTORE_BACKUP_DIR"
     echo "[RESTORE] If restore fails, you can recover from this backup"
     echo "[RESTORE] ============================================="
@@ -166,59 +160,42 @@ else
 fi
 
 # =============================================================================
-# Restore Tyme Database
+# Restore OpenTYME Database
 # =============================================================================
 if [ "$RESTORE_DB" = "true" ]; then
-    # Check for database dump (new format: tyme_database.dump, legacy: database.dump)
     DB_DUMP=""
-    if [ -f "$TEMP_DIR/tyme_database.dump" ]; then
+    if [ -f "$TEMP_DIR/opentyme_database.dump" ]; then
+        DB_DUMP="$TEMP_DIR/opentyme_database.dump"
+    elif [ -f "$TEMP_DIR/tyme_database.dump" ]; then
         DB_DUMP="$TEMP_DIR/tyme_database.dump"
     elif [ -f "$TEMP_DIR/database.dump" ]; then
         DB_DUMP="$TEMP_DIR/database.dump"
     fi
-    
+
     if [ -n "$DB_DUMP" ]; then
-        echo "[RESTORE] Restoring Tyme database from: $DB_DUMP"
-        
-        # Drop existing connections to the database
+        echo "[RESTORE] Restoring OpenTYME database from: $DB_DUMP"
+
         PGPASSWORD="$DB_PASSWORD" psql \
-            -h "$DB_HOST" \
-            -p "$DB_PORT" \
-            -U "$DB_USER" \
-            -d postgres \
+            -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres \
             -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$DB_NAME' AND pid <> pg_backend_pid();" \
             2>/dev/null || true
-        
-        # Drop and recreate database
+
         PGPASSWORD="$DB_PASSWORD" psql \
-            -h "$DB_HOST" \
-            -p "$DB_PORT" \
-            -U "$DB_USER" \
-            -d postgres \
-            -c "DROP DATABASE IF EXISTS $DB_NAME;" \
-            2>/dev/null || true
-        
+            -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres \
+            -c "DROP DATABASE IF EXISTS $DB_NAME;" 2>/dev/null || true
+
         PGPASSWORD="$DB_PASSWORD" psql \
-            -h "$DB_HOST" \
-            -p "$DB_PORT" \
-            -U "$DB_USER" \
-            -d postgres \
+            -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres \
             -c "CREATE DATABASE $DB_NAME;"
-        
-        # Restore database dump
+
         PGPASSWORD="$DB_PASSWORD" pg_restore \
-            -h "$DB_HOST" \
-            -p "$DB_PORT" \
-            -U "$DB_USER" \
-            -d "$DB_NAME" \
-            -v \
-            --no-owner \
-            --no-privileges \
+            -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+            -v --no-owner --no-privileges \
             "$DB_DUMP" || echo "[RESTORE] Warning: Some objects may have failed to restore"
-        
-        echo "[RESTORE] Tyme database restored successfully"
+
+        echo "[RESTORE] OpenTYME database restored successfully"
     else
-        echo "[RESTORE] Warning: No Tyme database dump found in backup"
+        echo "[RESTORE] Warning: No OpenTYME database dump found in backup"
     fi
 fi
 
@@ -227,84 +204,76 @@ fi
 # =============================================================================
 if [ "$RESTORE_KEYCLOAK" = "true" ] && [ -f "$TEMP_DIR/keycloak_database.dump" ]; then
     echo "[RESTORE] Restoring Keycloak database..."
-    
-    # Drop existing connections to the database
+
     PGPASSWORD="$KC_DB_PASSWORD" psql \
-        -h "$KC_DB_HOST" \
-        -p "$KC_DB_PORT" \
-        -U "$KC_DB_USER" \
-        -d postgres \
+        -h "$KC_DB_HOST" -p "$KC_DB_PORT" -U "$KC_DB_USER" -d postgres \
         -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$KC_DB_NAME' AND pid <> pg_backend_pid();" \
         2>/dev/null || true
-    
-    # Drop and recreate database
+
     PGPASSWORD="$KC_DB_PASSWORD" psql \
-        -h "$KC_DB_HOST" \
-        -p "$KC_DB_PORT" \
-        -U "$KC_DB_USER" \
-        -d postgres \
-        -c "DROP DATABASE IF EXISTS $KC_DB_NAME;" \
-        2>/dev/null || true
-    
+        -h "$KC_DB_HOST" -p "$KC_DB_PORT" -U "$KC_DB_USER" -d postgres \
+        -c "DROP DATABASE IF EXISTS $KC_DB_NAME;" 2>/dev/null || true
+
     PGPASSWORD="$KC_DB_PASSWORD" psql \
-        -h "$KC_DB_HOST" \
-        -p "$KC_DB_PORT" \
-        -U "$KC_DB_USER" \
-        -d postgres \
+        -h "$KC_DB_HOST" -p "$KC_DB_PORT" -U "$KC_DB_USER" -d postgres \
         -c "CREATE DATABASE $KC_DB_NAME OWNER $KC_DB_USER;"
-    
-    # Restore database dump
+
     PGPASSWORD="$KC_DB_PASSWORD" pg_restore \
-        -h "$KC_DB_HOST" \
-        -p "$KC_DB_PORT" \
-        -U "$KC_DB_USER" \
-        -d "$KC_DB_NAME" \
-        -v \
-        --no-owner \
-        --no-privileges \
-        "$TEMP_DIR/keycloak_database.dump" || echo "[RESTORE] Warning: Some Keycloak objects may have failed to restore"
-    
+        -h "$KC_DB_HOST" -p "$KC_DB_PORT" -U "$KC_DB_USER" -d "$KC_DB_NAME" \
+        -v --no-owner --no-privileges \
+        "$TEMP_DIR/keycloak_database.dump" || echo "[RESTORE] Warning: Some Keycloak objects may have failed"
+
     echo "[RESTORE] Keycloak database restored successfully"
 elif [ "$RESTORE_KEYCLOAK" = "true" ]; then
     echo "[RESTORE] Warning: No Keycloak database dump found in backup"
 fi
 
 # =============================================================================
-# Restore MinIO Storage
+# Restore S3 Object Storage (SeaweedFS)
 # =============================================================================
-if [ "$RESTORE_MINIO" = "true" ] && [ -d "$TEMP_DIR/minio_backup" ]; then
-    echo "[RESTORE] Restoring MinIO storage..."
-    
-    # Check if mc (MinIO client) is available
-    if command -v mc >/dev/null 2>&1; then
-        # Configure mc alias for MinIO
-        mc alias set restore-minio "http://${MINIO_HOST}:${MINIO_PORT}" "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" 2>/dev/null || true
-        
-        # Find all backup buckets and restore them
-        for bucket_dir in "$TEMP_DIR/minio_backup"/*; do
+if [ "$RESTORE_STORAGE" = "true" ]; then
+    # Try new-format directory (storage/) first, fall back to legacy (minio/)
+    STORAGE_BACKUP_DIR=""
+    if [ -d "$TEMP_DIR/storage" ]; then
+        STORAGE_BACKUP_DIR="$TEMP_DIR/storage"
+    elif [ -d "$TEMP_DIR/minio" ]; then
+        STORAGE_BACKUP_DIR="$TEMP_DIR/minio"
+    elif [ -d "$TEMP_DIR/minio_backup" ]; then
+        STORAGE_BACKUP_DIR="$TEMP_DIR/minio_backup"
+    fi
+
+    if [ -n "$STORAGE_BACKUP_DIR" ] && command -v aws >/dev/null 2>&1; then
+        echo "[RESTORE] Restoring S3 storage from: $STORAGE_BACKUP_DIR"
+
+        for bucket_dir in "$STORAGE_BACKUP_DIR"/*/; do
             if [ -d "$bucket_dir" ]; then
                 bucket_name=$(basename "$bucket_dir")
                 echo "[RESTORE] Restoring bucket: $bucket_name"
-                
+
                 # Create bucket if it doesn't exist
-                mc mb "restore-minio/$bucket_name" 2>/dev/null || true
-                
-                # Mirror files to the bucket
-                mc mirror --overwrite "$bucket_dir" "restore-minio/$bucket_name" || echo "[RESTORE] Warning: Some files in $bucket_name may have failed"
+                AWS_ACCESS_KEY_ID="$STORAGE_ACCESS_KEY" \
+                AWS_SECRET_ACCESS_KEY="$STORAGE_SECRET_KEY" \
+                aws s3 mb "s3://$bucket_name" \
+                    --endpoint-url "$STORAGE_ENDPOINT_URL" 2>/dev/null || true
+
+                # Sync files into bucket
+                AWS_ACCESS_KEY_ID="$STORAGE_ACCESS_KEY" \
+                AWS_SECRET_ACCESS_KEY="$STORAGE_SECRET_KEY" \
+                aws s3 sync "$bucket_dir" "s3://$bucket_name" \
+                    --endpoint-url "$STORAGE_ENDPOINT_URL" \
+                    --no-progress 2>/dev/null || \
+                    echo "[RESTORE] Warning: Some files in $bucket_name may have failed"
             fi
         done
-        
-        echo "[RESTORE] MinIO storage restored successfully"
+
+        echo "[RESTORE] S3 storage restored successfully"
+    elif [ -n "$STORAGE_BACKUP_DIR" ]; then
+        echo "[RESTORE] Warning: AWS CLI not found — cannot restore S3 storage automatically"
+        echo "[RESTORE] Storage backup files are at: $STORAGE_BACKUP_DIR"
+        echo "[RESTORE] Install awscli and re-run to restore storage"
     else
-        echo "[RESTORE] Warning: MinIO client (mc) not found. Copying files to backup location..."
-        # Fallback: copy to a location where it can be manually restored
-        mkdir -p "$TEMP_DIR/minio_restore_manual"
-        cp -r "$TEMP_DIR/minio_backup"/* "$TEMP_DIR/minio_restore_manual/" 2>/dev/null || true
-        echo "[RESTORE] MinIO backup files copied to: $TEMP_DIR/minio_restore_manual"
-        echo "[RESTORE] Please manually restore these files to MinIO"
+        echo "[RESTORE] Warning: No storage backup found in archive"
     fi
-elif [ "$RESTORE_MINIO" = "true" ]; then
-    echo "[RESTORE] Warning: No MinIO backup found in archive"
 fi
 
 # =============================================================================
@@ -312,18 +281,15 @@ fi
 # =============================================================================
 if [ "$RESTORE_STORAGE" = "true" ] && [ -d "$TEMP_DIR/uploads" ]; then
     echo "[RESTORE] Restoring legacy storage files..."
-    
-    # Backup existing storage if it exists
+
     if [ -d "$STORAGE_PATH" ]; then
         BACKUP_EXISTING="$STORAGE_PATH.backup_$TIMESTAMP"
         echo "[RESTORE] Backing up existing storage to: $BACKUP_EXISTING"
         mv "$STORAGE_PATH" "$BACKUP_EXISTING"
     fi
-    
-    # Restore storage
+
     mkdir -p "$(dirname "$STORAGE_PATH")"
     cp -r "$TEMP_DIR/uploads" "$STORAGE_PATH"
-    
     echo "[RESTORE] Legacy storage files restored successfully"
 fi
 
@@ -332,41 +298,33 @@ fi
 # =============================================================================
 if [ "$RESTORE_CONFIG" = "true" ] && [ -f "$TEMP_DIR/.env" ]; then
     echo "[RESTORE] Restoring configuration..."
-    
-    # Backup existing config if it exists
+
     if [ -f "$CONFIG_PATH" ]; then
         BACKUP_CONFIG="$CONFIG_PATH.backup_$TIMESTAMP"
         echo "[RESTORE] Backing up existing config to: $BACKUP_CONFIG"
         cp "$CONFIG_PATH" "$BACKUP_CONFIG"
     fi
-    
-    # Restore config
+
     cp "$TEMP_DIR/.env" "$CONFIG_PATH"
-    
     echo "[RESTORE] Configuration restored successfully"
 fi
 
 # =============================================================================
 # Repopulate Backup Records
 # =============================================================================
-# Scan backups directory and add missing entries to system_backups table
 if [ "$RESTORE_DB" = "true" ] && [ -d "$BACKUPS_DIR" ]; then
     echo "[RESTORE] Scanning backups directory to repopulate system_backups table..."
-    
+
     for backup_dir in "$BACKUPS_DIR"/*; do
         if [ -d "$backup_dir" ]; then
             backup_name=$(basename "$backup_dir")
             backup_file=$(find "$backup_dir" -name "*.tar.gz" | head -n 1)
-            
+
             if [ -n "$backup_file" ] && [ -f "$backup_file" ]; then
-                # Get file size
                 file_size=$(stat -f%z "$backup_file" 2>/dev/null || stat -c%s "$backup_file" 2>/dev/null || echo "0")
-                
-                # Extract timestamp from filename (backup_YYYYMMDD_HHMMSS.tar.gz)
                 filename=$(basename "$backup_file")
                 timestamp_part=$(echo "$filename" | sed 's/backup_\([0-9]\{8\}_[0-9]\{6\}\).*/\1/')
-                
-                # Convert timestamp to ISO format
+
                 if [ ${#timestamp_part} -eq 15 ]; then
                     year=${timestamp_part:0:4}
                     month=${timestamp_part:4:2}
@@ -378,30 +336,19 @@ if [ "$RESTORE_DB" = "true" ] && [ -d "$BACKUPS_DIR" ]; then
                 else
                     created_at=$(date -r "$backup_file" -u "+%Y-%m-%d %H:%M:%S+00" 2>/dev/null || date -u "+%Y-%m-%d %H:%M:%S+00")
                 fi
-                
-                # Determine backup type
+
                 if echo "$backup_name" | grep -q "^scheduled_"; then
                     backup_type="scheduled"
                 else
                     backup_type="manual"
                 fi
-                
-                # Insert backup record
+
                 PGPASSWORD="$DB_PASSWORD" psql \
-                    -h "$DB_HOST" \
-                    -p "$DB_PORT" \
-                    -U "$DB_USER" \
-                    -d "$DB_NAME" \
+                    -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
                     -c "INSERT INTO system_backups (backup_name, backup_type, status, backup_path, file_size_bytes, includes_database, includes_storage, includes_config, started_at, completed_at, created_at)
-                        SELECT 
-                            '${backup_name}',
-                            '${backup_type}',
-                            'completed',
-                            '${backup_dir}',
-                            ${file_size},
-                            true,
-                            true,
-                            false,
+                        SELECT
+                            '${backup_name}', '${backup_type}', 'completed',
+                            '${backup_dir}', ${file_size}, true, true, false,
                             '${created_at}'::timestamp with time zone,
                             '${created_at}'::timestamp with time zone,
                             '${created_at}'::timestamp with time zone
@@ -409,7 +356,7 @@ if [ "$RESTORE_DB" = "true" ] && [ -d "$BACKUPS_DIR" ]; then
                             SELECT 1 FROM system_backups WHERE backup_name = '${backup_name}'
                         );" \
                     2>/dev/null || echo "[RESTORE] Warning: Failed to insert backup record for: $backup_name"
-                
+
                 echo "[RESTORE] Registered backup: $backup_name"
             fi
         fi
@@ -428,10 +375,9 @@ echo "=============================================="
 cat <<EOF
 {
   "success": true,
-  "restored_tyme_database": $RESTORE_DB,
+  "restored_database": $RESTORE_DB,
   "restored_keycloak_database": $RESTORE_KEYCLOAK,
   "restored_storage": $RESTORE_STORAGE,
-  "restored_minio": $RESTORE_MINIO,
   "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
 EOF

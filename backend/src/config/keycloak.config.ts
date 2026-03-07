@@ -1,5 +1,6 @@
 import KcAdminClient from '@keycloak/keycloak-admin-client';
 import session from 'express-session';
+import { logger } from '../utils/logger';
 
 /**
  * Keycloak Configuration
@@ -65,7 +66,7 @@ export const isKeycloakConfigured = (): boolean => {
   const missing = requiredVars.filter(varName => !process.env[varName]);
   
   if (missing.length > 0) {
-    console.warn('[Keycloak] Warning: Missing environment variables:', missing);
+    logger.warn('[Keycloak] Warning: Missing environment variables:', missing);
     return false;
   }
   
@@ -76,10 +77,10 @@ export const isKeycloakConfigured = (): boolean => {
  * Log Keycloak configuration (without secrets)
  */
 export const logKeycloakConfig = (): void => {
-  console.info('[Keycloak] Configuration:');
-  console.info(`  - Realm: ${keycloakConfig.realm}`);
-  console.info(`  - Base URL: ${keycloakConfig.baseUrl}`);
-  console.info(`  - Client ID: ${keycloakConfig.clientId}`);
+  logger.info('[Keycloak] Configuration:');
+  logger.info(`  - Realm: ${keycloakConfig.realm}`);
+  logger.info(`  - Base URL: ${keycloakConfig.baseUrl}`);
+  logger.info(`  - Client ID: ${keycloakConfig.clientId}`);
 };
 
 /**

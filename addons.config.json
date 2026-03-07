@@ -1,0 +1,29 @@
+{
+  "$schema": "./schemas/addons-config.schema.json",
+  "addons": [
+    {
+      "name": "ai-expense-analysis",
+      "enabled": true,
+      "source": {
+        "type": "github",
+        "repo": "SteffenHebestreit/opentyme-addon-ai-analysis",
+        "ref": "v1.0.0"
+      }
+    },
+    {
+      "name": "email-builder",
+      "enabled": true,
+      "source": {
+        "type": "github",
+        "repo": "SteffenHebestreit/opentyme-addon-email-builder",
+        "ref": "v1.0.0"
+      }
+    }
+  ],
+  "privateRepoCredentials": {
+    "github": {
+      "type": "env",
+      "variable": "GITHUB_ADDON_TOKEN"
+    }
+  }
+}

@@ -22,6 +22,7 @@ frontend/
 │   │   ├── hooks/                 # Query/mutation wrappers
 │   │   │   ├── useAuth.ts         # Auth query hooks
 │   │   │   ├── useClients.ts      # Client query hooks
+│   │   │   ├── usePlugins.ts      # Plugin query hooks
 │   │   │   └── useProjects.ts     # Project query hooks
 │   │   └── services/              # API service functions
 │   │       ├── client.ts          # Axios instance
@@ -29,10 +30,12 @@ frontend/
 │   │       ├── auth.service.ts
 │   │       ├── client.service.ts
 │   │       ├── dashboard.service.ts
+│   │       ├── email-template.service.ts
 │   │       ├── expense.service.ts
 │   │       ├── invoice.service.ts
 │   │       ├── invoice-text-template.service.ts
 │   │       ├── payment.service.ts
+│   │       ├── plugin.service.ts
 │   │       ├── project.service.ts
 │   │       ├── report.service.ts
 │   │       ├── tax-rate.service.ts
@@ -113,7 +116,8 @@ frontend/
 │   │
 │   ├── pages/                      # Page components (routes)
 │   │   ├── admin/
-│   │   │   └── AdminPage.tsx
+│   │   │   ├── AdminPage.tsx      # Settings / Plugins hub
+│   │   │   └── PluginsPage.tsx    # Plugin management UI
 │   │   ├── auth/
 │   │   │   ├── ForgotPassword.tsx
 │   │   │   ├── Login.tsx
@@ -129,6 +133,13 @@ frontend/
 │   │   │   └── ProfilePage.tsx
 │   │   ├── Reports.tsx
 │   │   └── LandingPage.tsx
+│   │
+│   ├── plugins/                    # Addon plugin system
+│   │   ├── plugin-loader.ts       # Discovers and loads frontend addons
+│   │   └── plugin-registry.ts     # In-memory frontend plugin registry
+│   │
+│   ├── types/                      # Shared TypeScript types
+│   │   └── plugin.types.ts        # Plugin / addon type definitions
 │   │
 │   ├── services/                   # Business logic services
 │   │   └── auth/
@@ -784,8 +795,8 @@ CC BY-NC 4.0 License - See root LICENSE file
 
 ---
 
-**Frontend Version**: 1.0.0  
-**React**: 18.2.0  
-**Vite**: 4.4.5  
-**TypeScript**: 5.0.2  
-**Last Updated**: October 17, 2025
+**Frontend Version**: 1.0.0
+**React**: 18.3.1
+**Vite**: 5.4.11
+**TypeScript**: 5.7.3
+**Last Updated**: March 2026

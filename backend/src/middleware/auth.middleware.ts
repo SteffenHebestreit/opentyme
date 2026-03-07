@@ -6,6 +6,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { keycloakService } from '../services/keycloak.service';
+import { logger } from '../utils/logger';
 
 /**
  * Authenticates requests using Keycloak Bearer tokens.
@@ -74,10 +75,10 @@ export const authenticateToken = async (
       role: userInfo.roles.includes('admin') ? 'admin' : 'user', // For backwards compatibility
     };
 
-    console.log(`[Auth] ✅ User authenticated: ${userInfo.username} (${userInfo.id})`);
+    logger.info(`[Auth] User authenticated: ${userInfo.username} (${userInfo.id})`);
     next();
   } catch (error) {
-    console.error('[Auth] ❌ Authentication error:', error);
+    logger.error('[Auth] Authentication error:', error);
     res.status(500).json({ message: 'An unexpected error occurred during authentication.' });
   }
 };

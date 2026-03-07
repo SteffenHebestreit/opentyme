@@ -135,7 +135,6 @@ main() {
         "auth.localhost"
         "traefik.localhost"
         "mail.localhost"
-        "minio.localhost"
         "s3.localhost"
         "mcp.localhost"
     )
@@ -166,7 +165,7 @@ main() {
     echo "  - http://auth.localhost     (Keycloak)"
     echo "  - http://traefik.localhost  (Traefik Dashboard)"
     echo "  - http://mail.localhost     (MailHog)"
-    echo "  - http://minio.localhost    (MinIO Console)"
+    echo ""
     echo "  - http://mcp.localhost      (MCP Server)"
     echo ""
     echo -e "${YELLOW}NOTE: All domains resolve to $LOCAL_IP${NC}"

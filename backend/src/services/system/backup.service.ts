@@ -3,7 +3,7 @@
  * 
  * Handles backup and restore operations for:
  * - PostgreSQL database
- * - MinIO storage (receipts, invoices, user buckets)
+ * - S3-compatible object storage (receipts, invoices, user buckets)
  * - Configuration files
  * 
  * @module services/system/backup.service

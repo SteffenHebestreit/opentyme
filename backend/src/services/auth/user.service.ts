@@ -8,6 +8,7 @@
 import { getDbClient } from '../../utils/database';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { logger } from '../../utils/logger';
 import {
   BaseUser,
   CreateUserDto,
@@ -69,7 +70,7 @@ export class UserService {
       const result = await db.query(queryText, values);
       return result.rows[0] as User;
     } catch (error) {
-        console.error('Error creating user:', error);
+        logger.error('Error creating user:', error);
         // Check for unique constraint violation
         if ((error as any).code === '23505') { // PostgreSQL unique_violation code
             throw new Error('Username or email already exists.');
@@ -175,7 +176,7 @@ export class UserService {
         if (result.rows.length === 0) return null; // User not found
         return result.rows[0] as User;
     } catch (error) {
-        console.error('Error updating user:', error);
+        logger.error('Error updating user:', error);
          if ((error as any).code === '23505') { // PostgreSQL unique_violation code
             throw new Error('Username or email already exists.');
         }

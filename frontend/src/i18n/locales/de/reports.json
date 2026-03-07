@@ -20,11 +20,17 @@
     "footer": "Fußzeile",
     "footerPlaceholder": "Fußzeilentext eingeben (z.B. Firmendaten, Seitenzahlen)",
     "exportButton": "Exportieren",
+    "hidePrices": "Preise ausblenden",
+    "hidePricesHelp": "Nur Stunden exportieren, ohne Stundensätze und Geldbeträge",
+    "emailButton": "E-Mail senden",
+    "emailTo": "Senden an",
+    "emailToHelp": "Der Bericht wird als PDF generiert und an diese Adresse gesendet.",
     "formats": {
       "jsonDescription": "Rohdaten im JSON-Format zur Weiterverarbeitung",
       "csvDescription": "Tabellenformat für Excel/Numbers",
       "excelDescription": "Excel-Arbeitsmappe mit Formatierung, mehreren Blättern und Filtern",
-      "pdfDescription": "Druckfertiges Dokument mit Formatierung"
+      "pdfDescription": "Druckfertiges Dokument mit Formatierung",
+      "emailDescription": "Als PDF-Anhang per E-Mail versenden"
     }
   },
   "quickPeriods": {

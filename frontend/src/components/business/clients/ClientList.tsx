@@ -57,11 +57,7 @@ export default function ClientList() {
   }, [isModalOpen, searchParams]);
 
   // Use data directly, ensuring it updates when the query result changes
-  const clients = useMemo(() => {
-    // Return data if available, otherwise empty array
-    console.log('[ClientList] Data updated:', data?.length, 'clients', listParams);
-    return data ?? [];
-  }, [data, listParams]);
+  const clients = useMemo(() => data ?? [], [data]);
 
   const openCreateModal = () => {
     setModalMode('create');

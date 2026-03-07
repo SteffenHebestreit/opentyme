@@ -232,10 +232,9 @@ export const ClientFormModal: FC<ClientFormModalProps> = ({
     };
   }, [initialClient]);
 
-  // State to toggle billing address section visibility
+  // State to toggle billing address section visibility (billing_email is top-level, excluded here)
   const hasBillingData = initialClient && (
     initialClient.billing_contact_person ||
-    initialClient.billing_email ||
     initialClient.billing_phone ||
     initialClient.billing_address ||
     initialClient.billing_city ||
@@ -349,6 +348,20 @@ export const ClientFormModal: FC<ClientFormModalProps> = ({
           />
         </div>
 
+        <Input
+          id="billing-email"
+          label={t('form.billing.email', 'Invoice Email')}
+          type="email"
+          placeholder={t('form.email.placeholder')}
+          {...register('billing_email', {
+            pattern: {
+              value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+              message: t('form.email.invalid'),
+            },
+          })}
+          error={errors.billing_email?.message}
+        />
+
         <div className="grid gap-4 sm:grid-cols-2">
           <Textarea
             label={t('form.address.label')}
@@ -401,20 +414,7 @@ export const ClientFormModal: FC<ClientFormModalProps> = ({
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input
-                id="billing-email"
-                label={t('form.billing.email')}
-                type="email"
-                placeholder={t('form.email.placeholder')}
-                {...register('billing_email', {
-                  pattern: {
-                    value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                    message: t('form.email.invalid'),
-                  },
-                })}
-                error={errors.billing_email?.message}
-              />
+            <div>
               <Input
                 id="billing-phone"
                 label={t('form.billing.phone')}

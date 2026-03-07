@@ -1,0 +1,59 @@
+# =============================================================================
+# Longhorn PersistentVolumeClaims for SeaweedFS on Kubernetes
+# =============================================================================
+# Apply with: kubectl apply -f k8s/storage/longhorn-pvc.yaml
+#
+# Requires Longhorn installed in the cluster:
+#   helm repo add longhorn https://charts.longhorn.io
+#   helm install longhorn longhorn/longhorn --namespace longhorn-system --create-namespace
+# =============================================================================
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: seaweedfs-master-pvc
+  namespace: opentyme
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: master
+spec:
+  storageClassName: longhorn
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: seaweedfs-volume-pvc
+  namespace: opentyme
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: volume
+spec:
+  storageClassName: longhorn
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi   # Adjust to your expected storage needs
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: seaweedfs-filer-pvc
+  namespace: opentyme
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: filer
+spec:
+  storageClassName: longhorn
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

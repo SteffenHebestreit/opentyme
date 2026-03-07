@@ -1,4 +1,5 @@
 import { Application } from 'express';
+import { logger } from '../utils/logger';
 
 // Auth routes
 import authRoutes from './auth/auth.routes';
@@ -22,6 +23,11 @@ import depreciationRoutes from './financial/depreciation.routes';
 import backupRoutes from './system/backup.routes';
 import initializationRoutes from './system/initialization.routes';
 import settingsRoutes from './system/settings.routes';
+import pluginsRoutes from './system/plugins.routes';
+
+// Communication routes
+import emailTemplateRoutes from './communication/email-template.routes';
+import emailSendRoutes from './communication/email-send.routes';
 
 // Analytics routes
 import analyticsRoutes from './analytics/analytics.routes';
@@ -31,63 +37,76 @@ import taxPackageRoutes from './analytics/tax-package.routes';
 export default function setupRoutes(app: Application) {
   // Auth endpoints
   app.use('/api/auth', authRoutes);
-  console.log('Auth routes registered under /api/auth');
-  
+  logger.debug('Auth routes registered under /api/auth');
+
   app.use('/api/password-reset', passwordResetRoutes);
-  console.log('Password reset routes registered under /api/password-reset');
+  logger.debug('Password reset routes registered under /api/password-reset');
 
   // Business endpoints
   app.use('/api/clients', clientRoutes);
-  console.log('Client routes registered under /api/clients');
-  
+  logger.debug('Client routes registered under /api/clients');
+
   app.use('/api/projects', projectRoutes);
-  console.log('Project routes registered under /api/projects');
-  
+  logger.debug('Project routes registered under /api/projects');
+
   app.use('/api/time-entries', timeEntryRoutes);
-  console.log('Time entry routes registered under /api/time-entries');
+  logger.debug('Time entry routes registered under /api/time-entries');
 
   app.use('/api/expenses', expenseRoutes);
-  console.log('Expense routes registered under /api/expenses');
+  logger.debug('Expense routes registered under /api/expenses');
 
   // Financial endpoints
   app.use('/api/invoices', invoiceRoutes);
-  console.log('Invoice routes registered under /api/invoices');
-  
+  logger.debug('Invoice routes registered under /api/invoices');
+
   app.use('/api/payments', paymentRoutes);
-  console.log('Payment routes registered under /api/payments');
+  logger.debug('Payment routes registered under /api/payments');
 
   app.use('/api/tax-prepayments', taxPrepaymentRoutes);
-  console.log('Tax prepayment routes registered under /api/tax-prepayments');
+  logger.debug('Tax prepayment routes registered under /api/tax-prepayments');
 
   app.use('/api/depreciation', depreciationRoutes);
-  console.log('Depreciation routes registered under /api/depreciation');
+  logger.debug('Depreciation routes registered under /api/depreciation');
 
   // Admin endpoints
   app.use('/api/admin/tax-rates', taxRateRoutes);
-  console.log('Tax rate routes registered under /api/admin/tax-rates');
-  
+  logger.debug('Tax rate routes registered under /api/admin/tax-rates');
+
   app.use('/api/admin/invoice-templates', invoiceTextTemplateRoutes);
-  console.log('Invoice text template routes registered under /api/admin/invoice-templates');
+  logger.debug('Invoice text template routes registered under /api/admin/invoice-templates');
 
   // System endpoints
   app.use('/api/system/backups', backupRoutes);
-  console.log('Backup/Restore routes registered under /api/system/backups');
+  logger.debug('Backup/Restore routes registered under /api/system/backups');
 
   app.use('/api/system', initializationRoutes);
-  console.log('System initialization routes registered under /api/system');
+  logger.debug('System initialization routes registered under /api/system');
 
   app.use('/api/settings', settingsRoutes);
-  console.log('Settings routes registered under /api/settings');
+  logger.debug('Settings routes registered under /api/settings');
+
+  // Plugin management endpoints
+  app.use('/api/plugins', pluginsRoutes);
+  logger.debug('Plugin routes registered under /api/plugins');
+
+  // Communication endpoints
+  app.use('/api/email-templates', emailTemplateRoutes);
+  logger.debug('Email template routes registered under /api/email-templates');
+
+  app.use('/api/email', emailSendRoutes);
+  logger.debug('Email send routes registered under /api/email');
 
   // Analytics endpoints
   app.use('/api/analytics', analyticsRoutes);
-  console.log('Analytics routes registered under /api/analytics');
+  logger.debug('Analytics routes registered under /api/analytics');
 
   // Report endpoints
   app.use('/api/reports', reportRoutes);
-  console.log('Report routes registered under /api/reports');
+  logger.debug('Report routes registered under /api/reports');
 
   // Tax package endpoints
   app.use('/api/tax-package', taxPackageRoutes);
-  console.log('Tax package routes registered under /api/tax-package');
+  logger.debug('Tax package routes registered under /api/tax-package');
+
+  logger.info('All routes registered successfully');
 }

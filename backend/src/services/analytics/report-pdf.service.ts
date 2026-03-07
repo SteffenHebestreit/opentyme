@@ -7,13 +7,14 @@
 import PdfPrinter from 'pdfmake';
 import { TDocumentDefinitions, Content, TableCell } from 'pdfmake/interfaces';
 import moment from 'moment-timezone';
-import type { 
-  VATReport, 
-  IncomeExpenseReport, 
-  InvoiceReport, 
+import type {
+  VATReport,
+  IncomeExpenseReport,
+  InvoiceReport,
   ExpenseReport,
   TimeTrackingReport
 } from './report.service';
+import { getDbClient } from '../../utils/database';
 
 // Fonts configuration for pdfmake
 const fonts = {
@@ -25,12 +26,51 @@ const fonts = {
   }
 };
 
-const COLORS = {
+// Default color scheme
+const DEFAULT_COLORS = {
   primary: '#7c3aed',
   headerBg: '#f3f4f6',
   border: '#e5e7eb',
   text: '#1f2937',
 };
+
+// Active colors — temporarily overridden per request (Node.js is single-threaded, safe for sync PDF generation)
+let COLORS = { ...DEFAULT_COLORS };
+
+export interface PdfTheme {
+  primary?: string;
+  secondary?: string;
+  accent?: string;
+}
+
+/**
+ * Fetches the user's theme colors from the settings table for PDF generation.
+ */
+export async function getUserPdfTheme(userId: string): Promise<PdfTheme> {
+  try {
+    const pool = getDbClient();
+    const result = await pool.query(
+      'SELECT theme_primary_color, theme_secondary_color, theme_accent_color FROM settings WHERE user_id = $1',
+      [userId]
+    );
+    const row = result.rows[0];
+    if (!row) return {};
+    return {
+      primary: row.theme_primary_color ?? undefined,
+      secondary: row.theme_secondary_color ?? undefined,
+      accent: row.theme_accent_color ?? undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/** Apply theme override to module-level COLORS and return restore function */
+function applyTheme(theme?: PdfTheme): () => void {
+  const saved = { ...COLORS };
+  if (theme?.primary) COLORS = { ...COLORS, primary: theme.primary };
+  return () => { COLORS = saved; };
+}
 
 // Translations
 const translations = {
@@ -1202,7 +1242,8 @@ async function generateTimeTrackingReportPDF(
   data: TimeTrackingReport,
   lang: 'en' | 'de' = 'de',
   currency: string = 'EUR',
-  metadata?: { headline?: string; description?: string; footer?: string }
+  metadata?: { headline?: string; description?: string; footer?: string },
+  hidePrices: boolean = false
 ): Promise<Buffer> {
   const dateRange = `${moment(data.period.start_date).format('DD.MM.YYYY')} - ${moment(data.period.end_date).format('DD.MM.YYYY')}`;
   const reportTitle = metadata?.headline || (lang === 'de' ? 'Zeiterfassung' : 'Time Tracking');
@@ -1223,11 +1264,16 @@ async function generateTimeTrackingReportPDF(
   });
 
   const taskSummaryBody: any[] = [
-    [
-      { text: 'Aufgabe', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
-      { text: 'Gesamtstunden', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
-      { text: 'Wert', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
-    ],
+    hidePrices
+      ? [
+          { text: 'Aufgabe', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Gesamtstunden', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+        ]
+      : [
+          { text: 'Aufgabe', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Gesamtstunden', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+          { text: 'Wert', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+        ],
   ];
 
   let taskTotalHours = 0;
@@ -1239,18 +1285,32 @@ async function generateTimeTrackingReportPDF(
       taskTotalHours += summary.hours;
       taskTotalValue += summary.value;
       
-      taskSummaryBody.push([
-        { text: taskName, fontSize: 8 },
-        { text: summary.hours.toFixed(2), fontSize: 8, alignment: 'right' },
-        { text: formatCurrency(summary.value, currency), fontSize: 8, alignment: 'right' },
-      ]);
+      taskSummaryBody.push(
+        hidePrices
+          ? [
+              { text: taskName, fontSize: 8 },
+              { text: summary.hours.toFixed(2), fontSize: 8, alignment: 'right' },
+            ]
+          : [
+              { text: taskName, fontSize: 8 },
+              { text: summary.hours.toFixed(2), fontSize: 8, alignment: 'right' },
+              { text: formatCurrency(summary.value, currency), fontSize: 8, alignment: 'right' },
+            ]
+      );
     });
 
-  taskSummaryBody.push([
-    { text: 'Gesamt', fontSize: 9, bold: true, fillColor: '#f3f4f6' },
-    { text: taskTotalHours.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
-    { text: formatCurrency(taskTotalValue, currency), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
-  ]);
+  taskSummaryBody.push(
+    hidePrices
+      ? [
+          { text: 'Gesamt', fontSize: 9, bold: true, fillColor: '#f3f4f6' },
+          { text: taskTotalHours.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+        ]
+      : [
+          { text: 'Gesamt', fontSize: 9, bold: true, fillColor: '#f3f4f6' },
+          { text: taskTotalHours.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+          { text: formatCurrency(taskTotalValue, currency), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+        ]
+  );
 
   // TABLE 2: Daily Summary (hours per day with client and project)
   const dailySummaryMap = new Map<string, { 
@@ -1282,13 +1342,20 @@ async function generateTimeTrackingReportPDF(
   });
 
   const dailySummaryBody: any[] = [
-    [
-      { text: 'Datum', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
-      { text: 'Projekt(e)', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
-      { text: 'Kunde(n)', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
-      { text: 'Gesamtstunden', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
-      { text: 'Wert', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
-    ],
+    hidePrices
+      ? [
+          { text: 'Datum', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Projekt(e)', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Kunde(n)', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Gesamtstunden', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+        ]
+      : [
+          { text: 'Datum', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Projekt(e)', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Kunde(n)', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Gesamtstunden', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+          { text: 'Wert', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+        ],
   ];
 
   let dailyTotalHours = 0;
@@ -1310,22 +1377,40 @@ async function generateTimeTrackingReportPDF(
       const projectsList = Array.from(summary.projects).join(', ');
       const clientsList = Array.from(summary.clients).join(', ');
 
-      dailySummaryBody.push([
-        { text: formattedDate, fontSize: 8 },
-        { text: projectsList || '-', fontSize: 7 },
-        { text: clientsList || '-', fontSize: 7 },
-        { text: summary.hours.toFixed(2), fontSize: 8, alignment: 'right' },
-        { text: formatCurrency(summary.value, currency), fontSize: 8, alignment: 'right' },
-      ]);
+      dailySummaryBody.push(
+        hidePrices
+          ? [
+              { text: formattedDate, fontSize: 8 },
+              { text: projectsList || '-', fontSize: 7 },
+              { text: clientsList || '-', fontSize: 7 },
+              { text: summary.hours.toFixed(2), fontSize: 8, alignment: 'right' },
+            ]
+          : [
+              { text: formattedDate, fontSize: 8 },
+              { text: projectsList || '-', fontSize: 7 },
+              { text: clientsList || '-', fontSize: 7 },
+              { text: summary.hours.toFixed(2), fontSize: 8, alignment: 'right' },
+              { text: formatCurrency(summary.value, currency), fontSize: 8, alignment: 'right' },
+            ]
+      );
     });
 
-  dailySummaryBody.push([
-    { text: 'Gesamt', fontSize: 9, bold: true, fillColor: '#f3f4f6', colSpan: 3 },
-    {},
-    {},
-    { text: dailyTotalHours.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
-    { text: formatCurrency(dailyTotalValue, currency), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
-  ]);
+  dailySummaryBody.push(
+    hidePrices
+      ? [
+          { text: 'Gesamt', fontSize: 9, bold: true, fillColor: '#f3f4f6', colSpan: 3 },
+          {},
+          {},
+          { text: dailyTotalHours.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+        ]
+      : [
+          { text: 'Gesamt', fontSize: 9, bold: true, fillColor: '#f3f4f6', colSpan: 3 },
+          {},
+          {},
+          { text: dailyTotalHours.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+          { text: formatCurrency(dailyTotalValue, currency), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+        ]
+  );
 
   // CLIENT SUMMARY (grouped by client)
   const clientSummaryMap = new Map<string, { hours: number; billable_hours: number; value: number }>();
@@ -1343,12 +1428,18 @@ async function generateTimeTrackingReportPDF(
   });
 
   const clientSummaryBody: any[] = [
-    [
-      { text: 'Kunde', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
-      { text: 'Gesamtstunden', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
-      { text: 'Abrechenbar', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
-      { text: 'Wert', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
-    ],
+    hidePrices
+      ? [
+          { text: 'Kunde', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Gesamtstunden', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+          { text: 'Abrechenbar', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+        ]
+      : [
+          { text: 'Kunde', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Gesamtstunden', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+          { text: 'Abrechenbar', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+          { text: 'Wert', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+        ],
   ];
 
   let clientTotalHours = 0;
@@ -1362,20 +1453,36 @@ async function generateTimeTrackingReportPDF(
       clientTotalBillable += summary.billable_hours;
       clientTotalValue += summary.value;
       
-      clientSummaryBody.push([
-        { text: clientName, fontSize: 8 },
-        { text: summary.hours.toFixed(2), fontSize: 8, alignment: 'right' },
-        { text: summary.billable_hours.toFixed(2), fontSize: 8, alignment: 'right' },
-        { text: formatCurrency(summary.value, currency), fontSize: 8, alignment: 'right' },
-      ]);
+      clientSummaryBody.push(
+        hidePrices
+          ? [
+              { text: clientName, fontSize: 8 },
+              { text: summary.hours.toFixed(2), fontSize: 8, alignment: 'right' },
+              { text: summary.billable_hours.toFixed(2), fontSize: 8, alignment: 'right' },
+            ]
+          : [
+              { text: clientName, fontSize: 8 },
+              { text: summary.hours.toFixed(2), fontSize: 8, alignment: 'right' },
+              { text: summary.billable_hours.toFixed(2), fontSize: 8, alignment: 'right' },
+              { text: formatCurrency(summary.value, currency), fontSize: 8, alignment: 'right' },
+            ]
+      );
     });
 
-  clientSummaryBody.push([
-    { text: 'Gesamt', fontSize: 9, bold: true, fillColor: '#f3f4f6' },
-    { text: clientTotalHours.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
-    { text: clientTotalBillable.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
-    { text: formatCurrency(clientTotalValue, currency), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
-  ]);
+  clientSummaryBody.push(
+    hidePrices
+      ? [
+          { text: 'Gesamt', fontSize: 9, bold: true, fillColor: '#f3f4f6' },
+          { text: clientTotalHours.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+          { text: clientTotalBillable.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+        ]
+      : [
+          { text: 'Gesamt', fontSize: 9, bold: true, fillColor: '#f3f4f6' },
+          { text: clientTotalHours.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+          { text: clientTotalBillable.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+          { text: formatCurrency(clientTotalValue, currency), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+        ]
+  );
 
   // PROJECT SUMMARY (grouped by project)
   const projectSummaryMap = new Map<string, { hours: number; billable_hours: number; value: number; client: string }>();
@@ -1393,13 +1500,20 @@ async function generateTimeTrackingReportPDF(
   });
 
   const projectSummaryBody: any[] = [
-    [
-      { text: 'Projekt', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
-      { text: 'Kunde', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
-      { text: 'Gesamtstunden', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
-      { text: 'Abrechenbar', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
-      { text: 'Wert', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
-    ],
+    hidePrices
+      ? [
+          { text: 'Projekt', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Kunde', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Gesamtstunden', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+          { text: 'Abrechenbar', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+        ]
+      : [
+          { text: 'Projekt', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Kunde', fontSize: 9, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Gesamtstunden', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+          { text: 'Abrechenbar', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+          { text: 'Wert', fontSize: 9, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+        ],
   ];
 
   let projectTotalHours = 0;
@@ -1413,35 +1527,62 @@ async function generateTimeTrackingReportPDF(
       projectTotalBillable += summary.billable_hours;
       projectTotalValue += summary.value;
       
-      projectSummaryBody.push([
-        { text: projectName, fontSize: 8 },
-        { text: summary.client || '-', fontSize: 8 },
-        { text: summary.hours.toFixed(2), fontSize: 8, alignment: 'right' },
-        { text: summary.billable_hours.toFixed(2), fontSize: 8, alignment: 'right' },
-        { text: formatCurrency(summary.value, currency), fontSize: 8, alignment: 'right' },
-      ]);
+      projectSummaryBody.push(
+        hidePrices
+          ? [
+              { text: projectName, fontSize: 8 },
+              { text: summary.client || '-', fontSize: 8 },
+              { text: summary.hours.toFixed(2), fontSize: 8, alignment: 'right' },
+              { text: summary.billable_hours.toFixed(2), fontSize: 8, alignment: 'right' },
+            ]
+          : [
+              { text: projectName, fontSize: 8 },
+              { text: summary.client || '-', fontSize: 8 },
+              { text: summary.hours.toFixed(2), fontSize: 8, alignment: 'right' },
+              { text: summary.billable_hours.toFixed(2), fontSize: 8, alignment: 'right' },
+              { text: formatCurrency(summary.value, currency), fontSize: 8, alignment: 'right' },
+            ]
+      );
     });
 
-  projectSummaryBody.push([
-    { text: 'Gesamt', fontSize: 9, bold: true, fillColor: '#f3f4f6', colSpan: 2 },
-    {},
-    { text: projectTotalHours.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
-    { text: projectTotalBillable.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
-    { text: formatCurrency(projectTotalValue, currency), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
-  ]);
+  projectSummaryBody.push(
+    hidePrices
+      ? [
+          { text: 'Gesamt', fontSize: 9, bold: true, fillColor: '#f3f4f6', colSpan: 2 },
+          {},
+          { text: projectTotalHours.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+          { text: projectTotalBillable.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+        ]
+      : [
+          { text: 'Gesamt', fontSize: 9, bold: true, fillColor: '#f3f4f6', colSpan: 2 },
+          {},
+          { text: projectTotalHours.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+          { text: projectTotalBillable.toFixed(2), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+          { text: formatCurrency(projectTotalValue, currency), fontSize: 9, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+        ]
+  );
 
   // TABLE 3: Detailed Entries
   const entriesTableBody: any[] = [
-    [
-      { text: 'Datum', fontSize: 8, bold: true, fillColor: COLORS.headerBg },
-      { text: 'Projekt', fontSize: 8, bold: true, fillColor: COLORS.headerBg },
-      { text: 'Kunde', fontSize: 8, bold: true, fillColor: COLORS.headerBg },
-      { text: 'Aufgabe', fontSize: 8, bold: true, fillColor: COLORS.headerBg },
-      { text: 'Beschreibung', fontSize: 8, bold: true, fillColor: COLORS.headerBg },
-      { text: 'Stunden', fontSize: 8, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
-      { text: 'Stundensatz', fontSize: 8, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
-      { text: 'Wert', fontSize: 8, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
-    ],
+    hidePrices
+      ? [
+          { text: 'Datum', fontSize: 8, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Projekt', fontSize: 8, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Kunde', fontSize: 8, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Aufgabe', fontSize: 8, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Beschreibung', fontSize: 8, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Stunden', fontSize: 8, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+        ]
+      : [
+          { text: 'Datum', fontSize: 8, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Projekt', fontSize: 8, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Kunde', fontSize: 8, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Aufgabe', fontSize: 8, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Beschreibung', fontSize: 8, bold: true, fillColor: COLORS.headerBg },
+          { text: 'Stunden', fontSize: 8, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+          { text: 'Stundensatz', fontSize: 8, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+          { text: 'Wert', fontSize: 8, bold: true, fillColor: COLORS.headerBg, alignment: 'right' },
+        ],
   ];
 
   data.entries.forEach(entry => {
@@ -1452,28 +1593,50 @@ async function generateTimeTrackingReportPDF(
       year: 'numeric',
     });
 
-    entriesTableBody.push([
-      { text: formattedDate, fontSize: 7 },
-      { text: entry.project_name || '-', fontSize: 7 },
-      { text: entry.client_name || '-', fontSize: 7 },
-      { text: entry.task_name || '-', fontSize: 7 },
-      { text: entry.description || '-', fontSize: 7 },
-      { text: entry.hours.toFixed(2), fontSize: 7, alignment: 'right' },
-      { text: entry.hourly_rate ? formatCurrency(entry.hourly_rate, currency) : '-', fontSize: 7, alignment: 'right' },
-      { text: entry.value ? formatCurrency(entry.value, currency) : '-', fontSize: 7, alignment: 'right' },
-    ]);
+    entriesTableBody.push(
+      hidePrices
+        ? [
+            { text: formattedDate, fontSize: 7 },
+            { text: entry.project_name || '-', fontSize: 7 },
+            { text: entry.client_name || '-', fontSize: 7 },
+            { text: entry.task_name || '-', fontSize: 7 },
+            { text: entry.description || '-', fontSize: 7 },
+            { text: entry.hours.toFixed(2), fontSize: 7, alignment: 'right' },
+          ]
+        : [
+            { text: formattedDate, fontSize: 7 },
+            { text: entry.project_name || '-', fontSize: 7 },
+            { text: entry.client_name || '-', fontSize: 7 },
+            { text: entry.task_name || '-', fontSize: 7 },
+            { text: entry.description || '-', fontSize: 7 },
+            { text: entry.hours.toFixed(2), fontSize: 7, alignment: 'right' },
+            { text: entry.hourly_rate ? formatCurrency(entry.hourly_rate, currency) : '-', fontSize: 7, alignment: 'right' },
+            { text: entry.value ? formatCurrency(entry.value, currency) : '-', fontSize: 7, alignment: 'right' },
+          ]
+    );
   });
 
-  entriesTableBody.push([
-    { text: 'Gesamt', fontSize: 8, bold: true, fillColor: '#f3f4f6', colSpan: 5 },
-    {},
-    {},
-    {},
-    {},
-    { text: data.summary.total_hours.toFixed(2), fontSize: 8, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
-    { text: '', fontSize: 8, fillColor: '#f3f4f6' },
-    { text: formatCurrency(data.summary.billable_value, currency), fontSize: 8, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
-  ]);
+  entriesTableBody.push(
+    hidePrices
+      ? [
+          { text: 'Gesamt', fontSize: 8, bold: true, fillColor: '#f3f4f6', colSpan: 5 },
+          {},
+          {},
+          {},
+          {},
+          { text: data.summary.total_hours.toFixed(2), fontSize: 8, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+        ]
+      : [
+          { text: 'Gesamt', fontSize: 8, bold: true, fillColor: '#f3f4f6', colSpan: 5 },
+          {},
+          {},
+          {},
+          {},
+          { text: data.summary.total_hours.toFixed(2), fontSize: 8, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+          { text: '', fontSize: 8, fillColor: '#f3f4f6' },
+          { text: formatCurrency(data.summary.billable_value, currency), fontSize: 8, bold: true, fillColor: '#f3f4f6', alignment: 'right' },
+        ]
+  );
 
   // Simple sequential page numbering
   const customFooter = (currentPage: number, pageCount: number): Content => {
@@ -1495,17 +1658,8 @@ async function generateTimeTrackingReportPDF(
     } as Content;
   };
 
-  const docDefinition: TDocumentDefinitions = {
-    pageSize: 'A4',
-    pageOrientation: 'landscape',
-    pageMargins: [20, 90, 20, 60],
-    header: (currentPage: number, pageCount: number) => createHeader(reportTitle, lang, dateRange),
-    footer: customFooter,
-    info: {
-      title: reportTitle,
-      subject: metadata?.description || '',
-    },
-    content: [
+  const buildTimeTrackingContent = (): any[] => {
+    const content: any[] = [
       // TABLE 1: Task Summary
       {
         text: '1. Zusammenfassung nach Aufgabe',
@@ -1517,7 +1671,7 @@ async function generateTimeTrackingReportPDF(
       {
         table: {
           headerRows: 1,
-          widths: ['*', 100, 120],
+          widths: hidePrices ? ['*', 100] : ['*', 100, 120],
           body: taskSummaryBody,
         },
         layout: {
@@ -1541,7 +1695,7 @@ async function generateTimeTrackingReportPDF(
       {
         table: {
           headerRows: 1,
-          widths: [60, 150, 150, 80, 100],
+          widths: hidePrices ? [60, 150, 150, 80] : [60, 150, 150, 80, 100],
           body: dailySummaryBody,
         },
         layout: {
@@ -1565,7 +1719,7 @@ async function generateTimeTrackingReportPDF(
       {
         table: {
           headerRows: 1,
-          widths: [55, 80, 80, 60, '*', 50, 70, 70],
+          widths: hidePrices ? [55, 100, 100, 80, '*', 60] : [55, 80, 80, 60, '*', 50, 70, 70],
           body: entriesTableBody,
         },
         layout: {
@@ -1577,7 +1731,7 @@ async function generateTimeTrackingReportPDF(
         margin: [0, 0, 0, 25],
       },
 
-      // SUMMARY PAGE (not counted in pagination)
+      // SUMMARY PAGE
       {
         text: 'Gesamtzusammenfassung',
         fontSize: 14,
@@ -1612,7 +1766,11 @@ async function generateTimeTrackingReportPDF(
         ],
         margin: [0, 0, 0, 20],
       },
-      {
+    ];
+
+    // Conditionally add billable value section
+    if (!hidePrices) {
+      content.push({
         columns: [
           {
             width: '100%',
@@ -1623,9 +1781,11 @@ async function generateTimeTrackingReportPDF(
           },
         ],
         margin: [0, 0, 0, 30],
-      },
+      });
+    }
 
-      // Client Summary Table
+    // Client Summary Table
+    content.push(
       {
         text: 'Stunden nach Kunde',
         fontSize: 12,
@@ -1636,7 +1796,7 @@ async function generateTimeTrackingReportPDF(
       {
         table: {
           headerRows: 1,
-          widths: ['*', 80, 80, 90],
+          widths: hidePrices ? ['*', 80, 80] : ['*', 80, 80, 90],
           body: clientSummaryBody,
         },
         layout: {
@@ -1659,7 +1819,7 @@ async function generateTimeTrackingReportPDF(
       {
         table: {
           headerRows: 1,
-          widths: ['*', 100, 70, 70, 80],
+          widths: hidePrices ? ['*', 100, 70, 70] : ['*', 100, 70, 70, 80],
           body: projectSummaryBody,
         },
         layout: {
@@ -1670,7 +1830,22 @@ async function generateTimeTrackingReportPDF(
         },
         margin: [0, 0, 0, 25],
       },
-    ],
+    );
+
+    return content;
+  };
+
+  const docDefinition: TDocumentDefinitions = {
+    pageSize: 'A4',
+    pageOrientation: 'landscape',
+    pageMargins: [20, 90, 20, 60],
+    header: (currentPage: number, pageCount: number) => createHeader(reportTitle, lang, dateRange),
+    footer: customFooter,
+    info: {
+      title: reportTitle,
+      subject: metadata?.description || '',
+    },
+    content: buildTimeTrackingContent(),
     styles: {
       header: {
         fontSize: 20,
@@ -1710,4 +1885,6 @@ export default {
   generateInvoiceReportPDF,
   generateExpenseReportPDF,
   generateTimeTrackingReportPDF,
+  getUserPdfTheme,
+  applyTheme,
 };

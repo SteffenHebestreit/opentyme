@@ -9,8 +9,8 @@ import { CustomSelect } from '@/components/forms';
 import { formatCurrency } from '@/utils/currency';
 import { PaymentDetailModal } from '@/components/business/payments/PaymentDetailModal';
 import { RecordPaymentModal } from '@/components/business/invoices/RecordPaymentModal';
-import { Plus, ArrowDownLeft, ArrowUpRight, Landmark, Wallet } from 'lucide-react';
-import { Table, Column } from '@/components/common/Table';
+import { Plus, ArrowDownLeft, ArrowUpRight, Landmark, Wallet, DollarSign, TrendingUp, TrendingDown } from 'lucide-react';
+import { Table, Column, LoadingSpinner, PageHeader, StatCard, EmptyState, Alert } from '@/components/common';
 
 /**
  * Payments page component displaying payment and refund records only.
@@ -285,9 +285,7 @@ export default function PaymentsPage({ startDate: propStartDate, endDate: propEn
     return (
       <div className="min-h-screen pt-20 pb-8 px-4">
         <div className="container mx-auto max-w-7xl">
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
-          </div>
+          <LoadingSpinner size="lg" fullScreen text={t('loading', { defaultValue: 'Loading payments...' })} />
         </div>
       </div>
     );
@@ -297,16 +295,11 @@ export default function PaymentsPage({ startDate: propStartDate, endDate: propEn
     return (
       <div className="min-h-screen pt-20 pb-8 px-4">
         <div className="container mx-auto max-w-7xl">
-          <div className={`rounded-lg p-4 ${
-            state.theme === 'light'
-              ? 'bg-red-50 text-red-800'
-              : 'bg-red-900/20 text-red-300'
-          }`}>
-            <p className="font-semibold">Error loading payments</p>
-            <p className="text-sm mt-1">
-              {error instanceof Error ? error.message : 'An unknown error occurred'}
-            </p>
-          </div>
+          <Alert
+            type="error"
+            title="Error loading payments"
+            message={error instanceof Error ? error.message : 'An unknown error occurred'}
+          />
         </div>
       </div>
     );
@@ -315,21 +308,19 @@ export default function PaymentsPage({ startDate: propStartDate, endDate: propEn
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">{t('title')}</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {t('subtitle')}
-          </p>
-        </div>
-        <button
-          onClick={() => setIsAddPaymentModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          {t('addPayment', { defaultValue: 'Add Payment' })}
-        </button>
-      </div>
+      <PageHeader
+        title={t('title')}
+        subtitle={t('subtitle')}
+        actions={
+          <button
+            onClick={() => setIsAddPaymentModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            {t('addPayment', { defaultValue: 'Add Payment' })}
+          </button>
+        }
+      />
 
       {/* Filters */}
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -375,96 +366,74 @@ export default function PaymentsPage({ startDate: propStartDate, endDate: propEn
       {/* Summary Cards */}
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="rounded-lg border border-blue-200 dark:border-blue-900/30 bg-blue-50 dark:bg-blue-900/20 p-4">
-              <div className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-1">
-                {t('summary.totalTransactions')}
-              </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {filteredPayments.length}
-              </div>
-          </div>
+          <StatCard
+            label={t('summary.totalTransactions')}
+            value={filteredPayments.length}
+            variant="blue"
+            icon={DollarSign}
+          />
 
-          <div className="rounded-lg border border-green-200 dark:border-green-900/30 bg-green-50 dark:bg-green-900/20 p-4">
-              <div className="text-sm font-medium text-green-600 dark:text-green-400 mb-1">
-                {t('summary.incomePayments')}
-              </div>
-              <div className="text-2xl font-bold text-green-600">
-                {formatCurrency(
-                  filteredPayments
-                    .filter(p => p.payment_type === 'payment' || (p.payment_type as string) === 'vat_refund' || (p.payment_type as string) === 'income_tax_refund')
-                    .reduce((sum, p) => sum + Number(p.amount), 0)
-                )}
-              </div>
-          </div>
+          <StatCard
+            label={t('summary.incomePayments')}
+            value={formatCurrency(
+              filteredPayments
+                .filter(p => p.payment_type === 'payment' || (p.payment_type as string) === 'vat_refund' || (p.payment_type as string) === 'income_tax_refund')
+                .reduce((sum, p) => sum + Number(p.amount), 0)
+            )}
+            variant="green"
+            icon={TrendingUp}
+          />
 
-          <div className="rounded-lg border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-900/20 p-4">
-              <div className="text-sm font-medium text-red-600 dark:text-red-400 mb-1">
-                {t('summary.refunds')}
-              </div>
-              <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(
-                  filteredPayments
-                  .reduce((sum, p) => {
-                    if (p.payment_type === 'payment' || (p.payment_type as string) === 'vat_refund' || (p.payment_type as string) === 'income_tax_refund') {
-                      return sum;
-                    }
-                    return sum + Number(p.amount);
-                  }, 0)
-                )}
-              </div>
-          </div>
+          <StatCard
+            label={t('summary.refunds')}
+            value={formatCurrency(
+              filteredPayments
+              .reduce((sum, p) => {
+                if (p.payment_type === 'payment' || (p.payment_type as string) === 'vat_refund' || (p.payment_type as string) === 'income_tax_refund') {
+                  return sum;
+                }
+                return sum + Number(p.amount);
+              }, 0)
+            )}
+            variant="red"
+            icon={TrendingDown}
+          />
 
-          <div className="rounded-lg border border-indigo-200 dark:border-indigo-900/30 bg-indigo-50 dark:bg-indigo-900/20 p-4">
-              <div className="text-sm font-medium text-indigo-600 dark:text-indigo-400 mb-1">
-                {t('summary.netAmount')}
-              </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatCurrency(
-                  filteredPayments.reduce((sum, p) => {
-                    // Add payments and tax refunds, subtract refunds
-                    if (p.payment_type === 'payment' || (p.payment_type as string) === 'vat_refund' || (p.payment_type as string) === 'income_tax_refund') {
-                      return sum + Number(p.amount);
-                    } else {
-                      return sum - Number(p.amount);
-                    }
-                  }, 0)
-              )}
-            </div>
-          </div>
+          <StatCard
+            label={t('summary.netAmount')}
+            value={formatCurrency(
+              filteredPayments.reduce((sum, p) => {
+                // Add payments and tax refunds, subtract refunds
+                if (p.payment_type === 'payment' || (p.payment_type as string) === 'vat_refund' || (p.payment_type as string) === 'income_tax_refund') {
+                  return sum + Number(p.amount);
+                } else {
+                  return sum - Number(p.amount);
+                }
+              }, 0)
+            )}
+            variant="indigo"
+            icon={Wallet}
+          />
         </div>
       </div>
 
       {/* Payments Table */}
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
         <Table
           data={filteredPayments}
           columns={columns}
           pageSize={10}
           onRowClick={(payment) => setSelectedPayment(payment)}
           emptyMessage={
-            <div className="p-6 text-center">
-              <svg
-                className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
-                {t('noPayments')}
-              </h3>
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                {searchTerm || paymentMethodFilter !== 'all'
+            <EmptyState
+              icon={DollarSign}
+              title={t('noPayments')}
+              description={
+                searchTerm || paymentMethodFilter !== 'all'
                   ? t('tryAdjustingFilters')
-                  : t('noPaymentsMessage')}
-              </p>
-            </div>
+                  : t('noPaymentsMessage')
+              }
+            />
           }
           className="border-0 shadow-none"
         />

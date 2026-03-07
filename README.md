@@ -96,7 +96,7 @@
 ### 💸 Expense Tracking
 - Track project and general business expenses
 - **Tax breakdown tracking** (net amount, tax rate, tax amount) for tax declaration
-- Receipt upload support (MinIO object storage)
+- Receipt upload support (S3-compatible object storage)
 - Expense categories and tagging
 - Billable vs reimbursable expense tracking
 - Approval workflow (pending, approved, rejected, reimbursed)
@@ -134,11 +134,26 @@
 - Tax prepayments tracking (VAT & income tax)
 - Recent invoices and time entries widgets
 
+### 📧 Email & Communication
+- MJML-based email template editor with live preview
+- Full CRUD for email templates (create, edit, delete, duplicate)
+- `{{placeholder}}` variable support for dynamic content (company, invoice, client data)
+- GrapeJS visual drag-and-drop email builder (available as addon)
+- Per-user SMTP configuration with test delivery
+- MailHog integration for local email testing
+
+### 🎨 Output Theming
+- Custom primary, secondary, and accent colors applied to generated PDFs and email templates
+- Company logo and background image upload via S3-compatible object storage
+- Theme settings per user, stored in database
+
 ### ⚙️ Administration
 - User settings and preferences
 - Company information and branding
 - Tax rate configuration
 - Invoice text templates (header, footer, terms)
+- Email templates management with MJML builder
+- SMTP and output theming configuration
 - Currency and timezone settings
 - AI-powered expense extraction settings (optional)
 
@@ -146,8 +161,18 @@
 - Scheduled backup system with cron expressions
 - Manual backup creation and restore
 - Backup retention policy configuration
-- Comprehensive backup (PostgreSQL + Keycloak + MinIO)
+- Comprehensive backup (PostgreSQL + Keycloak + SeaweedFS)
 - Backup history and status tracking
+- Single-file database schema (`init.sql`) — no migration runner needed
+
+### 🧩 Plugin / Addon System
+- Modular addon architecture with manifest-based loading
+- Build-time and runtime addon installation (GitHub, GitLab, local)
+- Backend: auto-registered routes, services, and SQL migrations per addon
+- Frontend: slot-based component injection and lazy-loaded route pages
+- Per-user plugin enable/disable and settings (JSONB)
+- JSON Schema validation for addon manifests
+- Addon boilerplate template for third-party development
 
 ### 🎨 User Interface
 - Modern, responsive design with TailwindCSS
@@ -208,7 +233,7 @@
 | **Joi** | 17.9 | Request validation |
 | **PDFKit** | 0.17 | PDF generation |
 | **Multer** | 1.4 | File upload handling |
-| **MinIO Client** | 8.0 | Object storage client |
+| **AWS SDK v3** | 3.x | S3-compatible storage client |
 | **Redis** | 4.6 | Session cache |
 | **Axios** | 1.6 | HTTP client |
 | **Helmet** | 7.0 | Security headers |
@@ -224,7 +249,7 @@
 | **PostgreSQL** | 17-alpine | Application database |
 | **PostgreSQL** | 17-alpine | Keycloak database (isolated) |
 | **Redis** | 7.4-alpine | Session cache |
-| **MinIO** | 2024.10 | S3-compatible object storage |
+| **SeaweedFS** | 3.x | S3-compatible object storage |
 | **MailHog** | 1.0 | Email testing (development) |
 | **Nginx** | 1.27-alpine | Static file serving |
 | **MCP Server** | FastAPI | AI-powered PDF extraction (optional) |
@@ -257,7 +282,7 @@
        │                       │          │       │        │
        │                       ▼          ▼       ▼        ▼
        │                 ┌──────────┐ ┌──────┐ ┌────┐ ┌──────┐
-       │                 │PostgreSQL│ │Redis │ │KC  │ │MinIO │
+       │                 │PostgreSQL│ │Redis │ │KC  │ │SeaWd │
        │                 │(Main DB) │ │Cache │ │DB  │ │ S3   │
        │                 └──────────┘ └──────┘ └────┘ └──────┘
        └──────────► Authentication Flow (OAuth 2.0 + PKCE)
@@ -346,7 +371,6 @@ OpenTYME uses subdomains for its services (e.g., `auth.localhost` for Keycloak).
 # <YOUR_LOCAL_IP>  auth.localhost
 # <YOUR_LOCAL_IP>  traefik.localhost
 # <YOUR_LOCAL_IP>  mail.localhost
-# <YOUR_LOCAL_IP>  minio.localhost
 # <YOUR_LOCAL_IP>  s3.localhost
 # <YOUR_LOCAL_IP>  mcp.localhost
 ```
@@ -363,7 +387,6 @@ sudo ./scripts/setup-hosts.sh
 # <YOUR_LOCAL_IP>  auth.localhost
 # <YOUR_LOCAL_IP>  traefik.localhost
 # <YOUR_LOCAL_IP>  mail.localhost
-# <YOUR_LOCAL_IP>  minio.localhost
 # <YOUR_LOCAL_IP>  s3.localhost
 # <YOUR_LOCAL_IP>  mcp.localhost
 ```
@@ -374,10 +397,10 @@ sudo ./scripts/setup-hosts.sh
 
 ```bash
 # Start all containers in detached mode
-docker-compose up -d
+docker compose up -d
 
 # Watch logs (optional)
-docker-compose logs -f
+docker compose logs -f
 
 # Wait for all services to be healthy (~60-90 seconds)
 # You'll see "Keycloak realm imported successfully" when ready
@@ -394,7 +417,6 @@ Once all services are running:
 | **Keycloak Admin** | http://auth.localhost | admin / admin |
 | **Traefik Dashboard** | http://traefik.localhost | (no auth required) |
 | **MailHog** | http://mail.localhost | (no auth required) |
-| **MinIO Console** | http://minio.localhost | minioadmin / minioadmin123 |
 | **API Documentation** | http://localhost/api/api-docs | (no auth required) |
 | **MCP Server** | http://mcp.localhost | (optional, for AI features) |
 
@@ -440,7 +462,7 @@ If you're using Docker Desktop with MCP (Model Context Protocol) servers:
 
 3. **Restart services**:
    ```bash
-   docker-compose up -d mcp-gateway backend
+   docker compose up -d mcp-gateway backend
    ```
 
 4. The `mcp-gateway` service aggregates all Docker Desktop MCP servers, enabling:
@@ -465,7 +487,7 @@ The project includes a FastAPI-based MCP server for PDF extraction:
 
 2. **Restart services**:
    ```bash
-   docker-compose up -d mcp-server backend
+   docker compose up -d mcp-server backend
    ```
 
 3. **Verify MCP server**: Visit http://mcp.localhost/api/health
@@ -499,7 +521,7 @@ Create a `.env` file in the project root (or use defaults):
 # ============================================
 # DATABASE CONFIGURATION
 # ============================================
-POSTGRES_DB=opentyme_db
+POSTGRES_DB=opentyme
 POSTGRES_PASSWORD=password
 
 # Keycloak Database (Isolated)
@@ -544,11 +566,10 @@ VITE_KEYCLOAK_CLIENT_ID=opentyme-frontend
 VITE_KEYCLOAK_ENABLED=true
 
 # ============================================
-# MINIO (OBJECT STORAGE)
+# OBJECT STORAGE (SeaweedFS — S3-compatible)
 # ============================================
-MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=minioadmin123
-MINIO_BUCKET=receipts
+STORAGE_ACCESS_KEY=admin
+STORAGE_SECRET_KEY=password
 
 # ============================================
 # EMAIL CONFIGURATION (MailHog for dev)
@@ -574,7 +595,6 @@ The Keycloak realm is automatically imported from `keycloak/realm-import.json` o
   - `opentyme-app` - Backend service client (confidential)
   - `opentyme-frontend` - Frontend SPA client (public with PKCE)
   - `opentyme-admin-service` - Admin service client
-  - `minio` - MinIO integration
 - **Default Users**:
   - `admin` (role: admin)
   - `user` (role: user)
@@ -622,10 +642,13 @@ The application uses a comprehensive PostgreSQL schema with the following tables
 #### System
 - **system_backups** - Backup operation history and status
 - **system_backup_schedule** - Scheduled backup configurations
+- **plugins** - Addon plugin registry
+- **report_export_audit** - Report export audit trail
 
 #### Advanced Features
 - **tax_prepayments** - VAT and income tax prepayment tracking
 - **expense_depreciation_schedule** - Multi-year asset depreciation (AfA)
+- **payment_invoices** - Junction table for multi-invoice payments
 
 ### Key Features
 
@@ -785,6 +808,25 @@ POST   /api/system/backups               # Create manual backup
 POST   /api/system/backups/cleanup       # Cleanup old backups
 ```
 
+#### Tax Prepayments
+```
+GET    /api/tax-prepayments              # List tax prepayments
+POST   /api/tax-prepayments              # Create tax prepayment
+GET    /api/tax-prepayments/:id          # Get tax prepayment
+PUT    /api/tax-prepayments/:id          # Update tax prepayment
+DELETE /api/tax-prepayments/:id          # Delete tax prepayment
+```
+
+#### Plugins (Addon System)
+```
+GET    /api/plugins                      # List installed plugins
+GET    /api/plugins/:name                # Get plugin details
+POST   /api/plugins/:name/enable         # Enable plugin for current user
+POST   /api/plugins/:name/disable        # Disable plugin for current user
+GET    /api/plugins/:name/settings       # Get plugin settings
+PUT    /api/plugins/:name/settings       # Update plugin settings
+```
+
 #### Analytics
 ```
 GET    /api/analytics/yearly-summary     # Dashboard financial summary
@@ -897,7 +939,7 @@ The application uses **OAuth 2.0 Authorization Code Flow with PKCE** for secure 
 - **Network Isolation**: Docker bridge network
 - **Service Communication**: Internal network only
 - **Database Isolation**: Separate Keycloak database
-- **Object Storage**: MinIO with Keycloak OIDC integration
+- **Object Storage**: SeaweedFS (S3-compatible) with per-user bucket isolation
 - **Rate Limiting**: Configurable API rate limits (disabled in dev)
 
 ---
@@ -1002,7 +1044,7 @@ The project includes a Docker Compose service for running E2E tests:
 
 ```bash
 # Run UI tests in Docker
-docker-compose up frontend-ui-tests
+docker compose upfrontend-ui-tests
 
 # View test results
 cat frontend/playwright-report/index.html
@@ -1018,14 +1060,14 @@ Development mode includes hot-reload for both frontend and backend:
 
 ```bash
 # Start all services
-docker-compose up -d
+docker compose up -d
 
 # Watch logs
-docker-compose logs -f backend frontend
+docker compose logs -f backend frontend
 
 # Restart after code changes
-docker-compose restart backend
-docker-compose restart frontend
+docker compose restart backend
+docker compose restart frontend
 ```
 
 ### Production Deployment
@@ -1050,10 +1092,10 @@ cp .env .env.production
 
 ```bash
 # Build production images
-docker-compose -f docker-compose.yml build
+docker compose -f docker-compose.yml build
 
 # Start in production mode
-docker-compose -f docker-compose.yml up -d
+docker compose -f docker-compose.yml up -d
 ```
 
 #### 3. SSL/TLS Configuration
@@ -1188,8 +1230,8 @@ npm run dev  # Starts on port 3000
 #### With Docker (Recommended)
 
 ```bash
-# Use docker-compose for full environment
-docker-compose up -d
+# Use Docker Compose for full environment
+docker compose up -d
 
 # Backend hot-reload is enabled via volume mounts
 # Frontend hot-reload is enabled via Vite HMR
@@ -1224,7 +1266,7 @@ opentyme/
 │   │   │   ├── analytics/     # Reports & analytics
 │   │   │   ├── business/      # Core business services
 │   │   │   ├── financial/     # Invoice, payment services
-│   │   │   ├── storage/       # MinIO file storage
+│   │   │   ├── storage/       # S3-compatible file storage
 │   │   │   └── system/        # Backup, scheduling
 │   │   └── utils/             # Utilities
 │   ├── scripts/               # Backup/restore scripts
@@ -1233,16 +1275,24 @@ opentyme/
 │   └── package.json
 ├── docs/                       # Documentation
 │   ├── AI_FEATURES.md
+│   ├── ADDON_DEVELOPMENT_GUIDE.md
 │   ├── DEPRECIATION_FEATURE.md
+│   ├── PLUGIN_SYSTEM_COMPLETE.md
 │   └── STORAGE_ARCHITECTURE.md
 ├── keycloak/
 │   └── realm-import.json      # Keycloak realm configuration
 ├── traefik/
 │   ├── traefik.yml           # Traefik static config
 │   └── traefik-dynamic.yml   # Dynamic routing rules
-├── scripts/                    # Host-side backup scripts
+├── schemas/                    # JSON Schemas for validation
+│   ├── addon-manifest.schema.json
+│   └── addons-config.schema.json
+├── scripts/                    # Host-side scripts (backup, hosts setup)
 ├── backups/                    # Backup storage
-├── init.sql                   # Database schema
+├── addons.config.json         # Addon configuration
+├── opentyme-addon-ai-analysis/ # AI analysis addon (local)
+├── opentyme-addon-boilerplate/ # Addon development template
+├── init.sql                   # Database schema (full)
 ├── docker-compose.yml         # Service orchestration
 ├── LICENSE                    # CC BY-NC 4.0 License
 └── README.md                  # This file
@@ -1354,13 +1404,13 @@ lsof -i :8080   # Keycloak
 
 ```bash
 # Check if PostgreSQL is running
-docker-compose ps db
+docker compose ps db
 
 # View database logs
-docker-compose logs db
+docker compose logs db
 
 # Restart database
-docker-compose restart db
+docker compose restart db
 
 # Verify database initialization
 docker exec -it opentyme-db psql -U postgres -d opentyme_db -c "\dt"
@@ -1370,10 +1420,10 @@ docker exec -it opentyme-db psql -U postgres -d opentyme_db -c "\dt"
 
 ```bash
 # Check Keycloak status
-docker-compose ps keycloak
+docker compose ps keycloak
 
 # Wait for Keycloak to fully start (can take 60-90 seconds)
-docker-compose logs -f keycloak
+docker compose logs -f keycloak
 
 # Verify realm import
 # Look for "Realm imported successfully" in logs
@@ -1383,11 +1433,11 @@ docker-compose logs -f keycloak
 
 ```bash
 # Check frontend logs
-docker-compose logs frontend
+docker compose logs frontend
 
 # Rebuild frontend
-docker-compose build frontend
-docker-compose restart frontend
+docker compose build frontend
+docker compose restart frontend
 
 # Clear browser cache
 # Open DevTools > Application > Clear Storage
@@ -1397,7 +1447,7 @@ docker-compose restart frontend
 
 ```bash
 # Check backend logs
-docker-compose logs backend
+docker compose logs backend
 
 # Test API directly
 curl http://localhost/api/health
@@ -1406,45 +1456,46 @@ curl http://localhost/api/health
 # Use browser DevTools > Network tab to inspect Authorization header
 ```
 
-#### MinIO/Receipt upload issues
+#### Receipt upload issues
 
 ```bash
-# Check MinIO status
-docker-compose ps minio
+# Check SeaweedFS status
+docker compose ps seaweedfs
 
-# Access MinIO console
-open http://minio.localhost
+# List buckets via AWS CLI
+AWS_ACCESS_KEY_ID=admin AWS_SECRET_ACCESS_KEY=password \
+  aws s3 ls --endpoint-url http://localhost:8333
 
-# Verify bucket exists
-# Login with minioadmin/minioadmin123
-# Check "receipts" bucket
+# List files in a user bucket
+AWS_ACCESS_KEY_ID=admin AWS_SECRET_ACCESS_KEY=password \
+  aws s3 ls s3://user-<userId>/ --endpoint-url http://localhost:8333 --recursive
 ```
 
 ### Reset Everything
 
 ```bash
 # Stop and remove all containers, volumes, and images
-docker-compose down -v --rmi all
+docker compose down -v --rmi all
 
 # Remove database volumes
 docker volume rm $(docker volume ls -q | grep opentyme)
 
 # Start fresh
-docker-compose up -d
+docker compose up -d
 ```
 
 ### View Logs
 
 ```bash
 # All services
-docker-compose logs -f
+docker compose logs -f
 
 # Specific service
-docker-compose logs -f backend
-docker-compose logs -f keycloak
+docker compose logs -f backend
+docker compose logs -f keycloak
 
 # Last 100 lines
-docker-compose logs --tail=100 backend
+docker compose logs --tail=100 backend
 ```
 
 ### Performance Issues
@@ -1468,8 +1519,10 @@ docker exec -it opentyme-db psql -U postgres -d opentyme_db
 Detailed documentation for specific features and integrations can be found in the `docs/` directory:
 
 - [AI Features](docs/AI_FEATURES.md) - AI integration architecture, implementation guide, and usage
+- [Addon Development Guide](docs/ADDON_DEVELOPMENT_GUIDE.md) - How to create custom addons
+- [Plugin System](docs/PLUGIN_SYSTEM_COMPLETE.md) - Plugin architecture and loader documentation
 - [Depreciation Feature](docs/DEPRECIATION_FEATURE.md) - Asset depreciation with German tax law compliance (AfA)
-- [Storage Architecture](docs/STORAGE_ARCHITECTURE.md) - MinIO object storage design and per-user bucket system
+- [Storage Architecture](docs/STORAGE_ARCHITECTURE.md) - SeaweedFS S3-compatible object storage design and per-user bucket system
 
 ---
 
@@ -1609,9 +1662,21 @@ We love hearing your ideas! Open a GitHub issue with:
 - [x] Recurring payments (fixed monthly payments for retainer projects without invoices)
 - [x] Scheduled backup system with retention policies
 - [x] AI-powered receipt extraction (optional, via MCP server)
+- [x] **Plugin/Addon System** - Modular addon architecture with manifest-based loading
+- [x] Invoice correction / credit notes
+- [x] Tax package export for tax advisors
+- [x] Report export audit trail
+
+### Completed ✅ (v1.0.0 — March 2026)
+- [x] **Email template system** — MJML-based templates with `{{placeholder}}` support, full CRUD
+- [x] **SMTP configuration** — per-user SMTP settings with test delivery, MailHog for local testing
+- [x] **Output theming** — custom colors, logo and background image applied to PDFs and emails
+- [x] **GrapeJS email builder** — visual drag-and-drop MJML editor available as an addon
+- [x] **Addon system hardening** — fixed Docker entrypoint, healthcheck, and disabled-addon skip bug
 
 ### In Progress 🚧
-- [ ] Email invoice delivery
+- [ ] Email invoice delivery (send invoices via email using saved templates)
+- [ ] Addon marketplace / management UI improvements
 
 ### Planned 📋
 - [ ] Report templates and scheduling
@@ -1624,4 +1689,4 @@ We love hearing your ideas! Open a GitHub issue with:
 
 **Built with ❤️ by developers, for developers**
 
-**Version**: 1.0.0 | **Last Updated**: November 2025 | **Status**: Production Ready ✅
+**Version**: 1.0.0 | **Last Updated**: March 2026 | **Status**: Production Ready ✅

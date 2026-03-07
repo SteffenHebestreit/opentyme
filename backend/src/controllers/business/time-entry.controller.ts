@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { TimeEntryService } from '../../services/business/time-entry.service';
+import { logger } from '../../utils/logger';
 import { ProjectService } from '../../services/business/project.service';
 import { 
   CreateTimeEntryDto,
@@ -135,8 +136,8 @@ export class TimeEntryController {
           : undefined,
       };
 
-      console.log('[DEBUG] Creating time entry with user_id:', transformedData.user_id);
-      console.log('[DEBUG] transformedData before service call:', JSON.stringify(transformedData, null, 2));
+      logger.debug('[DEBUG] Creating time entry with user_id:', transformedData.user_id);
+      logger.debug('[DEBUG] transformedData before service call:', JSON.stringify(transformedData, null, 2));
       
       const timeEntry = await timeEntryService.create(transformedData);
       res.status(201).json({
@@ -144,7 +145,7 @@ export class TimeEntryController {
         time_entry: timeEntry,
       });
     } catch (err: any) {
-      console.error('Create time entry error:', err);
+      logger.error('Create time entry error:', err);
       // Handle specific errors like foreign key violation for project_id or user_id
       if(err.message.includes("Invalid 'project_id' specified.") || err.message.includes("Invalid 'user_id' specified.")) {
           res.status(400).json({ message: `Validation failed: Invalid ID provided.` });
@@ -241,7 +242,7 @@ export class TimeEntryController {
       
       res.status(200).json(transformedEntries);
     } catch (err: any) {
-      console.error('Find all time entries error:', err);
+      logger.error('Find all time entries error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -308,7 +309,7 @@ export class TimeEntryController {
         res.status(404).json({ message: 'Time entry not found' });
       }
     } catch (err: any) {
-      console.error('Find time entry by ID error:', err);
+      logger.error('Find time entry by ID error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -379,7 +380,7 @@ export class TimeEntryController {
         res.status(404).json({ message: 'Time entry not found' });
       }
     } catch (err: any) {
-      console.error('Update time entry error:', err);
+      logger.error('Update time entry error:', err);
        if(err.message.includes("Invalid 'project_id' specified.") || err.message.includes("Invalid 'user_id' specified.")) {
            res.status(400).json({ message: "Validation failed: Invalid ID provided for update." });
         } else {
@@ -416,7 +417,7 @@ export class TimeEntryController {
         res.status(404).json({ message: 'Time entry not found or already deleted' });
       }
     } catch (err: any) {
-      console.error('Delete time entry error:', err);
+      logger.error('Delete time entry error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
   }
@@ -482,7 +483,7 @@ export class TimeEntryController {
           time_entry: activeTimeEntry
       });
     } catch (err: any) {
-        console.error('Start timer error:', err);
+        logger.error('Start timer error:', err);
         if(err.message.includes("Invalid 'project_id' specified.")) {
             res.status(400).json({ message: "Validation failed: Invalid project ID provided for timer start." });
         } else {
@@ -540,7 +541,7 @@ export class TimeEntryController {
         });
 
       } catch (err: any) {
-          console.error('Stop timer error:', err);
+          logger.error('Stop timer error:', err);
           res.status(500).json({ message: err.message || 'Internal server error' });
       }
   }
@@ -596,7 +597,7 @@ export class TimeEntryController {
         });
         */
       } catch (err: any) {
-          console.error('Pause timer error:', err);
+          logger.error('Pause timer error:', err);
           res.status(500).json({ message: err.message || 'Internal server error' });
       }
   }

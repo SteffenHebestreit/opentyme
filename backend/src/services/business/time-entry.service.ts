@@ -5,6 +5,7 @@ import {
   TimeEntry as ITimeEntry,
   TimeEntryStatus
 } from '../../models/business/time-entry.model';
+import { logger } from '../../utils/logger';
 
 const db = getDbClient();
 
@@ -70,7 +71,7 @@ export class TimeEntryService {
       const result = await db.query(queryText, values);
       return this.getTimeEntryWithDetails(result.rows[0]);
     } catch (error) {
-      console.error('Error creating time entry:', error);
+      logger.error('Error creating time entry:', error);
       if ((error as any).code === '23503') { // foreign_key_violation
         const field = (error as any).constraint.includes('project_id') ? 'project_id' : 'user_id';
         throw new Error(`Invalid '${field}' specified.`);
@@ -165,7 +166,7 @@ export class TimeEntryService {
         client_name: row.client_name || null
       }));
     } catch (error) {
-      console.error('Error fetching all time entries:', error);
+      logger.error('Error fetching all time entries:', error);
       throw new Error(`Failed to fetch time entries: ${(error as any).message}`);
     }
   }
@@ -199,7 +200,7 @@ export class TimeEntryService {
       if (result.rows.length === 0) return null;
       return this.getTimeEntryWithDetails(result.rows[0]);
     } catch (error) {
-      console.error('Error fetching time entry by ID:', error);
+      logger.error('Error fetching time entry by ID:', error);
       throw new Error(`Failed to fetch time entry: ${(error as any).message}`);
     }
   }
@@ -300,7 +301,7 @@ export class TimeEntryService {
       if (result.rows.length === 0) return null;
       return this.getTimeEntryWithDetails(result.rows[0]);
     } catch (error) {
-      console.error('Error updating time entry:', error);
+      logger.error('Error updating time entry:', error);
       if ((error as any).code === '23503') { // foreign_key_violation
         const field = (error as any).constraint.includes('project_id') ? 'project_id' : 'user_id';
         throw new Error(`Invalid '${field}' specified.`);
@@ -328,7 +329,7 @@ export class TimeEntryService {
       const result = await db.query(queryText, [id]);
       return (result.rowCount ?? 0) > 0;
     } catch (error) {
-      console.error('Error deleting time entry:', error);
+      logger.error('Error deleting time entry:', error);
       throw new Error(`Failed to delete time entry: ${(error as any).message}`);
     }
   }

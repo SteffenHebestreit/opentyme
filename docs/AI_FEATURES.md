@@ -380,5 +380,5 @@ curl -X POST http://localhost:8000/api/expenses/analyze-receipt \
 ## Related Documentation
 
 - [Depreciation Feature](./DEPRECIATION_FEATURE.md) - German tax law depreciation (AfA) feature specification
-- [Storage Architecture](./STORAGE_ARCHITECTURE.md) - MinIO per-user bucket storage
+- [Storage Architecture](./STORAGE_ARCHITECTURE.md) - SeaweedFS S3-compatible per-user bucket storage
 - [README](../README.md) - Main project documentation

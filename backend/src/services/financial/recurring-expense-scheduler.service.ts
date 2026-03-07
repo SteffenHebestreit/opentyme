@@ -10,6 +10,7 @@
 import cron, { ScheduledTask } from 'node-cron';
 import { getDbClient } from '../../utils/database';
 import { RecurrenceFrequency } from '../../models/business/expense.model';
+import { logger } from '../../utils/logger';
 
 const pool = getDbClient();
 
@@ -21,15 +22,15 @@ class RecurringExpenseSchedulerService {
    * Runs daily at 2 AM to generate recurring expenses
    */
   public initialize(): void {
-    console.log('[RecurringExpenseScheduler] Initializing scheduler...');
+    logger.info('[RecurringExpenseScheduler] Initializing scheduler...');
     
     // Run daily at 2:00 AM
     this.cronJob = cron.schedule('0 2 * * *', async () => {
-      console.log('[RecurringExpenseScheduler] Running scheduled recurring expense generation...');
+      logger.info('[RecurringExpenseScheduler] Running scheduled recurring expense generation...');
       await this.processRecurringExpenses();
     });
 
-    console.log('[RecurringExpenseScheduler] Scheduler initialized (runs daily at 2:00 AM)');
+    logger.info('[RecurringExpenseScheduler] Scheduler initialized (runs daily at 2:00 AM)');
   }
 
   /**
@@ -38,7 +39,7 @@ class RecurringExpenseSchedulerService {
   public stop(): void {
     if (this.cronJob) {
       this.cronJob.stop();
-      console.log('[RecurringExpenseScheduler] Scheduler stopped');
+      logger.info('[RecurringExpenseScheduler] Scheduler stopped');
     }
   }
 
@@ -68,13 +69,13 @@ class RecurringExpenseSchedulerService {
       const result = await client.query(query);
       const recurringExpenses = result.rows;
 
-      console.log(`[RecurringExpenseScheduler] Found ${recurringExpenses.length} recurring expenses to process`);
+      logger.info(`[RecurringExpenseScheduler] Found ${recurringExpenses.length} recurring expenses to process`);
 
       for (const expense of recurringExpenses) {
         try {
           await this.generateExpenseInstance(client, expense);
         } catch (error) {
-          console.error(
+          logger.error(
             `[RecurringExpenseScheduler] Error generating instance for expense ${expense.id}:`,
             error
           );
@@ -83,10 +84,10 @@ class RecurringExpenseSchedulerService {
       }
 
       await client.query('COMMIT');
-      console.log(`[RecurringExpenseScheduler] Successfully processed ${recurringExpenses.length} recurring expenses`);
+      logger.info(`[RecurringExpenseScheduler] Successfully processed ${recurringExpenses.length} recurring expenses`);
     } catch (error) {
       await client.query('ROLLBACK');
-      console.error('[RecurringExpenseScheduler] Error processing recurring expenses:', error);
+      logger.error('[RecurringExpenseScheduler] Error processing recurring expenses:', error);
       throw error;
     } finally {
       client.release();
@@ -101,15 +102,24 @@ class RecurringExpenseSchedulerService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayStr = today.toISOString().split('T')[0];
-    
-    let currentOccurrence = template.next_occurrence;
+
+    // pg returns date columns as Date objects — normalise to YYYY-MM-DD strings
+    // so string comparisons work correctly throughout this method.
+    const toDateStr = (val: any): string => {
+      if (!val) return '';
+      if (val instanceof Date) return val.toISOString().split('T')[0];
+      return String(val).split('T')[0];
+    };
+
+    let currentOccurrence = toDateStr(template.next_occurrence);
+    const endDateStr = template.recurrence_end_date ? toDateStr(template.recurrence_end_date) : null;
     let generatedCount = 0;
     
     // Generate all missed occurrences up to today
     while (currentOccurrence <= todayStr) {
       // Check if we've exceeded end date
-      if (template.recurrence_end_date && currentOccurrence > template.recurrence_end_date) {
-        console.log(
+      if (endDateStr && currentOccurrence > endDateStr) {
+        logger.info(
           `[RecurringExpenseScheduler] Recurring expense ${template.id} has reached end date, stopping generation`
         );
         // Set next_occurrence to null to stop processing
@@ -168,7 +178,7 @@ class RecurringExpenseSchedulerService {
       const newExpenseId = result.rows[0].id;
       generatedCount++;
 
-      console.log(
+      logger.info(
         `[RecurringExpenseScheduler] Generated expense ${newExpenseId} from template ${template.id} for date ${currentOccurrence}`
       );
 
@@ -186,7 +196,7 @@ class RecurringExpenseSchedulerService {
     );
 
     if (generatedCount > 1) {
-      console.log(
+      logger.info(
         `[RecurringExpenseScheduler] Caught up on ${generatedCount} missed occurrences for expense ${template.id}`
       );
     }
@@ -219,7 +229,7 @@ class RecurringExpenseSchedulerService {
    * Manually trigger recurring expense processing (for testing or manual runs)
    */
   public async triggerManually(): Promise<void> {
-    console.log('[RecurringExpenseScheduler] Manual trigger initiated');
+    logger.info('[RecurringExpenseScheduler] Manual trigger initiated');
     await this.processRecurringExpenses();
   }
 }

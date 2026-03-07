@@ -20,11 +20,12 @@
  */
 
 import archiver from 'archiver';
+import { logger } from '../../utils/logger';
 import { Readable, PassThrough } from 'stream';
 import { getDbClient } from '../../utils/database';
 import { reportService, IncomeExpenseReport, VATReport } from './report.service';
 import reportPDFService from './report-pdf.service';
-import { minioService } from '../storage/minio.service';
+import { storageService } from '../storage/storage.service';
 import { InvoiceController } from '../../controllers/financial/invoice.controller';
 import PDFDocument from 'pdfkit';
 import * as ExcelJS from 'exceljs';
@@ -706,7 +707,7 @@ export class TaxPackageService {
 
     // Error handling
     archive.on('error', (err: Error) => {
-      console.error('Archive error:', err);
+      logger.error('Archive error:', err);
       passThrough.destroy(err);
     });
 
@@ -755,7 +756,7 @@ export class TaxPackageService {
             });
           }
         } catch (err) {
-          console.error(`Failed to generate PDF for invoice ${invoice.invoice_number}:`, err);
+          logger.error(`Failed to generate PDF for invoice ${invoice.invoice_number}:`, err);
         }
       }
     }
@@ -772,7 +773,7 @@ export class TaxPackageService {
               name: `${folderNames.expenses}/${this.formatDateForFilename(expense.expense_date)}_${safeFileName}.${ext}` 
             });
           } catch (err) {
-            console.error(`Failed to get receipt for expense ${expense.id}:`, err);
+            logger.error(`Failed to get receipt for expense ${expense.id}:`, err);
           }
         }
       }
@@ -791,7 +792,7 @@ export class TaxPackageService {
               name: `${folderNames.taxPrepayments}/${this.formatDateForFilename(prepayment.payment_date)}_${taxTypeLabel}_${quarterLabel}.${ext}` 
             });
           } catch (err) {
-            console.error(`Failed to get receipt for tax prepayment ${prepayment.id}:`, err);
+            logger.error(`Failed to get receipt for tax prepayment ${prepayment.id}:`, err);
           }
         }
       }
@@ -818,13 +819,13 @@ export class TaxPackageService {
       const invoiceController = new InvoiceController();
       return await invoiceController.generatePDFBuffer(invoiceId, userId, false);
     } catch (error) {
-      console.error(`Failed to generate invoice PDF for ${invoiceId}:`, error);
+      logger.error(`Failed to generate invoice PDF for ${invoiceId}:`, error);
       return null;
     }
   }
 
   /**
-   * Get receipt file stream from MinIO
+   * Get receipt file stream from object storage
    */
   private async getReceiptStream(receiptUrl: string, filename: string | null): Promise<{
     stream: Readable;
@@ -834,7 +835,7 @@ export class TaxPackageService {
     const bucket = urlParts[0];
     const objectName = urlParts.slice(1).join('/');
 
-    const stream = await minioService.getFileStream(bucket, objectName);
+    const stream = await storageService.getFileStream(bucket, objectName);
 
     return {
       stream,

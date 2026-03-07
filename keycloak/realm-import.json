@@ -195,47 +195,6 @@
       "publicClient": false,
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false
-    },
-    {
-      "clientId": "minio",
-      "name": "MinIO Object Storage",
-      "description": "MinIO S3-compatible object storage with Keycloak authentication",
-      "enabled": true,
-      "clientAuthenticatorType": "client-secret",
-      "secret": "minio-client-secret-change-in-production",
-      "publicClient": false,
-      "protocol": "openid-connect",
-      "bearerOnly": false,
-      "standardFlowEnabled": true,
-      "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": true,
-      "serviceAccountsEnabled": false,
-      "authorizationServicesEnabled": false,
-      "fullScopeAllowed": true,
-      "redirectUris": [
-        "http://minio.localhost/oauth_callback",
-        "http://minio.localhost/*",
-        "http://localhost:9001/oauth_callback",
-        "http://localhost:9001/*"
-      ],
-      "webOrigins": ["http://minio.localhost", "http://localhost:9001"],
-      "attributes": {},
-      "protocolMappers": [
-        {
-          "name": "minio-policy-mapper",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-usermodel-attribute-mapper",
-          "consentRequired": false,
-          "config": {
-            "userinfo.token.claim": "true",
-            "user.attribute": "policy",
-            "id.token.claim": "true",
-            "access.token.claim": "true",
-            "claim.name": "policy",
-            "jsonType.label": "String"
-          }
-        }
-      ]
     }
   ],
   "users": [
