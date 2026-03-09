@@ -4,6 +4,7 @@
 
 import { Router, Application } from 'express';
 import { Pool } from 'pg';
+import type { CustomToolDefinition } from '../services/ai/ai-tool-registry.service';
 
 /**
  * Addon manifest structure - defines the complete plugin configuration
@@ -148,16 +149,7 @@ export interface AIContext {
    *   },
    * });
    */
-  registerTool: (tool: {
-    name: string;
-    description: string;
-    parameters: {
-      type: 'object';
-      properties: Record<string, { type: string; description?: string; enum?: (string | number)[]; items?: object; properties?: object }>;
-      required?: string[];
-    };
-    execute: (args: Record<string, unknown>) => Promise<unknown>;
-  }) => void;
+  registerTool: (tool: CustomToolDefinition) => void;
 
   /**
    * Inject context into the LLM system prompt.
