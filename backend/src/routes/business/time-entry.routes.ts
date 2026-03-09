@@ -25,23 +25,37 @@ router.use(extractKeycloakUser);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [project_id, date_start]
+ *             required: [project_id, entry_date, entry_time, duration_hours]
  *             properties:
  *               project_id:
  *                 type: string
  *                 format: uuid
- *               description:
+ *                 description: UUID of the project to log time against
+ *               entry_date:
  *                 type: string
- *               date_start:
+ *                 pattern: '^\d{4}-\d{2}-\d{2}$'
+ *                 description: Date of the time entry in YYYY-MM-DD format (e.g. "2026-03-09")
+ *                 example: "2026-03-09"
+ *               entry_time:
  *                 type: string
- *                 format: date-time
- *               date_end:
+ *                 pattern: '^([01]\d|2[0-3]):([0-5]\d)$'
+ *                 description: Start time of the entry in HH:MM format (24-hour, e.g. "09:00")
+ *                 example: "09:00"
+ *               entry_end_time:
  *                 type: string
- *                 format: date-time
+ *                 pattern: '^([01]\d|2[0-3]):([0-5]\d)$'
+ *                 description: End time of the entry in HH:MM format (optional, e.g. "11:45")
+ *                 example: "11:45"
  *               duration_hours:
  *                 type: number
- *                 format: decimal
- *               is_billable:
+ *                 description: Duration in decimal hours (e.g. 2.75 for 2h45m, 0.5 for 30min)
+ *                 example: 2.75
+ *               description:
+ *                 type: string
+ *                 description: Description of the work done
+ *               task_name:
+ *                 type: string
+ *               billable:
  *                 type: boolean
  *                 default: true
  *               category:
@@ -241,18 +255,28 @@ router.get('/:id', timeEntryController.findById.bind(timeEntryController));
  *           schema:
  *             type: object
  *             properties:
- *               description:
+ *               entry_date:
  *                 type: string
- *               date_start:
+ *                 pattern: '^\d{4}-\d{2}-\d{2}$'
+ *                 description: Date in YYYY-MM-DD format
+ *                 example: "2026-03-09"
+ *               entry_time:
  *                 type: string
- *                 format: date-time
- *               date_end:
+ *                 pattern: '^([01]\d|2[0-3]):([0-5]\d)$'
+ *                 description: Start time in HH:MM format
+ *                 example: "09:00"
+ *               entry_end_time:
  *                 type: string
- *                 format: date-time
+ *                 pattern: '^([01]\d|2[0-3]):([0-5]\d)$'
+ *                 description: End time in HH:MM format
  *               duration_hours:
  *                 type: number
- *                 format: decimal
- *               is_billable:
+ *                 description: Duration in decimal hours
+ *               description:
+ *                 type: string
+ *               task_name:
+ *                 type: string
+ *               billable:
  *                 type: boolean
  *               category:
  *                 type: string
