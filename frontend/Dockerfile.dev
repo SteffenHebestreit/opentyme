@@ -21,8 +21,8 @@ COPY scripts/install-addons.sh ./scripts/
 # Ensure plugins directory always exists even if installs fail
 RUN mkdir -p /app/frontend/src/plugins
 
-# Make script executable and run frontend addon installation
-RUN chmod +x ./scripts/install-addons.sh
+# Strip CRLF and make script executable
+RUN sed -i 's/\r//' ./scripts/install-addons.sh && chmod +x ./scripts/install-addons.sh
 RUN GITHUB_ADDON_TOKEN="${GITHUB_ADDON_TOKEN}" \
     GITLAB_ADDON_TOKEN="${GITLAB_ADDON_TOKEN}" \
     OPENTYME_ADDONS="${OPENTYME_ADDONS}" \

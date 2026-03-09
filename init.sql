@@ -1058,7 +1058,13 @@ CREATE TABLE public.settings (
     theme_primary_color character varying(7) DEFAULT '#7c3aed',
     theme_secondary_color character varying(7) DEFAULT '#5b21b6',
     theme_accent_color character varying(7) DEFAULT '#f59e0b',
-    theme_background_image_url text
+    theme_background_image_url text,
+    stt_enabled boolean DEFAULT false,
+    stt_provider character varying(50) DEFAULT 'whisper'::character varying,
+    stt_api_url character varying(512),
+    stt_api_key character varying(512),
+    stt_model character varying(255) DEFAULT 'large-v3'::character varying,
+    stt_language character varying(10) DEFAULT ''::character varying
 );
 
 
@@ -2256,6 +2262,43 @@ ALTER TABLE ONLY public.tax_prepayments
 
 ALTER TABLE ONLY public.time_entries
     ADD CONSTRAINT time_entries_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id) ON DELETE CASCADE;
+
+
+--
+-- AI Assistant Tables
+--
+
+CREATE TABLE IF NOT EXISTS public.ai_conversations (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id       VARCHAR(255) NOT NULL,
+    title         VARCHAR(500),
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_conversations_user_id ON public.ai_conversations(user_id);
+
+CREATE TABLE IF NOT EXISTS public.ai_messages (
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id  UUID NOT NULL REFERENCES public.ai_conversations(id) ON DELETE CASCADE,
+    role             VARCHAR(50) NOT NULL CHECK (role IN ('user', 'assistant', 'tool')),
+    content          TEXT,
+    tool_calls       JSONB,
+    tool_call_id     VARCHAR(255),
+    tool_name        VARCHAR(255),
+    metadata         JSONB,
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_messages_conversation_id ON public.ai_messages(conversation_id);
+
+-- Migration: add STT columns to existing settings tables (idempotent)
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS stt_enabled boolean DEFAULT false;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS stt_provider character varying(50) DEFAULT 'whisper';
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS stt_api_url character varying(512);
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS stt_api_key character varying(512);
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS stt_model character varying(255) DEFAULT 'large-v3';
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS stt_language character varying(10) DEFAULT '';
 
 
 --

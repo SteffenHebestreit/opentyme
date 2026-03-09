@@ -16,8 +16,10 @@ COPY opentyme-addon-email-builder ./opentyme-addon-email-builder
 # Make script executable
 RUN chmod +x ./scripts/install-addons.sh
 
-# Run addon installation (frontend only)
-RUN ./scripts/install-addons.sh frontend || true
+# Run addon installation using local sources (network not available at build time)
+RUN mkdir -p frontend/src/plugins && \
+    echo '{"addons":[{"name":"ai-expense-analysis","enabled":true,"source":{"type":"local","path":"./opentyme-addon-ai-analysis"}},{"name":"email-builder","enabled":true,"source":{"type":"local","path":"./opentyme-addon-email-builder"}}]}' > addons.build.json && \
+    OPENTYME_ADDONS_CONFIG=addons.build.json ./scripts/install-addons.sh frontend || true
 
 # Stage 2: Build the application
 FROM node:20-alpine AS build
@@ -51,7 +53,7 @@ RUN addgroup -g 1001 -S nodejs && \
     adduser -S frontend -u 1001
 
 # Copy built application from build stage
-COPY --from=build /usr/src/app/dist /usr/share/nginx/html
+COPY --from=build /usr/src/dist/frontend /usr/share/nginx/html
 
 # Copy Nginx configuration
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf

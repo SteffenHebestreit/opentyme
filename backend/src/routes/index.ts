@@ -29,6 +29,11 @@ import pluginsRoutes from './system/plugins.routes';
 import emailTemplateRoutes from './communication/email-template.routes';
 import emailSendRoutes from './communication/email-send.routes';
 
+// AI routes
+import aiRoutes from './ai/ai-assistant.routes';
+import aiInsightsRoutes from './ai/ai-insights.routes';
+import { getAgentCard } from '../controllers/ai/ai-assistant.controller';
+
 // Analytics routes
 import analyticsRoutes from './analytics/analytics.routes';
 import reportRoutes from './analytics/report.routes';
@@ -107,6 +112,18 @@ export default function setupRoutes(app: Application) {
   // Tax package endpoints
   app.use('/api/tax-package', taxPackageRoutes);
   logger.debug('Tax package routes registered under /api/tax-package');
+
+  // AI assistant endpoints (AG-UI + A2A)
+  app.use('/api/ai', aiRoutes);
+  logger.debug('AI assistant routes registered under /api/ai');
+
+  // AI insights (pre-aggregated query endpoints for LLM tool use)
+  app.use('/api/insights', aiInsightsRoutes);
+  logger.debug('AI insights routes registered under /api/insights');
+
+  // A2A Agent Card at well-known path
+  app.get('/.well-known/agent.json', getAgentCard);
+  logger.debug('A2A Agent Card registered at /.well-known/agent.json');
 
   logger.info('All routes registered successfully');
 }

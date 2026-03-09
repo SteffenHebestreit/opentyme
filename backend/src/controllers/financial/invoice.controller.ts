@@ -960,11 +960,11 @@ export class InvoiceController {
           i.status,
           i.currency,
           COALESCE(
-            (SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id = i.id AND p.status != 'cancelled'), 
+            (SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id = i.id AND p.payment_type = 'payment'), 
             0
           ) AS amount_paid,
           (i.total_amount - COALESCE(
-            (SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id = i.id AND p.status != 'cancelled'), 
+            (SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id = i.id AND p.payment_type = 'payment'), 
             0
           )) AS outstanding_balance
         FROM invoices i 

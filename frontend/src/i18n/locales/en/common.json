@@ -165,5 +165,23 @@
   },
   "tooltips": {
     "login": "Login"
+  },
+  "ai": {
+    "title": "AI Assistant",
+    "thinking": "Thinking…",
+    "listening": "Listening…",
+    "newConversation": "New conversation",
+    "welcomeTitle": "How can I help you today?",
+    "welcomeBody": "Ask about clients, invoices, time entries, or analytics.",
+    "welcomeBodyMic": "Use the mic for speech input.",
+    "placeholder": "Ask something… (Enter to send, Shift+Enter for newline)",
+    "stopRecording": "Stop recording",
+    "startRecording": "Start speech input",
+    "send": "Send",
+    "stop": "Stop",
+    "toolArguments": "Arguments",
+    "toolResult": "Result",
+    "open": "Open AI assistant",
+    "close": "Close AI assistant"
   }
 }

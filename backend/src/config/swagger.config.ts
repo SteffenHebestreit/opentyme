@@ -656,7 +656,8 @@ const options: swaggerJsdoc.Options = {
   apis: [
     './src/routes/**/*.ts',
     './src/controllers/**/*.ts',
-    './src/models/**/*.ts'
+    './src/models/**/*.ts',
+    './src/plugins/**/*.ts',
   ]
 };
 

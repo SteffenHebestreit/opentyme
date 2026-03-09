@@ -26,6 +26,9 @@ import TimeEntryList from '@/components/business/time-tracking/TimeEntryList.tsx
 import FinancesPage from '@/pages/finances/FinancesPage.tsx';
 import AdminPage from '@/pages/admin/AdminPage.tsx';
 
+// AI Chat Widget
+import AIChatWidget from '@/components/ai/AIChatWidget.tsx';
+
 const App: React.FC = () => (
   <AuthProvider>
     <Layout>
@@ -96,6 +99,7 @@ const App: React.FC = () => (
         />
         <Route path="*" element={<div className="p-8">404 Not Found</div>} />
       </Routes>
+      <AIChatWidget />
     </Layout>
   </AuthProvider>
 );

@@ -13,11 +13,13 @@
 import fs from 'fs';
 import path from 'path';
 import { Router, Application } from 'express';
-import { AddonManifest, Plugin, PluginContext, AddonPlugin } from '../types/plugin.types';
+import { AddonManifest, Plugin, PluginContext, AddonPlugin, AIContext } from '../types/plugin.types';
 import { pluginRegistry } from './plugin-registry';
 import { logger } from '../utils/logger';
 import { pool } from '../utils/database';
 import { authenticateKeycloak, extractKeycloakUser } from '../middleware/auth/keycloak.middleware';
+import { registerCustomTool } from '../services/ai/ai-tool-registry.service';
+import { registerSystemPromptExtension } from '../services/ai/system-prompt-registry.service';
 import semver from 'semver';
 
 // Current OpenTYME version for compatibility checking
@@ -46,10 +48,16 @@ class PluginLoader {
       const pluginDirs = this.discoverPlugins();
       logger.info(`Found ${pluginDirs.length} potential plugin(s)`);
 
+      const aiContext: AIContext = {
+        registerTool: (tool) => registerCustomTool(tool),
+        registerSystemPromptExtension: (name, text) => registerSystemPromptExtension(name, text),
+      };
+
       const context: PluginContext = {
         app,
         logger,
         database: pool(),
+        ai: aiContext,
       };
 
       for (const pluginDir of pluginDirs) {

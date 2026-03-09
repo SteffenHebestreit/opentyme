@@ -15,11 +15,10 @@ COPY backend/src ./src
 COPY backend/tests ./tests
 COPY backend/scripts ./scripts
 COPY backend/config ./config
-COPY backend/migrations ./migrations
 COPY backend/jest.config.js backend/tsconfig.json backend/nodemon.json ./
 
-# Make scripts executable
-RUN chmod +x ./scripts/*.sh || true
+# Strip CRLF and make scripts executable
+RUN sed -i 's/\r//' ./scripts/*.sh && chmod +x ./scripts/*.sh || true
 
 # Create plugins directory
 RUN mkdir -p ./src/plugins
@@ -65,10 +64,11 @@ RUN mkdir -p /usr/src/app/logs /usr/src/app/backups /usr/src/app/src/plugins
 RUN mkdir -p /app-root/scripts
 COPY addons.config.json /app-root/
 COPY scripts/install-addons.sh /app-root/scripts/
+RUN sed -i 's/\r//' /app-root/scripts/install-addons.sh && chmod +x /app-root/scripts/install-addons.sh
 
 # Copy entrypoint script
 COPY backend/docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN sed -i 's/\r//' /usr/local/bin/docker-entrypoint.sh && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Copy any environment files (optional — skip if none exist)
 RUN echo "Note: production env files are injected at runtime via docker-compose"

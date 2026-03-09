@@ -53,6 +53,17 @@ export default function GeneralSettingsPage() {
     company_website: '',
     company_tax_id: '',
     company_logo_url: '',
+    ai_enabled: false,
+    ai_provider: 'openai',
+    ai_api_url: '',
+    ai_api_key: '',
+    ai_model: '',
+    stt_enabled: false,
+    stt_provider: 'whisper',
+    stt_api_url: '',
+    stt_api_key: '',
+    stt_model: 'large-v3',
+    stt_language: '',
   });
   
   const [isLoading, setIsLoading] = useState(true);
@@ -71,7 +82,7 @@ export default function GeneralSettingsPage() {
         }
       } catch (error) {
         console.error('Failed to load settings:', error);
-        setSaveMessage(t('admin.general.loadError') || 'Failed to load settings');
+        setSaveMessage(t('admin.general.loadError'));
       } finally {
         setIsLoading(false);
       }
@@ -136,9 +147,9 @@ export default function GeneralSettingsPage() {
       {/* Company Information */}
       <div className="space-y-4">
         <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          Company Information
+          {t('admin.general.companyInfo')}
         </h3>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Company Name */}
           <div>
@@ -157,7 +168,7 @@ export default function GeneralSettingsPage() {
           {/* Company Subline */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Company Tagline
+              {t('admin.general.companyTagline')}
             </label>
             <input
               type="text"
@@ -171,7 +182,7 @@ export default function GeneralSettingsPage() {
           {/* Company Address */}
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Address
+              {t('admin.general.address')}
             </label>
             <textarea
               value={settings.company_address || ''}
@@ -187,14 +198,14 @@ export default function GeneralSettingsPage() {
       {/* Tax & Contact Information */}
       <div className="space-y-4">
         <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          Tax & Contact Information
+          {t('admin.general.taxContactInfo')}
         </h3>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Tax ID */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Tax ID (USt-IdNr)
+              {t('admin.general.taxId')}
             </label>
             <input
               type="text"
@@ -252,12 +263,12 @@ export default function GeneralSettingsPage() {
       {/* Company Logo */}
       <div className="space-y-4">
         <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          Company Logo
+          {t('admin.general.companyLogo')}
         </h3>
-        
+
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Logo URL
+            {t('admin.general.logoUrl')}
           </label>
           <input
             type="url"
@@ -267,11 +278,11 @@ export default function GeneralSettingsPage() {
             placeholder="https://example.com/logo.png"
           />
           <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            Enter the URL of your company logo. It will appear on invoices and documents.
+            {t('admin.general.logoUrlHint')}
           </p>
           {settings.company_logo_url && (
             <div className="mt-3 p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Preview:</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{t('admin.general.logoPreview')}</p>
               <img 
                 src={settings.company_logo_url} 
                 alt="Company Logo" 
@@ -288,16 +299,16 @@ export default function GeneralSettingsPage() {
       {/* User Location Settings */}
       <div className="space-y-4">
         <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          User Location
+          {t('admin.general.userLocation')}
         </h3>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Set your location for timezone handling and regional holiday display.
+          {t('admin.general.userLocationHint')}
         </p>
-        
+
         <div className="grid grid-cols-1 gap-4 max-w-lg">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Region (German State)
+              {t('admin.general.regionLabel')}
             </label>
             <select
               value={settings.user_region || ''}
@@ -312,7 +323,7 @@ export default function GeneralSettingsPage() {
               }}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             >
-              <option value="">No specific region</option>
+              <option value="">{t('admin.general.noRegion')}</option>
               {GERMAN_STATES.map((state) => (
                 <option key={state.code} value={state.code}>
                   {state.name}
@@ -320,7 +331,7 @@ export default function GeneralSettingsPage() {
               ))}
             </select>
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Your region is used to display regional holidays in charts and determine timezone for time tracking.
+              {t('admin.general.regionHint')}
             </p>
           </div>
         </div>
@@ -349,6 +360,218 @@ export default function GeneralSettingsPage() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* AI Assistant Settings */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+          {t('admin.general.aiAssistant')}
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          {t('admin.general.aiAssistantHint')}
+        </p>
+
+        {/* Enable toggle */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!!settings.ai_enabled}
+            onClick={() => handleFieldChange('ai_enabled', !settings.ai_enabled)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+              settings.ai_enabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                settings.ai_enabled ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {t('admin.general.enableAI')}
+          </span>
+        </div>
+
+        {settings.ai_enabled && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 border-l-2 border-purple-200 dark:border-purple-800">
+            {/* Provider */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t('admin.general.llmProvider')}
+              </label>
+              <select
+                value={settings.ai_provider || 'openai'}
+                onChange={(e) => handleFieldChange('ai_provider', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option value="openai">OpenAI-compatible (local / LM Studio / vLLM)</option>
+                <option value="anthropic">Anthropic Claude</option>
+                <option value="azure">Azure OpenAI</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+
+            {/* Model */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t('admin.general.modelName')}
+              </label>
+              <input
+                type="text"
+                value={settings.ai_model || ''}
+                onChange={(e) => handleFieldChange('ai_model', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="e.g. gpt-4o, llama-3.3-70b, claude-opus-4-6"
+              />
+            </div>
+
+            {/* API URL */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t('admin.general.apiBaseUrl')}
+              </label>
+              <input
+                type="url"
+                value={settings.ai_api_url || ''}
+                onChange={(e) => handleFieldChange('ai_api_url', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="http://localhost:11434/v1  (leave blank for OpenAI default)"
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {t('admin.general.apiBaseUrlHint')}
+              </p>
+            </div>
+
+            {/* API Key */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t('admin.general.apiKey')}
+              </label>
+              <input
+                type="password"
+                value={settings.ai_api_key || ''}
+                onChange={(e) => handleFieldChange('ai_api_key', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="sk-..."
+                autoComplete="new-password"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Speech-to-Text Settings */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+          {t('admin.general.stt')}
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          {t('admin.general.sttHint')}
+        </p>
+
+        {/* Enable toggle */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!!settings.stt_enabled}
+            onClick={() => handleFieldChange('stt_enabled', !settings.stt_enabled)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+              settings.stt_enabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                settings.stt_enabled ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {t('admin.general.enableSTT')}
+          </span>
+        </div>
+
+        {settings.stt_enabled && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 border-l-2 border-purple-200 dark:border-purple-800">
+            {/* STT Provider */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t('admin.general.sttEngine')}
+              </label>
+              <select
+                value={settings.stt_provider || 'whisper'}
+                onChange={(e) => handleFieldChange('stt_provider', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option value="whisper">fast-whisper</option>
+                <option value="qwen_asr">Qwen3 ASR</option>
+                <option value="custom">Custom OpenAI-compat</option>
+              </select>
+            </div>
+
+            {/* STT Model */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t('admin.general.sttModel')}
+              </label>
+              <input
+                type="text"
+                value={settings.stt_model || ''}
+                onChange={(e) => handleFieldChange('stt_model', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="large-v3"
+              />
+            </div>
+
+            {/* STT API URL */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t('admin.general.sttServerUrl')}
+              </label>
+              <input
+                type="url"
+                value={settings.stt_api_url || ''}
+                onChange={(e) => handleFieldChange('stt_api_url', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="http://localhost:8080"
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {t('admin.general.sttServerUrlHint')}
+              </p>
+            </div>
+
+            {/* STT API Key */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t('admin.general.sttApiKeyOptional')}
+              </label>
+              <input
+                type="password"
+                value={settings.stt_api_key || ''}
+                onChange={(e) => handleFieldChange('stt_api_key', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Leave blank if not required"
+                autoComplete="new-password"
+              />
+            </div>
+
+            {/* STT Language */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t('admin.general.sttLanguageOptional')}
+              </label>
+              <input
+                type="text"
+                value={settings.stt_language || ''}
+                onChange={(e) => handleFieldChange('stt_language', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder={t('admin.general.sttLanguagePlaceholder')}
+                maxLength={10}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Save Button */}

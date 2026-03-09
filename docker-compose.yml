@@ -46,6 +46,7 @@ services:
       # AI Services
       - MCP_SERVER_URL=http://mcp-server:8000
       - AI_ENABLED=${AI_ENABLED:-false}
+      - INTERNAL_API_URL=http://localhost:8000
       # Addon installation
       - GITHUB_ADDON_TOKEN=${GITHUB_ADDON_TOKEN:-}
       - GITLAB_ADDON_TOKEN=${GITLAB_ADDON_TOKEN:-}
@@ -101,7 +102,6 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-      - /app/src/plugins   # preserve image-baked addon plugins (not overridden by ./frontend mount)
     depends_on:
       - backend
     networks:
@@ -351,6 +351,8 @@ services:
 
   # FastAPI MCP Server for AI-powered PDF Extraction
   mcp-server:
+    profiles:
+      - mcp
     build:
       context: https://github.com/SteffenHebestreit/fastapi_mcp_template.git
       dockerfile: Dockerfile

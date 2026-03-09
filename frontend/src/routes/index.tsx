@@ -46,6 +46,9 @@ import Reports from '@/pages/Reports';
 // Auth guard loader
 import { authGuardLoader } from './loaders/authGuardLoader';
 
+// AI Chat Widget (floating, present on every page)
+import AIChatWidget from '@/components/ai/AIChatWidget';
+
 /**
  * Renders the component registered by an addon for the current path.
  * Placed before the 404 catch-all so addon routes resolve correctly.
@@ -80,6 +83,7 @@ function RootLayout() {
   return (
     <Layout>
       <Outlet />
+      <AIChatWidget />
     </Layout>
   );
 }

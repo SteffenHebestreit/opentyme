@@ -646,6 +646,12 @@ export interface Settings {
   ai_model: string | null;
   mcp_server_url: string | null;
   mcp_server_api_key: string | null;
+  stt_enabled: boolean;
+  stt_provider: string;
+  stt_api_url: string | null;
+  stt_api_key: string | null;
+  stt_model: string | null;
+  stt_language: string | null;
   created_at: string;
   updated_at: string;
 }

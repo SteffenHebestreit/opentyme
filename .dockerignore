@@ -5,4 +5,5 @@
 **/coverage
 .git
 docs/
-opentyme-addon-*/
+opentyme-addon-*/node_modules
+opentyme-addon-*/.git

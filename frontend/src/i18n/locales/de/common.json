@@ -165,5 +165,23 @@
   },
   "tooltips": {
     "login": "Anmelden"
+  },
+  "ai": {
+    "title": "KI-Assistent",
+    "thinking": "Denkt nach…",
+    "listening": "Hört zu…",
+    "newConversation": "Neues Gespräch",
+    "welcomeTitle": "Wie kann ich Ihnen heute helfen?",
+    "welcomeBody": "Fragen zu Kunden, Rechnungen, Zeiteinträgen oder Analysen.",
+    "welcomeBodyMic": "Nutzen Sie das Mikrofon für Spracheingabe.",
+    "placeholder": "Frage eingeben… (Enter zum Senden, Shift+Enter für neue Zeile)",
+    "stopRecording": "Aufnahme beenden",
+    "startRecording": "Spracheingabe starten",
+    "send": "Senden",
+    "stop": "Stopp",
+    "toolArguments": "Argumente",
+    "toolResult": "Ergebnis",
+    "open": "KI-Assistent öffnen",
+    "close": "KI-Assistent schließen"
   }
 }
