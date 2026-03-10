@@ -504,8 +504,9 @@ export default function GeneralSettingsPage() {
                 onChange={(e) => handleFieldChange('stt_provider', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               >
-                <option value="whisper">fast-whisper</option>
+                <option value="faster_whisper">faster-whisper (recommended)</option>
                 <option value="qwen_asr">Qwen3 ASR</option>
+                <option value="whisper">OpenAI-compat (fast-whisper server)</option>
                 <option value="custom">Custom OpenAI-compat</option>
               </select>
             </div>

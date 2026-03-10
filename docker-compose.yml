@@ -459,27 +459,29 @@ services:
   #     - project-network
 
 # Volumes for persistent data
-  # ── Speech-to-Text (optional, CPU) ───────────────────────────────────────────
+  # ── Speech-to-Text — faster-whisper (optional, CPU) ─────────────────────────
   # Start with: docker compose --profile stt up
-  # CPU-only — works on any machine without GPU passthrough (WSL2 compatible).
-  # The model (~3 GB) is downloaded on first start.
-  qwen3-asr:
+  # CPU-only with CTranslate2 int8 — no GPU required (WSL2 compatible).
+  # Model is downloaded on first start (~1.5 GB for distil-large-v3).
+  # Set WHISPER_MODEL_SIZE to: tiny|base|small|medium|large-v3|distil-large-v3
+  faster-whisper:
     profiles: [stt]
     build:
       context: ./services
-      dockerfile: qwen3-asr-cpu/Dockerfile
+      dockerfile: faster-whisper-cpu/Dockerfile
     ports:
-      - "5002:5002"
+      - "5002:8000"
     environment:
-      QWEN3_ASR_MODEL: ${QWEN3_ASR_MODEL:-Qwen/Qwen3-ASR-1.7B}
+      WHISPER_MODEL_SIZE: ${WHISPER_MODEL_SIZE:-distil-large-v3}
+      USE_CUDA: "false"
     volumes:
-      - qwen3_asr_cache:/root/.cache
+      - whisper_cache:/root/.cache
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
-      start_period: 600s
+      start_period: 300s
       retries: 3
     networks:
       - project-network
@@ -493,7 +495,7 @@ volumes:
     driver: local
   seaweedfs_data:
     driver: local
-  qwen3_asr_cache:
+  whisper_cache:
     driver: local
   # clamav_data: (commented out as volume is not used if service is disabled)
   #   driver: local

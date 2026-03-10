@@ -72,19 +72,20 @@ export class TranscriptionService {
     const apiUrl = settings.stt_api_url.replace(/\/$/, '');
     const apiKey = settings.stt_api_key;
     const language = settings.stt_language || undefined;
-    const isQwen3Native = settings.stt_provider === 'qwen_asr';
+    // Providers using tts-stt-playground native /transcribe format (field: 'audio')
+    const isNativeEndpoint = settings.stt_provider === 'qwen_asr' || settings.stt_provider === 'faster_whisper';
 
     const ext = mimeType.split('/')[1]?.split(';')[0] ?? 'webm';
     const form = new FormData();
     const blob = new Blob([new Uint8Array(audioBuffer)], { type: mimeType });
 
-    // qwen_asr: native /transcribe endpoint — field name 'audio'
-    // others:   OpenAI-compatible /v1/audio/transcriptions — field name 'file'
-    const endpoint = isQwen3Native
+    // native: /transcribe endpoint — field name 'audio' (qwen_asr, faster_whisper)
+    // others: OpenAI-compatible /v1/audio/transcriptions — field name 'file'
+    const endpoint = isNativeEndpoint
       ? `${apiUrl}/transcribe`
       : `${apiUrl}/v1/audio/transcriptions`;
 
-    if (isQwen3Native) {
+    if (isNativeEndpoint) {
       form.append('audio', blob, `audio.${ext}`);
       if (language) form.append('language', language);
     } else {
