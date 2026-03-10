@@ -76,16 +76,20 @@ export class TranscriptionService {
 
     const ext = mimeType.split('/')[1]?.split(';')[0] ?? 'webm';
     const form = new FormData();
-    form.append('file', new Blob([new Uint8Array(audioBuffer)], { type: mimeType }), `audio.${ext}`);
-    if (language) form.append('language', language);
+    const blob = new Blob([new Uint8Array(audioBuffer)], { type: mimeType });
 
-    // qwen_asr: native /transcribe endpoint (tts-stt-playground format)
-    // others:   OpenAI-compatible /v1/audio/transcriptions
+    // qwen_asr: native /transcribe endpoint — field name 'audio'
+    // others:   OpenAI-compatible /v1/audio/transcriptions — field name 'file'
     const endpoint = isQwen3Native
       ? `${apiUrl}/transcribe`
       : `${apiUrl}/v1/audio/transcriptions`;
 
-    if (!isQwen3Native) {
+    if (isQwen3Native) {
+      form.append('audio', blob, `audio.${ext}`);
+      if (language) form.append('language', language);
+    } else {
+      form.append('file', blob, `audio.${ext}`);
+      if (language) form.append('language', language);
       form.append('model', settings.stt_model || 'whisper-1');
       form.append('response_format', 'json');
     }
