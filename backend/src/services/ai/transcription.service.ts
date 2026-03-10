@@ -71,23 +71,30 @@ export class TranscriptionService {
 
     const apiUrl = settings.stt_api_url.replace(/\/$/, '');
     const apiKey = settings.stt_api_key;
-    const model = settings.stt_model || 'whisper-1';
     const language = settings.stt_language || undefined;
+    const isQwen3Native = settings.stt_provider === 'qwen_asr';
 
-    // Build multipart form — compatible with OpenAI /audio/transcriptions
-    // Uses native FormData + Blob available in Node 18+
     const ext = mimeType.split('/')[1]?.split(';')[0] ?? 'webm';
     const form = new FormData();
     form.append('file', new Blob([new Uint8Array(audioBuffer)], { type: mimeType }), `audio.${ext}`);
-    form.append('model', model);
     if (language) form.append('language', language);
-    form.append('response_format', 'json');
+
+    // qwen_asr: native /transcribe endpoint (tts-stt-playground format)
+    // others:   OpenAI-compatible /v1/audio/transcriptions
+    const endpoint = isQwen3Native
+      ? `${apiUrl}/transcribe`
+      : `${apiUrl}/v1/audio/transcriptions`;
+
+    if (!isQwen3Native) {
+      form.append('model', settings.stt_model || 'whisper-1');
+      form.append('response_format', 'json');
+    }
 
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 60_000);
 
-      const response = await fetch(`${apiUrl}/v1/audio/transcriptions`, {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),

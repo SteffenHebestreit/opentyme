@@ -1,0 +1,4 @@
+[submodule "services/tts-stt-playground"]
+	path = services/tts-stt-playground
+	url = https://github.com/SteffenHebestreit/tts-stt-playground.git
+	branch = master
