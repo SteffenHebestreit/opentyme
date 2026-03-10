@@ -34,6 +34,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // This survives React StrictMode double-mount in development
 let keycloakInitPromise: Promise<boolean> | null = null;
 
+// Set to true only after keycloak.init() resolves successfully.
+// Used to detect the Vite HMR case where AuthContext is re-evaluated but the
+// keycloak instance from keycloak.config.ts (a different module) was already
+// fully initialized, so calling init() a second time would fail or hang.
+let keycloakFullyInitialized = false;
+
 // Custom hook for using the auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -71,10 +77,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Use promise-based singleton to prevent double initialization
         // This handles React StrictMode's double-mount in development
         if (!keycloakInitPromise) {
-          if (keycloak.authenticated !== undefined) {
-            // Already initialized (e.g. Vite HMR re-evaluated AuthContext but not keycloak.config).
-            // Re-use the existing Keycloak state instead of calling init() a second time,
-            // which would hang or throw "already initialized".
+          if (keycloakFullyInitialized) {
+            // Vite HMR re-evaluated AuthContext (resetting keycloakInitPromise to null)
+            // but the keycloak instance in keycloak.config.ts was NOT reloaded — it is
+            // already fully initialized including its internal adapter. Calling init()
+            // a second time on the same instance makes adapter.login() undefined and
+            // breaks the login button. Reuse the existing state instead.
             console.log('[Auth] Keycloak already initialized, reusing state...');
             keycloakInitPromise = Promise.resolve(!!keycloak.authenticated);
           } else {
@@ -100,6 +108,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
 
         const authenticated = await keycloakInitPromise;
+        keycloakFullyInitialized = true; // adapter is ready — login() is safe to call
         setIsKeycloakInitialized(true);
 
         if (authenticated) {
