@@ -83,7 +83,25 @@ Enable in **Settings → AI**. Any OpenAI-compatible API works (local LLM via LM
 
 Set `INTERNAL_API_URL=http://localhost:8000` in the backend environment so the assistant can call the API on the user's behalf.
 
-Speech-to-text (mic button) uses a separate STT provider configured under **Settings → AI → Speech**.
+Speech-to-text (mic button) is configured under **Settings → AI → Speech**.
+
+The built-in STT service uses [faster-whisper](https://github.com/SYSTRAN/faster-whisper) and is started separately:
+
+```bash
+docker compose --profile stt up -d
+```
+
+Set `WHISPER_MODEL_SIZE` in `.env` — choose a **multilingual** model for non-English:
+
+| Model | Size | Speed (CPU) | Languages |
+|-------|------|-------------|-----------|
+| `medium` | ~1.5 GB | ~3–4× realtime | Multilingual |
+| `large-v3` | ~3 GB | ~1× realtime | Multilingual (best quality) |
+| `distil-large-v3` | ~1.5 GB | ~5–10× realtime | **English only** |
+
+Then configure in Settings:
+- **STT Engine**: `faster-whisper (recommended)`
+- **STT Server URL**: `http://faster-whisper:8000` (internal Docker hostname)
 
 ---
 

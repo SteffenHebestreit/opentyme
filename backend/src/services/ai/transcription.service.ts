@@ -88,6 +88,9 @@ export class TranscriptionService {
     if (isNativeEndpoint) {
       form.append('audio', blob, `audio.${ext}`);
       if (language) form.append('language', language);
+      form.append('task', 'transcribe');
+      // Raise VAD no-speech threshold so webm/opus recordings aren't filtered out
+      form.append('no_speech_threshold', '0.95');
     } else {
       form.append('file', blob, `audio.${ext}`);
       if (language) form.append('language', language);

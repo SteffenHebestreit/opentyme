@@ -1,0 +1,35 @@
+# ROCm override for AMD GPU acceleration (ROCm 6.2+, Strix Halo gfx1201 / RDNA 4)
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.rocm.yml --profile stt up -d
+#
+# Strix Halo (gfx1201): gfx1201 is not in ROCm 6.2's official list.
+#   HSA_OVERRIDE_GFX_VERSION=11.0.0 makes ROCm treat it as gfx1100 (RDNA 3).
+#   Set in .env or it defaults to 11.0.0 here.
+#
+# Unified memory note:
+#   Strix Halo shares LPDDR5x between CPU and GPU. expandable_segments:True
+#   prevents the HIP allocator from pre-reserving a fixed block and fragmenting RAM.
+
+services:
+  faster-whisper:
+    build:
+      context: ./services
+      dockerfile: faster-whisper-rocm/Dockerfile
+    environment:
+      WHISPER_MODEL_SIZE: ${WHISPER_MODEL_SIZE:-large-v3}
+      FORCE_ACCELERATION: rocm
+      USE_CUDA: ""
+      HIP_VISIBLE_DEVICES: ${HIP_VISIBLE_DEVICES:-0}
+      HSA_OVERRIDE_GFX_VERSION: ${HSA_OVERRIDE_GFX_VERSION:-11.0.0}
+      PYTORCH_HIP_ALLOC_CONF: ${PYTORCH_HIP_ALLOC_CONF:-expandable_segments:True,max_split_size_mb:512}
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add:
+      - video
+      - render
+    deploy:
+      resources:
+        reservations:
+          devices: []
