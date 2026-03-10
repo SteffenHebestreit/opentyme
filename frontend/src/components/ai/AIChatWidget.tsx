@@ -38,7 +38,7 @@ class AIChatErrorBoundary extends Component<
 
 // ── Inner widget (only rendered when ai_enabled=true) ────────────────────────
 
-function AIChatWidgetInner() {
+function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
   const { t } = useTranslation('common');
   const [open, setOpen] = useState(false);
   const chat = useAIChat();
@@ -58,6 +58,7 @@ function AIChatWidgetInner() {
             onSend={chat.sendMessage}
             onStop={chat.stopStreaming}
             onClear={chat.clearConversation}
+            sttEnabled={sttEnabled}
           />
         </div>
       )}
@@ -88,11 +89,15 @@ function AIChatWidgetInner() {
 export default function AIChatWidget() {
   const { isAuthenticated, isLoadingAuth } = useAuth();
   const [aiEnabled, setAiEnabled] = useState<boolean | null>(null);
+  const [sttEnabled, setSttEnabled] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) return;
     getSettings()
-      .then((s) => setAiEnabled(!!s.ai_enabled))
+      .then((s) => {
+        setAiEnabled(!!s.ai_enabled);
+        setSttEnabled(!!s.stt_enabled);
+      })
       .catch(() => setAiEnabled(false));
   }, [isAuthenticated]);
 
@@ -101,7 +106,7 @@ export default function AIChatWidget() {
 
   return (
     <AIChatErrorBoundary>
-      <AIChatWidgetInner />
+      <AIChatWidgetInner sttEnabled={sttEnabled} />
     </AIChatErrorBoundary>
   );
 }

@@ -18,6 +18,7 @@ interface Props {
   onSend: (text: string) => void;
   onStop: () => void;
   onClear: () => void;
+  sttEnabled?: boolean;
 }
 
 // Guardrail: max input length
@@ -124,7 +125,7 @@ function MessageBubble({ msg, toolResult }: { msg: UIMessage; toolResult?: UIMes
 
 // ── Main panel ───────────────────────────────────────────────────────────────
 
-export default function AIChatPanel({ messages, isStreaming, error, onSend, onStop, onClear }: Props) {
+export default function AIChatPanel({ messages, isStreaming, error, onSend, onStop, onClear, sttEnabled = false }: Props) {
   const { t } = useTranslation('common');
   const [input, setInput] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -265,8 +266,8 @@ export default function AIChatPanel({ messages, isStreaming, error, onSend, onSt
         {/* Addon quick-action buttons (slot) */}
         <Slot name="ai-chat-actions" context={{ onSend, isStreaming }} className="flex flex-wrap gap-1.5 mb-2" />
         <div className="flex items-center gap-2">
-          {/* Mic button */}
-          <button
+          {/* Mic button — only shown when speech-to-text is configured */}
+          {sttEnabled && <button
             onClick={toggleRecording}
             disabled={isStreaming}
             title={isRecording ? t('ai.stopRecording') : t('ai.startRecording')}
@@ -277,7 +278,7 @@ export default function AIChatPanel({ messages, isStreaming, error, onSend, onSt
             }`}
           >
             {isRecording ? <MicOff size={16} /> : <Mic size={16} />}
-          </button>
+          </button>}
 
           {/* Text input */}
           <div className="flex-1 relative">
