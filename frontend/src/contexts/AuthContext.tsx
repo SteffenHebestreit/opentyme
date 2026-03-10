@@ -71,14 +71,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Use promise-based singleton to prevent double initialization
         // This handles React StrictMode's double-mount in development
         if (!keycloakInitPromise) {
-          console.log('[Auth] Initializing Keycloak...');
-          
-          keycloakInitPromise = keycloak.init({
-            onLoad: 'check-sso',
-            checkLoginIframe: false, // Disable iframe check to avoid X-Frame-Options issues
-            pkceMethod: 'S256',
-            enableLogging: import.meta.env.DEV,
-          });
+          if (keycloak.authenticated !== undefined) {
+            // Already initialized (e.g. Vite HMR re-evaluated AuthContext but not keycloak.config).
+            // Re-use the existing Keycloak state instead of calling init() a second time,
+            // which would hang or throw "already initialized".
+            console.log('[Auth] Keycloak already initialized, reusing state...');
+            keycloakInitPromise = Promise.resolve(!!keycloak.authenticated);
+          } else {
+            console.log('[Auth] Initializing Keycloak...');
+            // Race against a 15 s timeout so the loading screen never hangs forever.
+            keycloakInitPromise = Promise.race([
+              keycloak.init({
+                onLoad: 'check-sso',
+                checkLoginIframe: false, // Disable iframe check to avoid X-Frame-Options issues
+                pkceMethod: 'S256',
+                enableLogging: import.meta.env.DEV,
+              }),
+              new Promise<boolean>(resolve =>
+                setTimeout(() => {
+                  console.warn('[Auth] Keycloak init timed out — treating as unauthenticated');
+                  resolve(false);
+                }, 15000)
+              ),
+            ]);
+          }
         } else {
           console.log('[Auth] Using existing Keycloak initialization...');
         }
@@ -293,7 +309,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    */
   const isAdmin = hasRole('admin');
   
-  const isAuthenticated = !!user && !!token && !!keycloak.authenticated;
+  // Derive auth state purely from React state — do NOT read keycloak.authenticated directly
+  // here, as it's a mutable non-React property that can flip between renders and cause flicker.
+  const isAuthenticated = !!user && !!token;
 
   const contextValue: AuthContextType = {
     user,
