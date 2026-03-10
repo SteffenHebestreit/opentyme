@@ -459,35 +459,27 @@ services:
   #     - project-network
 
 # Volumes for persistent data
-  # ── Speech-to-Text (optional) ────────────────────────────────────────────────
+  # ── Speech-to-Text (optional, CPU) ───────────────────────────────────────────
   # Start with: docker compose --profile stt up
-  # Requires an NVIDIA GPU (CUDA). The model (~3 GB) is downloaded on first start.
+  # CPU-only — works on any machine without GPU passthrough (WSL2 compatible).
+  # The model (~3 GB) is downloaded on first start.
   qwen3-asr:
     profiles: [stt]
     build:
-      context: ./services/tts-stt-playground/qwen3-asr-service
-      dockerfile: Dockerfile
+      context: ./services
+      dockerfile: qwen3-asr-cpu/Dockerfile
     ports:
       - "5002:5002"
     environment:
       QWEN3_ASR_MODEL: ${QWEN3_ASR_MODEL:-Qwen/Qwen3-ASR-1.7B}
-      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
-      NVIDIA_DRIVER_CAPABILITIES: ${NVIDIA_DRIVER_CAPABILITIES:-compute,utility}
     volumes:
       - qwen3_asr_cache:/root/.cache
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: [gpu]
-              driver: nvidia
-              count: 1
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
       interval: 30s
       timeout: 10s
-      start_period: 120s
+      start_period: 600s
       retries: 3
     networks:
       - project-network
