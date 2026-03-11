@@ -459,28 +459,29 @@ services:
   #     - project-network
 
 # Volumes for persistent data
-  # ── Speech-to-Text — faster-whisper (optional, CPU) ─────────────────────────
+  # ── Speech-to-Text — faster-whisper ─────────────────────────────────────────
   # Start with: docker compose --profile stt up
-  # CPU-only with CTranslate2 int8 — no GPU required (WSL2 compatible).
+  # CPU by default (WSL2 / Docker Desktop compatible).
+  # For AMD ROCm GPU: docker compose -f docker-compose.yml -f docker-compose.rocm.yml --profile stt up
   # Model is downloaded on first start (~3 GB for large-v3).
   # Set WHISPER_MODEL_SIZE in .env:
   #   Multilingual: tiny | base | small | medium (fast) | large-v3 (best)
-  #   English-only: distil-large-v3 (fastest, but NOT suitable for non-English)
+  #   English-only: distil-large-v3 (fastest, NOT suitable for non-English)
   faster-whisper:
     profiles: [stt]
     build:
-      context: ./services
-      dockerfile: faster-whisper-cpu/Dockerfile
+      context: ./services/tts-stt-playground/stt-service
+      dockerfile: Dockerfile
     ports:
-      - "5002:5002"
+      - "5002:8000"
     environment:
       WHISPER_MODEL_SIZE: ${WHISPER_MODEL_SIZE:-large-v3}
-      USE_CUDA: "false"
+      FORCE_ACCELERATION: ${FORCE_ACCELERATION:-cpu}
     volumes:
       - whisper_cache:/root/.cache
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       start_period: 300s

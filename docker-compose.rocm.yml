@@ -14,8 +14,8 @@
 services:
   faster-whisper:
     build:
-      context: ./services
-      dockerfile: faster-whisper-rocm/Dockerfile
+      context: ./services/tts-stt-playground/stt-service
+      dockerfile: Dockerfile.rocm
     environment:
       WHISPER_MODEL_SIZE: ${WHISPER_MODEL_SIZE:-large-v3}
       FORCE_ACCELERATION: rocm
