@@ -145,6 +145,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         } else {
           console.log('[Auth] ℹ️ User is not authenticated');
+          // Clear any stale tokens so axios interceptor doesn't send them
+          // and trigger 401 → redirect → reload → loop
+          clearTokens();
         }
       } catch (error) {
         console.error('[Auth] ❌ Keycloak initialization failed:', error);
