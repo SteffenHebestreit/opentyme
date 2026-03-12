@@ -52,9 +52,11 @@ router.use(extractKeycloakUser);
  *                 example: 2.75
  *               description:
  *                 type: string
- *                 description: Description of the work done
+ *                 description: Free-text note about the specific work done (e.g. "Fixed login redirect bug", "Implemented dark mode")
  *               task_name:
  *                 type: string
+ *                 description: The task or activity label within the project (e.g. "Development", "Code Review", "Meeting", "Bug Fix"). Use this when the user specifies a task name — do NOT put the task name into the description field.
+ *                 example: "Development"
  *               billable:
  *                 type: boolean
  *                 default: true
@@ -274,8 +276,10 @@ router.get('/:id', timeEntryController.findById.bind(timeEntryController));
  *                 description: Duration in decimal hours
  *               description:
  *                 type: string
+ *                 description: Free-text note about the specific work done
  *               task_name:
  *                 type: string
+ *                 description: The task or activity label within the project (e.g. "Development", "Code Review", "Meeting"). Do NOT put the task name into the description field.
  *               billable:
  *                 type: boolean
  *               category:
