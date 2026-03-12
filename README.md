@@ -140,14 +140,14 @@ Addons receive `context.ai` in `initialize()` — three paths:
 
 ### Frontend slots
 
-| Slot | Where |
-|------|-------|
-| `expense-form-actions` | Add Expense modal |
-| `expense-detail-actions` | Expense Detail modal |
-| `dashboard-widgets` | Dashboard (after Recent Invoices) |
-| `settings-tabs` | Admin → Settings (expose `.tabMeta`) |
-| `ai-chat-actions` | Above AI chat input — `{ onSend, isStreaming }` |
-| `email-template-builder` | Email Template editor Code tab |
+| Slot | Where | Context |
+|------|-------|---------|
+| `expense-form-actions` | Add Expense modal | `{ setDescription, setAmount, setCurrency, setCategory, setExpenseDate, setNotes }` |
+| `expense-detail-actions` | Expense Detail modal | `{ expense, onExpenseUpdated, isEditing }` |
+| `dashboard-widgets` | Dashboard (after Recent Invoices) | `{ metrics }` |
+| `settings-tabs` | Admin → Settings | `{ activeTab }` — component must expose static `.tabMeta = { id, label, icon }` |
+| `ai-chat-actions` | Above AI chat input | `{ onSend, isStreaming }` |
+| `email-template-builder` | Email Template editor Code tab | `{ templateId?, mjmlContent, setMjmlContent, onSave? }` |
 
 ---
 

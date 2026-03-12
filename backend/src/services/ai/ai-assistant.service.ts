@@ -261,8 +261,13 @@ IMPORTANT — use the right tool for the job:
           });
           emit({ type: EventType.TOOL_CALL_END, toolCallId: tcId });
 
-          const result = await executeToolCall(tcName, argsObj, bearerToken);
-          const resultContent = JSON.stringify(result.data ?? result.error ?? '');
+          let resultContent: string;
+          try {
+            const result = await executeToolCall(tcName, argsObj, bearerToken);
+            resultContent = JSON.stringify(result.data ?? result.error ?? '');
+          } catch (toolErr: any) {
+            resultContent = JSON.stringify({ error: `Tool execution failed: ${toolErr.message}` });
+          }
 
           emit({
             type: EventType.TOOL_CALL_RESULT,

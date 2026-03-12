@@ -9,15 +9,18 @@ const KEYCLOAK_URL = process.env.KEYCLOAK_PUBLIC_URL || 'http://auth.localhost';
 const REALM = process.env.KEYCLOAK_REALM || 'tyme';
 // Use admin service credentials for token introspection
 const CLIENT_ID = process.env.KEYCLOAK_ADMIN_CLIENT_ID || 'tyme-admin-service';
-const CLIENT_SECRET = process.env.KEYCLOAK_ADMIN_CLIENT_SECRET || 'admin-service-secret-change-in-production';
+const CLIENT_SECRET = process.env.KEYCLOAK_ADMIN_CLIENT_SECRET;
+if (!CLIENT_SECRET) {
+  throw new Error('KEYCLOAK_ADMIN_CLIENT_SECRET environment variable is required');
+}
 
 /**
  * Token introspection cache
  * Maps token -> { data, expiry }
- * Cache tokens for 5 minutes to reduce Keycloak load
+ * Cache tokens for 2 minutes to limit window for stale role/permission data
  */
 const tokenCache = new Map<string, { data: any; expiry: number }>();
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
 
 /**
  * Clean up expired cache entries every 5 minutes

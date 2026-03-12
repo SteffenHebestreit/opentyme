@@ -85,18 +85,23 @@ export const sanitizeRequestBody = (req: Request, res: Response, next: NextFunct
       }
     });
 
-    // For nested objects, recursively sanitize string fields
+    // For nested objects/arrays, recursively sanitize string fields
     const sanitizeNestedObject = (obj: any): any => {
-      if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+      if (!obj || typeof obj !== 'object') {
         return obj;
       }
 
+      if (Array.isArray(obj)) {
+        return obj.map((item: any) =>
+          typeof item === 'string' ? purify.sanitize(item) : sanitizeNestedObject(item)
+        );
+      }
+
       const result: Record<string, any> = {};
-      
       for (const key in obj) {
         if (typeof obj[key] === 'string') {
           result[key] = purify.sanitize(obj[key]);
-        } else if (typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
+        } else if (typeof obj[key] === 'object') {
           result[key] = sanitizeNestedObject(obj[key]);
         } else {
           result[key] = obj[key];
@@ -106,9 +111,9 @@ export const sanitizeRequestBody = (req: Request, res: Response, next: NextFunct
       return result;
     };
 
-    // If we have nested objects in the body, sanitize them too
+    // Sanitize nested objects and arrays in the body
     for (const key in sanitizedBody) {
-      if (typeof sanitizedBody[key] === 'object' && !Array.isArray(sanitizedBody[key])) {
+      if (typeof sanitizedBody[key] === 'object') {
         sanitizedBody[key] = sanitizeNestedObject(sanitizedBody[key]);
       }
     }
