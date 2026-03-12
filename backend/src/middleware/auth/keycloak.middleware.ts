@@ -9,7 +9,7 @@ const KEYCLOAK_URL = process.env.KEYCLOAK_PUBLIC_URL || 'http://auth.localhost';
 const REALM = process.env.KEYCLOAK_REALM || 'tyme';
 // Use admin service credentials for token introspection
 const CLIENT_ID = process.env.KEYCLOAK_ADMIN_CLIENT_ID || 'tyme-admin-service';
-const CLIENT_SECRET = process.env.KEYCLOAK_ADMIN_CLIENT_SECRET;
+const CLIENT_SECRET = process.env.KEYCLOAK_ADMIN_CLIENT_SECRET as string;
 if (!CLIENT_SECRET) {
   throw new Error('KEYCLOAK_ADMIN_CLIENT_SECRET environment variable is required');
 }
