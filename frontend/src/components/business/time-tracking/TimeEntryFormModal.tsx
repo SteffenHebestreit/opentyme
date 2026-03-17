@@ -245,8 +245,17 @@ export const TimeEntryFormModal: FC<TimeEntryFormModalProps> = ({
       entryDate = typeof initialEntry.entry_date === 'string' 
         ? initialEntry.entry_date.split('T')[0]  
         : new Date(initialEntry.entry_date).toISOString().split('T')[0];
-      startTime = initialEntry.entry_time || '';
-      endTime = initialEntry.entry_end_time || '';
+      startTime = initialEntry.entry_time ? initialEntry.entry_time.slice(0, 5) : '';
+      endTime = initialEntry.entry_end_time ? initialEntry.entry_end_time.slice(0, 5) : '';
+
+      // Derive end time from start + duration when entry_end_time is not stored
+      if (!endTime && startTime && initialEntry.duration_hours) {
+        const [h, m] = startTime.split(':').map(Number);
+        const endMinutes = h * 60 + m + Math.round(initialEntry.duration_hours * 60);
+        const endH = Math.floor(endMinutes / 60) % 24;
+        const endM = endMinutes % 60;
+        endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+      }
     } else if (initialEntry.start_time) {
       // Legacy format: extract from start_time timestamp
       const startDate = new Date(initialEntry.start_time);

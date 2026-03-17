@@ -65,6 +65,25 @@ function resolveSchema(schema: Record<string, unknown>, components: Record<strin
   return schema;
 }
 
+/**
+ * Strip 'example' fields from property schemas to prevent LLMs from anchoring
+ * on hardcoded example values (e.g. a static date like "2026-03-09") instead of
+ * using user-provided values.
+ */
+function stripExamples(props: Record<string, unknown>): Record<string, unknown> {
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(props)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const prop = { ...(value as Record<string, unknown>) };
+      delete prop.example;
+      cleaned[key] = prop;
+    } else {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned;
+}
+
 function buildParameters(
   operation: Record<string, unknown>,
   components: Record<string, unknown>
@@ -101,7 +120,7 @@ function buildParameters(
     }
   }
 
-  return { properties, required };
+  return { properties: stripExamples(properties), required };
 }
 
 // Cache

@@ -29,7 +29,7 @@ import { buildSystemPromptExtensions } from './system-prompt-registry.service';
 // ---- Types ----------------------------------------------------------------
 
 export interface ConversationMessage {
-  role: 'user' | 'assistant' | 'tool';
+  role: 'user' | 'assistant' | 'tool' | 'system';
   content: string | null;
   tool_calls?: LLMToolCall[];
   tool_call_id?: string;
@@ -175,7 +175,7 @@ export class AIAssistantService {
        FROM ai_messages
        WHERE conversation_id = $1
        ORDER BY created_at ASC
-       LIMIT 40`,
+       LIMIT 20`,
       [conversationId]
     );
 
@@ -187,12 +187,20 @@ export class AIAssistantService {
       ...(row.tool_name ? { name: row.tool_name } : {}),
     }));
 
+    const today = new Date().toISOString().split('T')[0];
     const systemPrompt = `You are the AI assistant for OpenTYME, a time tracking and invoicing application for freelancers and small businesses.
-Today is ${new Date().toISOString().split('T')[0]}. User: ${userFullName} (${userEmail}).
+Today is ${today}. User: ${userFullName} (${userEmail}).
 You have tools that call the application REST API on the user's behalf.
 Always fetch real data rather than guessing. Summarize results concisely and helpfully.
 When creating or modifying data, confirm what was done.
 Always respond in the user's preferred language: ${language}.
+
+CRITICAL — follow user-provided values exactly:
+- When the user specifies dates, times, descriptions, task names, or any other values, use them EXACTLY as given. NEVER substitute, invent, or change user-provided values.
+- If the user says "today", use ${today}. If the user says a specific date, use that exact date.
+- If the user provides specific start/end times, use those exact times — do NOT change them.
+- If the user corrects you, re-read their original request carefully and use the correct values. Do NOT repeat the same mistake.
+- When creating multiple entries in one request, each entry must match the user's specifications individually.
 
 IMPORTANT — use the right tool for the job:
 - For totals, sums, averages or any aggregation over time entries → use get_time_summary (never fetch raw time entry lists to calculate)
@@ -202,10 +210,10 @@ IMPORTANT — use the right tool for the job:
 - For a full picture of one client (hours + invoices) → use get_client_overview
 - For a full picture of one project (hours, budget, invoices) → use get_project_overview
 - Only use get_time_entries / get_invoices / get_expenses when the user explicitly wants to see the individual records (not totals).
-- All date parameters use YYYY-MM-DD format. "This month" = start_date ${new Date().toISOString().slice(0, 7)}-01, end_date ${new Date().toISOString().split('T')[0]}.${buildSystemPromptExtensions()}`;
+- All date parameters use YYYY-MM-DD format. "This month" = start_date ${new Date().toISOString().slice(0, 7)}-01, end_date ${today}.${buildSystemPromptExtensions()}`;
 
     const messages: ConversationMessage[] = [
-      { role: 'user', content: systemPrompt },
+      { role: 'system', content: systemPrompt },
       ...history,
     ];
 
@@ -245,7 +253,8 @@ IMPORTANT — use the right tool for the job:
           let argsObj: Record<string, unknown> = {};
           try {
             argsObj = JSON.parse(tc.function.arguments || '{}');
-          } catch {
+          } catch (parseErr) {
+            logger.warn(`[AI] Failed to parse tool call arguments for ${tcName}: ${tc.function.arguments}`, parseErr);
             argsObj = {};
           }
 

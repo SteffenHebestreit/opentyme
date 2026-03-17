@@ -34,29 +34,24 @@ router.use(extractKeycloakUser);
  *               entry_date:
  *                 type: string
  *                 pattern: '^\d{4}-\d{2}-\d{2}$'
- *                 description: Date of the time entry in YYYY-MM-DD format (e.g. "2026-03-09")
- *                 example: "2026-03-09"
+ *                 description: Date of the time entry in YYYY-MM-DD format — use the exact date the user specifies
  *               entry_time:
  *                 type: string
  *                 pattern: '^([01]\d|2[0-3]):([0-5]\d)$'
- *                 description: Start time of the entry in HH:MM format (24-hour, e.g. "09:00")
- *                 example: "09:00"
+ *                 description: Start time of the entry in HH:MM format (24-hour) — use the exact time the user specifies
  *               entry_end_time:
  *                 type: string
  *                 pattern: '^([01]\d|2[0-3]):([0-5]\d)$'
- *                 description: End time of the entry in HH:MM format (optional, e.g. "11:45")
- *                 example: "11:45"
+ *                 description: End time of the entry in HH:MM format — use the exact time the user specifies
  *               duration_hours:
  *                 type: number
- *                 description: Duration in decimal hours (e.g. 2.75 for 2h45m, 0.5 for 30min)
- *                 example: 2.75
+ *                 description: Duration in decimal hours (e.g. 2.75 for 2h45m, 0.5 for 30min). Calculate from start/end times.
  *               description:
  *                 type: string
- *                 description: Free-text note about the specific work done (e.g. "Fixed login redirect bug", "Implemented dark mode")
+ *                 description: Free-text note about the specific work done — use the user's exact words
  *               task_name:
  *                 type: string
  *                 description: The task or activity label within the project (e.g. "Development", "Code Review", "Meeting", "Bug Fix"). Use this when the user specifies a task name — do NOT put the task name into the description field.
- *                 example: "Development"
  *               billable:
  *                 type: boolean
  *                 default: true

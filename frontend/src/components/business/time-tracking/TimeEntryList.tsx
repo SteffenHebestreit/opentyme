@@ -263,6 +263,8 @@ export default function TimeEntryList() {
     setModalMode('edit');
     setEditingEntry(entry);
     setFormError(null);
+    const entryProject = projects.find(p => p.id === entry.project_id);
+    setModalClientFilter(entryProject?.client_id ?? '');
     setIsModalOpen(true);
   };
 
