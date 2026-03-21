@@ -314,19 +314,20 @@ export class TimeEntryService {
    * Deletes a time entry from the database.
    * 
    * @async
-   * @param {string} id - The UUID of the time entry to delete
+  * @param {string} id - The UUID of the time entry to delete
+  * @param {string} userId - The UUID of the authenticated owner
    * @returns {Promise<boolean>} True if the time entry was deleted, false if not found
    * @throws {Error} If the deletion fails
    * 
    * @example
-   * const deleted = await timeEntryService.delete('entry-uuid');
+  * const deleted = await timeEntryService.delete('entry-uuid', 'user-uuid');
    * if (deleted) console.log('Time entry deleted successfully');
    */
-  async delete(id: string): Promise<boolean> {
+  async delete(id: string, userId: string): Promise<boolean> {
     const db = getDbClient();
-    const queryText = `DELETE FROM time_entries WHERE id = $1`;
+    const queryText = `DELETE FROM time_entries WHERE id = $1 AND user_id = $2`;
     try {
-      const result = await db.query(queryText, [id]);
+      const result = await db.query(queryText, [id, userId]);
       return (result.rowCount ?? 0) > 0;
     } catch (error) {
       logger.error('Error deleting time entry:', error);

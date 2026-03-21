@@ -258,7 +258,7 @@ describe('TimeEntryService', () => {
         duration_hours: 1
       });
       
-      const result = await timeEntryService.delete(newEntry.id);
+      const result = await timeEntryService.delete(newEntry.id, TEST_USER_ID);
       expect(result).toBe(true);
 
       const foundEntry = await timeEntryService.findById(newEntry.id);
@@ -266,7 +266,7 @@ describe('TimeEntryService', () => {
     });
 
     it('should return false for non-existent ID', async () => {
-      const result = await timeEntryService.delete('00000000-0000-0000-0000-000000000000');
+      const result = await timeEntryService.delete('00000000-0000-0000-0000-000000000000', TEST_USER_ID);
       expect(result).toBe(false);
     });
   });
@@ -447,7 +447,7 @@ describe('TimeEntryService', () => {
         description: 'Entry to delete'
       });
       
-      const result = await timeEntryService.delete(newEntry.id);
+      const result = await timeEntryService.delete(newEntry.id, TEST_USER_ID);
       expect(result).toBe(true);
       
       const foundEntry = await timeEntryService.findById(newEntry.id);
@@ -455,7 +455,7 @@ describe('TimeEntryService', () => {
     });
 
     it('should return false for non-existent ID', async () => {
-      const result = await timeEntryService.delete('00000000-0000-0000-0000-000000000000');
+      const result = await timeEntryService.delete('00000000-0000-0000-0000-000000000000', TEST_USER_ID);
       expect(result).toBe(false);
     });
   });

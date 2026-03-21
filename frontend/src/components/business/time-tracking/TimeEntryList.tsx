@@ -352,7 +352,7 @@ export default function TimeEntryList() {
     setSuccessMessage(null);
     setTimerError(null);
     try {
-      await stopTimer.mutateAsync();
+      await stopTimer.mutateAsync(entry.id);
       setSuccessMessage(t('messages.timerStopped'));
     } catch (stopError) {
       setTimerError(extractErrorMessage(stopError));
@@ -408,8 +408,10 @@ export default function TimeEntryList() {
           entry={activeEntry}
           onPause={handlePauseTimer}
           onStop={() => handleStopTimer(activeEntry)}
+          onDelete={() => void handleDelete(activeEntry)}
           isPausing={pauseTimer.isPending}
           isStopping={stopTimer.isPending && stoppingId === activeEntry.id}
+          isDeleting={deleteEntry.isPending && deletingId === activeEntry.id}
         />
       ) : (
         <TimerStarterCard

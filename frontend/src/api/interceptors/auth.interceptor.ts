@@ -15,7 +15,7 @@
  */
 
 import { AxiosError, AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
-import { getAccessToken, clearTokens } from '@/services/auth/tokenManager';
+import { getAccessToken, clearTokens, isTokenExpired } from '@/services/auth/tokenManager';
 
 /**
  * Setup authentication interceptor for an Axios instance
@@ -81,17 +81,20 @@ export const setupAuthInterceptor = (axiosInstance: AxiosInstance): AxiosInstanc
     (error: AxiosError) => {
       // Handle 401 Unauthorized responses
       if (error.response?.status === 401) {
-        console.warn('[Auth Interceptor] 401 Unauthorized - clearing tokens and redirecting to login');
-        
-        // Clear all tokens from localStorage
-        clearTokens();
-        
-        // Redirect to login page
-        // Use window.location instead of router to ensure a full page reload
-        // This clears any cached state and ensures fresh authentication
-        const currentPath = window.location.pathname;
-        if (currentPath !== '/login') {
-          window.location.href = '/login';
+        const hasToken = Boolean(getAccessToken());
+        const shouldForceLogout = !hasToken || isTokenExpired();
+
+        if (shouldForceLogout) {
+          console.warn('[Auth Interceptor] 401 Unauthorized with missing or expired token - clearing tokens and redirecting to login');
+
+          clearTokens();
+
+          const currentPath = window.location.pathname;
+          if (currentPath !== '/login') {
+            window.location.replace('/login');
+          }
+        } else {
+          console.warn('[Auth Interceptor] 401 received while token is still present and unexpired - skipping forced redirect');
         }
       }
       

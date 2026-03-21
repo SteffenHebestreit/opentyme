@@ -208,7 +208,7 @@ export function useStartTimer() {
 export function useStopTimer() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => stopTimer(),
+    mutationFn: (timeEntryId?: string) => stopTimer(timeEntryId),
     onSuccess: (_response: TimeEntryResponse) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.timeEntries.all });
     },

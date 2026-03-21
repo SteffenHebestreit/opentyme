@@ -33,6 +33,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Module-level flag to prevent multiple Keycloak initializations
 // This survives React StrictMode double-mount in development
 let keycloakInitPromise: Promise<boolean> | null = null;
+let keycloakInitTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 // Set to true only after keycloak.init() resolves successfully.
 // Used to detect the Vite HMR case where AuthContext is re-evaluated but the
@@ -87,28 +88,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             keycloakInitPromise = Promise.resolve(!!keycloak.authenticated);
           } else {
             console.log('[Auth] Initializing Keycloak...');
-            // Race against a 15 s timeout so the loading screen never hangs forever.
-            keycloakInitPromise = Promise.race([
-              keycloak.init({
+            const initPromise = keycloak.init({
                 onLoad: 'check-sso',
                 checkLoginIframe: false, // Disable iframe check to avoid X-Frame-Options issues
                 pkceMethod: 'S256',
                 enableLogging: import.meta.env.DEV,
-              }),
-              new Promise<boolean>(resolve =>
-                setTimeout(() => {
-                  console.warn('[Auth] Keycloak init timed out — treating as unauthenticated');
-                  resolve(false);
-                }, 15000)
-              ),
-            ]);
+              })
+              .then((authenticated) => {
+                keycloakFullyInitialized = true;
+                return authenticated;
+              });
+
+            const timeoutPromise = new Promise<boolean>(resolve => {
+              keycloakInitTimeoutId = setTimeout(() => {
+                keycloakInitTimeoutId = null;
+                console.warn('[Auth] Keycloak init timed out — treating as unauthenticated');
+                resolve(false);
+              }, 15000);
+            });
+
+            // Race against a 15 s timeout so the loading screen never hangs forever.
+            keycloakInitPromise = Promise.race([initPromise, timeoutPromise]).finally(() => {
+              if (keycloakInitTimeoutId) {
+                clearTimeout(keycloakInitTimeoutId);
+                keycloakInitTimeoutId = null;
+              }
+            });
           }
         } else {
           console.log('[Auth] Using existing Keycloak initialization...');
         }
 
         const authenticated = await keycloakInitPromise;
-        keycloakFullyInitialized = true; // adapter is ready — login() is safe to call
         setIsKeycloakInitialized(true);
 
         if (authenticated) {
@@ -153,6 +164,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.error('[Auth] ❌ Keycloak initialization failed:', error);
         // Reset the promise so it can be retried
         keycloakInitPromise = null;
+        if (keycloakInitTimeoutId) {
+          clearTimeout(keycloakInitTimeoutId);
+          keycloakInitTimeoutId = null;
+        }
       } finally {
         setIsLoadingAuth(false);
       }

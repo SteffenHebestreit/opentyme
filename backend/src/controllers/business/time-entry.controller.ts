@@ -404,13 +404,18 @@ export class TimeEntryController {
    */
   async delete(req: Request, res: Response): Promise<void> {
     const { id } = req.params;
+    const userId = (req as any).user?.id;
     if (!id) {
         res.status(400).json({ message: 'Time entry ID is required.' });
         return;
     }
+    if (!userId) {
+        res.status(401).json({ message: 'Unauthorized. User ID not found.' });
+        return;
+    }
 
     try {
-      const deleted = await timeEntryService.delete(id);
+      const deleted = await timeEntryService.delete(id, userId);
       if (deleted) {
         res.status(200).json({ message: 'Time entry deleted successfully' });
       } else {
@@ -442,8 +447,8 @@ export class TimeEntryController {
         const options = { user_id: userId };
         const currentEntries = await timeEntryService.findAll(options);
         
-        // Check if there's an active timer (entry with start_time but no entry_date)
-        const activeTimer = currentEntries.find((entry: any) => entry.start_time && !entry.entry_date);
+        // Active timers keep date_start set until they are stopped and entry_end_time is written.
+        const activeTimer = currentEntries.find((entry: any) => entry.date_start && !entry.entry_end_time);
         if (activeTimer) {
           res.status(400).json({ 
             message: 'You already have an active timer running. Please stop it before starting a new one.' 
@@ -494,6 +499,7 @@ export class TimeEntryController {
 
   async stopTimer(req: Request, res: Response): Promise<void> {
       const userId = (req as any).user?.id;
+      const requestedTimeEntryId = req.body?.time_entry_id as string | undefined;
        if (!userId) {
          res.status(401).json({ message: 'Unauthorized. User ID not found.' });
          return;
@@ -503,32 +509,43 @@ export class TimeEntryController {
         // Find the user's active timer (entry with date_start but no entry_end_time)
         const options = { user_id: userId };
         const activeEntries = await timeEntryService.findAll(options);
-        
-        const activeTimer = activeEntries.find((entry: any) => entry.date_start && !entry.entry_end_time);
+
+        const runningEntries = activeEntries.filter((entry: any) => entry.date_start && !entry.entry_end_time);
+        const activeTimer = requestedTimeEntryId
+          ? runningEntries.find((entry: any) => entry.id === requestedTimeEntryId)
+          : runningEntries[0];
 
         if (!activeTimer) {
             res.status(404).json({ message: 'No active timer found to stop.' });
             return;
         }
 
-        // Get actual start and end times
         const now = getCurrentTime();
-        const actualStartTime = activeTimer.date_start ? new Date(activeTimer.date_start) : now;
-        
-        // Round times according to billing rules
-        const { startTime, endTime, durationHours } = roundTimerToQuarters(actualStartTime, now);
+        const entriesToStop = requestedTimeEntryId
+          ? [
+              activeTimer,
+              ...runningEntries.filter((entry: any) => entry.id !== activeTimer.id),
+            ]
+          : runningEntries;
 
-        // Update entry with rounded times and duration
-        // Note: hourly_rate should already be set from startTimer, so we don't override it
-        const updateData: UpdateTimeEntryDto = {
-          entry_date: startTime,
-          entry_time: formatTimeString(startTime), // Rounded start time in Europe/Berlin timezone
-          entry_end_time: formatTimeString(endTime), // Rounded end time in Europe/Berlin timezone
-          duration_hours: durationHours, // Calculated from rounded times with 15min minimum
-          date_start: startTime, // Update date_start with rounded time for consistency
-        };
+        const updatedEntries = await Promise.all(
+          entriesToStop.map(async (entry: any) => {
+            const actualStartTime = entry.date_start ? new Date(entry.date_start) : now;
+            const { startTime, endTime, durationHours } = roundTimerToQuarters(actualStartTime, now);
 
-        const updatedEntry = await timeEntryService.update(activeTimer.id, updateData);
+            const updateData: UpdateTimeEntryDto = {
+              entry_date: startTime,
+              entry_time: formatTimeString(startTime),
+              entry_end_time: formatTimeString(endTime),
+              duration_hours: durationHours,
+              date_start: startTime,
+            };
+
+            return timeEntryService.update(entry.id, updateData);
+          })
+        );
+
+        const updatedEntry = updatedEntries[0];
 
         if (!updatedEntry) {
              res.status(500).json({ message: 'Failed to stop timer.' });

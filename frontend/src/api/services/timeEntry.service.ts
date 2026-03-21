@@ -152,6 +152,7 @@ export async function startTimer(projectId: string, payload: Partial<TimeEntryPa
  * Changes status to 'completed'.
  * 
  * @async
+ * @param {string} [timeEntryId] - Optional active time entry ID to stop explicitly
  * @returns {Promise<TimeEntryResponse>} Response containing the stopped time entry
  * @throws {Error} If no active timer found or stop fails
  * 
@@ -159,8 +160,10 @@ export async function startTimer(projectId: string, payload: Partial<TimeEntryPa
  * const response = await stopTimer();
  * console.log('Timer stopped. Duration:', response.time_entry.duration_hours, 'hours');
  */
-export async function stopTimer(): Promise<TimeEntryResponse> {
-  const { data } = await apiClient.put<TimeEntryResponse>('/time-entries/stop');
+export async function stopTimer(timeEntryId?: string): Promise<TimeEntryResponse> {
+  const { data } = await apiClient.put<TimeEntryResponse>('/time-entries/stop',
+    timeEntryId ? { time_entry_id: timeEntryId } : undefined
+  );
   return data;
 }
 

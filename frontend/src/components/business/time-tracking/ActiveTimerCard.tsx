@@ -60,15 +60,19 @@ import { formatDate } from '../../../utils/date';
  * @property {TimeEntry} entry - Active time entry with start_time
  * @property {() => void} onPause - Callback when Pause button clicked
  * @property {() => void} onStop - Callback when Stop button clicked
+ * @property {() => void} onDelete - Callback when Delete button clicked
  * @property {boolean} isPausing - Whether pause action is in progress
  * @property {boolean} isStopping - Whether stop action is in progress
+ * @property {boolean} isDeleting - Whether delete action is in progress
  */
 interface ActiveTimerCardProps {
   entry: TimeEntry;
   onPause: () => void;
   onStop: () => void;
+  onDelete: () => void;
   isPausing: boolean;
   isStopping: boolean;
+  isDeleting: boolean;
 }
 
 /**
@@ -93,7 +97,7 @@ const formatElapsed = (start: Date): string => {
   return `${hours}:${minutes}:${seconds}`;
 };
 
-export const ActiveTimerCard: FC<ActiveTimerCardProps> = ({ entry, onPause, onStop, isPausing, isStopping }) => {
+export const ActiveTimerCard: FC<ActiveTimerCardProps> = ({ entry, onPause, onStop, onDelete, isPausing, isStopping, isDeleting }) => {
   const { t } = useTranslation('time-tracking');
   
   const startDate = useMemo(() => {
@@ -149,11 +153,14 @@ export const ActiveTimerCard: FC<ActiveTimerCardProps> = ({ entry, onPause, onSt
       <div className="flex flex-col items-end gap-4">
         <div className="text-3xl font-mono font-semibold text-indigo-700 dark:text-indigo-200">{elapsed}</div>
         <div className="flex items-center gap-3">
-          <Button type="button" variant="secondary" onClick={onPause} disabled={isPausing || isStopping}>
+          <Button type="button" variant="secondary" onClick={onPause} disabled={isPausing || isStopping || isDeleting}>
             {isPausing ? t('timer.pausing') : t('timer.pause')}
           </Button>
-          <Button type="button" variant="danger" onClick={onStop} disabled={isStopping}>
+          <Button type="button" variant="danger" onClick={onStop} disabled={isStopping || isDeleting}>
             {isStopping ? t('timer.stopping') : t('timer.stop')}
+          </Button>
+          <Button type="button" variant="outline" onClick={onDelete} disabled={isDeleting || isStopping || isPausing}>
+            {isDeleting ? t('deleting') : t('delete')}
           </Button>
         </div>
       </div>
