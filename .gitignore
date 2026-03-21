@@ -132,9 +132,9 @@ seaweedfs_data/
 clamav_data/
 
 # Generated Content
-invoices/
-exports/
-uploads/
+./invoices/
+./exports/
+./uploads/
 
 # Test Artifacts and Temporary Files
 test_*.png
