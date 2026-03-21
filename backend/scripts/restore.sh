@@ -1,5 +1,5 @@
-#!/bin/sh
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
 # =============================================================================
 # OpenTYME System Restore Script
@@ -11,7 +11,7 @@ set -e
 #
 # SAFETY FEATURES:
 # - Automatic backup of current data BEFORE restore (pre_restore_*)
-# - Pre-restore backups are stored in /app/backups/pre_restore_<timestamp>
+# - Pre-restore backups are stored in /usr/src/app/backups/pre_restore_<timestamp>
 # - If restore fails, you can recover from the pre-restore backup
 #
 # Usage:
@@ -25,10 +25,10 @@ set -e
 #
 # Recovery:
 #   If something goes wrong, your original data is in:
-#   /app/backups/pre_restore_<timestamp>/
+#   /usr/src/app/backups/pre_restore_<timestamp>/
 # =============================================================================
 
-BACKUP_FILE="${BACKUP_PATH:-$1}"
+BACKUP_FILE="${BACKUP_PATH:-${1:-}}"
 RESTORE_DB="${RESTORE_DATABASE:-true}"
 RESTORE_KEYCLOAK="${RESTORE_KEYCLOAK:-true}"
 RESTORE_STORAGE="${RESTORE_STORAGE:-true}"
@@ -36,7 +36,7 @@ RESTORE_CONFIG="${RESTORE_CONFIG:-false}"
 SKIP_PRE_BACKUP="${SKIP_PRE_BACKUP:-false}"
 
 # Pre-restore backup directory
-PRE_RESTORE_BACKUP_DIR="${PRE_RESTORE_BACKUP_DIR:-/app/backups/pre_restore_$(date +%Y%m%d_%H%M%S)}"
+PRE_RESTORE_BACKUP_DIR="${PRE_RESTORE_BACKUP_DIR:-/usr/src/app/backups/pre_restore_$(date +%Y%m%d_%H%M%S)}"
 
 # OpenTYME Database configuration
 DB_HOST="${DB_HOST:-db}"
@@ -46,11 +46,11 @@ DB_PASSWORD="${DB_PASSWORD:-password}"
 DB_NAME="${DB_NAME:-opentyme}"
 
 # Keycloak Database configuration
-KC_DB_HOST="${KC_DB_HOST:-keycloak-db}"
-KC_DB_PORT="${KC_DB_PORT:-5432}"
-KC_DB_USER="${KC_DB_USER:-keycloak_user}"
-KC_DB_PASSWORD="${KC_DB_PASSWORD:-keycloak_password}"
-KC_DB_NAME="${KC_DB_NAME:-keycloak}"
+KC_DB_HOST="${KC_DB_HOST:-${KEYCLOAK_DB_HOST:-keycloak-db}}"
+KC_DB_PORT="${KC_DB_PORT:-${KEYCLOAK_DB_PORT:-5432}}"
+KC_DB_USER="${KC_DB_USER:-${KEYCLOAK_DB_USER:-keycloak_user}}"
+KC_DB_PASSWORD="${KC_DB_PASSWORD:-${KEYCLOAK_DB_PASSWORD:-keycloak_password}}"
+KC_DB_NAME="${KC_DB_NAME:-${KEYCLOAK_DB_NAME:-postgres}}"
 
 # S3-compatible storage configuration (SeaweedFS)
 STORAGE_HOST="${STORAGE_ENDPOINT:-${MINIO_ENDPOINT:-seaweedfs}}"
@@ -62,7 +62,8 @@ STORAGE_ENDPOINT_URL="http://${STORAGE_HOST}:${STORAGE_S3_PORT}"
 # Legacy paths
 STORAGE_PATH="${STORAGE_PATH:-/usr/src/app/uploads}"
 CONFIG_PATH="${CONFIG_PATH:-/usr/src/app/.env}"
-BACKUPS_DIR="${BACKUPS_DIR:-/app/backups}"
+BACKUPS_DIR="${BACKUPS_DIR:-/usr/src/app/backups}"
+KEYCLOAK_REALM_IMPORT_PATH="${KEYCLOAK_REALM_IMPORT_PATH:-/opt/keycloak/data/import/realm-import.json}"
 
 if [ -z "$BACKUP_FILE" ]; then
     echo "[RESTORE] Error: Backup file not specified"
@@ -72,7 +73,7 @@ fi
 
 # If BACKUP_FILE is a directory, find the .tar.gz file inside it
 if [ -d "$BACKUP_FILE" ]; then
-    BACKUP_TAR=$(find "$BACKUP_FILE" -name "*.tar.gz" | head -n 1)
+    BACKUP_TAR=$(find "$BACKUP_FILE" -maxdepth 1 -type f -name "*.tar.gz" | sort | head -n 1)
     if [ -z "$BACKUP_TAR" ]; then
         echo "[RESTORE] Error: No .tar.gz file found in directory: $BACKUP_FILE"
         exit 1
@@ -205,18 +206,25 @@ fi
 if [ "$RESTORE_KEYCLOAK" = "true" ] && [ -f "$TEMP_DIR/keycloak_database.dump" ]; then
     echo "[RESTORE] Restoring Keycloak database..."
 
-    PGPASSWORD="$KC_DB_PASSWORD" psql \
-        -h "$KC_DB_HOST" -p "$KC_DB_PORT" -U "$KC_DB_USER" -d postgres \
-        -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$KC_DB_NAME' AND pid <> pg_backend_pid();" \
-        2>/dev/null || true
+    if [ "$KC_DB_NAME" = "postgres" ]; then
+        PGPASSWORD="$KC_DB_PASSWORD" psql \
+            -h "$KC_DB_HOST" -p "$KC_DB_PORT" -U "$KC_DB_USER" -d postgres \
+            -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public AUTHORIZATION $KC_DB_USER; GRANT ALL ON SCHEMA public TO $KC_DB_USER;" \
+            >/dev/null
+    else
+        PGPASSWORD="$KC_DB_PASSWORD" psql \
+            -h "$KC_DB_HOST" -p "$KC_DB_PORT" -U "$KC_DB_USER" -d postgres \
+            -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$KC_DB_NAME' AND pid <> pg_backend_pid();" \
+            2>/dev/null || true
 
-    PGPASSWORD="$KC_DB_PASSWORD" psql \
-        -h "$KC_DB_HOST" -p "$KC_DB_PORT" -U "$KC_DB_USER" -d postgres \
-        -c "DROP DATABASE IF EXISTS $KC_DB_NAME;" 2>/dev/null || true
+        PGPASSWORD="$KC_DB_PASSWORD" psql \
+            -h "$KC_DB_HOST" -p "$KC_DB_PORT" -U "$KC_DB_USER" -d postgres \
+            -c "DROP DATABASE IF EXISTS $KC_DB_NAME;" 2>/dev/null || true
 
-    PGPASSWORD="$KC_DB_PASSWORD" psql \
-        -h "$KC_DB_HOST" -p "$KC_DB_PORT" -U "$KC_DB_USER" -d postgres \
-        -c "CREATE DATABASE $KC_DB_NAME OWNER $KC_DB_USER;"
+        PGPASSWORD="$KC_DB_PASSWORD" psql \
+            -h "$KC_DB_HOST" -p "$KC_DB_PORT" -U "$KC_DB_USER" -d postgres \
+            -c "CREATE DATABASE $KC_DB_NAME OWNER $KC_DB_USER;"
+    fi
 
     PGPASSWORD="$KC_DB_PASSWORD" pg_restore \
         -h "$KC_DB_HOST" -p "$KC_DB_PORT" -U "$KC_DB_USER" -d "$KC_DB_NAME" \
@@ -296,7 +304,20 @@ fi
 # =============================================================================
 # Restore Configuration
 # =============================================================================
-if [ "$RESTORE_CONFIG" = "true" ] && [ -f "$TEMP_DIR/.env" ]; then
+CONFIG_SOURCE=""
+REALM_SOURCE=""
+
+if [ -f "$TEMP_DIR/config/.env" ]; then
+    CONFIG_SOURCE="$TEMP_DIR/config/.env"
+elif [ -f "$TEMP_DIR/.env" ]; then
+    CONFIG_SOURCE="$TEMP_DIR/.env"
+fi
+
+if [ -f "$TEMP_DIR/config/realm-import.json" ]; then
+    REALM_SOURCE="$TEMP_DIR/config/realm-import.json"
+fi
+
+if [ "$RESTORE_CONFIG" = "true" ] && [ -n "$CONFIG_SOURCE" ]; then
     echo "[RESTORE] Restoring configuration..."
 
     if [ -f "$CONFIG_PATH" ]; then
@@ -305,8 +326,17 @@ if [ "$RESTORE_CONFIG" = "true" ] && [ -f "$TEMP_DIR/.env" ]; then
         cp "$CONFIG_PATH" "$BACKUP_CONFIG"
     fi
 
-    cp "$TEMP_DIR/.env" "$CONFIG_PATH"
+    cp "$CONFIG_SOURCE" "$CONFIG_PATH"
     echo "[RESTORE] Configuration restored successfully"
+fi
+
+if [ "$RESTORE_CONFIG" = "true" ] && [ -n "$REALM_SOURCE" ]; then
+    if command -v docker >/dev/null 2>&1 && docker container inspect opentyme-keycloak >/dev/null 2>&1; then
+        docker cp "$REALM_SOURCE" "opentyme-keycloak:$KEYCLOAK_REALM_IMPORT_PATH" >/dev/null 2>&1 || \
+            echo "[RESTORE] Warning: Failed to copy Keycloak realm import file into container"
+    else
+        echo "[RESTORE] Warning: Keycloak container is not available; realm import file kept at $REALM_SOURCE"
+    fi
 fi
 
 # =============================================================================

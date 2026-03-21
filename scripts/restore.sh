@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ###############################################################################
 # OpenTYME Restore Script (Host-side)
@@ -24,23 +24,27 @@
 #   DRY_RUN             - Show what would be restored without changes (default: false)
 ###############################################################################
 
-set -e
-set -o pipefail
+set -euo pipefail
 
 # Configuration from environment
-BACKUP_PATH="${BACKUP_PATH:-$1}"
+BACKUP_PATH="${BACKUP_PATH:-${1:-}}"
 RESTORE_DATABASE="${RESTORE_DATABASE:-true}"
 RESTORE_KEYCLOAK="${RESTORE_KEYCLOAK:-true}"
 RESTORE_STORAGE="${RESTORE_STORAGE:-true}"
 RESTORE_CONFIG="${RESTORE_CONFIG:-false}"
 SKIP_PRE_BACKUP="${SKIP_PRE_BACKUP:-false}"
 DRY_RUN="${DRY_RUN:-false}"
+KEYCLOAK_DATABASE_NAME="${KEYCLOAK_DATABASE_NAME:-${KEYCLOAK_DB_NAME:-postgres}}"
+
+if [ -n "${HOME:-}" ] && [ -d "$HOME/.local/bin" ]; then
+    export PATH="$HOME/.local/bin:$PATH"
+fi
 
 # Pre-restore backup directory
 PRE_RESTORE_BACKUP_DIR="./backups/pre_restore_$(date +%Y%m%d_%H%M%S)"
 
 # S3-compatible storage configuration (SeaweedFS)
-STORAGE_HOST="${STORAGE_ENDPOINT:-seaweedfs}"
+STORAGE_HOST="${STORAGE_ENDPOINT:-localhost}"
 STORAGE_S3_PORT="${STORAGE_PORT:-8333}"
 STORAGE_ACCESS_KEY="${STORAGE_ACCESS_KEY:-admin}"
 STORAGE_SECRET_KEY="${STORAGE_SECRET_KEY:-password}"
@@ -71,10 +75,20 @@ if [ -z "$BACKUP_PATH" ]; then
     exit 1
 fi
 
-if [ ! -d "$BACKUP_PATH" ]; then
-    error "Backup directory not found: $BACKUP_PATH"
+if [ ! -d "$BACKUP_PATH" ] && [ ! -f "$BACKUP_PATH" ]; then
+    error "Backup path not found: $BACKUP_PATH"
     exit 1
 fi
+
+EXTRACTED_BACKUP_DIR=""
+
+cleanup() {
+    if [ -n "$EXTRACTED_BACKUP_DIR" ] && [ -d "$EXTRACTED_BACKUP_DIR" ]; then
+        rm -rf "$EXTRACTED_BACKUP_DIR"
+    fi
+}
+
+trap cleanup EXIT
 
 # Check if docker-compose is available
 if ! command -v docker-compose &> /dev/null && ! command -v docker &> /dev/null; then
@@ -105,11 +119,15 @@ echo ""
 if [ "$DRY_RUN" = "true" ]; then
     warn "DRY RUN MODE - No changes will be made"
     log "Would restore from: $BACKUP_PATH"
-    { [ -f "$BACKUP_PATH/opentyme_database.dump" ] || \
-      [ -f "$BACKUP_PATH/tyme_database.dump" ] || \
-      [ -f "$BACKUP_PATH/database.dump" ]; } && log "  - OpenTYME database: YES"
-    [ -f "$BACKUP_PATH/keycloak_database.dump" ] && log "  - Keycloak database: YES"
-    { [ -d "$BACKUP_PATH/storage" ] || [ -d "$BACKUP_PATH/minio_backup" ]; } && log "  - S3 storage: YES"
+        if [ -d "$BACKUP_PATH" ]; then
+                { [ -f "$BACKUP_PATH/opentyme_database.dump" ] || \
+                    [ -f "$BACKUP_PATH/tyme_database.dump" ] || \
+                    [ -f "$BACKUP_PATH/database.dump" ]; } && log "  - OpenTYME database: YES"
+                [ -f "$BACKUP_PATH/keycloak_database.dump" ] && log "  - Keycloak database: YES"
+                { [ -d "$BACKUP_PATH/storage" ] || [ -d "$BACKUP_PATH/minio_backup" ]; } && log "  - S3 storage: YES"
+        else
+                log "  - Archive file: YES"
+        fi
     exit 0
 fi
 
@@ -118,6 +136,12 @@ echo ""
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     log "Restore cancelled"
     exit 0
+fi
+
+if [ -f "$BACKUP_PATH" ]; then
+    EXTRACTED_BACKUP_DIR="$(mktemp -d ./backups/restore_extract_XXXXXX)"
+    tar -xzf "$BACKUP_PATH" -C "$EXTRACTED_BACKUP_DIR"
+    BACKUP_PATH="$EXTRACTED_BACKUP_DIR"
 fi
 
 # =============================================================================
@@ -138,7 +162,7 @@ if [ "$SKIP_PRE_BACKUP" != "true" ]; then
 
     if [ "$RESTORE_KEYCLOAK" = "true" ]; then
         log "Backing up current Keycloak database..."
-        $DOCKER_COMPOSE exec -T keycloak-db pg_dump -U keycloak_user -d keycloak -Fc \
+        $DOCKER_COMPOSE exec -T keycloak-db pg_dump -U keycloak_user -d "$KEYCLOAK_DATABASE_NAME" -Fc \
             > "$PRE_RESTORE_BACKUP_DIR/keycloak_database.dump" 2>/dev/null || \
             warn "Could not backup Keycloak database (may not exist)"
     fi
@@ -191,15 +215,20 @@ if [ "$RESTORE_KEYCLOAK" = "true" ]; then
     if [ -f "$KC_DB_FILE" ]; then
         log "Restoring Keycloak database..."
 
-        $DOCKER_COMPOSE exec -T keycloak-db psql -U keycloak_user -d postgres \
-            -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='keycloak' AND pid <> pg_backend_pid();" 2>/dev/null || true
-        $DOCKER_COMPOSE exec -T keycloak-db psql -U keycloak_user -d postgres \
-            -c "DROP DATABASE IF EXISTS keycloak;" 2>/dev/null || true
-        $DOCKER_COMPOSE exec -T keycloak-db psql -U keycloak_user -d postgres \
-            -c "CREATE DATABASE keycloak OWNER keycloak_user;"
+        if [ "$KEYCLOAK_DATABASE_NAME" = "postgres" ]; then
+            $DOCKER_COMPOSE exec -T keycloak-db psql -U keycloak_user -d postgres \
+                -c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public AUTHORIZATION keycloak_user; GRANT ALL ON SCHEMA public TO keycloak_user;" >/dev/null
+        else
+            $DOCKER_COMPOSE exec -T keycloak-db psql -U keycloak_user -d postgres \
+                -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='${KEYCLOAK_DATABASE_NAME}' AND pid <> pg_backend_pid();" 2>/dev/null || true
+            $DOCKER_COMPOSE exec -T keycloak-db psql -U keycloak_user -d postgres \
+                -c "DROP DATABASE IF EXISTS ${KEYCLOAK_DATABASE_NAME};" 2>/dev/null || true
+            $DOCKER_COMPOSE exec -T keycloak-db psql -U keycloak_user -d postgres \
+                -c "CREATE DATABASE ${KEYCLOAK_DATABASE_NAME} OWNER keycloak_user;"
+        fi
 
         cat "$KC_DB_FILE" | $DOCKER_COMPOSE exec -T keycloak-db pg_restore \
-            -U keycloak_user -d keycloak -v --no-owner --no-privileges 2>&1 || true
+            -U keycloak_user -d "$KEYCLOAK_DATABASE_NAME" -v --no-owner --no-privileges 2>&1 || true
 
         log "Keycloak database restored successfully"
     else
@@ -252,19 +281,23 @@ fi
 
 # Restore configuration
 if [ "$RESTORE_CONFIG" = "true" ]; then
-    CONFIG_FILE="$BACKUP_PATH/config.tar.gz"
+    CONFIG_DIR=""
 
-    if [ -f "$CONFIG_FILE" ]; then
+    if [ -d "$BACKUP_PATH/config" ]; then
+        CONFIG_DIR="$BACKUP_PATH/config"
+    elif [ -f "$BACKUP_PATH/config.tar.gz" ]; then
+        CONFIG_DIR="$(mktemp -d ./backups/config_restore_XXXXXX)"
+        tar -xzf "$BACKUP_PATH/config.tar.gz" -C "$CONFIG_DIR"
+    fi
+
+    if [ -n "$CONFIG_DIR" ]; then
         log "Restoring configuration..."
         warn "Configuration restore requires manual review"
 
-        TEMP_DIR=$(mktemp -d)
-        tar -xzf "$CONFIG_FILE" -C "$TEMP_DIR"
-
-        log "Configuration files extracted to: $TEMP_DIR"
+        log "Configuration files extracted to: $CONFIG_DIR"
         log "Please review and apply configuration changes manually"
     else
-        warn "Configuration backup file not found: $CONFIG_FILE"
+        warn "Configuration backup files not found"
     fi
 fi
 

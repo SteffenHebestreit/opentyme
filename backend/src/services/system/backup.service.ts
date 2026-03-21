@@ -10,14 +10,14 @@
  */
 
 import { Pool } from 'pg';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs/promises';
 import { existsSync } from 'fs';
 import { logger } from '../../utils/logger';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 interface BackupOptions {
   includeDatabase?: boolean;
@@ -41,6 +41,13 @@ interface BackupRecord {
   completed_at?: Date;
   error_message?: string;
   metadata?: any;
+}
+
+interface BackupScriptResult {
+  success?: boolean;
+  file_path?: string;
+  file_size?: number;
+  timestamp?: string;
 }
 
 interface ScheduleConfig {
@@ -82,6 +89,8 @@ class BackupService {
       backupName = `backup_${Date.now()}`
     } = options;
 
+    const backupDir = path.join(this.backupBasePath, backupName);
+
     logger.info(`Creating backup: ${backupName} by user ${userId}`);
 
     // Insert backup record
@@ -99,7 +108,7 @@ class BackupService {
 
     try {
       // Execute backup script
-      const backupPath = await this.executeBackupScript({
+      const backupPath = await this.executeBackupScript(backupDir, {
         includeDatabase,
         includeStorage,
         includeConfig,
@@ -130,6 +139,8 @@ class BackupService {
     } catch (error: any) {
       logger.error(`Backup failed: ${error.message}`);
 
+      await this.cleanupFailedBackupDirectory(backupDir);
+
       // Update backup record as failed
       await this.pool.query(
         `UPDATE system_backups 
@@ -145,10 +156,7 @@ class BackupService {
   /**
    * Execute backup script
    */
-  private async executeBackupScript(options: BackupOptions & { backupName: string }): Promise<string> {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const backupDir = path.join(this.backupBasePath, options.backupName || `backup_${timestamp}`);
-
+  private async executeBackupScript(backupDir: string, options: BackupOptions & { backupName: string }): Promise<string> {
     // Ensure backup directory exists
     await fs.mkdir(backupDir, { recursive: true });
 
@@ -156,6 +164,7 @@ class BackupService {
     const env = {
       ...process.env,
       BACKUP_DIR: backupDir,
+      BACKUP_NAME: options.backupName,
       INCLUDE_DATABASE: options.includeDatabase ? 'true' : 'false',
       INCLUDE_STORAGE: options.includeStorage ? 'true' : 'false',
       INCLUDE_CONFIG: options.includeConfig ? 'true' : 'false',
@@ -169,7 +178,7 @@ class BackupService {
     }
 
     logger.info(`Executing backup script: ${scriptPath}`);
-    const { stdout, stderr } = await execAsync(`sh ${scriptPath}`, { env, maxBuffer: 10 * 1024 * 1024 });
+    const { stdout, stderr } = await execFileAsync(scriptPath, [], { env, maxBuffer: 10 * 1024 * 1024 });
 
     if (stderr) {
       logger.warn(`Backup script warnings: ${stderr}`);
@@ -177,7 +186,7 @@ class BackupService {
 
     logger.info(`Backup script output: ${stdout}`);
 
-    return backupDir;
+    return this.resolveBackupArtifactPath(backupDir, stdout);
   }
 
   /**
@@ -240,13 +249,83 @@ class BackupService {
     }
 
     logger.info(`Executing restore script: ${scriptPath}`);
-    const { stdout, stderr } = await execAsync(`sh ${scriptPath}`, { env, maxBuffer: 10 * 1024 * 1024 });
+    const { stdout, stderr } = await execFileAsync(scriptPath, [backupPath], { env, maxBuffer: 10 * 1024 * 1024 });
 
     if (stderr) {
       logger.warn(`Restore script warnings: ${stderr}`);
     }
 
     logger.info(`Restore script output: ${stdout}`);
+  }
+
+  private parseBackupScriptResult(stdout: string): BackupScriptResult | null {
+    const trimmed = stdout.trim();
+    const jsonStart = trimmed.lastIndexOf('{');
+
+    if (jsonStart === -1) {
+      return null;
+    }
+
+    const jsonCandidate = trimmed.slice(jsonStart);
+
+    try {
+      return JSON.parse(jsonCandidate) as BackupScriptResult;
+    } catch {
+      return null;
+    }
+  }
+
+  private async resolveBackupArtifactPath(backupDir: string, stdout: string): Promise<string> {
+    const scriptResult = this.parseBackupScriptResult(stdout);
+
+    if (scriptResult?.file_path && existsSync(scriptResult.file_path)) {
+      return scriptResult.file_path;
+    }
+
+    const entries = await fs.readdir(backupDir);
+    const archiveCandidates = entries
+      .filter((entry) => entry.endsWith('.tar.gz'))
+      .map((entry) => path.join(backupDir, entry));
+
+    if (archiveCandidates.length === 0) {
+      throw new Error(`Backup script completed without creating an archive in ${backupDir}`);
+    }
+
+    const candidatesWithStats = await Promise.all(
+      archiveCandidates.map(async (candidate) => ({
+        candidate,
+        stats: await fs.stat(candidate),
+      }))
+    );
+
+    const completedArchive = candidatesWithStats
+      .filter(({ stats }) => stats.isFile() && stats.size > 0)
+      .sort((left, right) => right.stats.mtimeMs - left.stats.mtimeMs)[0];
+
+    if (!completedArchive) {
+      throw new Error(`Backup script created only empty archives in ${backupDir}`);
+    }
+
+    return completedArchive.candidate;
+  }
+
+  private async cleanupFailedBackupDirectory(backupDir: string): Promise<void> {
+    if (!existsSync(backupDir)) {
+      return;
+    }
+
+    const entries = await fs.readdir(backupDir);
+
+    if (entries.length === 0) {
+      await fs.rm(backupDir, { recursive: true, force: true });
+      return;
+    }
+
+    const meaningfulEntries = entries.filter((entry) => !entry.startsWith('temp_'));
+
+    if (meaningfulEntries.length === 0) {
+      await fs.rm(backupDir, { recursive: true, force: true });
+    }
   }
 
   /**
