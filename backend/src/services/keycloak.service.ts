@@ -10,6 +10,7 @@
 
 import KcAdminClient from '@keycloak/keycloak-admin-client';
 import axios from 'axios';
+import jwt, { JwtPayload } from 'jsonwebtoken';
 import { logger } from '../utils/logger';
 
 interface KeycloakConfig {
@@ -75,6 +76,7 @@ class KeycloakService {
   private config: KeycloakConfig;
   private authenticated: boolean = false;
   private authPromise: Promise<void> | null = null;
+  private realmPublicKeyPem: string | null = null;
 
   constructor() {
     this.config = {
@@ -166,12 +168,69 @@ class KeycloakService {
       const introspection: TokenIntrospection = await response.json();
 
       if (!introspection.active) {
-        return null;
+        logger.warn('[Keycloak Service] Token introspection returned inactive token, falling back to local JWT verification');
+        return await this.verifyJwtLocally(token);
       }
 
       return introspection;
     } catch (error) {
       logger.error('[Keycloak Service] Token verification error:', error);
+      return null;
+    }
+  }
+
+  private async getRealmPublicKeyPem(): Promise<string> {
+    if (this.realmPublicKeyPem) {
+      return this.realmPublicKeyPem;
+    }
+
+    const response = await axios.get(`${this.config.baseUrl}/realms/${this.config.realmName}`);
+    const publicKey = response.data?.public_key;
+
+    if (!publicKey) {
+      throw new Error('Keycloak realm public key is missing');
+    }
+
+    this.realmPublicKeyPem = `-----BEGIN PUBLIC KEY-----\n${publicKey}\n-----END PUBLIC KEY-----`;
+    return this.realmPublicKeyPem;
+  }
+
+  private async verifyJwtLocally(token: string): Promise<TokenIntrospection | null> {
+    try {
+      const publicKeyPem = await this.getRealmPublicKeyPem();
+      const acceptedIssuers = [
+        process.env.KEYCLOAK_PUBLIC_URL ? `${process.env.KEYCLOAK_PUBLIC_URL}/realms/${this.config.realmName}` : null,
+        `${this.config.baseUrl}/realms/${this.config.realmName}`,
+      ].filter(Boolean) as string[];
+      const issuer = acceptedIssuers.length === 1
+        ? acceptedIssuers[0]
+        : acceptedIssuers as [string, ...string[]];
+
+      const payload = jwt.verify(token, publicKeyPem, {
+        algorithms: ['RS256'],
+        issuer,
+      }) as JwtPayload;
+
+      return {
+        active: true,
+        sub: payload.sub,
+        preferred_username: typeof payload.preferred_username === 'string' ? payload.preferred_username : undefined,
+        email: typeof payload.email === 'string' ? payload.email : undefined,
+        email_verified: typeof payload.email_verified === 'boolean' ? payload.email_verified : undefined,
+        name: typeof payload.name === 'string' ? payload.name : undefined,
+        given_name: typeof payload.given_name === 'string' ? payload.given_name : undefined,
+        family_name: typeof payload.family_name === 'string' ? payload.family_name : undefined,
+        realm_access: typeof payload.realm_access === 'object' && payload.realm_access !== null
+          ? payload.realm_access as { roles: string[] }
+          : undefined,
+        exp: typeof payload.exp === 'number' ? payload.exp : undefined,
+        iat: typeof payload.iat === 'number' ? payload.iat : undefined,
+        aud: Array.isArray(payload.aud) || typeof payload.aud === 'string' ? payload.aud : undefined,
+        iss: typeof payload.iss === 'string' ? payload.iss : undefined,
+        typ: typeof payload.typ === 'string' ? payload.typ : undefined,
+      };
+    } catch (error) {
+      logger.error('[Keycloak Service] Local JWT verification error:', error);
       return null;
     }
   }
@@ -288,13 +347,14 @@ class KeycloakService {
       // Send email verification
       if (response.id) {
         try {
+          const frontendUrl = process.env.FRONTEND_URL || process.env.PUBLIC_URL || 'http://localhost:3000';
           await this.client.users.executeActionsEmail({
             realm: this.config.realmName,
             id: response.id,
             actions: ['VERIFY_EMAIL'],
             clientId: 'tyme-frontend', // Frontend client for email verification redirect
             lifespan: 43200, // 12 hours
-            redirectUri: 'http://localhost:3000/login',
+            redirectUri: `${frontendUrl}/login`,
           });
           logger.info('[Keycloak Service] Verification email sent to:', userData.email);
         } catch (emailError) {
@@ -364,7 +424,7 @@ class KeycloakService {
   /**
    * Register a new user in Keycloak via Admin API
    * Includes role assignment and proper configuration
-   * 
+   *
    * @param userData - User registration data
    * @returns Success message and user ID
    */
@@ -416,7 +476,7 @@ class KeycloakService {
   /**
    * Authenticate user with username/email and password
    * Uses Direct Access Grants (Resource Owner Password Credentials)
-   * 
+   *
    * @param emailOrUsername - User's email or username
    * @param password - User's password
    * @returns Keycloak token response
@@ -453,7 +513,7 @@ class KeycloakService {
 
   /**
    * Refresh access token using refresh token
-   * 
+   *
    * @param refreshToken - The refresh token
    * @returns New token response
    */
@@ -483,7 +543,7 @@ class KeycloakService {
 
   /**
    * Logout user by invalidating refresh token
-   * 
+   *
    * @param refreshToken - The refresh token to invalidate
    */
   async logout(refreshToken: string): Promise<void> {
@@ -511,7 +571,7 @@ class KeycloakService {
 
   /**
    * Get user info from Keycloak using access token
-   * 
+   *
    * @param accessToken - The access token
    * @returns User information
    */

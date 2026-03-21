@@ -44,6 +44,22 @@ export const keycloakConfig: KeycloakConfig = {
  */
 export const keycloak = new Keycloak(keycloakConfig);
 
+export const hasWebCrypto = (): boolean => {
+  if (typeof window === 'undefined') {
+    return true;
+  }
+
+  return Boolean(window.isSecureContext && window.crypto?.subtle);
+};
+
+export const getPkceMethod = (): 'S256' | false => {
+  if (hasWebCrypto()) {
+    return 'S256';
+  }
+
+  return false;
+};
+
 /**
  * Keycloak initialization options
  * 
@@ -54,7 +70,7 @@ export const keycloak = new Keycloak(keycloakConfig);
 export const keycloakInitOptions = {
   onLoad: 'check-sso' as const,
   checkLoginIframe: true,
-  pkceMethod: 'S256' as const,
+  pkceMethod: getPkceMethod(),
   enableLogging: import.meta.env.DEV,
 };
 

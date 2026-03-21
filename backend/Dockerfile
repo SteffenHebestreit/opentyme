@@ -14,7 +14,6 @@ RUN npm install
 COPY backend/src ./src
 COPY backend/tests ./tests
 COPY backend/scripts ./scripts
-COPY backend/config ./config
 COPY backend/jest.config.js backend/tsconfig.json backend/nodemon.json ./
 
 # Strip CRLF and make scripts executable

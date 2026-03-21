@@ -3,6 +3,19 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
+const allowedHosts = [
+  'localhost',
+  '127.0.0.1',
+  'host.docker.internal',
+  '.docker.internal',
+  process.env.APP_HOST,
+  process.env.AUTH_HOST,
+  process.env.TRAEFIK_HOST,
+  process.env.MAIL_HOST,
+  process.env.S3_HOST,
+  process.env.MCP_HOST,
+].filter(Boolean);
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -15,12 +28,7 @@ export default defineConfig({
     port: 3000,
     host: true,
     strictPort: true,
-    allowedHosts: [
-      'localhost',
-      '127.0.0.1',
-      'host.docker.internal',
-      '.docker.internal'
-    ],
+    allowedHosts,
     hmr: {
       overlay: true,
     },

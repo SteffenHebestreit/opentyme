@@ -135,6 +135,7 @@ clamav_data/
 ./invoices/
 ./exports/
 ./uploads/
+keycloak/realm-import.json
 
 # Test Artifacts and Temporary Files
 test_*.png

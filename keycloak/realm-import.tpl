@@ -77,11 +77,11 @@
         "http://localhost/*",
         "http://10.10.0.2:3000/*",
         "http://auth.localhost/*",
-        "http://localhost/*",
-        "http://localhost:3000/*",
-        "http://auth.localhost/*",
-        "https://localhost/*",
-        "https://auth.localhost/*"
+        "http://__APP_HOST__/*",
+        "http://__APP_HOST__:3000/*",
+        "http://__AUTH_HOST__/*",
+        "https://__APP_HOST__/*",
+        "https://__AUTH_HOST__/*"
       ],
       "webOrigins": [
         "http://localhost:3000",
@@ -91,15 +91,15 @@
         "http://localhost",
         "http://10.10.0.2:3000",
         "http://auth.localhost",
-        "http://localhost",
-        "http://localhost:3000",
-        "http://auth.localhost",
-        "https://localhost",
-        "https://auth.localhost"
+        "http://__APP_HOST__",
+        "http://__APP_HOST__:3000",
+        "http://__AUTH_HOST__",
+        "https://__APP_HOST__",
+        "https://__AUTH_HOST__"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:3000/*##http://localhost:5173/*##http://localhost/*##http://auth.localhost/*##http://localhost/*##http://localhost:3000/*##http://auth.localhost/*##https://localhost/*##https://auth.localhost/*"
+        "post.logout.redirect.uris": "http://localhost:3000/*##http://localhost:5173/*##http://localhost/*##http://auth.localhost/*##http://__APP_HOST__/*##http://__APP_HOST__:3000/*##http://__AUTH_HOST__/*##https://__APP_HOST__/*##https://__AUTH_HOST__/*"
       },
       "protocolMappers": [
         {
@@ -194,14 +194,14 @@
       "redirectUris": [
         "http://localhost:8000/*",
         "http://localhost/*",
-        "http://localhost/*",
-        "https://localhost/*"
+        "http://__APP_HOST__/*",
+        "https://__APP_HOST__/*"
       ],
       "webOrigins": [
         "http://localhost:8000",
         "http://localhost",
-        "http://localhost",
-        "https://localhost"
+        "http://__APP_HOST__",
+        "https://__APP_HOST__"
       ],
       "attributes": {}
     },

@@ -4,14 +4,14 @@ import { logger } from '../utils/logger';
 
 /**
  * Keycloak Configuration
- * 
+ *
  * This configuration sets up Keycloak Admin Client for authentication.
  * The backend validates tokens using the Keycloak Admin API.
  */
 
 const keycloakConfig = {
   realm: process.env.KEYCLOAK_REALM || 'tyme',
-  baseUrl: process.env.KEYCLOAK_PUBLIC_URL || process.env.KEYCLOAK_URL || 'http://keycloak:8080',
+  baseUrl: process.env.KEYCLOAK_URL || process.env.KEYCLOAK_PUBLIC_URL || 'http://keycloak:8080',
   clientId: process.env.KEYCLOAK_CLIENT_ID || 'tyme-app',
   clientSecret: process.env.KEYCLOAK_CLIENT_SECRET || 'tyme-secret-change-in-production',
 };
@@ -64,12 +64,12 @@ export const isKeycloakConfigured = (): boolean => {
   ];
 
   const missing = requiredVars.filter(varName => !process.env[varName]);
-  
+
   if (missing.length > 0) {
     logger.warn('[Keycloak] Warning: Missing environment variables:', missing);
     return false;
   }
-  
+
   return true;
 };
 

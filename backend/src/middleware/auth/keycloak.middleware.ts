@@ -2,10 +2,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { kcAdminClient } from '../../config/keycloak.config';
 import axios from 'axios';
+import crypto from 'crypto';
+import jwt, { JwtPayload } from 'jsonwebtoken';
 import { logger } from '../../utils/logger';
 
-// Use the public URL that matches the token issuer
-const KEYCLOAK_URL = process.env.KEYCLOAK_PUBLIC_URL || 'http://auth.localhost';
+// Use the internal service URL for backend-to-Keycloak communication so
+// token introspection does not depend on trusting the public certificate chain.
+const KEYCLOAK_URL = process.env.KEYCLOAK_URL || 'http://keycloak:8080';
+const KEYCLOAK_PUBLIC_URL = process.env.KEYCLOAK_PUBLIC_URL;
 const REALM = process.env.KEYCLOAK_REALM || 'tyme';
 // Use admin service credentials for token introspection
 const CLIENT_ID = process.env.KEYCLOAK_ADMIN_CLIENT_ID || 'tyme-admin-service';
@@ -21,6 +25,7 @@ if (!CLIENT_SECRET) {
  */
 const tokenCache = new Map<string, { data: any; expiry: number }>();
 const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+let realmPublicKeyPemCache: string | null = null;
 
 /**
  * Clean up expired cache entries every 5 minutes
@@ -41,12 +46,12 @@ async function introspectToken(token: string): Promise<any> {
   // Check cache first
   const cached = tokenCache.get(token);
   const now = Date.now();
-  
+
   if (cached && cached.expiry > now) {
     logger.debug('[Keycloak] Token introspection cache hit');
     return cached.data;
   }
-  
+
   // Cache miss or expired - introspect with Keycloak
   try {
     const response = await axios.post(
@@ -64,7 +69,7 @@ async function introspectToken(token: string): Promise<any> {
     );
 
     const data = response.data;
-    
+
     // Cache the result if token is active
     if (data.active) {
       tokenCache.set(token, {
@@ -73,12 +78,72 @@ async function introspectToken(token: string): Promise<any> {
       });
       logger.debug('[Keycloak] Token introspection cached');
     }
-    
+
     return data;
   } catch (error: any) {
     logger.error('[Keycloak] Token introspection error:', error.response?.data || error.message);
     throw new Error('Failed to introspect token');
   }
+}
+
+function fingerprintToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex').slice(0, 12);
+}
+
+async function getRealmPublicKeyPem(): Promise<string> {
+  if (realmPublicKeyPemCache) {
+    return realmPublicKeyPemCache;
+  }
+
+  const response = await axios.get(`${KEYCLOAK_URL}/realms/${REALM}`);
+  const publicKey = response.data?.public_key;
+
+  if (!publicKey) {
+    throw new Error('Keycloak realm public key is missing');
+  }
+
+  realmPublicKeyPemCache = `-----BEGIN PUBLIC KEY-----\n${publicKey}\n-----END PUBLIC KEY-----`;
+  return realmPublicKeyPemCache;
+}
+
+async function verifyJwtLocally(token: string): Promise<any | null> {
+  try {
+    const publicKeyPem = await getRealmPublicKeyPem();
+    const acceptedIssuers = [
+      KEYCLOAK_PUBLIC_URL ? `${KEYCLOAK_PUBLIC_URL}/realms/${REALM}` : null,
+      `${KEYCLOAK_URL}/realms/${REALM}`,
+    ].filter(Boolean) as string[];
+    const issuer = acceptedIssuers.length === 1
+      ? acceptedIssuers[0]
+      : acceptedIssuers as [string, ...string[]];
+
+    const payload = jwt.verify(token, publicKeyPem, {
+      algorithms: ['RS256'],
+      issuer,
+    }) as JwtPayload;
+
+    return {
+      active: true,
+      ...payload,
+    };
+  } catch (error: any) {
+    logger.error('[Keycloak] Local JWT verification error:', error.message);
+    return null;
+  }
+}
+
+async function validateToken(token: string): Promise<any> {
+  const introspection = await introspectToken(token);
+
+  if (introspection?.active) {
+    return introspection;
+  }
+
+  logger.warn('[Keycloak] Token introspection returned inactive token, falling back to local JWT verification', {
+    tokenFingerprint: fingerprintToken(token),
+  });
+
+  return verifyJwtLocally(token);
 }
 
 /**
@@ -89,11 +154,11 @@ export const authenticateKeycloak = async (req: Request, res: Response, next: Ne
   try {
     // Extract token from Authorization header
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({ 
+      res.status(401).json({
         error: 'Unauthorized',
-        message: 'No token provided' 
+        message: 'No token provided'
       });
       return;
     }
@@ -101,13 +166,13 @@ export const authenticateKeycloak = async (req: Request, res: Response, next: Ne
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
     // Introspect the token with Keycloak
-    const tokenInfo = await introspectToken(token);
+    const tokenInfo = await validateToken(token);
 
     // Check if token is active
     if (!tokenInfo.active) {
-      res.status(401).json({ 
+      res.status(401).json({
         error: 'Unauthorized',
-        message: 'Token is not active or has expired' 
+        message: 'Token is not active or has expired'
       });
       return;
     }
@@ -126,9 +191,9 @@ export const authenticateKeycloak = async (req: Request, res: Response, next: Ne
     next();
   } catch (error: any) {
     logger.error('[Keycloak] Authentication error:', error.message);
-    res.status(403).json({ 
+    res.status(403).json({
       error: 'Forbidden',
-      message: 'Token validation failed' 
+      message: 'Token validation failed'
     });
   }
 };
@@ -141,15 +206,15 @@ export const authenticateKeycloak = async (req: Request, res: Response, next: Ne
 export const extractKeycloakUser = (req: Request, res: Response, next: NextFunction): void => {
   try {
     const token = req.kauth?.grant?.access_token?.content;
-    
+
     if (!token) {
-      res.status(401).json({ 
+      res.status(401).json({
         error: 'Unauthorized',
-        message: 'Authentication required. No valid token found.' 
+        message: 'Authentication required. No valid token found.'
       });
       return;
     }
-    
+
     // Extract user information from token
     // Use Keycloak sub (subject) as the user ID - this is used directly in all queries
     // No users table exists - Keycloak is the single source of truth
@@ -166,13 +231,13 @@ export const extractKeycloakUser = (req: Request, res: Response, next: NextFunct
     };
 
     logger.info(`[Keycloak] Authenticated user: ${req.user.username} (${req.user.email}) with roles: ${req.user.roles?.join(', ')}`);
-    
+
     next();
   } catch (error) {
     logger.error('[Keycloak] Error extracting user from token:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Internal Server Error',
-      message: 'Failed to process authentication token' 
+      message: 'Failed to process authentication token'
     });
   }
 };
@@ -180,22 +245,22 @@ export const extractKeycloakUser = (req: Request, res: Response, next: NextFunct
 /**
  * Require specific role(s) for route access
  * This is a higher-order function that returns middleware
- * 
+ *
  * @param roles - Single role string or array of role strings (user must have at least one)
  * @returns Express middleware function
- * 
+ *
  * @example
  * router.get('/admin', authenticateKeycloak, extractKeycloakUser, requireRole('admin'), handler);
  * router.get('/resource', authenticateKeycloak, extractKeycloakUser, requireRole(['admin', 'manager']), handler);
  */
 export const requireRole = (roles: string | string[]) => {
   const requiredRoles = Array.isArray(roles) ? roles : [roles];
-  
+
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
-      res.status(401).json({ 
+      res.status(401).json({
         error: 'Unauthorized',
-        message: 'Authentication required' 
+        message: 'Authentication required'
       });
       return;
     }
@@ -205,8 +270,8 @@ export const requireRole = (roles: string | string[]) => {
 
     if (!hasRequiredRole) {
       logger.warn(`[Keycloak] Access denied for user ${req.user.username}. Required roles: ${requiredRoles.join(' or ')}, User roles: ${userRoles.join(', ')}`);
-      
-      res.status(403).json({ 
+
+      res.status(403).json({
         error: 'Forbidden',
         message: `Access denied. Required role: ${requiredRoles.join(' or ')}`,
         requiredRoles,
@@ -222,7 +287,7 @@ export const requireRole = (roles: string | string[]) => {
 
 /**
  * Convenience middleware to require admin role
- * 
+ *
  * @example
  * router.delete('/users/:id', authenticateKeycloak, extractKeycloakUser, requireAdmin, handler);
  */
@@ -230,7 +295,7 @@ export const requireAdmin = requireRole('admin');
 
 /**
  * Convenience middleware to require manager role (or admin)
- * 
+ *
  * @example
  * router.get('/team-reports', authenticateKeycloak, extractKeycloakUser, requireManager, handler);
  */
@@ -239,19 +304,19 @@ export const requireManager = requireRole(['admin', 'manager']);
 /**
  * Middleware to check if user owns the resource
  * Compares req.user.id with a user_id parameter
- * 
+ *
  * @param paramName - Name of the parameter to check (default: 'user_id')
  * @param allowAdmin - Whether admin users can bypass ownership check (default: true)
- * 
+ *
  * @example
  * router.get('/users/:user_id/profile', authenticateKeycloak, extractKeycloakUser, requireOwnership('user_id'), handler);
  */
 export const requireOwnership = (paramName: string = 'user_id', allowAdmin: boolean = true) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
-      res.status(401).json({ 
+      res.status(401).json({
         error: 'Unauthorized',
-        message: 'Authentication required' 
+        message: 'Authentication required'
       });
       return;
     }
@@ -265,21 +330,21 @@ export const requireOwnership = (paramName: string = 'user_id', allowAdmin: bool
 
     // Check ownership
     const resourceUserId = req.params[paramName] || req.body[paramName] || req.query[paramName];
-    
+
     if (!resourceUserId) {
-      res.status(400).json({ 
+      res.status(400).json({
         error: 'Bad Request',
-        message: `Missing ${paramName} parameter for ownership verification` 
+        message: `Missing ${paramName} parameter for ownership verification`
       });
       return;
     }
 
     if (req.user.id !== resourceUserId && req.user.keycloakId !== resourceUserId) {
       logger.warn(`[Keycloak] Ownership check failed. User ${req.user.username} (${req.user.id}) attempted to access resource owned by ${resourceUserId}`);
-      
-      res.status(403).json({ 
+
+      res.status(403).json({
         error: 'Forbidden',
-        message: 'You do not have permission to access this resource' 
+        message: 'You do not have permission to access this resource'
       });
       return;
     }
@@ -292,14 +357,14 @@ export const requireOwnership = (paramName: string = 'user_id', allowAdmin: bool
 /**
  * Optional authentication - allows both authenticated and anonymous access
  * Extracts user info if token is present, but doesn't fail if it's missing
- * 
+ *
  * @example
  * router.get('/public-with-personalization', optionalAuth, handler);
  */
 export const optionalAuth = (req: Request, res: Response, next: NextFunction): void => {
   // Try to extract user info if token is present
   const token = req.kauth?.grant?.access_token?.content;
-  
+
   if (token) {
     try {
       req.user = {
@@ -320,7 +385,7 @@ export const optionalAuth = (req: Request, res: Response, next: NextFunction): v
   } else {
     logger.info('[Keycloak] Optional auth: No token present, continuing as anonymous');
   }
-  
+
   next();
 };
 

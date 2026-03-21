@@ -75,9 +75,25 @@ if [ -z "$BACKUP_PATH" ]; then
     exit 1
 fi
 
+MIGRATION_RESTORE_SCRIPT="$(dirname "$0")/restore-migration-bundle.sh"
+
 if [ ! -d "$BACKUP_PATH" ] && [ ! -f "$BACKUP_PATH" ]; then
     error "Backup path not found: $BACKUP_PATH"
     exit 1
+fi
+
+if [ -f "$BACKUP_PATH" ]; then
+    case "$(basename "$BACKUP_PATH")" in
+        system_migration_*.zip|system_migration_*.tar.gz|system_migration_*.tgz)
+            log "Detected migration bundle archive, delegating to $MIGRATION_RESTORE_SCRIPT"
+            exec bash "$MIGRATION_RESTORE_SCRIPT" "$BACKUP_PATH"
+            ;;
+    esac
+fi
+
+if [ -d "$BACKUP_PATH" ] && [ -d "$BACKUP_PATH/docker-volumes" ] && [ -f "$BACKUP_PATH/README-RESTORE.md" ]; then
+    log "Detected migration bundle directory, delegating to $MIGRATION_RESTORE_SCRIPT"
+    exec bash "$MIGRATION_RESTORE_SCRIPT" "$BACKUP_PATH"
 fi
 
 EXTRACTED_BACKUP_DIR=""

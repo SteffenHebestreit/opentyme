@@ -43,3 +43,4 @@ Notes:
 - Stop the target stack before restoring Docker volumes.
 - If the target already has Docker volumes with the same names, set `OVERWRITE_VOLUMES=true` when running the restore script.
 - The restore script recreates the Docker volumes exactly as they were backed up. Keep the same service and image versions when bringing the stack back up.
+- The repository restore script also accepts `.zip` migration bundles and can extract them with `python3` when `unzip` is not installed.

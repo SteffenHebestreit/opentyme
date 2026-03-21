@@ -20,13 +20,16 @@ services:
       - JWT_SECRET=${JWT_SECRET:-your-jwt-secret-here}
       - DEBUG=${DEBUG:-true}
       - KEYCLOAK_URL=http://keycloak:8080
-      - KEYCLOAK_PUBLIC_URL=http://auth.localhost
+      - KEYCLOAK_PUBLIC_URL=${PUBLIC_PROTOCOL:-http}://${AUTH_HOST:-auth.localhost}
       - KEYCLOAK_REALM=opentyme
       - KEYCLOAK_CLIENT_ID=opentyme-app
       - KEYCLOAK_CLIENT_SECRET=opentyme-secret-change-in-production
       - KEYCLOAK_ADMIN_CLIENT_ID=opentyme-admin-service
       - KEYCLOAK_ADMIN_CLIENT_SECRET=admin-service-secret-change-in-production
       - KEYCLOAK_ENABLED=true
+      - FRONTEND_URL=${PUBLIC_PROTOCOL:-http}://${APP_HOST:-localhost}
+      - PUBLIC_URL=${PUBLIC_PROTOCOL:-http}://${APP_HOST:-localhost}
+      - CORS_ORIGIN=${PUBLIC_PROTOCOL:-http}://${APP_HOST:-localhost},https://${APP_HOST:-localhost},https://${AUTH_HOST:-auth.localhost},http://${APP_HOST:-localhost}:3000,http://localhost,http://localhost:3000,http://127.0.0.1,http://127.0.0.1:3000
       - SMTP_HOST=mailhog
       - SMTP_PORT=1025
       - SMTP_USER=
@@ -70,13 +73,23 @@ services:
       - project-network
     labels:
       - "traefik.enable=true"
-      # Backend API router
-      - "traefik.http.routers.backend.rule=Host(`localhost`) && PathPrefix(`/api`)"
-      - "traefik.http.routers.backend.entrypoints=web"
-      - "traefik.http.routers.backend.priority=10"
+      - "traefik.http.routers.backend-local.rule=Host(`localhost`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend-local.entrypoints=web"
+      - "traefik.http.routers.backend-local.priority=10"
+      - "traefik.http.routers.backend-local.service=backend"
+      - "traefik.http.routers.backend-local.middlewares=compression@file,security-headers@file"
+      - "traefik.http.routers.backend-redirect.rule=Host(`${APP_HOST:-localhost}`) && !Host(`localhost`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend-redirect.entrypoints=web"
+      - "traefik.http.routers.backend-redirect.priority=20"
+      - "traefik.http.routers.backend-redirect.service=backend"
+      - "traefik.http.routers.backend-redirect.middlewares=https-redirect@file"
+      - "traefik.http.routers.backend-secure.rule=Host(`${APP_HOST:-localhost}`) && !Host(`localhost`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend-secure.entrypoints=websecure"
+      - "traefik.http.routers.backend-secure.priority=20"
+      - "traefik.http.routers.backend-secure.tls=true"
+      - "traefik.http.routers.backend-secure.service=backend"
+      - "traefik.http.routers.backend-secure.middlewares=compression@file,security-headers@file"
       - "traefik.http.services.backend.loadbalancer.server.port=8000"
-      # Middleware for security headers
-      - "traefik.http.routers.backend.middlewares=compression@file,security-headers@file"
 
   # Frontend Web Application - Development Mode
   frontend:
@@ -92,10 +105,17 @@ services:
       - "${FRONTEND_PORT:-3000}:3000"
       - "4173:4173"
     environment:
+      - APP_HOST=${APP_HOST:-localhost}
+      - AUTH_HOST=${AUTH_HOST:-auth.localhost}
+      - TRAEFIK_HOST=${TRAEFIK_HOST:-traefik.localhost}
+      - MAIL_HOST=${MAIL_HOST:-mail.localhost}
+      - S3_HOST=${S3_HOST:-s3.localhost}
+      - MCP_HOST=${MCP_HOST:-mcp.localhost}
+      - PUBLIC_PROTOCOL=${PUBLIC_PROTOCOL:-http}
       - VITE_APP_ENVIRONMENT=${VITE_APP_ENVIRONMENT:-development}
       - VITE_API_BASE_URL=http://backend:8000
       - VITE_API_URL=http://backend:8000
-      - VITE_KEYCLOAK_URL=http://auth.localhost
+      - VITE_KEYCLOAK_URL=${PUBLIC_PROTOCOL:-http}://${AUTH_HOST:-auth.localhost}
       - VITE_KEYCLOAK_REALM=opentyme
       - VITE_KEYCLOAK_CLIENT_ID=opentyme-frontend
       - VITE_KEYCLOAK_ENABLED=true
@@ -108,13 +128,23 @@ services:
       - project-network
     labels:
       - "traefik.enable=true"
-      # Frontend router
-      - "traefik.http.routers.frontend.rule=Host(`localhost`)"
-      - "traefik.http.routers.frontend.entrypoints=web"
-      - "traefik.http.routers.frontend.priority=1"
+      - "traefik.http.routers.frontend-local.rule=Host(`localhost`)"
+      - "traefik.http.routers.frontend-local.entrypoints=web"
+      - "traefik.http.routers.frontend-local.priority=1"
+      - "traefik.http.routers.frontend-local.service=frontend"
+      - "traefik.http.routers.frontend-local.middlewares=compression@file,security-headers@file"
+      - "traefik.http.routers.frontend-redirect.rule=Host(`${APP_HOST:-localhost}`) && !Host(`localhost`)"
+      - "traefik.http.routers.frontend-redirect.entrypoints=web"
+      - "traefik.http.routers.frontend-redirect.priority=1"
+      - "traefik.http.routers.frontend-redirect.service=frontend"
+      - "traefik.http.routers.frontend-redirect.middlewares=https-redirect@file"
+      - "traefik.http.routers.frontend-secure.rule=Host(`${APP_HOST:-localhost}`) && !Host(`localhost`)"
+      - "traefik.http.routers.frontend-secure.entrypoints=websecure"
+      - "traefik.http.routers.frontend-secure.priority=1"
+      - "traefik.http.routers.frontend-secure.tls=true"
+      - "traefik.http.routers.frontend-secure.service=frontend"
+      - "traefik.http.routers.frontend-secure.middlewares=compression@file,security-headers@file"
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"
-      # Middleware for security headers
-      - "traefik.http.routers.frontend.middlewares=compression@file,security-headers@file"
 
   frontend-ui-tests:
     image: mcr.microsoft.com/playwright:v1.49.1-noble
@@ -268,9 +298,14 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.7
     container_name: opentyme-keycloak
+    entrypoint:
+      - /bin/sh
+      - /opt/keycloak/data/import/init-keycloak.sh
     environment:
       - KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      - APP_HOST=${APP_HOST:-localhost}
+      - AUTH_HOST=${AUTH_HOST:-auth.localhost}
       - KC_DB=postgres
       - KC_DB_URL=jdbc:postgresql://keycloak-db:5432/postgres?currentSchema=public
       - KC_DB_USERNAME=keycloak_user
@@ -278,17 +313,16 @@ services:
       - KC_HTTP_ENABLED=true
       - KC_HEALTH_ENABLED=true
       - KC_METRICS_ENABLED=true
-      - KC_HOSTNAME=auth.localhost
-      - KC_HOSTNAME_PORT=80
+      - PUBLIC_PROTOCOL=${PUBLIC_PROTOCOL:-http}
+      - KC_HOSTNAME=${AUTH_HOST:-auth.localhost}
+      - KC_HOSTNAME_PORT=${PUBLIC_PORT:-80}
       - KC_HOSTNAME_STRICT=false
       - KC_HOSTNAME_STRICT_HTTPS=false
+      - KC_PROXY_HEADERS=xforwarded
     ports:
       - "${KEYCLOAK_PORT:-8080}:8080"
     volumes:
-      - ./keycloak/realm-import.json:/opt/keycloak/data/import/realm-import.json
-    command: 
-      - start-dev
-      - --import-realm
+      - ./keycloak:/opt/keycloak/data/import
     depends_on:
       keycloak-db:
         condition: service_healthy
@@ -302,12 +336,20 @@ services:
       - project-network
     labels:
       - "traefik.enable=true"
-      # Keycloak router
-      - "traefik.http.routers.keycloak.rule=Host(`auth.localhost`)"
-      - "traefik.http.routers.keycloak.entrypoints=web"
+      - "traefik.http.routers.keycloak-local.rule=Host(`auth.localhost`)"
+      - "traefik.http.routers.keycloak-local.entrypoints=web"
+      - "traefik.http.routers.keycloak-local.service=keycloak"
+      - "traefik.http.routers.keycloak-local.middlewares=compression@file,security-headers@file"
+      - "traefik.http.routers.keycloak-redirect.rule=Host(`${AUTH_HOST:-auth.localhost}`) && !Host(`auth.localhost`)"
+      - "traefik.http.routers.keycloak-redirect.entrypoints=web"
+      - "traefik.http.routers.keycloak-redirect.service=keycloak"
+      - "traefik.http.routers.keycloak-redirect.middlewares=https-redirect@file"
+      - "traefik.http.routers.keycloak-secure.rule=Host(`${AUTH_HOST:-auth.localhost}`) && !Host(`auth.localhost`)"
+      - "traefik.http.routers.keycloak-secure.entrypoints=websecure"
+      - "traefik.http.routers.keycloak-secure.tls=true"
+      - "traefik.http.routers.keycloak-secure.service=keycloak"
+      - "traefik.http.routers.keycloak-secure.middlewares=compression@file,security-headers@file"
       - "traefik.http.services.keycloak.loadbalancer.server.port=8080"
-      # Middleware for security headers
-      - "traefik.http.routers.keycloak.middlewares=compression@file,security-headers@file"
 
   # Traefik Reverse Proxy & Load Balancer
   traefik:
@@ -328,10 +370,17 @@ services:
       - project-network
     labels:
       - "traefik.enable=true"
-      # Dashboard router
-      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.localhost`)"
-      - "traefik.http.routers.traefik-dashboard.service=api@internal"
-      - "traefik.http.routers.traefik-dashboard.entrypoints=web"
+      - "traefik.http.routers.traefik-dashboard-local.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.traefik-dashboard-local.service=api@internal"
+      - "traefik.http.routers.traefik-dashboard-local.entrypoints=web"
+      - "traefik.http.routers.traefik-dashboard-redirect.rule=Host(`${TRAEFIK_HOST:-traefik.localhost}`) && !Host(`traefik.localhost`) && PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.traefik-dashboard-redirect.service=api@internal"
+      - "traefik.http.routers.traefik-dashboard-redirect.entrypoints=web"
+      - "traefik.http.routers.traefik-dashboard-redirect.middlewares=https-redirect@file"
+      - "traefik.http.routers.traefik-dashboard-secure.rule=Host(`${TRAEFIK_HOST:-traefik.localhost}`) && !Host(`traefik.localhost`) && PathPrefix(`/dashboard`)"
+      - "traefik.http.routers.traefik-dashboard-secure.service=api@internal"
+      - "traefik.http.routers.traefik-dashboard-secure.entrypoints=websecure"
+      - "traefik.http.routers.traefik-dashboard-secure.tls=true"
 
   # Mailhog - Email Testing (SMTP server with web UI)
   mailhog:
@@ -344,9 +393,17 @@ services:
       - project-network
     labels:
       - "traefik.enable=true"
-      # Mailhog web UI router
-      - "traefik.http.routers.mailhog.rule=Host(`mail.localhost`)"
-      - "traefik.http.routers.mailhog.entrypoints=web"
+      - "traefik.http.routers.mailhog-local.rule=Host(`mail.localhost`)"
+      - "traefik.http.routers.mailhog-local.entrypoints=web"
+      - "traefik.http.routers.mailhog-local.service=mailhog"
+      - "traefik.http.routers.mailhog-redirect.rule=Host(`${MAIL_HOST:-mail.localhost}`) && !Host(`mail.localhost`)"
+      - "traefik.http.routers.mailhog-redirect.entrypoints=web"
+      - "traefik.http.routers.mailhog-redirect.service=mailhog"
+      - "traefik.http.routers.mailhog-redirect.middlewares=https-redirect@file"
+      - "traefik.http.routers.mailhog-secure.rule=Host(`${MAIL_HOST:-mail.localhost}`) && !Host(`mail.localhost`)"
+      - "traefik.http.routers.mailhog-secure.entrypoints=websecure"
+      - "traefik.http.routers.mailhog-secure.tls=true"
+      - "traefik.http.routers.mailhog-secure.service=mailhog"
       - "traefik.http.services.mailhog.loadbalancer.server.port=8025"
 
   # FastAPI MCP Server for AI-powered PDF Extraction
@@ -383,8 +440,17 @@ services:
       - project-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.mcp-server.rule=Host(`mcp.localhost`)"
-      - "traefik.http.routers.mcp-server.entrypoints=web"
+      - "traefik.http.routers.mcp-server-local.rule=Host(`mcp.localhost`)"
+      - "traefik.http.routers.mcp-server-local.entrypoints=web"
+      - "traefik.http.routers.mcp-server-local.service=mcp-server"
+      - "traefik.http.routers.mcp-server-redirect.rule=Host(`${MCP_HOST:-mcp.localhost}`) && !Host(`mcp.localhost`)"
+      - "traefik.http.routers.mcp-server-redirect.entrypoints=web"
+      - "traefik.http.routers.mcp-server-redirect.service=mcp-server"
+      - "traefik.http.routers.mcp-server-redirect.middlewares=https-redirect@file"
+      - "traefik.http.routers.mcp-server-secure.rule=Host(`${MCP_HOST:-mcp.localhost}`) && !Host(`mcp.localhost`)"
+      - "traefik.http.routers.mcp-server-secure.entrypoints=websecure"
+      - "traefik.http.routers.mcp-server-secure.tls=true"
+      - "traefik.http.routers.mcp-server-secure.service=mcp-server"
       - "traefik.http.services.mcp-server.loadbalancer.server.port=8000"
 
   # SeaweedFS S3-Compatible Object Storage for File Uploads (Receipts, Documents)
@@ -408,9 +474,17 @@ services:
       - project-network
     labels:
       - "traefik.enable=true"
-      # SeaweedFS S3 API router
-      - "traefik.http.routers.seaweedfs-s3.rule=Host(`s3.localhost`)"
-      - "traefik.http.routers.seaweedfs-s3.entrypoints=web"
+      - "traefik.http.routers.seaweedfs-s3-local.rule=Host(`s3.localhost`)"
+      - "traefik.http.routers.seaweedfs-s3-local.entrypoints=web"
+      - "traefik.http.routers.seaweedfs-s3-local.service=seaweedfs-s3"
+      - "traefik.http.routers.seaweedfs-s3-redirect.rule=Host(`${S3_HOST:-s3.localhost}`) && !Host(`s3.localhost`)"
+      - "traefik.http.routers.seaweedfs-s3-redirect.entrypoints=web"
+      - "traefik.http.routers.seaweedfs-s3-redirect.service=seaweedfs-s3"
+      - "traefik.http.routers.seaweedfs-s3-redirect.middlewares=https-redirect@file"
+      - "traefik.http.routers.seaweedfs-s3-secure.rule=Host(`${S3_HOST:-s3.localhost}`) && !Host(`s3.localhost`)"
+      - "traefik.http.routers.seaweedfs-s3-secure.entrypoints=websecure"
+      - "traefik.http.routers.seaweedfs-s3-secure.tls=true"
+      - "traefik.http.routers.seaweedfs-s3-secure.service=seaweedfs-s3"
       - "traefik.http.services.seaweedfs-s3.loadbalancer.server.port=8333"
 
   # Docker MCP Gateway - Aggregates MCP servers from Docker Desktop

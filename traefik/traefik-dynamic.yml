@@ -49,3 +49,8 @@ http:
       redirectScheme:
         scheme: https
         permanent: true
+
+tls:
+  certificates:
+    - certFile: /letsencrypt/local/local-dev.crt
+      keyFile: /letsencrypt/local/local-dev.key

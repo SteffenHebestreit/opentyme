@@ -55,7 +55,7 @@ async function startServer() {
 
     // Start the server
     app.listen(port, () => {
-      logger.info(`⚡️ [server]: Server is running at http://localhost:${port}`);
+      logger.info(`⚡️ [server]: Server is running at ${process.env.PUBLIC_URL || `http://localhost:${port}`}`);
       logger.info(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
   } catch (err: any) {

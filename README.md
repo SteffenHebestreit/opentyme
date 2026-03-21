@@ -22,14 +22,17 @@ cd opentyme
 
 ### 2. Hosts file
 
-OpenTYME's services use subdomains. Add them to your hosts file (replace `<IP>` with your machine's LAN IP — not `127.0.0.1`):
+Local development uses `localhost` for the app and `*.localhost` for the supporting services. On most systems, `*.localhost` already resolves to loopback. If your machine does not resolve these names automatically, add them to your hosts file:
 
 ```
-<IP>  auth.localhost
-<IP>  traefik.localhost
-<IP>  mail.localhost
-<IP>  s3.localhost
+127.0.0.1  auth.localhost
+127.0.0.1  traefik.localhost
+127.0.0.1  mail.localhost
+127.0.0.1  s3.localhost
+127.0.0.1  mcp.localhost
 ```
+
+To expose the stack under a custom LAN hostname instead, override `APP_HOST`, `AUTH_HOST`, `TRAEFIK_HOST`, `MAIL_HOST`, `S3_HOST`, and `MCP_HOST` in `.env` and point those names to the Docker host.
 
 Scripts are provided: `scripts/setup-hosts.sh` (Linux/macOS) or `scripts/setup-hosts.bat` (Windows, run as Administrator).
 
@@ -74,6 +77,39 @@ KEYCLOAK_ADMIN_CLIENT_SECRET=...
 STORAGE_ACCESS_KEY=...
 STORAGE_SECRET_KEY=...
 ```
+
+---
+
+## Restoring A Migration Bundle
+
+The repository can restore full-machine migration bundles such as `system_migration_20260321_221920.zip`.
+
+Create a bundle from the current machine:
+
+```bash
+./scripts/create-migration-bundle.sh
+```
+
+Restore the Docker volumes from a bundle into the current local stack:
+
+```bash
+OVERWRITE_VOLUMES=true ./scripts/restore-migration-bundle.sh /path/to/system_migration_YYYYMMDD_HHMMSS.zip
+docker compose up -d --build
+```
+
+You can also use the existing entrypoint:
+
+```bash
+OVERWRITE_VOLUMES=true ./scripts/restore.sh /path/to/system_migration_YYYYMMDD_HHMMSS.zip
+```
+
+Notes:
+
+- Stop the stack before restoring volumes.
+- `.zip`, `.tar.gz`, and already extracted bundle directories are supported.
+- `python3` is used automatically for `.zip` extraction if `unzip` is not installed.
+- To restore the bundled workspace snapshot as well, set `RESTORE_WORKSPACE=true` and optionally `RESTORE_ROOT=/target/path`.
+- If your Docker Compose project name is not `opentyme`, set `TARGET_VOLUME_PREFIX=<compose-project-name>` so archived `opentyme_*` volumes are restored under the correct names.
 
 ---
 

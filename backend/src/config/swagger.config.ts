@@ -1,5 +1,10 @@
 import swaggerJsdoc from 'swagger-jsdoc';
 
+const publicUrl = process.env.PUBLIC_URL || 'http://localhost';
+const directApiUrl = process.env.DIRECT_API_URL || 'http://localhost:8000/api';
+const keycloakPublicUrl = process.env.KEYCLOAK_PUBLIC_URL || 'http://auth.localhost';
+const keycloakRealm = process.env.KEYCLOAK_REALM || 'opentyme';
+
 const swaggerDefinition = {
   openapi: '3.0.0',
   info: {
@@ -33,11 +38,11 @@ const swaggerDefinition = {
   },
   servers: [
     {
-      url: 'http://localhost/api',
+      url: `${publicUrl}/api`,
       description: 'Development server (Traefik proxy)'
     },
     {
-      url: 'http://localhost:8000/api',
+      url: directApiUrl,
       description: 'Development server (Direct)'
     },
     {
@@ -58,8 +63,8 @@ const swaggerDefinition = {
         description: 'Keycloak OAuth 2.0 authentication',
         flows: {
           authorizationCode: {
-            authorizationUrl: 'http://localhost/auth/realms/tyme/protocol/openid-connect/auth',
-            tokenUrl: 'http://localhost/auth/realms/tyme/protocol/openid-connect/token',
+            authorizationUrl: `${keycloakPublicUrl}/realms/${keycloakRealm}/protocol/openid-connect/auth`,
+            tokenUrl: `${keycloakPublicUrl}/realms/${keycloakRealm}/protocol/openid-connect/token`,
             scopes: {
               openid: 'OpenID Connect scope',
               profile: 'User profile information',

@@ -129,15 +129,26 @@ main() {
     echo ""
     
     check_privileges
+
+    APP_HOST="${OPENTYME_APP_HOST:-localhost}"
+    AUTH_HOST="${OPENTYME_AUTH_HOST:-auth.${APP_HOST}}"
+    TRAEFIK_HOST="${OPENTYME_TRAEFIK_HOST:-traefik.${APP_HOST}}"
+    MAIL_HOST="${OPENTYME_MAIL_HOST:-mail.${APP_HOST}}"
+    S3_HOST="${OPENTYME_S3_HOST:-s3.${APP_HOST}}"
+    MCP_HOST="${OPENTYME_MCP_HOST:-mcp.${APP_HOST}}"
     
     # Domains to add
     DOMAINS=(
-        "auth.localhost"
-        "traefik.localhost"
-        "mail.localhost"
-        "s3.localhost"
-        "mcp.localhost"
+        "$AUTH_HOST"
+        "$TRAEFIK_HOST"
+        "$MAIL_HOST"
+        "$S3_HOST"
+        "$MCP_HOST"
     )
+
+    if [[ "$APP_HOST" != "localhost" ]]; then
+        DOMAINS=("$APP_HOST" "${DOMAINS[@]}")
+    fi
     
     echo "Adding host entries..."
     echo ""
@@ -161,12 +172,12 @@ main() {
     echo -e "${GREEN}✓ Hosts file updated successfully!${NC}"
     echo ""
     echo -e "${CYAN}You can now access:${NC}"
-    echo "  - http://localhost          (OpenTYME App)"
-    echo "  - http://auth.localhost     (Keycloak)"
-    echo "  - http://traefik.localhost  (Traefik Dashboard)"
-    echo "  - http://mail.localhost     (MailHog)"
+    echo "  - http://$APP_HOST          (OpenTYME App)"
+    echo "  - http://$AUTH_HOST         (Keycloak)"
+    echo "  - http://$TRAEFIK_HOST      (Traefik Dashboard)"
+    echo "  - http://$MAIL_HOST         (MailHog)"
     echo ""
-    echo "  - http://mcp.localhost      (MCP Server)"
+    echo "  - http://$MCP_HOST          (MCP Server)"
     echo ""
     echo -e "${YELLOW}NOTE: All domains resolve to $LOCAL_IP${NC}"
     echo ""

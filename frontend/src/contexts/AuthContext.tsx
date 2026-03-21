@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
-import { keycloak, TOKEN_REFRESH_THRESHOLD, TOKEN_CHECK_INTERVAL } from '../config/keycloak.config';
+import { keycloak, TOKEN_REFRESH_THRESHOLD, TOKEN_CHECK_INTERVAL, getPkceMethod, hasWebCrypto } from '../config/keycloak.config';
 import { setTokens, clearTokens, getUserFromToken } from '../services/auth/tokenManager';
 import { useApp } from '../store/AppContext';
 import { getSettings } from '../api/services/settings.service';
@@ -88,10 +88,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             keycloakInitPromise = Promise.resolve(!!keycloak.authenticated);
           } else {
             console.log('[Auth] Initializing Keycloak...');
+            const pkceMethod = getPkceMethod();
+            if (pkceMethod === false) {
+              console.warn('[Auth] Web Crypto is unavailable on this origin, disabling PKCE for Keycloak login');
+            }
             const initPromise = keycloak.init({
                 onLoad: 'check-sso',
                 checkLoginIframe: false, // Disable iframe check to avoid X-Frame-Options issues
-                pkceMethod: 'S256',
+                pkceMethod,
                 enableLogging: import.meta.env.DEV,
               })
               .then((authenticated) => {
@@ -295,6 +299,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    * After successful login, user is redirected back to the application.
    */
   const login = useCallback(() => {
+    if (!hasWebCrypto()) {
+      console.warn('[Auth] Starting Keycloak login without PKCE because Web Crypto is unavailable on this origin');
+    }
+
     keycloak.login({
       redirectUri: window.location.origin + window.location.pathname,
     });

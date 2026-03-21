@@ -2,31 +2,50 @@ import { Request, Response } from 'express';
 import { TimeEntryService } from '../../services/business/time-entry.service';
 import { logger } from '../../utils/logger';
 import { ProjectService } from '../../services/business/project.service';
-import { 
+import {
   CreateTimeEntryDto,
   UpdateTimeEntryDto,
   TimeEntry as ITimeEntry
 } from '../../models/business/time-entry.model';
 import Joi from 'joi';
-import { 
-  getCurrentTime, 
-  getCurrentDate, 
-  getCurrentTimeString, 
-  formatTimeString, 
+import {
+  getCurrentTime,
+  getCurrentDate,
+  getCurrentTimeString,
+  formatTimeString,
   formatDateString,
   calculateDurationHours,
-  roundTimerToQuarters 
+  roundTimerToQuarters
 } from '../../utils/timezone.util';
 
 const timeEntryService = new TimeEntryService();
 const projectService = new ProjectService();
+
+function computeEntryEndTime(entryTime: string, durationHours: number): string {
+  const parts = entryTime.split(':').map(Number);
+  const [hours, minutes, seconds = 0] = parts;
+  const startSeconds = (hours * 60 * 60) + (minutes * 60) + seconds;
+  const durationSeconds = Math.round(durationHours * 60 * 60);
+  const endSeconds = (startSeconds + durationSeconds) % (24 * 60 * 60);
+  const endHours = Math.floor(endSeconds / 3600);
+  const endMinutes = Math.floor((endSeconds % 3600) / 60);
+  const endRemainderSeconds = endSeconds % 60;
+
+  return [endHours, endMinutes, endRemainderSeconds]
+    .map((value) => value.toString().padStart(2, '0'))
+    .join(':');
+}
+
+function isActiveTimerEntry(entry: any): boolean {
+  return Boolean(entry?.date_start) && !entry?.entry_end_time && Number(entry?.duration_hours ?? 0) === 0;
+}
 
 /**
  * Joi validation schema for creating a new time entry.
  * Simplified model: single date + time + duration hours.
  * Users must create separate entries if work spans midnight.
  * Frontend sends: entry_date, entry_time, duration_hours, billable, task_name
- * 
+ *
  * @constant {Joi.ObjectSchema}
  */
 const createTimeEntrySchema = Joi.object({
@@ -42,7 +61,7 @@ const createTimeEntrySchema = Joi.object({
   billable: Joi.boolean().default(true),
   hourly_rate: Joi.number().min(0).optional(),
   tags: Joi.array().items(Joi.string()).optional(),
-  
+
   // Legacy fields for backward compatibility (will be ignored)
   start_time: Joi.date().iso().optional(),
   end_time: Joi.date().iso().optional(),
@@ -52,7 +71,7 @@ const createTimeEntrySchema = Joi.object({
 /**
  * Joi validation schema for updating an existing time entry.
  * All fields are optional, but at least one field must be provided.
- * 
+ *
  * @constant {Joi.ObjectSchema}
  */
 const updateTimeEntrySchema = Joi.object({
@@ -68,7 +87,7 @@ const updateTimeEntrySchema = Joi.object({
   billable: Joi.boolean().optional(),
   hourly_rate: Joi.number().min(0).optional(),
   tags: Joi.array().items(Joi.string()).optional(),
-  
+
   // Legacy fields for backward compatibility (will be ignored)
   start_time: Joi.date().iso().optional(),
   end_time: Joi.date().iso().optional(),
@@ -79,7 +98,7 @@ const updateTimeEntrySchema = Joi.object({
  * Controller for handling HTTP requests related to time entry management.
  * Provides CRUD operations for time entries with comprehensive validation and filtering.
  * Automatically calculates duration when both start and end dates are provided.
- * 
+ *
  * @class TimeEntryController
  */
 export class TimeEntryController {
@@ -88,12 +107,12 @@ export class TimeEntryController {
    * Creates a new time entry in the database.
    * Validates request body against createTimeEntrySchema.
    * Duration is automatically calculated if both date_start and date_end are provided.
-   * 
+   *
    * @async
    * @param {Request} req - Express request object with time entry data in body
    * @param {Response} res - Express response object
    * @returns {Promise<void>} Sends 201 with created time entry or error response
-   * 
+   *
    * @example
    * POST /api/time-entries
    * Body: {
@@ -123,22 +142,22 @@ export class TimeEntryController {
         category: value.category,
         entry_date: value.entry_date, // Single date string (YYYY-MM-DD)
         entry_time: value.entry_time, // Start time string (HH:mm or HH:mm:ss)
-        entry_end_time: value.entry_end_time || null, // End time string (HH:mm or HH:mm:ss), optional
+        entry_end_time: value.entry_end_time || computeEntryEndTime(value.entry_time, value.duration_hours),
         duration_hours: value.duration_hours, // Duration in hours (decimal)
         is_billable: value.billable ?? true,
         hourly_rate: value.hourly_rate,
         tags: value.tags,
-        
+
         // Keep legacy date_start field for backward compatibility during transition
         // Construct proper ISO timestamp from date and time strings
-        date_start: value.entry_date && value.entry_time 
-          ? new Date(`${value.entry_date}T${value.entry_time}:00.000Z`) 
+        date_start: value.entry_date && value.entry_time
+          ? new Date(`${value.entry_date}T${value.entry_time}:00.000Z`)
           : undefined,
       };
 
       logger.debug('[DEBUG] Creating time entry with user_id:', transformedData.user_id);
       logger.debug('[DEBUG] transformedData before service call:', JSON.stringify(transformedData, null, 2));
-      
+
       const timeEntry = await timeEntryService.create(transformedData);
       res.status(201).json({
         message: 'Time entry created successfully',
@@ -159,12 +178,12 @@ export class TimeEntryController {
    * Retrieves time entries from the database with optional filtering.
    * Supports filtering by user_id, project_id, and date range via query parameters.
    * Returns time entries with associated project details, ordered by start date (newest first).
-   * 
+   *
    * @async
    * @param {Request} req - Express request object with optional query params
    * @param {Response} res - Express response object
    * @returns {Promise<void>} Sends 200 with array of time entries or error response
-   * 
+   *
    * @example
    * GET /api/time-entries?project_id=uuid&start_date=2024-01-01&end_date=2024-01-31
    * Response: 200 [{ id: "uuid", description: "Work done", duration_hours: 3.5, ... }, ...]
@@ -182,12 +201,12 @@ export class TimeEntryController {
       user_id: userId  // Force user_id to authenticated user
     };
     if (req.query.project_id) options.project_id = req.query.project_id as string;
-    
+
     // For date filtering, expect YYYY-MM-DD format
     if (req.query.start_date) {
       const startDateStr = req.query.start_date as string;
       options.start_date = new Date(startDateStr);
-      if (isNaN(options.start_date.getTime())) { 
+      if (isNaN(options.start_date.getTime())) {
         res.status(400).json({ message: "Invalid 'start_date' format. Use YYYY-MM-DD." });
         return;
       }
@@ -195,7 +214,7 @@ export class TimeEntryController {
     if (req.query.end_date) {
       const endDateStr = req.query.end_date as string;
       options.end_date = new Date(endDateStr);
-       if (isNaN(options.end_date.getTime())) { 
+       if (isNaN(options.end_date.getTime())) {
         res.status(400).json({ message: "Invalid 'end_date' format. Use YYYY-MM-DD." });
         return;
       }
@@ -203,7 +222,7 @@ export class TimeEntryController {
 
     try {
       const timeEntries = await timeEntryService.findAll(options);
-      
+
       // Transform backend field names to frontend field names
       const transformedEntries = timeEntries.map((entry: any) => {
         // Calculate end_time for legacy compatibility
@@ -215,7 +234,7 @@ export class TimeEntryController {
           startDate.setHours(hours, minutes, 0, 0);
           endTime = new Date(startDate.getTime() + entry.duration_hours * 60 * 60 * 1000);
         }
-        
+
         return {
           id: entry.id,
           user_id: entry.user_id,
@@ -239,7 +258,7 @@ export class TimeEntryController {
           client_name: entry.client_name || null,
         };
       });
-      
+
       res.status(200).json(transformedEntries);
     } catch (err: any) {
       logger.error('Find all time entries error:', err);
@@ -250,12 +269,12 @@ export class TimeEntryController {
   /**
    * Retrieves a single time entry by ID.
    * Returns the time entry with associated project details if found.
-   * 
+   *
    * @async
    * @param {Request} req - Express request object with time entry ID in params
    * @param {Response} res - Express response object
    * @returns {Promise<void>} Sends 200 with time entry, 404 if not found, or error response
-   * 
+   *
    * @example
    * GET /api/time-entries/:id
    * Response: 200 { id: "uuid", description: "Work done", project: {...}, ... }
@@ -280,7 +299,7 @@ export class TimeEntryController {
           startDate.setHours(hours, minutes, 0, 0);
           endTime = new Date(startDate.getTime() + timeEntry.duration_hours * 60 * 60 * 1000);
         }
-        
+
         // Transform backend field names to frontend field names
         const transformedEntry = {
           id: timeEntry.id,
@@ -303,7 +322,7 @@ export class TimeEntryController {
           end_time: endTime, // Set only if entry is complete (has entry_date)
           duration_minutes: timeEntry.duration_hours ? Math.round(timeEntry.duration_hours * 60) : null,
         };
-        
+
         res.status(200).json(transformedEntry);
       } else {
         res.status(404).json({ message: 'Time entry not found' });
@@ -318,12 +337,12 @@ export class TimeEntryController {
    * Updates an existing time entry with partial data.
    * Validates request body against updateTimeEntrySchema.
    * At least one field must be provided for update.
-   * 
+   *
    * @async
    * @param {Request} req - Express request object with time entry ID in params and update data in body
    * @param {Response} res - Express response object
    * @returns {Promise<void>} Sends 200 with updated time entry, 404 if not found, or error response
-   * 
+   *
    * @example
    * PUT /api/time-entries/:id
    * Body: { "date_end": "2024-01-15T17:30:00Z", "duration_hours": 8.5 }
@@ -342,34 +361,34 @@ export class TimeEntryController {
       res.status(400).json({ message: 'Validation error', details: error.details });
       return;
     }
-    
+
     try {
       // Transform frontend field names to backend field names
       const transformedData: any = {};
-      
+
       if (value.project_id) transformedData.project_id = value.project_id;
       if (value.user_id) transformedData.user_id = value.user_id;
       if (value.task_name !== undefined) transformedData.task_name = value.task_name;
       if (value.description !== undefined) transformedData.description = value.description;
       if (value.category !== undefined) transformedData.category = value.category;
-      
+
       // New format: entry_date and entry_time
       if (value.entry_date !== undefined) transformedData.entry_date = value.entry_date;
       if (value.entry_time !== undefined) transformedData.entry_time = value.entry_time;
       if (value.entry_end_time !== undefined) transformedData.entry_end_time = value.entry_end_time;
       if (value.duration_hours !== undefined) transformedData.duration_hours = value.duration_hours;
-      
+
       // Legacy field transformation for backward compatibility
       if (value.start_time) transformedData.date_start = value.start_time;
       if (value.end_time !== undefined) transformedData.date_end = value.end_time;
       if (value.duration_minutes !== undefined && value.duration_minutes !== null) {
         transformedData.duration_hours = value.duration_minutes / 60;
       }
-      
+
       if (value.billable !== undefined) transformedData.is_billable = value.billable;
       if (value.hourly_rate !== undefined) transformedData.hourly_rate = value.hourly_rate;
       if (value.tags !== undefined) transformedData.tags = value.tags;
-      
+
       const updatedTimeEntry = await timeEntryService.update(id, transformedData);
       if (updatedTimeEntry) {
         res.status(200).json({
@@ -391,12 +410,12 @@ export class TimeEntryController {
 
   /**
    * Deletes a time entry from the database.
-   * 
+   *
    * @async
    * @param {Request} req - Express request object with time entry ID in params
    * @param {Response} res - Express response object
    * @returns {Promise<void>} Sends 200 on success, 404 if not found, or error response
-   * 
+   *
    * @example
    * DELETE /api/time-entries/:id
    * Response: 200 { message: "Time entry deleted successfully" }
@@ -434,9 +453,9 @@ export class TimeEntryController {
         res.status(400).json({ message: 'Project ID is required to start a timer.' });
         return;
     }
-    
+
     // In a real app, user_id would come from req.user.id via authentication middleware.
-    const userId = (req as any).user?.id; 
+    const userId = (req as any).user?.id;
     if (!userId) {
       res.status(401).json({ message: 'Unauthorized. User ID not found.' });
       return;
@@ -446,12 +465,12 @@ export class TimeEntryController {
         // Check for an existing active timer for this user to prevent multiple timers
         const options = { user_id: userId };
         const currentEntries = await timeEntryService.findAll(options);
-        
+
         // Active timers keep date_start set until they are stopped and entry_end_time is written.
-        const activeTimer = currentEntries.find((entry: any) => entry.date_start && !entry.entry_end_time);
+        const activeTimer = currentEntries.find((entry: any) => isActiveTimerEntry(entry));
         if (activeTimer) {
-          res.status(400).json({ 
-            message: 'You already have an active timer running. Please stop it before starting a new one.' 
+          res.status(400).json({
+            message: 'You already have an active timer running. Please stop it before starting a new one.'
           });
           return;
         }
@@ -480,7 +499,7 @@ export class TimeEntryController {
         // Keep date_start for active timers - will be converted to entry_date/time/duration on stop
         date_start: now,
       };
-      
+
       const activeTimeEntry = await timeEntryService.create(newTimeEntryData as CreateTimeEntryDto);
 
       res.status(201).json({
@@ -510,7 +529,7 @@ export class TimeEntryController {
         const options = { user_id: userId };
         const activeEntries = await timeEntryService.findAll(options);
 
-        const runningEntries = activeEntries.filter((entry: any) => entry.date_start && !entry.entry_end_time);
+        const runningEntries = activeEntries.filter((entry: any) => isActiveTimerEntry(entry));
         const activeTimer = requestedTimeEntryId
           ? runningEntries.find((entry: any) => entry.id === requestedTimeEntryId)
           : runningEntries[0];
@@ -574,8 +593,8 @@ export class TimeEntryController {
 
       try {
          // Timer functionality is deprecated with the new single date/time model
-        res.status(501).json({ 
-          message: 'Timer pause functionality is not supported in the new time entry model. Time entries are created with a specific duration.' 
+        res.status(501).json({
+          message: 'Timer pause functionality is not supported in the new time entry model. Time entries are created with a specific duration.'
         });
         return;
 
@@ -602,7 +621,7 @@ export class TimeEntryController {
         // Calculate and set duration
 
         const pausedEntry = await timeEntryService.update(currentActiveEntry.id, updateData);
-        
+
          if (!pausedEntry) {
              res.status(500).json({ message: 'Failed to pause timer.' });
             return;
