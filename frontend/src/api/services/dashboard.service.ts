@@ -185,6 +185,17 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   
   const MONTH_NAMES_DE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
   
+  const projectRateMap = new Map<string, number>(
+    projects
+      .filter((p: Project) => p.hourly_rate != null)
+      .map((p: Project) => [p.id, p.hourly_rate as number])
+  );
+
+  const getBillableRate = (entry: TimeEntry): number => {
+    if (entry.hourly_rate != null) return entry.hourly_rate;
+    return projectRateMap.get(entry.project_id) ?? 0;
+  };
+
   const revenueThisMonth = Number(
     timeEntries
       .filter((entry: TimeEntry) => {
@@ -195,7 +206,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
       })
       .reduce((sum: number, entry: TimeEntry) => {
         const hours = entry.duration_hours || 0;
-        const rate = entry.hourly_rate || 0;
+        const rate = getBillableRate(entry);
         return sum + (hours * rate);
       }, 0)
       .toFixed(2)
@@ -211,7 +222,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
       })
       .reduce((sum: number, entry: TimeEntry) => {
         const hours = entry.duration_hours || 0;
-        const rate = entry.hourly_rate || 0;
+        const rate = getBillableRate(entry);
         return sum + (hours * rate);
       }, 0)
       .toFixed(2)
@@ -252,12 +263,12 @@ export async function fetchDashboardData(): Promise<DashboardData> {
         .toFixed(2)
     ),
     outstandingInvoiceCount: invoices.filter(
-      (invoice: Invoice) => invoice.status !== 'paid' && invoice.status !== 'cancelled'
+      (invoice: Invoice) => invoice.status !== 'paid' && invoice.status !== 'cancelled' && invoice.status !== 'draft'
     ).length,
     outstandingInvoiceTotal: Number(
       invoices
-        .filter((invoice: Invoice) => invoice.status !== 'paid' && invoice.status !== 'cancelled')
-        .reduce((accumulator: number, invoice: Invoice) => accumulator + Number(invoice.total_amount || 0), 0)
+        .filter((invoice: Invoice) => invoice.status !== 'paid' && invoice.status !== 'cancelled' && invoice.status !== 'draft')
+        .reduce((accumulator: number, invoice: Invoice) => accumulator + Number(invoice.sub_total || 0), 0)
         .toFixed(2)
     ),
     revenueThisMonth,
