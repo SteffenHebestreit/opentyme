@@ -177,8 +177,8 @@ class BackupService {
       throw new Error(`Backup script not found: ${scriptPath}`);
     }
 
-    logger.info(`Executing backup script: ${scriptPath}`);
-    const { stdout, stderr } = await execFileAsync(scriptPath, [], { env, maxBuffer: 10 * 1024 * 1024 });
+    logger.info(`Executing backup script via bash: ${scriptPath}`);
+    const { stdout, stderr } = await execFileAsync('bash', [scriptPath], { env, maxBuffer: 10 * 1024 * 1024 });
 
     if (stderr) {
       logger.warn(`Backup script warnings: ${stderr}`);
@@ -248,8 +248,8 @@ class BackupService {
       throw new Error(`Restore script not found: ${scriptPath}`);
     }
 
-    logger.info(`Executing restore script: ${scriptPath}`);
-    const { stdout, stderr } = await execFileAsync(scriptPath, [backupPath], { env, maxBuffer: 10 * 1024 * 1024 });
+    logger.info(`Executing restore script via bash: ${scriptPath}`);
+    const { stdout, stderr } = await execFileAsync('bash', [scriptPath, backupPath], { env, maxBuffer: 10 * 1024 * 1024 });
 
     if (stderr) {
       logger.warn(`Restore script warnings: ${stderr}`);
