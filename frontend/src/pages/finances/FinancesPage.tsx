@@ -19,13 +19,14 @@ import InvoiceList from '@/components/business/invoices/InvoiceList';
 import PaymentsPage from '@/pages/payments/PaymentsPage';
 import ExpensesPage from '@/pages/expenses/ExpensesPage';
 import TaxPrepaymentsPage from '@/pages/finances/TaxPrepaymentsPage';
+import RecurringInvoicesPage from '@/pages/finances/RecurringInvoicesPage';
 import { fetchPayments } from '@/api/services/payment.service';
 import { fetchInvoices } from '@/api/services/invoice.service';
 import { fetchExpenseSummary } from '@/api/services/expense.service';
 import { Payment, Invoice } from '@/api/types';
 import { formatCurrency } from '@/utils/currency';
 
-type FinanceTab = 'invoices' | 'payments' | 'expenses' | 'tax-prepayments';
+type FinanceTab = 'invoices' | 'recurring' | 'payments' | 'expenses' | 'tax-prepayments';
 
 /**
  * Main finances page component with tabbed interface.
@@ -54,7 +55,7 @@ export default function FinancesPage() {
     const tab = searchParams.get('tab') as FinanceTab | null;
     const search = searchParams.get('search');
     
-    if (tab && ['invoices', 'payments', 'expenses', 'tax-prepayments'].includes(tab)) {
+    if (tab && ['invoices', 'recurring', 'payments', 'expenses', 'tax-prepayments'].includes(tab)) {
       setActiveTab(tab);
     }
     
@@ -186,6 +187,7 @@ export default function FinancesPage() {
 
   const tabs = [
     { id: 'invoices' as FinanceTab, label: t('tabs.invoices'), icon: '📄' },
+    { id: 'recurring' as FinanceTab, label: t('tabs.recurring', { defaultValue: 'Recurring' }), icon: '🔁' },
     { id: 'payments' as FinanceTab, label: t('tabs.payments'), icon: '💳' },
     { id: 'expenses' as FinanceTab, label: t('tabs.expenses'), icon: '💰' },
     { id: 'tax-prepayments' as FinanceTab, label: t('tabs.taxPrepayments'), icon: '📊' },
@@ -332,6 +334,9 @@ export default function FinancesPage() {
         <div className="relative">
           {activeTab === 'invoices' && (
             <InvoiceList startDate={startDate} endDate={endDate} initialSearchTerm={invoiceSearchTerm} />
+          )}
+          {activeTab === 'recurring' && (
+            <RecurringInvoicesPage />
           )}
           {activeTab === 'payments' && (
             <PaymentsPage startDate={startDate} endDate={endDate} onNavigateToInvoice={handleNavigateToInvoice} />

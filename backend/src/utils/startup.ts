@@ -294,6 +294,37 @@ async function ensureSchemaUpgrades(): Promise<void> {
       `ALTER TABLE settings ADD COLUMN IF NOT EXISTS overdue_reminders_enabled BOOLEAN DEFAULT false`
     );
 
+    // Recurring invoice schedules (retainers). Each row is a template that the
+    // recurring-invoice scheduler uses to generate draft invoices on a cadence.
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS recurring_invoices (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL,
+        client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+        project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+        title VARCHAR(255) NOT NULL,
+        frequency VARCHAR(20) NOT NULL CHECK (frequency IN ('monthly', 'quarterly', 'yearly')),
+        start_date DATE NOT NULL,
+        end_date DATE,
+        next_occurrence DATE,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        currency VARCHAR(3) NOT NULL DEFAULT 'EUR',
+        tax_rate_id VARCHAR(50),
+        payment_terms_days INTEGER NOT NULL DEFAULT 30,
+        invoice_headline VARCHAR(255),
+        notes TEXT,
+        line_items JSONB NOT NULL DEFAULT '[]'::jsonb,
+        last_generated_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_recurring_invoices_user ON recurring_invoices(user_id);
+      CREATE INDEX IF NOT EXISTS idx_recurring_invoices_due
+        ON recurring_invoices(is_active, next_occurrence)
+        WHERE is_active = true;
+    `);
+
     logger.info('[Startup] ✓ Schema upgrades applied');
   } catch (error) {
     logger.error('[Startup] Error applying schema upgrades:', error);

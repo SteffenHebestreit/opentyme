@@ -5,6 +5,7 @@ import { runStartupInitialization, shouldRunStartupInitialization } from './util
 import BackupScheduler from './services/system/backup-scheduler.service';
 import recurringExpenseScheduler from './services/financial/recurring-expense-scheduler.service';
 import invoiceReminderScheduler from './services/financial/invoice-reminder-scheduler.service';
+import recurringInvoiceScheduler from './services/financial/recurring-invoice-scheduler.service';
 import { mcpClient } from './services/mcp/mcp-client.service';
 
 const port = process.env.PORT || 8000;
@@ -51,6 +52,14 @@ async function startServer() {
       logger.info('✅ Invoice reminder scheduler initialized successfully');
     } catch (err: any) {
       logger.error('Failed to initialize invoice reminder scheduler:', err);
+    }
+
+    // Initialize recurring invoice scheduler
+    try {
+      recurringInvoiceScheduler.initialize();
+      logger.info('✅ Recurring invoice scheduler initialized successfully');
+    } catch (err: any) {
+      logger.error('Failed to initialize recurring invoice scheduler:', err);
     }
 
     // Initialize MCP client connections (DuckDuckGo, etc.)
