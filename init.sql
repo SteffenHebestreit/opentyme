@@ -1118,6 +1118,7 @@ CREATE TABLE public.system_backup_schedule (
     includes_storage boolean DEFAULT true,
     includes_config boolean DEFAULT false,
     last_run_at timestamp with time zone,
+    last_run_status character varying(50),
     next_run_at timestamp with time zone,
     created_by character varying(255),
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
@@ -2303,6 +2304,9 @@ ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS stt_language character vary
 -- Migration: invoice/PDF locale + overdue reminder opt-in (idempotent)
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS invoice_language character varying(5) DEFAULT 'de';
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS overdue_reminders_enabled boolean DEFAULT false;
+
+-- Migration: backup schedule last-run status (idempotent)
+ALTER TABLE public.system_backup_schedule ADD COLUMN IF NOT EXISTS last_run_status character varying(50);
 
 -- Migration: recurring invoice schedules (retainers) (idempotent)
 CREATE TABLE IF NOT EXISTS public.recurring_invoices (

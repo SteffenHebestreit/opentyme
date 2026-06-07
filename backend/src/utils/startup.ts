@@ -130,6 +130,7 @@ async function ensureBackupTablesExist(): Promise<void> {
           includes_storage BOOLEAN DEFAULT true,
           includes_config BOOLEAN DEFAULT false,
           last_run_at TIMESTAMP WITH TIME ZONE,
+          last_run_status VARCHAR(50),
           next_run_at TIMESTAMP WITH TIME ZONE,
           created_by VARCHAR(255),
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -292,6 +293,13 @@ async function ensureSchemaUpgrades(): Promise<void> {
     // Opt-in flag for emailing the account owner about newly-overdue invoices.
     await db.query(
       `ALTER TABLE settings ADD COLUMN IF NOT EXISTS overdue_reminders_enabled BOOLEAN DEFAULT false`
+    );
+
+    // Backup schedule last-run status (updateScheduleLastRun writes this column).
+    // Without it, scheduled-backup metadata updates fail and retention cleanup is
+    // silently skipped.
+    await db.query(
+      `ALTER TABLE system_backup_schedule ADD COLUMN IF NOT EXISTS last_run_status VARCHAR(50)`
     );
 
     // Recurring invoice schedules (retainers). Each row is a template that the

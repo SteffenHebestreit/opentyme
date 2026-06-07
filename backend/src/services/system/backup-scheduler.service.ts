@@ -76,9 +76,10 @@ class BackupScheduler {
     // Create scheduled task
     const task = cron.schedule(schedule.cron_expression, async () => {
       logger.info(`Executing scheduled backup: ${schedule.schedule_name}`);
-      
+
+      // 1) Run the backup itself.
+      let backupSucceeded = false;
       try {
-        // Create backup
         await this.backupService.createBackup(
           'system', // System user for scheduled backups
           {
@@ -89,20 +90,32 @@ class BackupScheduler {
           },
           'scheduled'
         );
-
-        // Update schedule last run
-        const nextRun = this.getNextRunTime(schedule.cron_expression);
-        await this.backupService.updateScheduleLastRun(schedule.id, 'completed', nextRun);
-
+        backupSucceeded = true;
         logger.info(`Scheduled backup completed: ${schedule.schedule_name}`);
-
-        // Cleanup old backups based on retention policy
-        if (schedule.retention_days > 0) {
-          await this.backupService.cleanupOldBackups(schedule.retention_days);
-        }
       } catch (error: any) {
         logger.error(`Scheduled backup failed: ${schedule.schedule_name} - ${error.message}`);
-        await this.backupService.updateScheduleLastRun(schedule.id, 'failed');
+      }
+
+      // 2) Update schedule metadata. Isolated so a failure here can never block
+      //    retention cleanup (a past bug let a metadata error skip cleanup entirely).
+      try {
+        const nextRun = this.getNextRunTime(schedule.cron_expression);
+        await this.backupService.updateScheduleLastRun(
+          schedule.id,
+          backupSucceeded ? 'completed' : 'failed',
+          nextRun
+        );
+      } catch (error: any) {
+        logger.error(`Failed to update schedule metadata for ${schedule.schedule_name}: ${error.message}`);
+      }
+
+      // 3) Apply the retention policy independently, only after a successful backup.
+      if (backupSucceeded && schedule.retention_days > 0) {
+        try {
+          await this.backupService.cleanupOldBackups(schedule.retention_days);
+        } catch (error: any) {
+          logger.error(`Retention cleanup failed for ${schedule.schedule_name}: ${error.message}`);
+        }
       }
     });
 
