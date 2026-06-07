@@ -273,6 +273,35 @@ async function rescanBackups(): Promise<void> {
 }
 
 /**
+ * Apply additive, idempotent schema upgrades for features added after the
+ * initial schema. All statements use IF NOT EXISTS / ADD COLUMN IF NOT EXISTS
+ * so they are safe to run on every startup and never drop or modify data.
+ */
+async function ensureSchemaUpgrades(): Promise<void> {
+  const db = getDbClient();
+
+  try {
+    logger.info('[Startup] Applying additive schema upgrades...');
+
+    // Invoice/PDF locale preference (e.g. 'de', 'en'). Default 'de' preserves
+    // existing German-formatted invoice behaviour.
+    await db.query(
+      `ALTER TABLE settings ADD COLUMN IF NOT EXISTS invoice_language VARCHAR(5) DEFAULT 'de'`
+    );
+
+    // Opt-in flag for emailing the account owner about newly-overdue invoices.
+    await db.query(
+      `ALTER TABLE settings ADD COLUMN IF NOT EXISTS overdue_reminders_enabled BOOLEAN DEFAULT false`
+    );
+
+    logger.info('[Startup] ✓ Schema upgrades applied');
+  } catch (error) {
+    logger.error('[Startup] Error applying schema upgrades:', error);
+    // Don't throw - startup should continue
+  }
+}
+
+/**
  * Run all startup initialization tasks
  */
 export async function runStartupInitialization(): Promise<void> {
@@ -281,6 +310,9 @@ export async function runStartupInitialization(): Promise<void> {
 
     // Ensure backup tables exist (critical after restore)
     await ensureBackupTablesExist();
+
+    // Apply additive schema upgrades for newer features
+    await ensureSchemaUpgrades();
 
     // Initialize users from Keycloak
     await initializeExistingUsers();

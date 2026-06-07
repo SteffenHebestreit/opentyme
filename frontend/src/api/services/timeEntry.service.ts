@@ -123,6 +123,47 @@ export async function deleteTimeEntry(id: string): Promise<void> {
 }
 
 /**
+ * A time entry that overlaps a proposed time range, returned by checkTimeEntryOverlap.
+ */
+export interface OverlappingEntry {
+  id: string;
+  entry_date: string;
+  entry_time: string;
+  entry_end_time: string | null;
+  duration_hours: number | string | null;
+  task_name: string | null;
+  description: string | null;
+  project_name: string | null;
+}
+
+/**
+ * Checks whether a proposed time entry overlaps existing entries on the same date.
+ * Non-blocking — used to warn the user about double-booking before they save.
+ *
+ * @async
+ * @param {Object} params - Overlap query parameters
+ * @param {string} params.entry_date - Date in YYYY-MM-DD format
+ * @param {string} params.entry_time - Start time (HH:mm)
+ * @param {string} [params.entry_end_time] - End time (HH:mm); optional if duration is given
+ * @param {number} [params.duration_hours] - Duration in hours; used to derive end time
+ * @param {string} [params.exclude_id] - Time entry ID to exclude (when editing)
+ * @returns {Promise<{ hasOverlap: boolean; overlaps: OverlappingEntry[] }>}
+ */
+export async function checkTimeEntryOverlap(params: {
+  entry_date: string;
+  entry_time: string;
+  entry_end_time?: string;
+  duration_hours?: number;
+  exclude_id?: string;
+}): Promise<{ hasOverlap: boolean; overlaps: OverlappingEntry[] }> {
+  const { data } = await apiClient.get<{ hasOverlap: boolean; overlaps: OverlappingEntry[] }>(
+    '/time-entries/check-overlap',
+    { params }
+  );
+  return data;
+}
+
+/**
  * Starts a new timer for a specific project.
  * Creates a time entry with status 'active' and date_start set to current time.
  * 

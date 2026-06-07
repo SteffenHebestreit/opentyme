@@ -229,7 +229,7 @@ export class AnalyticsController {
   async getYearlyFinancialSummary(req: Request, res: Response) {
     try {
       const userId = (req as any).user?.id;
-      
+
       if (!userId) {
         res.status(401).json({ message: 'Unauthorized' });
         return;
@@ -240,10 +240,40 @@ export class AnalyticsController {
       const year = yearParam ? parseInt(yearParam, 10) : undefined;
 
       const data = await analyticsService.getYearlyFinancialSummary(userId, year);
-      
+
       res.status(200).json(data);
     } catch (error: any) {
       logger.error('Get yearly financial summary error:', error);
+      res.status(500).json({ message: error.message || 'Internal server error' });
+    }
+  }
+
+  /**
+   * Get per-project time-budget consumption (estimated vs logged hours).
+   *
+   * @route GET /api/analytics/project-time-budgets
+   * @access Protected
+   *
+   * @example
+   * GET /api/analytics/project-time-budgets
+   * Response: [
+   *   { project_id, project_name, estimated_hours: 40, logged_hours: 32.5,
+   *     remaining_hours: 7.5, percentage: 81.3, over_budget: false }
+   * ]
+   */
+  async getProjectTimeBudgets(req: Request, res: Response) {
+    try {
+      const userId = (req as any).user?.id;
+
+      if (!userId) {
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+      }
+
+      const data = await analyticsService.getProjectTimeBudgets(userId);
+      res.status(200).json(data);
+    } catch (error: any) {
+      logger.error('Get project time budgets error:', error);
       res.status(500).json({ message: error.message || 'Internal server error' });
     }
   }

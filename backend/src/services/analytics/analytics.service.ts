@@ -119,8 +119,87 @@ export interface YearlyFinancialSummary {
   remaining_tax_payable: number;
 }
 
+/**
+ * Time budget status for a single project.
+ *
+ * @interface ProjectTimeBudget
+ * @property {string} project_id - Project UUID
+ * @property {string} project_name - Project display name
+ * @property {string|null} client_name - Associated client name, if any
+ * @property {number} estimated_hours - Planned hours from the project (0 if unset)
+ * @property {number} logged_hours - Total hours logged across all time entries
+ * @property {number} billable_hours - Logged hours flagged billable
+ * @property {number} remaining_hours - estimated_hours - logged_hours (can be negative)
+ * @property {number} percentage - Percent of the estimate consumed (0 if no estimate)
+ * @property {boolean} over_budget - True when logged_hours exceeds estimated_hours
+ */
+export interface ProjectTimeBudget {
+  project_id: string;
+  project_name: string;
+  client_name: string | null;
+  estimated_hours: number;
+  logged_hours: number;
+  billable_hours: number;
+  remaining_hours: number;
+  percentage: number;
+  over_budget: boolean;
+}
+
 export class AnalyticsService {
   private db = getDbClient();
+
+  /**
+   * Get time-budget consumption per project.
+   * Compares each project's estimated_hours against the sum of logged time-entry hours.
+   * Only includes active or completed projects that have an estimate or logged time.
+   *
+   * @param {string} userId - User ID (Keycloak UUID)
+   * @returns {Promise<ProjectTimeBudget[]>} Per-project budget status, most-consumed first
+   */
+  async getProjectTimeBudgets(userId: string): Promise<ProjectTimeBudget[]> {
+    const query = `
+      SELECT
+        p.id AS project_id,
+        p.name AS project_name,
+        c.name AS client_name,
+        COALESCE(p.estimated_hours, 0) AS estimated_hours,
+        COALESCE(SUM(te.duration_hours), 0) AS logged_hours,
+        COALESCE(SUM(CASE WHEN te.is_billable THEN te.duration_hours ELSE 0 END), 0) AS billable_hours
+      FROM projects p
+      LEFT JOIN clients c ON p.client_id = c.id
+      LEFT JOIN time_entries te ON te.project_id = p.id AND te.user_id = $1
+      WHERE p.user_id = $1
+        AND p.status IN ('active', 'completed', 'on_hold')
+      GROUP BY p.id, p.name, c.name, p.estimated_hours
+      HAVING COALESCE(p.estimated_hours, 0) > 0 OR COALESCE(SUM(te.duration_hours), 0) > 0
+      ORDER BY
+        CASE WHEN COALESCE(p.estimated_hours, 0) > 0
+             THEN COALESCE(SUM(te.duration_hours), 0) / p.estimated_hours
+             ELSE 0 END DESC,
+        logged_hours DESC
+    `;
+
+    const result = await this.db.query(query, [userId]);
+
+    return result.rows.map(row => {
+      const estimated = Number(row.estimated_hours);
+      const logged = Number(row.logged_hours);
+      const billable = Number(row.billable_hours);
+      const percentage = estimated > 0 ? Number(((logged / estimated) * 100).toFixed(1)) : 0;
+
+      return {
+        project_id: row.project_id,
+        project_name: row.project_name,
+        client_name: row.client_name || null,
+        estimated_hours: Number(estimated.toFixed(2)),
+        logged_hours: Number(logged.toFixed(2)),
+        billable_hours: Number(billable.toFixed(2)),
+        remaining_hours: Number((estimated - logged).toFixed(2)),
+        percentage,
+        over_budget: estimated > 0 && logged > estimated,
+      };
+    });
+  }
 
   /**
    * Get time tracking trend over specified number of days.
@@ -269,7 +348,7 @@ export class AnalyticsService {
     const params: any[] = [userId];
 
     if (days) {
-      query += ` AND date_start >= CURRENT_DATE - INTERVAL '${days} days'`;
+      query += ` AND entry_date >= CURRENT_DATE - INTERVAL '${days} days'`;
     }
 
     const result = await this.db.query(query, params);

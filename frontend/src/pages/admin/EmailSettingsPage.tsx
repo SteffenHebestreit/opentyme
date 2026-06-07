@@ -19,6 +19,7 @@ interface SmtpSettings {
   smtp_pass: string;
   smtp_from: string;
   smtp_secure: boolean;
+  overdue_reminders_enabled: boolean;
 }
 
 export default function EmailSettingsPage() {
@@ -31,6 +32,7 @@ export default function EmailSettingsPage() {
     smtp_pass: '',
     smtp_from: '',
     smtp_secure: false,
+    overdue_reminders_enabled: false,
   });
   const [testEmail, setTestEmail] = useState('');
   const [saving, setSaving] = useState(false);
@@ -49,6 +51,7 @@ export default function EmailSettingsPage() {
         smtp_pass: '', // never send password back to frontend
         smtp_from: d.smtp_from ?? '',
         smtp_secure: d.smtp_secure ?? false,
+        overdue_reminders_enabled: d.overdue_reminders_enabled ?? false,
       });
       if (d.smtp_user) setTestEmail(d.smtp_from || d.smtp_user);
     });
@@ -65,6 +68,7 @@ export default function EmailSettingsPage() {
         smtp_user: settings.smtp_user,
         smtp_from: settings.smtp_from,
         smtp_secure: settings.smtp_secure,
+        overdue_reminders_enabled: settings.overdue_reminders_enabled,
       };
       // Only send password if user typed something
       if (settings.smtp_pass) payload.smtp_pass = settings.smtp_pass;
@@ -158,6 +162,24 @@ export default function EmailSettingsPage() {
             onChange={(e) => setSettings((s) => ({ ...s, smtp_secure: e.target.checked }))}
           />
         </div>
+      </div>
+
+      {/* Notification preferences */}
+      <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
+          {t('admin.email.notificationsTitle', { defaultValue: 'Notifications' })}
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          {t('admin.email.overdueRemindersHint', {
+            defaultValue:
+              'When enabled, OpenTYME emails you a daily digest of your overdue invoices. Requires SMTP above to be configured.',
+          })}
+        </p>
+        <Checkbox
+          label={t('admin.email.overdueReminders', { defaultValue: 'Email me about overdue invoices' })}
+          checked={settings.overdue_reminders_enabled}
+          onChange={(e) => setSettings((s) => ({ ...s, overdue_reminders_enabled: e.target.checked }))}
+        />
       </div>
 
       {/* Save */}

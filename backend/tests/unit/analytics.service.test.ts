@@ -370,4 +370,79 @@ describe('AnalyticsService', () => {
       expect(profit5.length).toBeLessThanOrEqual(5);
     });
   });
+
+  describe('getProjectTimeBudgets', () => {
+    it('returns budget status for a project with an estimate and logged hours', async () => {
+      // Project with a 10-hour estimate
+      const budgetProject = await projectService.create({
+        user_id: TEST_USER_ID,
+        name: 'Budget Tracking Project',
+        client_id: testClient.id,
+        estimated_hours: 10,
+        status: 'active',
+      });
+
+      // Log 4 billable + 1 non-billable = 5 hours
+      await timeEntryService.create({
+        user_id: TEST_USER_ID,
+        project_id: budgetProject.id,
+        entry_date: new Date(),
+        entry_time: '09:00',
+        duration_hours: 4,
+        is_billable: true,
+      });
+      await timeEntryService.create({
+        user_id: TEST_USER_ID,
+        project_id: budgetProject.id,
+        entry_date: new Date(),
+        entry_time: '14:00',
+        duration_hours: 1,
+        is_billable: false,
+      });
+
+      const budgets = await analyticsService.getProjectTimeBudgets(TEST_USER_ID);
+      const entry = budgets.find(b => b.project_id === budgetProject.id);
+
+      expect(entry).toBeDefined();
+      expect(entry!.estimated_hours).toBe(10);
+      expect(entry!.logged_hours).toBeGreaterThanOrEqual(5);
+      expect(entry!.billable_hours).toBeGreaterThanOrEqual(4);
+      expect(entry!.percentage).toBeGreaterThanOrEqual(50);
+      expect(entry!.over_budget).toBe(false);
+      expect(entry!.remaining_hours).toBeLessThanOrEqual(5);
+    });
+
+    it('flags projects that exceed their estimate as over budget', async () => {
+      const smallProject = await projectService.create({
+        user_id: TEST_USER_ID,
+        name: 'Over Budget Project',
+        client_id: testClient.id,
+        estimated_hours: 1,
+        status: 'active',
+      });
+
+      await timeEntryService.create({
+        user_id: TEST_USER_ID,
+        project_id: smallProject.id,
+        entry_date: new Date(),
+        entry_time: '09:00',
+        duration_hours: 5,
+        is_billable: true,
+      });
+
+      const budgets = await analyticsService.getProjectTimeBudgets(TEST_USER_ID);
+      const entry = budgets.find(b => b.project_id === smallProject.id);
+
+      expect(entry).toBeDefined();
+      expect(entry!.over_budget).toBe(true);
+      expect(entry!.remaining_hours).toBeLessThan(0);
+      expect(entry!.percentage).toBeGreaterThan(100);
+    });
+
+    it('returns an empty array for a user with no projects', async () => {
+      const budgets = await analyticsService.getProjectTimeBudgets('00000000-0000-0000-0000-000000000001');
+      expect(Array.isArray(budgets)).toBe(true);
+      expect(budgets.length).toBe(0);
+    });
+  });
 });

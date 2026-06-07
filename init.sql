@@ -2300,6 +2300,10 @@ ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS stt_api_key character varyi
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS stt_model character varying(255) DEFAULT 'large-v3';
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS stt_language character varying(10) DEFAULT '';
 
+-- Migration: invoice/PDF locale + overdue reminder opt-in (idempotent)
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS invoice_language character varying(5) DEFAULT 'de';
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS overdue_reminders_enabled boolean DEFAULT false;
+
 
 --
 -- PostgreSQL database dump complete

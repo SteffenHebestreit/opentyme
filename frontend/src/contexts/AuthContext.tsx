@@ -3,6 +3,7 @@ import { keycloak, TOKEN_REFRESH_THRESHOLD, TOKEN_CHECK_INTERVAL, getPkceMethod,
 import { setTokens, clearTokens, getUserFromToken } from '../services/auth/tokenManager';
 import { useApp } from '../store/AppContext';
 import { getSettings } from '../api/services/settings.service';
+import apiClient from '../api/services/client';
 
 // Define user interface
 interface User {
@@ -316,13 +317,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    */
   const logout = useCallback(() => {
     console.log('[Auth] Logging out...');
-    
+
+    // Best-effort: evict the server-side token introspection cache so the token
+    // cannot continue to be served from cache. Fire-and-forget — must run before
+    // clearTokens() so the request still carries the bearer token, and must never
+    // block the logout flow on a network error.
+    apiClient.post('/auth/logout').catch(() => { /* ignore — logout proceeds regardless */ });
+
     // Clear local state
     clearTokens();
     setToken(null);
     setUser(null);
     appDispatch({ type: 'LOGOUT' });
-    
+
     // Logout from Keycloak
     keycloak.logout({
       redirectUri: window.location.origin + '/login',

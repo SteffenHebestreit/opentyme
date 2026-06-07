@@ -11,6 +11,7 @@ import { DashboardSkeleton } from './DashboardSkeleton';
 import { DashboardErrorState } from './DashboardErrorState';
 import TimeTrendChart from './charts/TimeTrendChart';
 import RevenueByClientChart from './charts/RevenueByClientChart';
+import ProjectTimeBudgets from './ProjectTimeBudgets';
 import DepreciationScheduleChart from './charts/DepreciationScheduleChart';
 import AssetRegisterTable from './AssetRegisterTable';
 import { Slot } from '../../plugins/slots';
@@ -89,6 +90,7 @@ export default function Dashboard() {
               <TimeTrendChart />
               <RevenueByClientChart />
             </div>
+            <ProjectTimeBudgets />
           </div>
 
           {/* Depreciation Section */}

@@ -40,6 +40,18 @@ setInterval(() => {
 }, 5 * 60 * 1000); // Clean up every 5 minutes
 
 /**
+ * Remove a token from the introspection cache.
+ * Called on logout so a revoked session cannot continue to be served from cache
+ * during the remainder of the cache TTL window.
+ *
+ * @param token - The raw access token to evict
+ * @returns true if a cache entry was removed
+ */
+export function invalidateTokenCache(token: string): boolean {
+  return tokenCache.delete(token);
+}
+
+/**
  * Introspect token using Keycloak Admin API with caching
  */
 async function introspectToken(token: string): Promise<any> {

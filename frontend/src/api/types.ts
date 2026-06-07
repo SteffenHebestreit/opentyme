@@ -652,6 +652,8 @@ export interface Settings {
   stt_api_key: string | null;
   stt_model: string | null;
   stt_language: string | null;
+  invoice_language: string | null;
+  overdue_reminders_enabled: boolean;
   created_at: string;
   updated_at: string;
 }

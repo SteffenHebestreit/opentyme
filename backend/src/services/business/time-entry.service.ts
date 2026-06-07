@@ -336,6 +336,63 @@ export class TimeEntryService {
   }
 
   /**
+   * Finds existing time entries that overlap a proposed time range on a given date.
+   * Used to warn the user about double-booking the same time slot.
+   *
+   * Two entries overlap when, on the same date, the proposed range [start, end)
+   * intersects an existing range. Active timers (duration 0 with no end time) and
+   * an optionally excluded entry (the one being edited) are ignored.
+   *
+   * @async
+   * @param {Object} params - Overlap query parameters
+   * @param {string} params.user_id - Authenticated user ID (multi-tenant isolation)
+   * @param {string} params.entry_date - Date in YYYY-MM-DD format
+   * @param {string} params.entry_time - Proposed start time (HH:mm[:ss])
+   * @param {string} params.entry_end_time - Proposed end time (HH:mm[:ss])
+   * @param {string} [params.exclude_id] - Time entry ID to exclude (when editing)
+   * @returns {Promise<Array>} Overlapping entries with project name
+   */
+  async findOverlapping(params: {
+    user_id: string;
+    entry_date: string;
+    entry_time: string;
+    entry_end_time: string;
+    exclude_id?: string;
+  }): Promise<any[]> {
+    const db = getDbClient();
+    const queryText = `
+      SELECT te.id, te.entry_date, te.entry_time, te.entry_end_time,
+             te.duration_hours, te.task_name, te.description,
+             p.name AS project_name
+      FROM time_entries te
+      LEFT JOIN projects p ON te.project_id = p.id
+      WHERE te.user_id = $1
+        AND te.entry_date = $2::date
+        AND te.duration_hours > 0
+        AND ($5::uuid IS NULL OR te.id <> $5::uuid)
+        AND te.entry_time::time < $4::time
+        AND $3::time < COALESCE(
+              te.entry_end_time::time,
+              (te.entry_time::time + (te.duration_hours * INTERVAL '1 hour'))::time
+            )
+      ORDER BY te.entry_time ASC
+    `;
+    try {
+      const result = await db.query(queryText, [
+        params.user_id,
+        params.entry_date,
+        params.entry_time,
+        params.entry_end_time,
+        params.exclude_id || null,
+      ]);
+      return result.rows;
+    } catch (error) {
+      logger.error('Error checking time entry overlap:', error);
+      throw new Error(`Failed to check time entry overlap: ${(error as any).message}`);
+    }
+  }
+
+  /**
    * Private helper method to enrich a time entry row with project details.
    * Fetches the associated project name from the database and attaches it to the time entry.
    * 

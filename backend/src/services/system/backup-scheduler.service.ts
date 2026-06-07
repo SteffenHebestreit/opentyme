@@ -10,6 +10,7 @@ import cron, { ScheduledTask } from 'node-cron';
 import { Pool } from 'pg';
 import BackupService from './backup.service';
 import { logger } from '../../utils/logger';
+import { getNextCronRun } from '../../utils/cron.util';
 
 interface ScheduledTaskInfo {
   scheduleId: string;
@@ -139,23 +140,22 @@ class BackupScheduler {
   }
 
   /**
-   * Get next run time for a cron expression
-   * Using cron-parser to calculate next execution time
+   * Calculate the exact next run time for a cron expression.
+   * Falls back to "tomorrow" only if the expression cannot be parsed.
    */
   private getNextRunTime(cronExpression: string): Date {
     try {
-      // Use a simple calculation: schedule it and let cron figure it out
-      // For now, return current time + 1 minute as placeholder
-      // In production, you'd want to use a library like 'cron-parser'
-      const now = new Date();
-      now.setMinutes(now.getMinutes() + 1);
-      return now;
+      const next = getNextCronRun(cronExpression);
+      if (next) {
+        return next;
+      }
+      logger.warn(`[BackupScheduler] No upcoming run found for cron "${cronExpression}" within horizon`);
     } catch (error) {
       logger.error('Failed to calculate next run time:', error);
-      const fallback = new Date();
-      fallback.setHours(fallback.getHours() + 1);
-      return fallback;
     }
+    const fallback = new Date();
+    fallback.setDate(fallback.getDate() + 1);
+    return fallback;
   }
 
   /**

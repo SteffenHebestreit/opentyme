@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { PasswordResetController } from '../../controllers/auth/password-reset.controller';
 import { UserService } from '../../services/auth/user.service';
 import { EmailService } from '../../services/external/email.service';
+import { passwordResetRateLimiter } from '../../middleware/rate-limit.middleware';
 
 // These will be injected by the main app or a route-specific DI mechanism
 let passwordResetController: PasswordResetController;
@@ -18,7 +19,7 @@ const emailService = new EmailService();
 passwordResetController = new PasswordResetController(userService, emailService);
 
 
-router.post('/request', passwordResetController.requestPasswordReset);
-router.post('/reset', passwordResetController.resetPassword);
+router.post('/request', passwordResetRateLimiter, passwordResetController.requestPasswordReset);
+router.post('/reset', passwordResetRateLimiter, passwordResetController.resetPassword);
 
 export default router;
