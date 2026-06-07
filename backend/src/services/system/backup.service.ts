@@ -170,15 +170,23 @@ class BackupService {
       INCLUDE_CONFIG: options.includeConfig ? 'true' : 'false',
     };
 
-    // Execute backup script
     const scriptPath = path.join(this.scriptsPath, 'backup.sh');
-    
+
     if (!existsSync(scriptPath)) {
       throw new Error(`Backup script not found: ${scriptPath}`);
     }
 
-    logger.info(`Executing backup script via bash: ${scriptPath}`);
-    const { stdout, stderr } = await execFileAsync('bash', [scriptPath], { env, maxBuffer: 10 * 1024 * 1024 });
+    const BACKUP_TIMEOUT_MS = parseInt(process.env.BACKUP_TIMEOUT_MS || '600000', 10); // 10 min default
+
+    logger.info(`Executing backup script via bash: ${scriptPath} (timeout: ${BACKUP_TIMEOUT_MS}ms)`);
+
+    const execPromise = execFileAsync('bash', [scriptPath], { env, maxBuffer: 10 * 1024 * 1024 });
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Backup script timed out after ${BACKUP_TIMEOUT_MS}ms`)), BACKUP_TIMEOUT_MS)
+    );
+
+    const { stdout, stderr } = await Promise.race([execPromise, timeoutPromise]);
 
     if (stderr) {
       logger.warn(`Backup script warnings: ${stderr}`);
@@ -364,10 +372,21 @@ class BackupService {
       throw new Error('Backup not found');
     }
 
-    // Delete backup files
+    // Delete the backup archive file and its parent directory (named after the backup).
+    // backup_path points to the .tar.gz file; the parent is the per-backup directory.
     if (backup.backup_path && existsSync(backup.backup_path)) {
-      await fs.rm(backup.backup_path, { recursive: true, force: true });
-      logger.info(`Deleted backup files: ${backup.backup_path}`);
+      const parentDir = path.dirname(backup.backup_path);
+      const isInsideBase = parentDir.startsWith(this.backupBasePath) && parentDir !== this.backupBasePath;
+
+      if (isInsideBase) {
+        // Remove the entire backup directory (includes the .tar.gz and any temp files)
+        await fs.rm(parentDir, { recursive: true, force: true });
+        logger.info(`Deleted backup directory: ${parentDir}`);
+      } else {
+        // Safety fallback: only remove the archive file itself
+        await fs.rm(backup.backup_path, { force: true });
+        logger.info(`Deleted backup archive: ${backup.backup_path}`);
+      }
     }
 
     // Delete backup record
@@ -379,13 +398,14 @@ class BackupService {
    * Cleanup old backups based on retention policy
    */
   async cleanupOldBackups(retentionDays: number = 30): Promise<number> {
-    logger.info(`Cleaning up backups older than ${retentionDays} days`);
+    const safeDays = Math.max(1, Math.floor(retentionDays));
+    logger.info(`Cleaning up backups older than ${safeDays} days`);
 
     const result = await this.pool.query(
-      `SELECT * FROM system_backups 
-       WHERE started_at < NOW() - INTERVAL '${retentionDays} days'
+      `SELECT * FROM system_backups
+       WHERE started_at < NOW() - ($1 * INTERVAL '1 day')
        AND status = 'completed'`,
-      []
+      [safeDays]
     );
 
     const oldBackups = result.rows;

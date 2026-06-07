@@ -373,17 +373,24 @@ if [ "$RESTORE_DB" = "true" ] && [ -d "$BACKUPS_DIR" ]; then
                     backup_type="manual"
                 fi
 
+                # Use psql variables ($N notation) to prevent SQL injection from
+                # backup names or paths that contain special characters.
                 PGPASSWORD="$DB_PASSWORD" psql \
                     -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+                    -v "bname=${backup_name}" \
+                    -v "btype=${backup_type}" \
+                    -v "bpath=${backup_dir}" \
+                    -v "bsize=${file_size}" \
+                    -v "bts=${created_at}" \
                     -c "INSERT INTO system_backups (backup_name, backup_type, status, backup_path, file_size_bytes, includes_database, includes_storage, includes_config, started_at, completed_at, created_at)
                         SELECT
-                            '${backup_name}', '${backup_type}', 'completed',
-                            '${backup_dir}', ${file_size}, true, true, false,
-                            '${created_at}'::timestamp with time zone,
-                            '${created_at}'::timestamp with time zone,
-                            '${created_at}'::timestamp with time zone
+                            :'bname', :'btype', 'completed',
+                            :'bpath', :bsize::bigint, true, true, false,
+                            :'bts'::timestamp with time zone,
+                            :'bts'::timestamp with time zone,
+                            :'bts'::timestamp with time zone
                         WHERE NOT EXISTS (
-                            SELECT 1 FROM system_backups WHERE backup_name = '${backup_name}'
+                            SELECT 1 FROM system_backups WHERE backup_name = :'bname'
                         );" \
                     2>/dev/null || echo "[RESTORE] Warning: Failed to insert backup record for: $backup_name"
 
