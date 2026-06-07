@@ -10,6 +10,7 @@ import cron, { ScheduledTask } from 'node-cron';
 import { Pool } from 'pg';
 import BackupService from './backup.service';
 import { logger } from '../../utils/logger';
+import { getNextCronRun } from '../../utils/cron.util';
 
 interface ScheduledTaskInfo {
   scheduleId: string;
@@ -75,9 +76,10 @@ class BackupScheduler {
     // Create scheduled task
     const task = cron.schedule(schedule.cron_expression, async () => {
       logger.info(`Executing scheduled backup: ${schedule.schedule_name}`);
-      
+
+      // 1) Run the backup itself.
+      let backupSucceeded = false;
       try {
-        // Create backup
         await this.backupService.createBackup(
           'system', // System user for scheduled backups
           {
@@ -88,20 +90,32 @@ class BackupScheduler {
           },
           'scheduled'
         );
-
-        // Update schedule last run
-        const nextRun = this.getNextRunTime(schedule.cron_expression);
-        await this.backupService.updateScheduleLastRun(schedule.id, 'completed', nextRun);
-
+        backupSucceeded = true;
         logger.info(`Scheduled backup completed: ${schedule.schedule_name}`);
-
-        // Cleanup old backups based on retention policy
-        if (schedule.retention_days > 0) {
-          await this.backupService.cleanupOldBackups(schedule.retention_days);
-        }
       } catch (error: any) {
         logger.error(`Scheduled backup failed: ${schedule.schedule_name} - ${error.message}`);
-        await this.backupService.updateScheduleLastRun(schedule.id, 'failed');
+      }
+
+      // 2) Update schedule metadata. Isolated so a failure here can never block
+      //    retention cleanup (a past bug let a metadata error skip cleanup entirely).
+      try {
+        const nextRun = this.getNextRunTime(schedule.cron_expression);
+        await this.backupService.updateScheduleLastRun(
+          schedule.id,
+          backupSucceeded ? 'completed' : 'failed',
+          nextRun
+        );
+      } catch (error: any) {
+        logger.error(`Failed to update schedule metadata for ${schedule.schedule_name}: ${error.message}`);
+      }
+
+      // 3) Apply the retention policy independently, only after a successful backup.
+      if (backupSucceeded && schedule.retention_days > 0) {
+        try {
+          await this.backupService.cleanupOldBackups(schedule.retention_days);
+        } catch (error: any) {
+          logger.error(`Retention cleanup failed for ${schedule.schedule_name}: ${error.message}`);
+        }
       }
     });
 
@@ -139,23 +153,22 @@ class BackupScheduler {
   }
 
   /**
-   * Get next run time for a cron expression
-   * Using cron-parser to calculate next execution time
+   * Calculate the exact next run time for a cron expression.
+   * Falls back to "tomorrow" only if the expression cannot be parsed.
    */
   private getNextRunTime(cronExpression: string): Date {
     try {
-      // Use a simple calculation: schedule it and let cron figure it out
-      // For now, return current time + 1 minute as placeholder
-      // In production, you'd want to use a library like 'cron-parser'
-      const now = new Date();
-      now.setMinutes(now.getMinutes() + 1);
-      return now;
+      const next = getNextCronRun(cronExpression);
+      if (next) {
+        return next;
+      }
+      logger.warn(`[BackupScheduler] No upcoming run found for cron "${cronExpression}" within horizon`);
     } catch (error) {
       logger.error('Failed to calculate next run time:', error);
-      const fallback = new Date();
-      fallback.setHours(fallback.getHours() + 1);
-      return fallback;
     }
+    const fallback = new Date();
+    fallback.setDate(fallback.getDate() + 1);
+    return fallback;
   }
 
   /**

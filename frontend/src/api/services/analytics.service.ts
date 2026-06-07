@@ -126,12 +126,37 @@ export const getProjectProfitability = async (limit: number = 10): Promise<Proje
 
 /**
  * Get yearly financial summary for the dashboard
- * 
+ *
  * @param year - Year to get summary for (defaults to current year)
  * @returns Promise with yearly financial summary data
  */
 export const getYearlyFinancialSummary = async (year?: number): Promise<YearlyFinancialSummary> => {
   const url = year ? `/analytics/yearly-summary?year=${year}` : '/analytics/yearly-summary';
   const response = await api.get(url);
+  return response.data;
+};
+
+/**
+ * Per-project time-budget consumption (estimated vs logged hours).
+ */
+export interface ProjectTimeBudget {
+  project_id: string;
+  project_name: string;
+  client_name: string | null;
+  estimated_hours: number;
+  logged_hours: number;
+  billable_hours: number;
+  remaining_hours: number;
+  percentage: number;
+  over_budget: boolean;
+}
+
+/**
+ * Get per-project time-budget consumption.
+ *
+ * @returns Promise with array of project time-budget data (most-consumed first)
+ */
+export const getProjectTimeBudgets = async (): Promise<ProjectTimeBudget[]> => {
+  const response = await api.get('/analytics/project-time-budgets');
   return response.data;
 };

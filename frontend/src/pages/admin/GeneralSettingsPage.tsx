@@ -362,6 +362,38 @@ export default function GeneralSettingsPage() {
         </div>
       </div>
 
+      {/* Invoice PDF Language */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+          {t('admin.general.invoiceLanguage', { defaultValue: 'Invoice PDF Format' })}
+        </h3>
+
+        <div className="grid grid-cols-1 gap-4 max-w-lg">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              {t('admin.general.invoiceLanguageLabel', { defaultValue: 'Number & date format' })}
+            </label>
+            <select
+              value={settings.invoice_language || 'de'}
+              onChange={(e) => handleFieldChange('invoice_language', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            >
+              <option value="de">Deutsch (de-DE)</option>
+              <option value="en">English (en-US)</option>
+              <option value="fr">Français (fr-FR)</option>
+              <option value="es">Español (es-ES)</option>
+              <option value="it">Italiano (it-IT)</option>
+              <option value="nl">Nederlands (nl-NL)</option>
+            </select>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              {t('admin.general.invoiceLanguageHint', {
+                defaultValue: 'Controls how dates and amounts are formatted on generated invoice PDFs.',
+              })}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* AI Assistant Settings */}
       <div className="space-y-4">
         <h3 className="text-lg font-medium text-gray-900 dark:text-white">

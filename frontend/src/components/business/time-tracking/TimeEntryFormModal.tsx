@@ -28,7 +28,7 @@ import { Textarea } from '../../forms/Textarea';
 import { Modal } from '../../ui/Modal';
 import { Project, TimeEntry, TimeEntryPayload, Client } from '../../../api/types';
 import { TimeSlotPicker } from './TimeSlotPicker';
-import { fetchTimeEntries } from '../../../api/services/timeEntry.service';
+import { fetchTimeEntries, checkTimeEntryOverlap } from '../../../api/services/timeEntry.service';
 import { Calendar } from 'lucide-react';
 
 /**
@@ -316,34 +316,56 @@ export const TimeEntryFormModal: FC<TimeEntryFormModalProps> = ({
   // Fetch existing time entries for the selected date
   const { data: dayTimeEntries = [] } = useQuery({
     queryKey: ['time-entries-day', watchEntryDate],
-    queryFn: () => watchEntryDate 
-      ? fetchTimeEntries({ 
-          start_date: watchEntryDate, 
-          end_date: watchEntryDate 
+    queryFn: () => watchEntryDate
+      ? fetchTimeEntries({
+          start_date: watchEntryDate,
+          end_date: watchEntryDate
         })
       : Promise.resolve([]),
     enabled: !!watchEntryDate && open,
   });
 
+  // Non-blocking overlap check: warns when the proposed slot collides with an existing entry
+  const overlapEnabled = Boolean(
+    open && watchEntryDate && watchStartTime && (watchEndTime || watchDuration)
+  );
+  const { data: overlapResult } = useQuery({
+    queryKey: ['time-entry-overlap', watchEntryDate, watchStartTime, watchEndTime, watchDuration, initialEntry?.id],
+    queryFn: () =>
+      checkTimeEntryOverlap({
+        entry_date: watchEntryDate,
+        entry_time: watchStartTime,
+        entry_end_time: watchEndTime || undefined,
+        duration_hours: !watchEndTime && watchDuration ? Number(watchDuration) : undefined,
+        exclude_id: initialEntry?.id,
+      }),
+    enabled: overlapEnabled,
+    retry: false,
+  });
+
   // Auto-calculate duration when start/end times change
+  // Supports cross-midnight entries: when end < start the entry spans to the next day
   useEffect(() => {
     if (watchStartTime && watchEndTime) {
       const [startHour, startMin] = watchStartTime.split(':').map(Number);
       const [endHour, endMin] = watchEndTime.split(':').map(Number);
-      
-      // Check for valid parsed values
+
       if (isNaN(startHour) || isNaN(startMin) || isNaN(endHour) || isNaN(endMin)) {
         return;
       }
-      
-      const startMinutes = startHour * 60 + startMin;
-      const endMinutes = endHour * 60 + endMin;
-      
+
+      let startMinutes = startHour * 60 + startMin;
+      let endMinutes = endHour * 60 + endMin;
+
+      // Cross-midnight: add 24 h to end time
+      if (endMinutes < startMinutes) {
+        endMinutes += 24 * 60;
+      }
+
       if (endMinutes > startMinutes) {
         const durationMinutes = endMinutes - startMinutes;
         const durationHours = (durationMinutes / 60).toFixed(2);
-        
-        // Only update if different from current value (to avoid infinite loops)
+
         if (watchDuration !== durationHours) {
           setValue('duration_hours', durationHours);
         }
@@ -396,15 +418,20 @@ export const TimeEntryFormModal: FC<TimeEntryFormModalProps> = ({
       return;
     }
 
-    // Validate end time if provided
+    // Validate end time if provided (cross-midnight entries are valid)
     if (values.end_time) {
       const [startHour, startMin] = values.start_time.split(':').map(Number);
       const [endHour, endMin] = values.end_time.split(':').map(Number);
-      
-      const startMinutes = startHour * 60 + startMin;
-      const endMinutes = endHour * 60 + endMin;
-      
-      if (endMinutes <= startMinutes) {
+
+      let startMinutes = startHour * 60 + startMin;
+      let endMinutes = endHour * 60 + endMin;
+
+      // Allow cross-midnight: treat end < start as next-day end
+      if (endMinutes < startMinutes) {
+        endMinutes += 24 * 60;
+      }
+
+      if (endMinutes === startMinutes) {
         setError('end_time', { type: 'validate', message: t('form.endTime.validation.afterStart') });
         return;
       }
@@ -563,6 +590,21 @@ export const TimeEntryFormModal: FC<TimeEntryFormModalProps> = ({
               endTime={watchEndTime}
               onStartTimeChange={(time) => setValue('start_time', time)}
               onEndTimeChange={(time) => setValue('end_time', time)}
+            />
+          )}
+
+          {/* Non-blocking overlap warning */}
+          {overlapResult?.hasOverlap && (
+            <Alert
+              type="warning"
+              message={t('form.overlap.warning', {
+                count: overlapResult.overlaps.length,
+                defaultValue:
+                  'This time range overlaps {{count}} existing entry/entries: ' +
+                  overlapResult.overlaps
+                    .map((o) => `${(o.entry_time || '').slice(0, 5)}${o.project_name ? ' · ' + o.project_name : ''}`)
+                    .join(', '),
+              })}
             />
           )}
         </div>

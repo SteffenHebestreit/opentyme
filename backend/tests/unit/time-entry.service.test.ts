@@ -553,6 +553,100 @@ describe('TimeEntryService', () => {
     });
   });
 
+  describe('findOverlapping', () => {
+    // Use an isolated far-future date so these entries never collide with others
+    const overlapDate = '2030-05-20';
+
+    beforeAll(async () => {
+      await timeEntryService.create({
+        user_id: TEST_USER_ID,
+        project_id: testProject.id,
+        entry_date: new Date(`${overlapDate}T00:00:00.000Z`),
+        entry_time: '09:00',
+        entry_end_time: '11:00',
+        duration_hours: 2,
+        description: 'Overlap base entry',
+      });
+    });
+
+    it('detects an overlapping range', async () => {
+      const overlaps = await timeEntryService.findOverlapping({
+        user_id: TEST_USER_ID,
+        entry_date: overlapDate,
+        entry_time: '10:00',
+        entry_end_time: '12:00',
+      });
+      expect(overlaps.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('treats adjacent ranges (end == start) as non-overlapping', async () => {
+      const overlaps = await timeEntryService.findOverlapping({
+        user_id: TEST_USER_ID,
+        entry_date: overlapDate,
+        entry_time: '11:00',
+        entry_end_time: '12:00',
+      });
+      expect(overlaps.length).toBe(0);
+    });
+
+    it('returns no overlap for a range before the existing entry', async () => {
+      const overlaps = await timeEntryService.findOverlapping({
+        user_id: TEST_USER_ID,
+        entry_date: overlapDate,
+        entry_time: '07:00',
+        entry_end_time: '09:00',
+      });
+      expect(overlaps.length).toBe(0);
+    });
+
+    it('returns no overlap for a different date', async () => {
+      const overlaps = await timeEntryService.findOverlapping({
+        user_id: TEST_USER_ID,
+        entry_date: '2030-05-21',
+        entry_time: '10:00',
+        entry_end_time: '12:00',
+      });
+      expect(overlaps.length).toBe(0);
+    });
+
+    it('excludes the specified entry id', async () => {
+      const entries = await timeEntryService.findAll({ user_id: TEST_USER_ID, project_id: testProject.id });
+      const base = entries.find((e: any) => {
+        const d = new Date(e.entry_date).toISOString().split('T')[0];
+        return d === overlapDate;
+      });
+      expect(base).toBeDefined();
+
+      const overlaps = await timeEntryService.findOverlapping({
+        user_id: TEST_USER_ID,
+        entry_date: overlapDate,
+        entry_time: '10:00',
+        entry_end_time: '12:00',
+        exclude_id: base!.id,
+      });
+      expect(overlaps.length).toBe(0);
+    });
+
+    it('ignores active timers (duration 0)', async () => {
+      const activeTimerDate = '2030-06-10';
+      await timeEntryService.create({
+        user_id: TEST_USER_ID,
+        project_id: testProject.id,
+        entry_date: new Date(`${activeTimerDate}T00:00:00.000Z`),
+        entry_time: '09:00',
+        duration_hours: 0, // active/running timer
+      });
+
+      const overlaps = await timeEntryService.findOverlapping({
+        user_id: TEST_USER_ID,
+        entry_date: activeTimerDate,
+        entry_time: '09:00',
+        entry_end_time: '10:00',
+      });
+      expect(overlaps.length).toBe(0);
+    });
+  });
+
   describe('filter entries', () => {
     it('should filter by project for billable entries', async () => {
       await timeEntryService.create({ 

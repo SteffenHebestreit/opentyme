@@ -1118,6 +1118,7 @@ CREATE TABLE public.system_backup_schedule (
     includes_storage boolean DEFAULT true,
     includes_config boolean DEFAULT false,
     last_run_at timestamp with time zone,
+    last_run_status character varying(50),
     next_run_at timestamp with time zone,
     created_by character varying(255),
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
@@ -2299,6 +2300,38 @@ ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS stt_api_url character varyi
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS stt_api_key character varying(512);
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS stt_model character varying(255) DEFAULT 'large-v3';
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS stt_language character varying(10) DEFAULT '';
+
+-- Migration: invoice/PDF locale + overdue reminder opt-in (idempotent)
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS invoice_language character varying(5) DEFAULT 'de';
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS overdue_reminders_enabled boolean DEFAULT false;
+
+-- Migration: backup schedule last-run status (idempotent)
+ALTER TABLE public.system_backup_schedule ADD COLUMN IF NOT EXISTS last_run_status character varying(50);
+
+-- Migration: recurring invoice schedules (retainers) (idempotent)
+CREATE TABLE IF NOT EXISTS public.recurring_invoices (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL,
+    client_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+    project_id uuid REFERENCES public.projects(id) ON DELETE SET NULL,
+    title character varying(255) NOT NULL,
+    frequency character varying(20) NOT NULL CHECK (frequency IN ('monthly', 'quarterly', 'yearly')),
+    start_date date NOT NULL,
+    end_date date,
+    next_occurrence date,
+    is_active boolean NOT NULL DEFAULT true,
+    currency character varying(3) NOT NULL DEFAULT 'EUR',
+    tax_rate_id character varying(50),
+    payment_terms_days integer NOT NULL DEFAULT 30,
+    invoice_headline character varying(255),
+    notes text,
+    line_items jsonb NOT NULL DEFAULT '[]'::jsonb,
+    last_generated_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_recurring_invoices_user ON public.recurring_invoices(user_id);
+CREATE INDEX IF NOT EXISTS idx_recurring_invoices_due ON public.recurring_invoices(is_active, next_occurrence) WHERE is_active = true;
 
 
 --

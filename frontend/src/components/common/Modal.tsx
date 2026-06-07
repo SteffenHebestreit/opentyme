@@ -128,15 +128,13 @@ export const Modal: React.FC<ModalProps> = ({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, closeOnEsc, onClose]);
 
-  // Prevent body scroll when modal is open
+  // Prevent body scroll when modal is open; restore original value on close
   React.useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.overflow = originalOverflow;
     };
   }, [isOpen]);
 

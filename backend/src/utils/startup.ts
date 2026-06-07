@@ -130,6 +130,7 @@ async function ensureBackupTablesExist(): Promise<void> {
           includes_storage BOOLEAN DEFAULT true,
           includes_config BOOLEAN DEFAULT false,
           last_run_at TIMESTAMP WITH TIME ZONE,
+          last_run_status VARCHAR(50),
           next_run_at TIMESTAMP WITH TIME ZONE,
           created_by VARCHAR(255),
           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -273,6 +274,73 @@ async function rescanBackups(): Promise<void> {
 }
 
 /**
+ * Apply additive, idempotent schema upgrades for features added after the
+ * initial schema. All statements use IF NOT EXISTS / ADD COLUMN IF NOT EXISTS
+ * so they are safe to run on every startup and never drop or modify data.
+ */
+async function ensureSchemaUpgrades(): Promise<void> {
+  const db = getDbClient();
+
+  try {
+    logger.info('[Startup] Applying additive schema upgrades...');
+
+    // Invoice/PDF locale preference (e.g. 'de', 'en'). Default 'de' preserves
+    // existing German-formatted invoice behaviour.
+    await db.query(
+      `ALTER TABLE settings ADD COLUMN IF NOT EXISTS invoice_language VARCHAR(5) DEFAULT 'de'`
+    );
+
+    // Opt-in flag for emailing the account owner about newly-overdue invoices.
+    await db.query(
+      `ALTER TABLE settings ADD COLUMN IF NOT EXISTS overdue_reminders_enabled BOOLEAN DEFAULT false`
+    );
+
+    // Backup schedule last-run status (updateScheduleLastRun writes this column).
+    // Without it, scheduled-backup metadata updates fail and retention cleanup is
+    // silently skipped.
+    await db.query(
+      `ALTER TABLE system_backup_schedule ADD COLUMN IF NOT EXISTS last_run_status VARCHAR(50)`
+    );
+
+    // Recurring invoice schedules (retainers). Each row is a template that the
+    // recurring-invoice scheduler uses to generate draft invoices on a cadence.
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS recurring_invoices (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL,
+        client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+        project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+        title VARCHAR(255) NOT NULL,
+        frequency VARCHAR(20) NOT NULL CHECK (frequency IN ('monthly', 'quarterly', 'yearly')),
+        start_date DATE NOT NULL,
+        end_date DATE,
+        next_occurrence DATE,
+        is_active BOOLEAN NOT NULL DEFAULT true,
+        currency VARCHAR(3) NOT NULL DEFAULT 'EUR',
+        tax_rate_id VARCHAR(50),
+        payment_terms_days INTEGER NOT NULL DEFAULT 30,
+        invoice_headline VARCHAR(255),
+        notes TEXT,
+        line_items JSONB NOT NULL DEFAULT '[]'::jsonb,
+        last_generated_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_recurring_invoices_user ON recurring_invoices(user_id);
+      CREATE INDEX IF NOT EXISTS idx_recurring_invoices_due
+        ON recurring_invoices(is_active, next_occurrence)
+        WHERE is_active = true;
+    `);
+
+    logger.info('[Startup] ✓ Schema upgrades applied');
+  } catch (error) {
+    logger.error('[Startup] Error applying schema upgrades:', error);
+    // Don't throw - startup should continue
+  }
+}
+
+/**
  * Run all startup initialization tasks
  */
 export async function runStartupInitialization(): Promise<void> {
@@ -281,6 +349,9 @@ export async function runStartupInitialization(): Promise<void> {
 
     // Ensure backup tables exist (critical after restore)
     await ensureBackupTablesExist();
+
+    // Apply additive schema upgrades for newer features
+    await ensureSchemaUpgrades();
 
     // Initialize users from Keycloak
     await initializeExistingUsers();

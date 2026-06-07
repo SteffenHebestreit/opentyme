@@ -446,6 +446,71 @@ export class TimeEntryController {
     }
   }
 
+  /**
+   * Checks whether a proposed time entry overlaps existing entries on the same date.
+   * Non-blocking helper — returns overlaps so the UI can warn the user.
+   *
+   * @async
+   * @param {Request} req - Express request with query: entry_date, entry_time,
+   *   and either entry_end_time or duration_hours; optional exclude_id
+   * @param {Response} res - Express response object
+   * @returns {Promise<void>} 200 with { overlaps: [...], hasOverlap: boolean }
+   *
+   * @example
+   * GET /api/time-entries/check-overlap?entry_date=2026-03-15&entry_time=09:00&entry_end_time=11:00
+   * Response: 200 { hasOverlap: true, overlaps: [{ id, entry_time, project_name, ... }] }
+   */
+  async checkOverlap(req: Request, res: Response): Promise<void> {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({ message: 'Authentication required' });
+      return;
+    }
+
+    const entryDate = req.query.entry_date as string;
+    const entryTime = req.query.entry_time as string;
+    let entryEndTime = req.query.entry_end_time as string | undefined;
+    const durationHours = req.query.duration_hours as string | undefined;
+    const excludeId = req.query.exclude_id as string | undefined;
+
+    if (!entryDate || !/^\d{4}-\d{2}-\d{2}$/.test(entryDate)) {
+      res.status(400).json({ message: "Valid 'entry_date' (YYYY-MM-DD) is required." });
+      return;
+    }
+    if (!entryTime || !/^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.test(entryTime)) {
+      res.status(400).json({ message: "Valid 'entry_time' (HH:MM) is required." });
+      return;
+    }
+
+    // Derive end time from duration when not explicitly provided
+    if (!entryEndTime && durationHours) {
+      const dur = Number(durationHours);
+      if (Number.isFinite(dur) && dur > 0) {
+        entryEndTime = computeEntryEndTime(entryTime, dur);
+      }
+    }
+
+    if (!entryEndTime || !/^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/.test(entryEndTime)) {
+      res.status(400).json({ message: "Provide a valid 'entry_end_time' or positive 'duration_hours'." });
+      return;
+    }
+
+    try {
+      const overlaps = await timeEntryService.findOverlapping({
+        user_id: userId,
+        entry_date: entryDate,
+        entry_time: entryTime,
+        entry_end_time: entryEndTime,
+        exclude_id: excludeId,
+      });
+
+      res.status(200).json({ hasOverlap: overlaps.length > 0, overlaps });
+    } catch (err: any) {
+      logger.error('Check overlap error:', err);
+      res.status(500).json({ message: err.message || 'Internal server error' });
+    }
+  }
+
   async startTimer(req: Request, res: Response): Promise<void> {
     // This endpoint will typically create a new active TimeEntry or resume an existing paused one.
     const { project_id } = req.body; // Project ID is essential to associate the timer

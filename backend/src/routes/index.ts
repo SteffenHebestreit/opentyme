@@ -18,6 +18,7 @@ import taxRateRoutes from './financial/tax-rate.routes';
 import invoiceTextTemplateRoutes from './financial/invoice-text-template.routes';
 import taxPrepaymentRoutes from './financial/tax-prepayment.routes';
 import depreciationRoutes from './financial/depreciation.routes';
+import recurringInvoiceRoutes from './financial/recurring-invoice.routes';
 
 // System routes
 import backupRoutes from './system/backup.routes';
@@ -72,6 +73,9 @@ export default function setupRoutes(app: Application) {
 
   app.use('/api/depreciation', depreciationRoutes);
   logger.debug('Depreciation routes registered under /api/depreciation');
+
+  app.use('/api/recurring-invoices', recurringInvoiceRoutes);
+  logger.debug('Recurring invoice routes registered under /api/recurring-invoices');
 
   // Admin endpoints
   app.use('/api/admin/tax-rates', taxRateRoutes);

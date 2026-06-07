@@ -70,7 +70,7 @@ describe('Layout Component', () => {
       { wrapper: Wrapper }
     );
 
-    expect(screen.getByText(/© 2023 Project Tracking System/i)).toBeInTheDocument();
+    expect(screen.getByText(/© 2026 OpenTYME/i)).toBeInTheDocument();
   });
 
   it('renders main content area', () => {
@@ -96,7 +96,7 @@ describe('Layout Component', () => {
     );
 
     const layoutDiv = container.firstChild as HTMLElement;
-    expect(layoutDiv.className).toContain('bg-gray-50');
+    expect(layoutDiv.className).toContain('light');
     expect(layoutDiv.className).not.toContain('dark');
   });
 
@@ -111,7 +111,7 @@ describe('Layout Component', () => {
 
     const layoutDiv = container.firstChild as HTMLElement;
     expect(layoutDiv.className).toContain('dark');
-    expect(layoutDiv.className).toContain('bg-gray-900');
+    expect(layoutDiv.className).toContain('from-gray-900');
   });
 
   it('has min-height screen layout', () => {
@@ -161,8 +161,8 @@ describe('Layout Component', () => {
 
     const footer = screen.getByRole('contentinfo');
     expect(footer.className).toContain('text-center');
-    expect(footer.className).toContain('text-gray-500');
-    expect(footer.className).toContain('dark:text-gray-400');
+    expect(footer.className).toContain('border-t');
+    expect(footer.className).toContain('backdrop-blur-sm');
   });
 
   it('renders multiple children', () => {
@@ -204,7 +204,7 @@ describe('Layout Component', () => {
       { wrapper: Wrapper }
     );
 
-    expect(screen.getByText(/2023/)).toBeInTheDocument();
+    expect(screen.getByText(/2026/)).toBeInTheDocument();
   });
 
   it('footer displays all rights reserved', () => {

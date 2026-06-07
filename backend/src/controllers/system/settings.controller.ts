@@ -74,6 +74,8 @@ export const getSettings = async (req: Request, res: Response): Promise<void> =>
         theme_secondary_color,
         theme_accent_color,
         theme_background_image_url,
+        invoice_language,
+        overdue_reminders_enabled,
         created_at,
         updated_at
       FROM settings
@@ -164,6 +166,8 @@ export const updateSettings = async (req: Request, res: Response): Promise<void>
       theme_secondary_color,
       theme_accent_color,
       theme_background_image_url,
+      invoice_language,
+      overdue_reminders_enabled,
     } = req.body;
 
     // Build dynamic update query based on provided fields
@@ -219,6 +223,8 @@ export const updateSettings = async (req: Request, res: Response): Promise<void>
       theme_secondary_color,
       theme_accent_color,
       theme_background_image_url,
+      invoice_language,
+      overdue_reminders_enabled,
     };
 
     Object.entries(fieldMap).forEach(([field, value]) => {

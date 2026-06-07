@@ -58,4 +58,10 @@ router.get('/project-profitability', analyticsController.getProjectProfitability
  */
 router.get('/yearly-summary', analyticsController.getYearlyFinancialSummary.bind(analyticsController));
 
+/**
+ * GET /api/analytics/project-time-budgets
+ * Get per-project time-budget consumption (estimated vs logged hours)
+ */
+router.get('/project-time-budgets', analyticsController.getProjectTimeBudgets.bind(analyticsController));
+
 export default router;

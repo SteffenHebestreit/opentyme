@@ -127,6 +127,44 @@ router.post('/', timeEntryController.create.bind(timeEntryController));
  */
 router.get('/', timeEntryController.findAll.bind(timeEntryController));
 
+/**
+ * @openapi
+ * /api/time-entries/check-overlap:
+ *   get:
+ *     tags:
+ *       - Time Entries
+ *     summary: Check whether a proposed time entry overlaps existing entries
+ *     description: Returns existing entries on the same date whose time range intersects the proposed range. Non-blocking — intended to warn the user about double-booking.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: entry_date
+ *         required: true
+ *         schema: { type: string, pattern: '^\d{4}-\d{2}-\d{2}$' }
+ *       - in: query
+ *         name: entry_time
+ *         required: true
+ *         schema: { type: string, pattern: '^([01]\d|2[0-3]):([0-5]\d)$' }
+ *       - in: query
+ *         name: entry_end_time
+ *         schema: { type: string, pattern: '^([01]\d|2[0-3]):([0-5]\d)$' }
+ *       - in: query
+ *         name: duration_hours
+ *         schema: { type: number }
+ *       - in: query
+ *         name: exclude_id
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Overlap check result
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+router.get('/check-overlap', timeEntryController.checkOverlap.bind(timeEntryController));
+
 router.post('/start', timeEntryController.startTimer.bind(timeEntryController));
 
 /**

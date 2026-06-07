@@ -408,21 +408,35 @@ export async function fetchPlaceholders(language: string = 'en'): Promise<Placeh
  */
 export async function downloadInvoicePDF(id: string, enableZugferd?: boolean): Promise<void> {
   const params = enableZugferd !== undefined ? { zugferd: enableZugferd ? 'true' : 'false' } : {};
-  
+
   const response = await apiClient.get(`/invoices/${id}/pdf`, {
-    responseType: 'blob', // Important: tells axios to expect binary data
+    responseType: 'blob',
     params,
   });
 
-  // Create a blob from the PDF data
+  // When the server returns an error as a blob, the Content-Type is application/json
+  if (response.data.type === 'application/json') {
+    const text = await response.data.text();
+    const json = JSON.parse(text);
+    throw new Error(json.message || 'Failed to generate PDF');
+  }
+
   const blob = new Blob([response.data], { type: 'application/pdf' });
-  
-  // Create URL and open in new tab
   const url = window.URL.createObjectURL(blob);
-  window.open(url, '_blank');
-  
-  // Clean up the URL after a delay to allow the browser to load it
-  setTimeout(() => window.URL.revokeObjectURL(url), 100);
+
+  const newTab = window.open(url, '_blank');
+  if (!newTab) {
+    // Popup was blocked — fall back to a direct download
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `invoice-${id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  // Revoke after enough time for browser to start loading
+  setTimeout(() => window.URL.revokeObjectURL(url), 10_000);
 }
 
 /**
@@ -442,10 +456,26 @@ export async function downloadStornoPDF(id: string): Promise<void> {
     responseType: 'blob',
   });
 
+  if (response.data.type === 'application/json') {
+    const text = await response.data.text();
+    const json = JSON.parse(text);
+    throw new Error(json.message || 'Failed to generate storno PDF');
+  }
+
   const blob = new Blob([response.data], { type: 'application/pdf' });
   const url = window.URL.createObjectURL(blob);
-  window.open(url, '_blank');
-  setTimeout(() => window.URL.revokeObjectURL(url), 100);
+
+  const newTab = window.open(url, '_blank');
+  if (!newTab) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `storno-${id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  setTimeout(() => window.URL.revokeObjectURL(url), 10_000);
 }
 
 /**
@@ -465,8 +495,24 @@ export async function downloadCorrectionPDF(id: string): Promise<void> {
     responseType: 'blob',
   });
 
+  if (response.data.type === 'application/json') {
+    const text = await response.data.text();
+    const json = JSON.parse(text);
+    throw new Error(json.message || 'Failed to generate correction PDF');
+  }
+
   const blob = new Blob([response.data], { type: 'application/pdf' });
   const url = window.URL.createObjectURL(blob);
-  window.open(url, '_blank');
-  setTimeout(() => window.URL.revokeObjectURL(url), 100);
+
+  const newTab = window.open(url, '_blank');
+  if (!newTab) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `correction-${id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  setTimeout(() => window.URL.revokeObjectURL(url), 10_000);
 }

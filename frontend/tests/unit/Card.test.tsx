@@ -17,7 +17,7 @@ describe('Card', () => {
     const { container } = render(<Card>Content</Card>);
     const card = container.firstChild as HTMLElement;
     expect(card.className).toContain('shadow');
-    expect(card.className).toContain('rounded-lg');
+    expect(card.className).toContain('rounded-2xl');
   });
 });
 
@@ -44,12 +44,22 @@ describe('CardHeader', () => {
     expect(screen.getByRole('button', { name: 'Action' })).toBeInTheDocument();
   });
 
-  it('renders children instead of action when both provided', () => {
-    render(
-      <CardHeader 
-        title="Test Title" 
+  it('renders action and falls back to children when no action is provided', () => {
+    // When both action and children are provided, action takes precedence (action || children)
+    const { rerender } = render(
+      <CardHeader
+        title="Test Title"
         action={<button>Action</button>}
       >
+        <span data-testid="child">Child content</span>
+      </CardHeader>
+    );
+    expect(screen.getByRole('button', { name: 'Action' })).toBeInTheDocument();
+    expect(screen.queryByTestId('child')).not.toBeInTheDocument();
+
+    // Without an action, children are rendered
+    rerender(
+      <CardHeader title="Test Title">
         <span data-testid="child">Child content</span>
       </CardHeader>
     );

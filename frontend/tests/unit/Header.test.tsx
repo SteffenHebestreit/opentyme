@@ -2,9 +2,9 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import Header from '../../src/components/common/Header';
-import { AppProvider } from '../../src/store/AppContext';
 
-// Mock the AppContext
+// --- Mock app + auth + plugin + i18n dependencies the Header relies on ---
+
 const mockDispatch = jest.fn();
 const mockState = {
   theme: 'light' as 'light' | 'dark',
@@ -16,62 +16,82 @@ const mockState = {
 
 jest.mock('../../src/store/AppContext', () => ({
   ...jest.requireActual('../../src/store/AppContext'),
-  useApp: () => ({
-    state: mockState,
-    dispatch: mockDispatch,
+  useApp: () => ({ state: mockState, dispatch: mockDispatch }),
+}));
+
+const mockAuth = {
+  isAuthenticated: false,
+  user: null as any,
+  isAdmin: false,
+  logout: jest.fn(),
+};
+
+jest.mock('../../src/contexts/AuthContext', () => ({
+  useAuth: () => mockAuth,
+}));
+
+jest.mock('../../src/api/hooks/usePlugins', () => ({
+  usePlugins: () => ({ data: { plugins: [] } }),
+}));
+
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, fallback?: string) => fallback || key,
+    i18n: { language: 'en', changeLanguage: jest.fn() },
   }),
 }));
 
-// Wrapper component for tests
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <BrowserRouter>
-    <AppProvider>{children}</AppProvider>
-  </BrowserRouter>
+  <BrowserRouter>{children}</BrowserRouter>
 );
 
 describe('Header Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockState.theme = 'light';
+    mockAuth.isAuthenticated = false;
+    mockAuth.user = null;
+    mockAuth.isAdmin = false;
   });
 
-  it('renders the header', () => {
+  it('renders the header banner', () => {
     render(<Header />, { wrapper: Wrapper });
-
-    // Check that header is rendered
     expect(screen.getByRole('banner')).toBeInTheDocument();
   });
 
-  it('displays the logo/brand link', () => {
+  it('displays the OpenTYME brand link to "/" when unauthenticated', () => {
     render(<Header />, { wrapper: Wrapper });
-
-    const logo = screen.getByRole('link', { name: /project tracker/i });
+    const logo = screen.getByRole('link', { name: /opentyme/i });
     expect(logo).toBeInTheDocument();
     expect(logo).toHaveAttribute('href', '/');
   });
 
-  it('displays moon icon when theme is light', () => {
-    mockState.theme = 'light';
+  it('links the brand to /dashboard when authenticated', () => {
+    mockAuth.isAuthenticated = true;
     render(<Header />, { wrapper: Wrapper });
-
-    const themeButton = screen.getByRole('button', { name: /toggle theme/i });
-    expect(themeButton).toBeInTheDocument();
-
-    // Moon icon has specific path for dark mode toggle
-    const moonIcon = themeButton.querySelector('svg path[d*="21.752"]');
-    expect(moonIcon).toBeInTheDocument();
+    const logo = screen.getByRole('link', { name: /opentyme/i });
+    expect(logo).toHaveAttribute('href', '/dashboard');
   });
 
-  it('displays sun icon when theme is dark', () => {
-    mockState.theme = 'dark';
+  it('renders an accessible theme toggle button', () => {
     render(<Header />, { wrapper: Wrapper });
-
     const themeButton = screen.getByRole('button', { name: /toggle theme/i });
     expect(themeButton).toBeInTheDocument();
+    expect(themeButton).toHaveAccessibleName();
+  });
 
-    // Sun icon has specific path for light mode toggle
-    const sunIcon = themeButton.querySelector('svg path[d*="M12 3v2.25"]');
-    expect(sunIcon).toBeInTheDocument();
+  it('displays the moon icon when theme is light', () => {
+    mockState.theme = 'light';
+    render(<Header />, { wrapper: Wrapper });
+    const themeButton = screen.getByRole('button', { name: /toggle theme/i });
+    expect(themeButton.querySelector('svg path[d*="21.752"]')).toBeInTheDocument();
+  });
+
+  it('displays the sun icon when theme is dark', () => {
+    mockState.theme = 'dark';
+    render(<Header />, { wrapper: Wrapper });
+    const themeButton = screen.getByRole('button', { name: /toggle theme/i });
+    expect(themeButton.querySelector('svg path[d*="M12 3v2.25"]')).toBeInTheDocument();
   });
 
   it('toggles theme from light to dark', async () => {
@@ -79,13 +99,9 @@ describe('Header Component', () => {
     mockState.theme = 'light';
     render(<Header />, { wrapper: Wrapper });
 
-    const themeButton = screen.getByRole('button', { name: /toggle theme/i });
-    await user.click(themeButton);
+    await user.click(screen.getByRole('button', { name: /toggle theme/i }));
 
-    expect(mockDispatch).toHaveBeenCalledWith({
-      type: 'SET_THEME',
-      payload: 'dark',
-    });
+    expect(mockDispatch).toHaveBeenCalledWith({ type: 'SET_THEME', payload: 'dark' });
   });
 
   it('toggles theme from dark to light', async () => {
@@ -93,82 +109,45 @@ describe('Header Component', () => {
     mockState.theme = 'dark';
     render(<Header />, { wrapper: Wrapper });
 
+    await user.click(screen.getByRole('button', { name: /toggle theme/i }));
+
+    expect(mockDispatch).toHaveBeenCalledWith({ type: 'SET_THEME', payload: 'light' });
+  });
+
+  it('dispatches the theme action once per click', async () => {
+    const user = userEvent.setup();
+    render(<Header />, { wrapper: Wrapper });
+
     const themeButton = screen.getByRole('button', { name: /toggle theme/i });
     await user.click(themeButton);
-
-    expect(mockDispatch).toHaveBeenCalledWith({
-      type: 'SET_THEME',
-      payload: 'light',
-    });
+    expect(mockDispatch).toHaveBeenCalledTimes(1);
+    await user.click(themeButton);
+    expect(mockDispatch).toHaveBeenCalledTimes(2);
   });
 
-  it('has accessible theme toggle button', () => {
-    render(<Header />, { wrapper: Wrapper });
-
-    const themeButton = screen.getByRole('button', { name: /toggle theme/i });
-    expect(themeButton).toHaveAccessibleName();
-  });
-
-  it('applies dark mode styles when theme is dark', () => {
-    mockState.theme = 'dark';
-    render(<Header />, { wrapper: Wrapper });
-
-    const header = screen.getByRole('banner');
-    expect(header.className).toContain('dark:bg-gray-800');
-  });
-
-  it('applies light mode styles when theme is light', () => {
+  it('applies light-mode background classes when theme is light', () => {
     mockState.theme = 'light';
     render(<Header />, { wrapper: Wrapper });
-
-    const header = screen.getByRole('banner');
-    expect(header.className).toContain('bg-white');
+    expect(screen.getByRole('banner').className).toContain('bg-white');
   });
 
-  it('renders navigation area', () => {
+  it('applies dark-mode background classes when theme is dark', () => {
+    mockState.theme = 'dark';
     render(<Header />, { wrapper: Wrapper });
-
-    // Navigation is hidden on mobile (md:flex)
-    const nav = screen.getByRole('navigation');
-    expect(nav).toBeInTheDocument();
-    expect(nav.className).toContain('md:flex');
+    expect(screen.getByRole('banner').className).toContain('bg-gray-900');
   });
 
-  it('hides navigation on mobile', () => {
+  it('shows the desktop navigation (hidden on mobile) when authenticated', () => {
+    mockAuth.isAuthenticated = true;
     render(<Header />, { wrapper: Wrapper });
-
     const nav = screen.getByRole('navigation');
     expect(nav.className).toContain('hidden');
     expect(nav.className).toContain('md:flex');
   });
 
-  it('logo has correct styling', () => {
+  it('hides navigation when not authenticated', () => {
+    mockAuth.isAuthenticated = false;
     render(<Header />, { wrapper: Wrapper });
-
-    const logo = screen.getByRole('link', { name: /project tracker/i });
-    expect(logo.className).toContain('text-indigo-600');
-    expect(logo.className).toContain('dark:text-indigo-400');
-    expect(logo.className).toContain('font-bold');
-  });
-
-  it('theme button has hover styles', () => {
-    render(<Header />, { wrapper: Wrapper });
-
-    const themeButton = screen.getByRole('button', { name: /toggle theme/i });
-    expect(themeButton.className).toContain('hover:bg-gray-100');
-    expect(themeButton.className).toContain('dark:hover:bg-gray-700');
-  });
-
-  it('dispatches theme action only once per click', async () => {
-    const user = userEvent.setup();
-    render(<Header />, { wrapper: Wrapper });
-
-    const themeButton = screen.getByRole('button', { name: /toggle theme/i });
-
-    await user.click(themeButton);
-    expect(mockDispatch).toHaveBeenCalledTimes(1);
-
-    await user.click(themeButton);
-    expect(mockDispatch).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
   });
 });

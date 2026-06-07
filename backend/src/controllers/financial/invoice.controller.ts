@@ -744,16 +744,36 @@ export class InvoiceController {
       let finalClientId = client_id; // Use destructured value
       let projectIdForQuery = project_id; // Use destructured value
 
-      if (project_id && !client_id) {
-          // Fetch client_id from the project if only project_id is provided
-          const projectQuery = `SELECT client_id FROM projects WHERE id = $1 AND user_id = $2`;
-          const projectResult = await this.db.query(projectQuery, [project_id, (req as any).user?.id]);
-          
-          if (projectResult.rows.length === 0) {
-              res.status(404).json({ message: 'Project not found or you do not have access.' });
-              return;
-          }
+      // Resolve project currency: project → user settings → 'EUR'
+      let resolvedCurrency = 'EUR';
+
+      if (project_id) {
+        const projectQuery = `SELECT client_id, currency FROM projects WHERE id = $1 AND user_id = $2`;
+        const projectResult = await this.db.query(projectQuery, [project_id, (req as any).user?.id]);
+
+        if (projectResult.rows.length === 0) {
+          res.status(404).json({ message: 'Project not found or you do not have access.' });
+          return;
+        }
+
+        if (!client_id) {
           finalClientId = projectResult.rows[0].client_id;
+        }
+
+        if (projectResult.rows[0].currency) {
+          resolvedCurrency = projectResult.rows[0].currency;
+        }
+      }
+
+      // Fall back to user settings currency when no project currency was found
+      if (resolvedCurrency === 'EUR' && !project_id) {
+        const settingsResult = await this.db.query(
+          `SELECT default_currency FROM settings WHERE user_id = $1`,
+          [(req as any).user?.id]
+        );
+        if (settingsResult.rows[0]?.default_currency) {
+          resolvedCurrency = settingsResult.rows[0].default_currency;
+        }
       }
 
       // Create a new invoice with customization fields
@@ -763,8 +783,8 @@ export class InvoiceController {
         project_id: projectIdForQuery, // Store the specific project if provided, null otherwise
         issue_date: new Date(), // Invoice is issued today
         due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-        status: 'draft' as const, 
-        currency: 'USD',
+        status: 'draft' as const,
+        currency: resolvedCurrency,
         invoice_headline: invoice_headline || null,
         header_template_id: header_template_id || null,
         footer_template_id: footer_template_id || null,
@@ -950,28 +970,54 @@ export class InvoiceController {
     }
 
     try {
+      // Calculate amount_paid using both direct invoice_id (legacy) and the
+      // payment_invoices junction table (new system), so all payment records
+      // are included regardless of which linking method was used.
       const queryText = `
-        SELECT 
+        SELECT
           i.id,
           i.invoice_number,
           TO_CHAR(i.issue_date, 'YYYY-MM-DD') as issue_date,
           TO_CHAR(i.due_date, 'YYYY-MM-DD') as due_date,
+          i.sub_total,
           i.total_amount,
           i.status,
           i.currency,
-          COALESCE(
-            (SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id = i.id AND p.payment_type = 'payment'), 
-            0
-          ) AS amount_paid,
-          (i.total_amount - COALESCE(
-            (SELECT SUM(p.amount) FROM payments p WHERE p.invoice_id = i.id AND p.payment_type = 'payment'), 
-            0
-          )) AS outstanding_balance
-        FROM invoices i 
-        WHERE i.client_id = $1 
+          COALESCE((
+            SELECT SUM(
+              CASE
+                WHEN p.payment_type = 'payment' THEN COALESCE(pi.amount, p.amount)
+                ELSE -COALESCE(pi.amount, p.amount)
+              END
+            )
+            FROM payments p
+            LEFT JOIN payment_invoices pi ON p.id = pi.payment_id AND pi.invoice_id = i.id
+            WHERE
+              pi.invoice_id = i.id
+              OR (p.invoice_id = i.id AND NOT EXISTS (
+                SELECT 1 FROM payment_invoices WHERE payment_id = p.id
+              ))
+          ), 0) AS amount_paid,
+          (i.sub_total - COALESCE((
+            SELECT SUM(
+              CASE
+                WHEN p.payment_type = 'payment' THEN COALESCE(pi.amount, p.amount)
+                ELSE -COALESCE(pi.amount, p.amount)
+              END
+            )
+            FROM payments p
+            LEFT JOIN payment_invoices pi ON p.id = pi.payment_id AND pi.invoice_id = i.id
+            WHERE
+              pi.invoice_id = i.id
+              OR (p.invoice_id = i.id AND NOT EXISTS (
+                SELECT 1 FROM payment_invoices WHERE payment_id = p.id
+              ))
+          ), 0)) AS outstanding_balance
+        FROM invoices i
+        WHERE i.client_id = $1 AND i.status != 'draft'
         ORDER BY i.issue_date DESC, i.created_at DESC
       `;
-      
+
       const result = await this.db.query(queryText, [client_id]);
       res.status(200).json(result.rows);
     } catch (err: any) {
@@ -997,21 +1043,36 @@ export class InvoiceController {
   // Get invoice by number (alternative to ID)
   async findByNumber(req: Request, res: Response) {
     // Params validation is done by Joi schema
-    const { invoice_number } = req.params; // Destructure from validated params
+    const { invoice_number } = req.params;
+    const userId = (req as any).user?.id;
+
+    if (!userId) {
+      res.status(401).json({ message: 'Authentication required' });
+      return;
+    }
 
     try {
-      // Get invoices for the specific client
       const queryText = `
-        SELECT i.id, i.user_id, i.client_id, i.project_id, 
+        SELECT i.id, i.user_id, i.client_id, i.project_id,
                i.invoice_number, i.status, i.issue_date, i.due_date,
                i.sub_total, i.tax_rate, i.tax_amount, i.total_amount,
-               i.currency, i.notes, i.created_at, i.updated_at
-        FROM invoices i 
-        WHERE i.invoice_number = $1
+               i.currency, i.notes, i.created_at, i.updated_at,
+               c.name as client_name,
+               p.name as project_name
+        FROM invoices i
+        LEFT JOIN clients c ON i.client_id = c.id
+        LEFT JOIN projects p ON i.project_id = p.id
+        WHERE i.invoice_number = $1 AND i.user_id = $2
       `;
-      
-      // Since we can't access db directly, let's just return a placeholder or remove this functionality for now
-      res.status(501).json({ message: 'Find by number not yet fully implemented' });
+
+      const result = await this.db.query(queryText, [invoice_number, userId]);
+
+      if (result.rows.length === 0) {
+        res.status(404).json({ message: 'Invoice not found' });
+        return;
+      }
+
+      res.status(200).json(result.rows[0]);
     } catch (err: any) {
       logger.error('Find invoice by number error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
@@ -1038,9 +1099,16 @@ export class InvoiceController {
     const userId = (req as any).user?.id;
 
     try {
-      // Helper function to format currency in German style
+      // Locale for number/date formatting in the PDF. Driven by the user's
+      // invoice_language setting; defaults to German to preserve existing behaviour.
+      // Set after settings are fetched; the helpers below are closures invoked
+      // later during PDF drawing, by which point pdfLocale is finalised.
+      let pdfLocale = 'de-DE';
+      let pdfLanguage = 'de';
+
+      // Helper function to format currency using the configured locale
       const formatCurrency = (amount: number, currency: string = 'EUR'): string => {
-        return new Intl.NumberFormat('de-DE', {
+        return new Intl.NumberFormat(pdfLocale, {
           style: 'currency',
           currency: currency,
           minimumFractionDigits: 2,
@@ -1048,20 +1116,20 @@ export class InvoiceController {
         }).format(amount);
       };
 
-      // Helper function to format dates in German style
+      // Helper function to format dates using the configured locale
       const formatDate = (dateString: string): string => {
         const date = new Date(dateString);
-        return date.toLocaleDateString('de-DE', {
+        return date.toLocaleDateString(pdfLocale, {
           day: '2-digit',
           month: '2-digit',
           year: 'numeric'
         });
       };
 
-      // Helper function to format month/year in German
+      // Helper function to format month/year using the configured locale
       const formatMonthYear = (dateString: string): string => {
         const date = new Date(dateString);
-        return date.toLocaleDateString('de-DE', {
+        return date.toLocaleDateString(pdfLocale, {
           month: '2-digit',
           year: 'numeric'
         });
@@ -1073,6 +1141,18 @@ export class InvoiceController {
         [userId]
       );
       const settings = settingsResult.rows[0] || {};
+
+      // Resolve PDF locale from the user's invoice_language preference
+      pdfLanguage = (settings.invoice_language || 'de').toString().toLowerCase();
+      const localeMap: Record<string, string> = {
+        de: 'de-DE',
+        en: 'en-US',
+        fr: 'fr-FR',
+        es: 'es-ES',
+        it: 'it-IT',
+        nl: 'nl-NL',
+      };
+      pdfLocale = localeMap[pdfLanguage] || 'de-DE';
 
       // Fetch invoice with all details
       const queryText = `
@@ -1108,7 +1188,7 @@ export class InvoiceController {
         client_email: invoice.client_email,
         client_phone: invoice.client_phone,
         project_name: invoice.project_name,
-        language: 'de',
+        language: pdfLanguage,
         referenceDate: new Date(invoice.issue_date),
       };
 
