@@ -158,9 +158,9 @@ describe('EmailTemplatesPage', () => {
       expect(screen.getByText('DE')).toBeInTheDocument();
     });
 
-    it('shows a checkmark for the default template', () => {
+    it('shows a Default badge for the default template', () => {
       renderPage();
-      expect(screen.getByText('✓')).toBeInTheDocument();
+      expect(screen.getByText('Default')).toBeInTheDocument();
     });
 
     it('navigates to editor when Edit is clicked', async () => {

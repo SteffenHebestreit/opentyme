@@ -148,7 +148,7 @@ describe('Skeleton Components', () => {
 
       expect(footer).toBeInTheDocument();
       expect(footer?.className).toContain('bg-gray-50');
-      expect(footer?.className).toContain('dark:bg-gray-900\\/30');
+      expect(footer?.className).toContain('dark:bg-gray-900/30');
     });
 
     it('footer contains button skeletons', () => {
@@ -253,7 +253,7 @@ describe('Skeleton Components', () => {
       const { container } = render(<SkeletonCard />);
       const footer = container.querySelector('.border-t');
 
-      expect(footer?.className).toContain('dark:bg-gray-900\\/30');
+      expect(footer?.className).toContain('dark:bg-gray-900/30');
     });
   });
 });

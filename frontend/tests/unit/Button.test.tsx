@@ -38,18 +38,18 @@ describe('Button', () => {
   it('renders with primary variant by default', () => {
     render(<Button>Primary</Button>);
     const button = screen.getByRole('button');
-    expect(button.className).toContain('bg-indigo-600');
+    expect(button.className).toContain('from-purple-600');
   });
 
   it('renders with different variants', () => {
     const { rerender } = render(<Button variant="secondary">Secondary</Button>);
-    expect(screen.getByRole('button').className).toContain('bg-gray-200');
+    expect(screen.getByRole('button').className).toContain('bg-gray-800/50');
 
     rerender(<Button variant="success">Success</Button>);
     expect(screen.getByRole('button').className).toContain('bg-green-600');
 
     rerender(<Button variant="danger">Danger</Button>);
-    expect(screen.getByRole('button').className).toContain('bg-red-600');
+    expect(screen.getByRole('button').className).toContain('from-red-600');
   });
 
   it('renders with different sizes', () => {

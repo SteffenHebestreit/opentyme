@@ -20,6 +20,9 @@ describe('ResetPassword Component', () => {
   });
 
   afterEach(() => {
+    // Always restore real timers so a test that enables fake timers can never
+    // leak them into the next test (which would hang userEvent's typing delay).
+    jest.useRealTimers();
     jest.resetAllMocks();
   });
 
@@ -32,8 +35,8 @@ describe('ResetPassword Component', () => {
 
     expect(screen.getByRole('heading', { name: /reset password/i })).toBeInTheDocument();
     expect(screen.getByText(/enter your new password below/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/new password/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/confirm password/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('New password')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Confirm new password')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /reset password/i })).toBeInTheDocument();
   });
 
@@ -44,7 +47,9 @@ describe('ResetPassword Component', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText(/password reset token is missing/i)).toBeInTheDocument();
+    // The page shows the "token missing" message in both the form alert and the
+    // fallback alert, so there can be more than one matching element.
+    expect(screen.getAllByText(/password reset token is missing/i).length).toBeGreaterThan(0);
   });
 
   it('submits new password successfully', async () => {
@@ -60,8 +65,8 @@ describe('ResetPassword Component', () => {
       </MemoryRouter>
     );
 
-    await user.type(screen.getByLabelText(/new password/i), 'NewPass123!');
-    await user.type(screen.getByLabelText(/confirm password/i), 'NewPass123!');
+    await user.type(screen.getByPlaceholderText('New password'), 'NewPass123!');
+    await user.type(screen.getByPlaceholderText('Confirm new password'), 'NewPass123!');
     await user.click(screen.getByRole('button', { name: /reset password/i }));
 
     await waitFor(() => {
@@ -89,22 +94,22 @@ describe('ResetPassword Component', () => {
       </MemoryRouter>
     );
 
-    await user.type(screen.getByLabelText(/new password/i), 'NewPass123!');
-    await user.type(screen.getByLabelText(/confirm password/i), 'NewPass123!');
+    await user.type(screen.getByPlaceholderText('New password'), 'NewPass123!');
+    await user.type(screen.getByPlaceholderText('Confirm new password'), 'NewPass123!');
     await user.click(screen.getByRole('button', { name: /reset password/i }));
 
+    // The page renders the server-provided message (here "Password successfully reset")
     await waitFor(() => {
-      expect(screen.getByText(/password has been successfully reset/i)).toBeInTheDocument();
+      expect(screen.getByText(/successfully reset/i)).toBeInTheDocument();
     });
   });
 
   it('redirects to login after successful reset', async () => {
     const user = userEvent.setup();
-    jest.useFakeTimers();
-    
+
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ message: 'Success' }),
+      json: async () => ({ message: 'Password successfully reset' }),
     });
 
     render(
@@ -113,20 +118,17 @@ describe('ResetPassword Component', () => {
       </MemoryRouter>
     );
 
-    await user.type(screen.getByLabelText(/new password/i), 'NewPass123!');
-    await user.type(screen.getByLabelText(/confirm password/i), 'NewPass123!');
+    await user.type(screen.getByPlaceholderText('New password'), 'NewPass123!');
+    await user.type(screen.getByPlaceholderText('Confirm new password'), 'NewPass123!');
     await user.click(screen.getByRole('button', { name: /reset password/i }));
 
-    await waitFor(() => {
-      expect(screen.getByText(/password has been successfully reset/i)).toBeInTheDocument();
-    });
-
-    // Fast-forward timer to trigger navigation
-    jest.advanceTimersByTime(3000);
-
-    expect(mockNavigate).toHaveBeenCalledWith('/login');
-
-    jest.useRealTimers();
+    // The page navigates to /login after a 3s delay (real timers).
+    await waitFor(
+      () => {
+        expect(mockNavigate).toHaveBeenCalledWith('/login');
+      },
+      { timeout: 4000 }
+    );
   });
 
   it('displays error when passwords do not match', async () => {
@@ -138,8 +140,8 @@ describe('ResetPassword Component', () => {
       </MemoryRouter>
     );
 
-    await user.type(screen.getByLabelText(/new password/i), 'Password123!');
-    await user.type(screen.getByLabelText(/confirm password/i), 'DifferentPassword123!');
+    await user.type(screen.getByPlaceholderText('New password'), 'Password123!');
+    await user.type(screen.getByPlaceholderText('Confirm new password'), 'DifferentPassword123!');
     await user.click(screen.getByRole('button', { name: /reset password/i }));
 
     await waitFor(() => {
@@ -150,7 +152,7 @@ describe('ResetPassword Component', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('displays error when fields are empty', async () => {
+  it('does not submit when fields are empty', async () => {
     const user = userEvent.setup();
 
     render(
@@ -159,11 +161,9 @@ describe('ResetPassword Component', () => {
       </MemoryRouter>
     );
 
+    // Both password inputs are HTML5 `required`, so the browser blocks submission
+    // and no reset request is made for an empty form.
     await user.click(screen.getByRole('button', { name: /reset password/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/please fill in all fields/i)).toBeInTheDocument();
-    });
 
     expect(global.fetch).not.toHaveBeenCalled();
   });
@@ -181,8 +181,8 @@ describe('ResetPassword Component', () => {
       </MemoryRouter>
     );
 
-    await user.type(screen.getByLabelText(/new password/i), 'NewPass123!');
-    await user.type(screen.getByLabelText(/confirm password/i), 'NewPass123!');
+    await user.type(screen.getByPlaceholderText('New password'), 'NewPass123!');
+    await user.type(screen.getByPlaceholderText('Confirm new password'), 'NewPass123!');
     await user.click(screen.getByRole('button', { name: /reset password/i }));
 
     await waitFor(() => {
@@ -200,8 +200,8 @@ describe('ResetPassword Component', () => {
       </MemoryRouter>
     );
 
-    await user.type(screen.getByLabelText(/new password/i), 'NewPass123!');
-    await user.type(screen.getByLabelText(/confirm password/i), 'NewPass123!');
+    await user.type(screen.getByPlaceholderText('New password'), 'NewPass123!');
+    await user.type(screen.getByPlaceholderText('Confirm new password'), 'NewPass123!');
     await user.click(screen.getByRole('button', { name: /reset password/i }));
 
     await waitFor(() => {
@@ -221,8 +221,8 @@ describe('ResetPassword Component', () => {
       </MemoryRouter>
     );
 
-    const newPasswordInput = screen.getByLabelText(/new password/i);
-    const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
+    const newPasswordInput = screen.getByPlaceholderText('New password');
+    const confirmPasswordInput = screen.getByPlaceholderText('Confirm new password');
     const submitButton = screen.getByRole('button', { name: /reset password/i });
 
     await user.type(newPasswordInput, 'NewPass123!');
@@ -242,8 +242,8 @@ describe('ResetPassword Component', () => {
       </MemoryRouter>
     );
 
-    const newPasswordInput = screen.getByLabelText(/new password/i);
-    const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
+    const newPasswordInput = screen.getByPlaceholderText('New password');
+    const confirmPasswordInput = screen.getByPlaceholderText('Confirm new password');
 
     expect(newPasswordInput).toBeRequired();
     expect(confirmPasswordInput).toBeRequired();
@@ -261,8 +261,8 @@ describe('ResetPassword Component', () => {
     );
 
     // First attempt with mismatched passwords
-    await user.type(screen.getByLabelText(/new password/i), 'Pass1');
-    await user.type(screen.getByLabelText(/confirm password/i), 'Pass2');
+    await user.type(screen.getByPlaceholderText('New password'), 'Pass1');
+    await user.type(screen.getByPlaceholderText('Confirm new password'), 'Pass2');
     await user.click(screen.getByRole('button', { name: /reset password/i }));
 
     await waitFor(() => {
@@ -270,10 +270,10 @@ describe('ResetPassword Component', () => {
     });
 
     // Clear and retry
-    await user.clear(screen.getByLabelText(/new password/i));
-    await user.clear(screen.getByLabelText(/confirm password/i));
-    await user.type(screen.getByLabelText(/new password/i), 'Pass123!');
-    await user.type(screen.getByLabelText(/confirm password/i), 'Pass123!');
+    await user.clear(screen.getByPlaceholderText('New password'));
+    await user.clear(screen.getByPlaceholderText('Confirm new password'));
+    await user.type(screen.getByPlaceholderText('New password'), 'Pass123!');
+    await user.type(screen.getByPlaceholderText('Confirm new password'), 'Pass123!');
 
     (global.fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
