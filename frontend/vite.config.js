@@ -46,6 +46,19 @@ export default defineConfig({
   },
   build: {
     outDir: '../dist/frontend',
+    rollupOptions: {
+      output: {
+        // Split heavy, on-demand libraries into their own cacheable chunks so the
+        // initial bundle stays small. React stays in `vendor` (needed on first paint).
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('pdfmake')) return 'pdf';
+          if (id.includes('exceljs')) return 'xlsx';
+          if (id.includes('chart.js') || id.includes('react-chartjs-2')) return 'charts';
+          return 'vendor';
+        },
+      },
+    },
   },
   // Specify the entry point as our JavaScript file
   optimizeDeps: {
