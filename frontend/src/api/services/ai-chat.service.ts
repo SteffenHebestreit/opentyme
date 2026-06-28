@@ -46,19 +46,19 @@ export interface StreamChatOptions {
   signal?: AbortSignal;
 }
 
+interface StreamSSEOptions {
+  onEvent: (event: AgentEvent) => void;
+  onDone?: () => void;
+  onError?: (message: string) => void;
+  signal?: AbortSignal;
+}
+
 /**
- * Stream a chat message using AG-UI SSE protocol.
+ * POSTs a JSON body and consumes an AG-UI SSE stream.
  * Returns the resolved threadId (conversationId) once RUN_STARTED is received.
  */
-export async function streamChat(options: StreamChatOptions): Promise<string | null> {
-  const { message, threadId, onEvent, onDone, onError, signal } = options;
-
-  // Guardrail: message length
-  if (!message || message.trim().length === 0) {
-    onError?.('Message cannot be empty');
-    return null;
-  }
-  const trimmedMessage = message.trim().slice(0, MAX_MESSAGE_LENGTH);
+async function streamSSE(url: string, body: unknown, options: StreamSSEOptions): Promise<string | null> {
+  const { onEvent, onDone, onError, signal } = options;
 
   const token = getAccessToken();
   if (!token) {
@@ -77,14 +77,14 @@ export async function streamChat(options: StreamChatOptions): Promise<string | n
   let resolvedThreadId: string | null = null;
 
   try {
-    const response = await fetch('/api/ai/run', {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
         Accept: 'text/event-stream',
       },
-      body: JSON.stringify({ message: trimmedMessage, threadId: threadId ?? undefined, language: i18n.language }),
+      body: JSON.stringify(body),
       signal: combinedSignal,
     });
 
@@ -145,6 +145,59 @@ export async function streamChat(options: StreamChatOptions): Promise<string | n
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+/**
+ * Stream a chat message using AG-UI SSE protocol.
+ */
+export async function streamChat(options: StreamChatOptions): Promise<string | null> {
+  const { message, threadId, onEvent, onDone, onError, signal } = options;
+
+  if (!message || message.trim().length === 0) {
+    onError?.('Message cannot be empty');
+    return null;
+  }
+  const trimmedMessage = message.trim().slice(0, MAX_MESSAGE_LENGTH);
+
+  return streamSSE(
+    '/api/ai/run',
+    { message: trimmedMessage, threadId: threadId ?? undefined, language: i18n.language },
+    { onEvent, onDone, onError, signal }
+  );
+}
+
+// ── Write-approval (human-in-the-loop) ──────────────────────────────────────
+
+export interface ApprovalAction {
+  toolCallId: string;
+  toolName: string;
+  arguments: Record<string, unknown>;
+}
+
+export interface ApprovalDecision {
+  toolCallId: string;
+  decision: 'approve' | 'reject';
+}
+
+export interface ApproveActionsOptions {
+  conversationId: string;
+  approvals: ApprovalDecision[];
+  onEvent: (event: AgentEvent) => void;
+  onDone?: () => void;
+  onError?: (message: string) => void;
+  signal?: AbortSignal;
+}
+
+/**
+ * Resume a run that paused for write approval, streaming the continuation.
+ */
+export async function approveActions(options: ApproveActionsOptions): Promise<string | null> {
+  const { conversationId, approvals, onEvent, onDone, onError, signal } = options;
+  return streamSSE(
+    `/api/ai/run/${conversationId}/approve`,
+    { approvals, language: i18n.language },
+    { onEvent, onDone, onError, signal }
+  );
 }
 
 function createCombinedSignal(...signals: AbortSignal[]): AbortSignal {

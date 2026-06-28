@@ -59,6 +59,8 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
             onStop={chat.stopStreaming}
             onClear={chat.clearConversation}
             sttEnabled={sttEnabled}
+            pendingApproval={chat.pendingApproval}
+            onApprove={chat.approve}
           />
         </div>
       )}

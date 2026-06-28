@@ -84,7 +84,13 @@ export const ProjectTimeBudgets: FC = () => {
     staleTime: 60_000,
   });
 
-  if (isLoading || isError || !data || data.length === 0) {
+  // Only show projects that actually have a time budget set. Without an estimate
+  // there is no budget to track, so a row would just be a raw hour count — which
+  // is misleading under a "Time Budgets" heading. The widget hides itself when no
+  // project has an estimate.
+  const budgets = (data ?? []).filter((b) => b.estimated_hours > 0);
+
+  if (isLoading || isError || budgets.length === 0) {
     return null;
   }
 
@@ -94,7 +100,7 @@ export const ProjectTimeBudgets: FC = () => {
         {t('projectBudgets.title', { defaultValue: 'Project Time Budgets' })}
       </h3>
       <div className="space-y-4">
-        {data.slice(0, 8).map((budget) => (
+        {budgets.slice(0, 8).map((budget) => (
           <BudgetRow key={budget.project_id} budget={budget} />
         ))}
       </div>

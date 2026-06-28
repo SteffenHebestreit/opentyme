@@ -25,6 +25,13 @@ export interface LLMTool {
 interface OperationInfo {
   method: string;
   pathTemplate: string;
+  tags: string[];
+}
+
+export interface ToolWithMeta {
+  tool: LLMTool;
+  method: string;
+  tags: string[];
 }
 
 const BLOCKED_PREFIXES = [
@@ -167,7 +174,11 @@ export function buildTools(): LLMTool[] {
       };
 
       tools.push(tool);
-      operationMap.set(safeName, { method: method.toUpperCase(), pathTemplate: path });
+      operationMap.set(safeName, {
+        method: method.toUpperCase(),
+        pathTemplate: path,
+        tags: (op.tags as string[]) || [],
+      });
     }
   }
 
@@ -183,7 +194,7 @@ export function buildTools(): LLMTool[] {
         parameters: def.parameters,
       },
     });
-    operationMap.set(safeName, { method: 'CUSTOM', pathTemplate: def.name });
+    operationMap.set(safeName, { method: 'CUSTOM', pathTemplate: def.name, tags: ['Custom'] });
   }
 
   toolsCache = tools;
@@ -195,4 +206,16 @@ export function buildTools(): LLMTool[] {
 export function getOperationByName(name: string): OperationInfo | undefined {
   if (!toolsCache) buildTools();
   return operationMap.get(name);
+}
+
+/**
+ * Returns every built tool alongside its HTTP method and OpenAPI tags.
+ * Used by tool-selection to apply role filtering and relevance ranking.
+ */
+export function getToolsWithMeta(): ToolWithMeta[] {
+  const tools = buildTools();
+  return tools.map((t) => {
+    const info = operationMap.get(t.function.name);
+    return { tool: t, method: info?.method ?? 'GET', tags: info?.tags ?? [] };
+  });
 }

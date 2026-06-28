@@ -7,11 +7,25 @@ import axios from 'axios';
 import { logger } from '../../utils/logger';
 import { getOperationByName } from './openapi-tool-builder.service';
 import { getCustomToolByName } from './ai-tool-registry.service';
+import { isToolAllowedForRoles } from './tool-selection.service';
 
 export interface ToolResult {
   status: number;
   data?: unknown;
   error?: string;
+}
+
+/**
+ * Whether a tool mutates data and therefore requires human approval before
+ * execution. HTTP tools: anything that isn't a GET. Custom tools: opt out via
+ * `requiresApproval: false`, otherwise treated as a write for safety.
+ */
+export function isWriteTool(toolName: string): boolean {
+  const custom = getCustomToolByName(toolName);
+  if (custom) return custom.requiresApproval !== false;
+  const op = getOperationByName(toolName);
+  if (!op) return false;
+  return op.method !== 'GET';
 }
 
 const MAX_RESPONSE_CHARS = 8000;
@@ -20,7 +34,9 @@ const INTERNAL_BASE_URL = process.env.INTERNAL_API_URL ?? 'http://localhost:8000
 export async function executeToolCall(
   toolName: string,
   args: Record<string, unknown>,
-  bearerToken: string
+  bearerToken: string,
+  roles?: string[],
+  signal?: AbortSignal
 ): Promise<ToolResult> {
   // Short-circuit: custom (non-HTTP) tools registered by addons run in-process
   const customTool = getCustomToolByName(toolName);
@@ -40,6 +56,13 @@ export async function executeToolCall(
   if (!operation) {
     logger.warn(`[AI ToolExecutor] Unknown tool: ${toolName}`);
     return { status: 400, error: `Unknown tool: ${toolName}` };
+  }
+
+  // Defense in depth: refuse tools the user's roles may not use, even if the
+  // model selected one it shouldn't (the API's own authz remains the backstop).
+  if (roles && !isToolAllowedForRoles(operation.tags, roles)) {
+    logger.warn(`[AI ToolExecutor] Role-blocked tool ${toolName} for roles [${roles.join(',')}]`);
+    return { status: 403, error: `You do not have permission to use ${toolName}.` };
   }
 
   const { method, pathTemplate } = operation;
@@ -73,6 +96,7 @@ export async function executeToolCall(
         'Content-Type': 'application/json',
       },
       timeout: 30000,
+      signal,
       validateStatus: () => true, // don't throw on non-2xx
     });
 

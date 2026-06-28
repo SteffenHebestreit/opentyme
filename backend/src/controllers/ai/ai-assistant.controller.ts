@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { logger } from '../../utils/logger';
 import { pool } from '../../utils/database';
-import { aiAssistantService } from '../../services/ai/ai-assistant.service';
+import { AIAssistantService, ToolApprovalDecision } from '../../services/ai/ai-assistant.service';
 import { openTyMEAgentCard } from '../../services/ai/a2a-agent.service';
 import { transcriptionService } from '../../services/ai/transcription.service';
 
@@ -90,9 +90,23 @@ export async function runStream(req: Request, res: Response): Promise<void> {
     res.write(`data: ${JSON.stringify(event)}\n\n`);
   };
 
+  // Cancel the run if the client disconnects; keep the SSE stream alive through proxies.
+  const abort = new AbortController();
+  req.on('close', () => abort.abort());
+  const keepAlive = setInterval(() => {
+    try {
+      res.write(': ping\n\n');
+    } catch {
+      /* connection already closed */
+    }
+  }, 15000);
+
+  // A fresh instance per request — the service holds per-user client/model state
+  // that must not be shared across concurrent requests.
+  const svc = new AIAssistantService();
   try {
-    await aiAssistantService.initialize(userId);
-    await aiAssistantService.runStream(
+    await svc.initialize(userId);
+    await svc.runStream(
       userId,
       threadId ?? null,
       trimmed,
@@ -100,13 +114,99 @@ export async function runStream(req: Request, res: Response): Promise<void> {
       req.user?.email ?? '',
       language ?? 'en',
       bearerToken,
-      emit
+      req.user?.roles ?? [],
+      emit,
+      abort.signal
     );
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     logger.error(`[AI Controller] runStream error: ${msg}`);
     emit({ type: 'RUN_ERROR', message: msg, code: 'INTERNAL' });
   } finally {
+    clearInterval(keepAlive);
+    res.write('data: [DONE]\n\n');
+    res.end();
+  }
+}
+
+/**
+ * POST /api/ai/run/:conversationId/approve
+ * AG-UI SSE endpoint. Resumes a run paused for write approval: executes the
+ * approved write tool calls (rejected ones are recorded as declined), then
+ * continues the assistant loop.
+ * Body: { approvals: [{ toolCallId, decision }], language? }
+ */
+export async function approveRun(req: Request, res: Response): Promise<void> {
+  const { conversationId } = req.params;
+  const { approvals, language } = req.body as { approvals?: ToolApprovalDecision[]; language?: string };
+
+  const userId = req.user?.id;
+  if (!userId) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  if (!UUID_RE.test(conversationId)) {
+    res.status(400).json({ error: 'Invalid conversationId format' });
+    return;
+  }
+  if (!Array.isArray(approvals) || approvals.length === 0) {
+    res.status(400).json({ error: 'approvals array is required' });
+    return;
+  }
+  if (!checkRateLimit(userId)) {
+    res.status(429).json({ error: 'Too many requests — please wait a moment' });
+    return;
+  }
+
+  const sanitized: ToolApprovalDecision[] = approvals
+    .filter(
+      (a) => a && typeof a.toolCallId === 'string' && (a.decision === 'approve' || a.decision === 'reject')
+    )
+    .map((a) => ({ toolCallId: a.toolCallId, decision: a.decision }));
+
+  const bearerToken = req.headers.authorization ?? '';
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  const emit = (event: Record<string, unknown>): void => {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  };
+
+  const abort = new AbortController();
+  req.on('close', () => abort.abort());
+  const keepAlive = setInterval(() => {
+    try {
+      res.write(': ping\n\n');
+    } catch {
+      /* connection already closed */
+    }
+  }, 15000);
+
+  const svc = new AIAssistantService();
+  try {
+    await svc.initialize(userId);
+    await svc.resumeRun(
+      userId,
+      conversationId,
+      sanitized,
+      req.user?.fullName ?? req.user?.username ?? 'User',
+      req.user?.email ?? '',
+      language ?? 'en',
+      bearerToken,
+      req.user?.roles ?? [],
+      emit,
+      abort.signal
+    );
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.error(`[AI Controller] approveRun error: ${msg}`);
+    emit({ type: 'RUN_ERROR', message: msg, code: 'INTERNAL' });
+  } finally {
+    clearInterval(keepAlive);
     res.write('data: [DONE]\n\n');
     res.end();
   }

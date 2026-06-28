@@ -487,20 +487,25 @@ services:
       - "traefik.http.routers.seaweedfs-s3-secure.service=seaweedfs-s3"
       - "traefik.http.services.seaweedfs-s3.loadbalancer.server.port=8333"
 
-  # Docker MCP Gateway - Aggregates MCP servers from Docker Desktop
-  mcp-gateway:
-    image: alpine/socat:latest
-    container_name: opentyme-mcp-gateway
-    command: >
-      TCP-LISTEN:3100,fork,reuseaddr
-      EXEC:"docker mcp gateway run --enable-all-servers",pty,stderr
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    ports:
-      - "3100:3100"
-    networks:
-      - project-network
-    restart: unless-stopped
+  # Docker MCP Gateway - DISABLED on this host.
+  # It runs `docker mcp gateway run`, which requires the Docker Desktop MCP
+  # toolkit. This is a plain Linux host without Docker Desktop, so the gateway
+  # can only ever fail ("Failed to connect to MCP Gateway"). The only consumer
+  # (AI web-search in depreciation analysis) degrades gracefully without it.
+  # Re-enable only on a host that has the `docker mcp` plugin installed.
+  # mcp-gateway:
+  #   image: alpine/socat:latest
+  #   container_name: opentyme-mcp-gateway
+  #   command: >
+  #     TCP-LISTEN:3100,fork,reuseaddr
+  #     EXEC:"docker mcp gateway run --enable-all-servers",pty,stderr
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   ports:
+  #     - "3100:3100"
+  #   networks:
+  #     - project-network
+  #   restart: unless-stopped
 
   # Nginx Reverse Proxy (kept for gradual migration - will be removed after Traefik testing)
   nginx:
