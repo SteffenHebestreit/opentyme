@@ -8,6 +8,7 @@ import setupRoutes from './routes';
 import { logger } from './utils/logger';
 import { sanitizeRequestBody } from './middleware/sanitize.middleware';
 import { globalRateLimiter } from './middleware/rate-limit.middleware';
+import { captureException } from './utils/observability';
 import { sessionConfig, isKeycloakConfigured, logKeycloakConfig } from './config/keycloak.config';
 import { swaggerSpec } from './config/swagger.config';
 import recurringExpenseScheduler from './services/financial/recurring-expense-scheduler.service';
@@ -114,7 +115,8 @@ app.get('/', (req: Request, res: Response) => {
 // Error handling middleware - must be last
 app.use((err: Error, req: Request, res: Response, next: Function) => {
   logger.error('Unhandled error:', { error: err.message, stack: err.stack, path: req.path });
-  
+  captureException(err, { path: req.path, method: req.method });
+
   if (process.env.NODE_ENV === 'production') {
     // Don't expose error details in production
     return res.status(500).json({ 
