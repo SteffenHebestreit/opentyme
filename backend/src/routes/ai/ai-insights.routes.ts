@@ -7,6 +7,7 @@ import {
   getProfitSummary,
   getClientOverview,
   getProjectOverview,
+  getTimePattern,
 } from '../../controllers/ai/ai-insights.controller';
 
 const router = Router();
@@ -46,6 +47,29 @@ router.use(authenticateKeycloak, extractKeycloakUser);
  *         description: Aggregated time summary
  */
 router.get('/time-summary', getTimeSummary);
+
+/**
+ * @swagger
+ * /api/insights/time-pattern:
+ *   get:
+ *     operationId: get_time_pattern
+ *     summary: Typical working pattern per weekday for a project (from real history)
+ *     description: Returns, per weekday, the user's average daily hours and the typical time blocks (start, end, hours) computed from their actual past entries. The gaps between consecutive blocks are the recurring breaks (e.g. school/kindergarten pickup). Use this BEFORE back-logging or replicating a schedule so you reproduce the real pattern instead of inventing generic blocks.
+ *     tags: [Insights]
+ *     parameters:
+ *       - in: query
+ *         name: project_id
+ *         schema: { type: string, format: uuid }
+ *         description: Restrict the analysis to a single project (recommended)
+ *       - in: query
+ *         name: weeks
+ *         schema: { type: integer, default: 8 }
+ *         description: How many weeks of history to analyse (1-52, default 8)
+ *     responses:
+ *       200:
+ *         description: Per-weekday typical blocks and average hours
+ */
+router.get('/time-pattern', getTimePattern);
 
 /**
  * @swagger
