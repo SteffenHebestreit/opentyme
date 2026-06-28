@@ -5,8 +5,9 @@
 
 import React, { useEffect, useRef, useState, KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Send, Square, Trash2, ChevronRight, ChevronDown, Wrench, Mic, MicOff } from 'lucide-react';
-import type { UIMessage } from '../../api/hooks/useAIChat';
+import { Send, Square, Trash2, ChevronRight, ChevronDown, Wrench, Mic, MicOff, Check, ShieldAlert, X } from 'lucide-react';
+import type { UIMessage, PendingApproval } from '../../api/hooks/useAIChat';
+import type { ApprovalDecision } from '../../api/services/ai-chat.service';
 import { startRecording } from '../../api/services/ai-transcription.service';
 import type { RecordingHandle } from '../../api/services/ai-transcription.service';
 import { Slot } from '../../plugins/slots/Slot';
@@ -19,6 +20,8 @@ interface Props {
   onStop: () => void;
   onClear: () => void;
   sttEnabled?: boolean;
+  pendingApproval?: PendingApproval | null;
+  onApprove?: (decisions: ApprovalDecision[]) => void;
 }
 
 // Guardrail: max input length
@@ -88,6 +91,111 @@ function ToolCallStep({ msg, result }: { msg: UIMessage; result?: UIMessage }) {
   );
 }
 
+// ── Write-approval card (human-in-the-loop) ──────────────────────────────────
+
+function formatArgs(args: Record<string, unknown>): string {
+  const entries = Object.entries(args ?? {});
+  if (entries.length === 0) return '';
+  return entries
+    .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`)
+    .join('  ·  ');
+}
+
+function ApprovalCard({
+  approval,
+  onApprove,
+}: {
+  approval: PendingApproval;
+  onApprove: (decisions: ApprovalDecision[]) => void;
+}) {
+  const { t } = useTranslation('common');
+  const [rejected, setRejected] = useState<Set<string>>(new Set());
+
+  const toggle = (id: string) =>
+    setRejected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const submit = (mode: 'all' | 'none' | 'selected') => {
+    const decisions: ApprovalDecision[] = approval.actions.map((a) => ({
+      toolCallId: a.toolCallId,
+      decision:
+        mode === 'all'
+          ? 'approve'
+          : mode === 'none'
+            ? 'reject'
+            : rejected.has(a.toolCallId)
+              ? 'reject'
+              : 'approve',
+    }));
+    onApprove(decisions);
+  };
+
+  return (
+    <div className="mt-2 rounded-xl border border-amber-400/40 dark:border-amber-500/30 bg-amber-50/80 dark:bg-amber-900/20 p-3 text-xs">
+      <div className="flex items-center gap-1.5 mb-2 font-semibold text-amber-700 dark:text-amber-300">
+        <ShieldAlert size={14} className="shrink-0" />
+        {t('ai.approvalTitle', 'Approve these changes?')}
+        <span className="ml-auto font-normal text-amber-600/80 dark:text-amber-400/80">
+          {approval.actions.length}
+        </span>
+      </div>
+      <div className="space-y-1.5 mb-2.5">
+        {approval.actions.map((a) => {
+          const isRejected = rejected.has(a.toolCallId);
+          const argsText = formatArgs(a.arguments);
+          return (
+            <button
+              key={a.toolCallId}
+              onClick={() => toggle(a.toolCallId)}
+              title={isRejected ? t('ai.willSkip', 'Will be skipped') : t('ai.willRun', 'Will run')}
+              className={`flex w-full items-start gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-colors ${
+                isRejected
+                  ? 'border-gray-200 dark:border-gray-700 bg-gray-100/60 dark:bg-gray-800/40 opacity-50 line-through'
+                  : 'border-emerald-300/50 dark:border-emerald-600/40 bg-white/70 dark:bg-gray-800/60'
+              }`}
+            >
+              <span className="shrink-0 mt-0.5">
+                {isRejected ? (
+                  <X size={12} className="text-gray-400" />
+                ) : (
+                  <Check size={12} className="text-emerald-500" />
+                )}
+              </span>
+              <span className="min-w-0">
+                <span className="font-mono font-medium text-gray-700 dark:text-gray-200">{a.toolName}</span>
+                {argsText && (
+                  <span className="block text-[11px] text-gray-500 dark:text-gray-400 break-words">{argsText}</span>
+                )}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => submit(rejected.size === 0 ? 'all' : 'selected')}
+          className="flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 font-medium transition-colors"
+        >
+          {rejected.size === 0 ? t('ai.approveAll', 'Approve all') : t('ai.approveSelected', 'Approve selected')}
+        </button>
+        <button
+          onClick={() => submit('none')}
+          className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 py-1.5 font-medium transition-colors"
+        >
+          {t('ai.rejectAll', 'Reject all')}
+        </button>
+      </div>
+      <div className="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500">
+        {t('ai.approvalHint', 'Tap an item to toggle whether it runs.')}
+      </div>
+    </div>
+  );
+}
+
 // ── Message bubble ───────────────────────────────────────────────────────────
 
 function MessageBubble({ msg, toolResult }: { msg: UIMessage; toolResult?: UIMessage }) {
@@ -125,7 +233,7 @@ function MessageBubble({ msg, toolResult }: { msg: UIMessage; toolResult?: UIMes
 
 // ── Main panel ───────────────────────────────────────────────────────────────
 
-export default function AIChatPanel({ messages, isStreaming, error, onSend, onStop, onClear, sttEnabled = false }: Props) {
+export default function AIChatPanel({ messages, isStreaming, error, onSend, onStop, onClear, sttEnabled = false, pendingApproval, onApprove }: Props) {
   const { t } = useTranslation('common');
   const [input, setInput] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -138,7 +246,7 @@ export default function AIChatPanel({ messages, isStreaming, error, onSend, onSt
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, pendingApproval]);
 
   const handleSend = () => {
     const text = input.trim();
@@ -252,6 +360,11 @@ export default function AIChatPanel({ messages, isStreaming, error, onSend, onSt
             />
           );
         })}
+
+        {/* Write-approval prompt (human-in-the-loop) — inside the scroll area so it scrolls with the chat */}
+        {pendingApproval && pendingApproval.actions.length > 0 && !isStreaming && onApprove && (
+          <ApprovalCard approval={pendingApproval} onApprove={onApprove} />
+        )}
       </div>
 
       {/* Error banners */}

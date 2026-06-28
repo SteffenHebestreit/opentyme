@@ -103,7 +103,8 @@ export class OpenTyMEAgentExecutor implements AgentExecutor {
       const userId = requestContext.userId ?? 'a2a-anonymous';
 
       await this.aiService.initialize(userId);
-      await this.aiService.runStream(userId, requestContext.contextId ?? null, userText, 'External Agent', '', 'en', bearerToken, emit);
+      // External agents get least privilege: empty roles → no admin-only tools.
+      await this.aiService.runStream(userId, requestContext.contextId ?? null, userText, 'External Agent', '', 'en', bearerToken, [], emit);
 
       eventBus.publish({ kind: 'message', messageId: uuidv4(), role: 'agent', contextId: requestContext.contextId, parts: [{ kind: 'text', text: responseText || 'Done.' }] });
       eventBus.finished();

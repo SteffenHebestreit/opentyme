@@ -36,6 +36,12 @@ export interface CustomToolDefinition {
     required?: string[];
   };
   /**
+   * Whether calling this tool requires human approval (it mutates data or has
+   * side effects). Defaults to `true` — set to `false` for read-only tools so
+   * they auto-run like GET endpoints.
+   */
+  requiresApproval?: boolean;
+  /**
    * The actual implementation. Receives the parsed args the LLM passed.
    * Must return a JSON-serializable value.
    * Throw an Error to signal failure — the message is returned to the LLM.

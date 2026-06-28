@@ -6,6 +6,7 @@ import {
 } from '../../middleware/auth/keycloak.middleware';
 import {
   runStream,
+  approveRun,
   listConversations,
   getConversation,
   deleteConversation,
@@ -31,6 +32,7 @@ router.use(authenticateKeycloak);
 router.use(extractKeycloakUser);
 
 router.post('/run', runStream);
+router.post('/run/:conversationId/approve', approveRun);
 router.get('/conversations', listConversations);
 router.get('/conversations/:id', getConversation);
 router.delete('/conversations/:id', deleteConversation);
