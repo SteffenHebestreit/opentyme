@@ -1,53 +1,27 @@
 /**
  * @fileoverview React Router v6 Data API route configuration.
- * 
- * Uses createBrowserRouter with loaders, actions, and error boundaries
- * for better data fetching and error handling patterns.
- * 
+ *
+ * Page components are code-split via route-level `lazy` so each page — and its
+ * heavy dependencies (charts, pdfmake, exceljs) — loads on demand, keeping the
+ * initial bundle small.
+ *
  * @see https://reactrouter.com/start/data/routing
  * @module routes
  */
 
 import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router-dom';
+import type { ComponentType } from 'react';
 import { frontendPluginRegistry } from '@/plugins/plugin-registry';
 
-// Layout
+// Always-loaded shell (small, on every page)
 import Layout from '@/components/common/Layout';
-
-// Error boundary
 import ErrorBoundary from '@/components/common/ErrorBoundary';
-
-// Auth pages
-import Login from '@/pages/auth/Login';
-import Register from '@/pages/auth/Register';
-import ForgotPassword from '@/pages/auth/ForgotPassword';
-import ResetPasswordPage from '@/pages/auth/ResetPassword';
-import LandingPage from '@/pages/LandingPage';
-
-// Main pages
-import Dashboard from '@/components/dashboard/Dashboard';
-import ProfilePage from '@/pages/profile/ProfilePage';
-import ClientList from '@/components/business/clients/ClientList';
-import ProjectList from '@/components/business/projects/ProjectList';
-import TimeEntryList from '@/components/business/time-tracking/TimeEntryList';
-
-// Finance & Admin pages
-import FinancesPage from '@/pages/finances/FinancesPage';
-import AdminPage from '@/pages/admin/AdminPage';
-import SystemAdmin from '@/pages/SystemAdmin';
-
-// Communication pages
-import EmailTemplateBuilder from '@/pages/email-templates/EmailTemplateBuilder';
-import ComposeEmailPage from '@/pages/email/ComposeEmailPage';
-
-// Reports page
-import Reports from '@/pages/Reports';
-
-// Auth guard loader
+import AIChatWidget from '@/components/ai/AIChatWidget';
 import { authGuardLoader } from './loaders/authGuardLoader';
 
-// AI Chat Widget (floating, present on every page)
-import AIChatWidget from '@/components/ai/AIChatWidget';
+/** Wraps a dynamic `import()` of a default-exported page into a React Router lazy module. */
+const page = (factory: () => Promise<{ default: ComponentType<unknown> }>) => () =>
+  factory().then((m) => ({ Component: m.default }));
 
 /**
  * Renders the component registered by an addon for the current path.
@@ -89,122 +63,55 @@ function RootLayout() {
 }
 
 /**
- * Main router configuration using Data API
+ * Main router configuration using Data API. Page components are lazy-loaded.
  */
-export const router = createBrowserRouter([
+export const router = createBrowserRouter(
+  [
+    {
+      path: '/',
+      Component: RootLayout,
+      ErrorBoundary,
+      children: [
+        // Public routes
+        { index: true, lazy: page(() => import('@/pages/LandingPage')) },
+        { path: 'login', lazy: page(() => import('@/pages/auth/Login')) },
+        { path: 'register', lazy: page(() => import('@/pages/auth/Register')) },
+        { path: 'forgot-password', lazy: page(() => import('@/pages/auth/ForgotPassword')) },
+        { path: 'reset-password', lazy: page(() => import('@/pages/auth/ResetPassword')) },
+
+        // Protected routes (require authentication)
+        { path: 'dashboard', loader: authGuardLoader, lazy: page(() => import('@/components/dashboard/Dashboard')) },
+        { path: 'profile', loader: authGuardLoader, lazy: page(() => import('@/pages/profile/ProfilePage')) },
+        { path: 'clients', loader: authGuardLoader, lazy: page(() => import('@/components/business/clients/ClientList')) },
+        { path: 'projects', loader: authGuardLoader, lazy: page(() => import('@/components/business/projects/ProjectList')) },
+        { path: 'time-entries', loader: authGuardLoader, lazy: page(() => import('@/components/business/time-tracking/TimeEntryList')) },
+        { path: 'finances', loader: authGuardLoader, lazy: page(() => import('@/pages/finances/FinancesPage')) },
+        { path: 'reports', loader: authGuardLoader, lazy: page(() => import('@/pages/Reports')) },
+        {
+          path: 'config',
+          loader: authGuardLoader,
+          children: [
+            { index: true, element: <Navigate to="general" replace /> },
+            { path: ':tab', loader: authGuardLoader, lazy: page(() => import('@/pages/admin/AdminPage')) },
+          ],
+        },
+        { path: 'system-admin', loader: authGuardLoader, lazy: page(() => import('@/pages/SystemAdmin')) },
+        { path: 'email/compose', loader: authGuardLoader, lazy: page(() => import('@/pages/email/ComposeEmailPage')) },
+        { path: 'email-templates/new', loader: authGuardLoader, lazy: page(() => import('@/pages/email-templates/EmailTemplateBuilder')) },
+        { path: 'email-templates/:id', loader: authGuardLoader, lazy: page(() => import('@/pages/email-templates/EmailTemplateBuilder')) },
+
+        // Backward compatibility redirects
+        { path: 'invoices', element: <Navigate to="/finances" replace /> },
+        { path: 'payments', element: <Navigate to="/finances" replace /> },
+
+        // Addon routes + 404 catch-all
+        { path: '*', loader: authGuardLoader, Component: PluginRoute },
+      ],
+    },
+  ],
   {
-    path: '/',
-    Component: RootLayout,
-    ErrorBoundary,
-    children: [
-      // Public routes
-      {
-        index: true,
-        Component: LandingPage,
-      },
-      {
-        path: 'login',
-        Component: Login,
-      },
-      {
-        path: 'register',
-        Component: Register,
-      },
-      {
-        path: 'forgot-password',
-        Component: ForgotPassword,
-      },
-      {
-        path: 'reset-password',
-        Component: ResetPasswordPage,
-      },
-
-      // Protected routes (require authentication)
-      {
-        path: 'dashboard',
-        loader: authGuardLoader,
-        Component: Dashboard,
-      },
-      {
-        path: 'profile',
-        loader: authGuardLoader,
-        Component: ProfilePage,
-      },
-      {
-        path: 'clients',
-        loader: authGuardLoader,
-        Component: ClientList,
-      },
-      {
-        path: 'projects',
-        loader: authGuardLoader,
-        Component: ProjectList,
-      },
-      {
-        path: 'time-entries',
-        loader: authGuardLoader,
-        Component: TimeEntryList,
-      },
-      {
-        path: 'finances',
-        loader: authGuardLoader,
-        Component: FinancesPage,
-      },
-      {
-        path: 'reports',
-        loader: authGuardLoader,
-        Component: Reports,
-      },
-      {
-        path: 'config',
-        loader: authGuardLoader,
-        children: [
-          { index: true, element: <Navigate to="general" replace /> },
-          { path: ':tab', loader: authGuardLoader, Component: AdminPage },
-        ],
-      },
-      {
-        path: 'system-admin',
-        loader: authGuardLoader,
-        Component: SystemAdmin,
-      },
-      {
-        path: 'email/compose',
-        loader: authGuardLoader,
-        Component: ComposeEmailPage,
-      },
-      {
-        path: 'email-templates/new',
-        loader: authGuardLoader,
-        Component: EmailTemplateBuilder,
-      },
-      {
-        path: 'email-templates/:id',
-        loader: authGuardLoader,
-        Component: EmailTemplateBuilder,
-      },
-
-      // Backward compatibility redirects
-      {
-        path: 'invoices',
-        element: <Navigate to="/finances" replace />,
-      },
-      {
-        path: 'payments',
-        element: <Navigate to="/finances" replace />,
-      },
-
-      // Addon routes + 404 catch-all
-      // PluginRoute resolves paths registered by addons; falls back to 404
-      {
-        path: '*',
-        loader: authGuardLoader,
-        Component: PluginRoute,
-      },
-    ],
-  },
-], {
-  future: {
-    v7_startTransition: true,
-  },
-});
+    future: {
+      v7_startTransition: true,
+    },
+  }
+);

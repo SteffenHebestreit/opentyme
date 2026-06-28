@@ -40,6 +40,7 @@ const CORE_TOOL_NAMES = new Set<string>([
   'get_profit_summary',
   'get_client_overview',
   'get_project_overview',
+  'get_time_pattern',
 ]);
 
 export function isAdminOnlyTool(tags: string[]): boolean {

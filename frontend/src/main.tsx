@@ -41,7 +41,12 @@ ReactDOM.createRoot(rootElement).render(
       <AppProvider>
         <AuthProvider>
           <SlotProvider>
-            <RouterProvider router={router} />
+            <RouterProvider
+              router={router}
+              fallbackElement={
+                <div className="flex items-center justify-center min-h-screen text-gray-500">Loading…</div>
+              }
+            />
           </SlotProvider>
         </AuthProvider>
       </AppProvider>

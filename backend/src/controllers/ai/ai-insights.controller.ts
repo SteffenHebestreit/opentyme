@@ -590,3 +590,126 @@ export async function getProjectOverview(req: Request, res: Response): Promise<v
     res.status(500).json({ error: msg });
   }
 }
+
+// ── GET /api/insights/time-pattern ──────────────────────────────────────────
+
+const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** "HH:MM[:SS]" → minutes since midnight (null if unparseable). */
+function timeToMinutes(t: string | null): number | null {
+  if (!t) return null;
+  const m = /^(\d{1,2}):(\d{2})/.exec(t);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
+/** minutes since midnight → "HH:MM", rounded to the nearest 5 minutes. */
+function minutesToTime(min: number): string {
+  const r = Math.round(min / 5) * 5;
+  return `${String(Math.floor(r / 60) % 24).padStart(2, '0')}:${String(r % 60).padStart(2, '0')}`;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Computes the user's typical working pattern PER WEEKDAY for a project from real
+ * historical entries: average daily hours and the typical blocks (start/end/hours)
+ * by position. The gaps between consecutive blocks are the recurring breaks. This
+ * lets the assistant reproduce real structure instead of inventing generic blocks.
+ */
+export async function getTimePattern(req: Request, res: Response): Promise<void> {
+  const uid = userId(req);
+  const { project_id } = req.query as Record<string, string | undefined>;
+  const weeks = Math.min(52, Math.max(1, parseInt((req.query.weeks as string) || '8', 10) || 8));
+
+  try {
+    const db = pool();
+    if (project_id) {
+      const check = await db.query(`SELECT id FROM projects WHERE id = $1 AND user_id = $2`, [project_id, uid]);
+      if (check.rows.length === 0) {
+        res.status(400).json({ error: `project_id "${project_id}" not found. Use get_projects to retrieve valid project UUIDs.` });
+        return;
+      }
+    }
+
+    const params: unknown[] = [uid, weeks * 7];
+    let filter = '';
+    if (project_id) { params.push(project_id); filter = `AND project_id = $${params.length}`; }
+
+    const result = await db.query(
+      `SELECT entry_date, entry_time, entry_end_time, duration_hours
+       FROM time_entries
+       WHERE user_id = $1
+         AND entry_date >= CURRENT_DATE - ($2::int * INTERVAL '1 day')
+         ${filter}
+       ORDER BY entry_date, entry_time`,
+      params
+    );
+
+    type Block = { startMin: number | null; endMin: number | null; hours: number };
+    const days = new Map<string, { dow: number; blocks: Block[] }>();
+    for (const row of result.rows) {
+      const dateStr = (row.entry_date instanceof Date ? row.entry_date.toISOString() : String(row.entry_date)).slice(0, 10);
+      let day = days.get(dateStr);
+      if (!day) {
+        day = { dow: new Date(dateStr + 'T00:00:00Z').getUTCDay(), blocks: [] };
+        days.set(dateStr, day);
+      }
+      day.blocks.push({
+        startMin: timeToMinutes(row.entry_time),
+        endMin: timeToMinutes(row.entry_end_time),
+        hours: Number(row.duration_hours) || 0,
+      });
+    }
+
+    const byDow = new Map<number, Array<{ totalHours: number; blocks: Block[] }>>();
+    for (const day of days.values()) {
+      const arr = byDow.get(day.dow) ?? [];
+      arr.push({ totalHours: day.blocks.reduce((s, b) => s + b.hours, 0), blocks: day.blocks });
+      byDow.set(day.dow, arr);
+    }
+
+    const weekdays = [];
+    for (let dow = 1; dow <= 5; dow++) {
+      const sample = byDow.get(dow);
+      if (!sample || sample.length === 0) continue;
+      const sampleDays = sample.length;
+      const maxBlocks = Math.max(...sample.map((d) => d.blocks.length));
+
+      const typicalBlocks = [];
+      for (let pos = 0; pos < maxBlocks; pos++) {
+        const present = sample.filter((d) => d.blocks[pos]?.startMin != null && d.blocks[pos]?.endMin != null);
+        if (present.length === 0) continue;
+        typicalBlocks.push({
+          position: pos + 1,
+          start: minutesToTime(present.reduce((s, d) => s + (d.blocks[pos].startMin as number), 0) / present.length),
+          end: minutesToTime(present.reduce((s, d) => s + (d.blocks[pos].endMin as number), 0) / present.length),
+          avg_hours: round2(present.reduce((s, d) => s + d.blocks[pos].hours, 0) / present.length),
+          occurrence: round2(present.length / sampleDays),
+        });
+      }
+
+      weekdays.push({
+        weekday: WEEKDAY_NAMES[dow],
+        iso_weekday: dow,
+        sample_days: sampleDays,
+        avg_total_hours: round2(sample.reduce((s, d) => s + d.totalHours, 0) / sampleDays),
+        avg_blocks_per_day: round2(sample.reduce((s, d) => s + d.blocks.length, 0) / sampleDays),
+        typical_blocks: typicalBlocks,
+      });
+    }
+
+    res.json({
+      project_id: project_id ?? null,
+      lookback_weeks: weeks,
+      total_days_sampled: days.size,
+      weekdays,
+      note: 'Per-weekday averages from REAL entries. Reproduce these blocks exactly when back-logging; the gaps between consecutive blocks are the recurring breaks (e.g. kindergarten pickup). Do not invent generic blocks. Skip weekdays not listed (no historical work) and days that already have entries.',
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error(`[Insights] getTimePattern: ${msg}`);
+    res.status(500).json({ error: msg });
+  }
+}

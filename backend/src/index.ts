@@ -7,6 +7,7 @@ import recurringExpenseScheduler from './services/financial/recurring-expense-sc
 import invoiceReminderScheduler from './services/financial/invoice-reminder-scheduler.service';
 import recurringInvoiceScheduler from './services/financial/recurring-invoice-scheduler.service';
 import { mcpClient } from './services/mcp/mcp-client.service';
+import { initObservability, installProcessHandlers } from './utils/observability';
 
 const port = process.env.PORT || 8000;
 
@@ -81,6 +82,10 @@ async function startServer() {
     process.exit(1);
   }
 }
+
+// Initialize error tracking + process-level safety nets before starting.
+initObservability();
+installProcessHandlers();
 
 // Start the application
 startServer();

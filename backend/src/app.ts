@@ -2,12 +2,13 @@ import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
-import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import swaggerUi from 'swagger-ui-express';
 import setupRoutes from './routes';
 import { logger } from './utils/logger';
 import { sanitizeRequestBody } from './middleware/sanitize.middleware';
+import { globalRateLimiter } from './middleware/rate-limit.middleware';
+import { captureException } from './utils/observability';
 import { sessionConfig, isKeycloakConfigured, logKeycloakConfig } from './config/keycloak.config';
 import { swaggerSpec } from './config/swagger.config';
 import recurringExpenseScheduler from './services/financial/recurring-expense-scheduler.service';
@@ -18,6 +19,14 @@ dotenv.config();
 
 const app: Express = express();
 
+// Trust the reverse-proxy chain (Traefik/Nginx) so req.ip is the real client IP.
+// Set TRUST_PROXY to the number of proxy hops (e.g. "2"); required before enabling
+// per-IP rate limiting. Defaults to off (req.ip unchanged).
+if (process.env.TRUST_PROXY) {
+  const tp = process.env.TRUST_PROXY;
+  app.set('trust proxy', /^\d+$/.test(tp) ? Number(tp) : tp === 'true' ? true : tp);
+}
+
 // Security middleware
 app.use(helmet());
 app.use(cors({
@@ -25,13 +34,9 @@ app.use(cors({
   credentials: true,
 }));
 
-// Rate limiting - DISABLED for development
-// Uncomment and configure in production if needed
-// const limiter = rateLimit({
-//   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-//   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '1000'),
-// });
-// app.use(limiter);
+// Global API rate limiting (opt-in). No-op unless RATE_LIMIT_ENABLED=true — and
+// only enable that after setting TRUST_PROXY so req.ip is the real client IP.
+app.use('/api', globalRateLimiter);
 
 // Compression middleware
 app.use(compression());
@@ -110,7 +115,8 @@ app.get('/', (req: Request, res: Response) => {
 // Error handling middleware - must be last
 app.use((err: Error, req: Request, res: Response, next: Function) => {
   logger.error('Unhandled error:', { error: err.message, stack: err.stack, path: req.path });
-  
+  captureException(err, { path: req.path, method: req.method });
+
   if (process.env.NODE_ENV === 'production') {
     // Don't expose error details in production
     return res.status(500).json({ 
