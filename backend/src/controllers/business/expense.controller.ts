@@ -22,17 +22,15 @@ import {
 } from '../../schemas/business/expense.schema';
 import { ExpenseStatus } from '../../models/business/expense.model';
 import { mcpClientService } from '../../services/ai/mcp-client.service';
-import { expenseExtractionService } from '../../services/ai/expense-extraction.service';
+import { ExpenseExtractionService } from '../../services/ai/expense-extraction.service';
 import { AIDepreciationService } from '../../services/financial/ai-depreciation.service';
 import { logger } from '../../utils/logger';
 
 export class ExpenseController {
   private expenseService: ExpenseService;
-  private aiDepreciationService: AIDepreciationService;
 
   constructor() {
     this.expenseService = new ExpenseService();
-    this.aiDepreciationService = new AIDepreciationService();
   }
 
   /**
@@ -244,7 +242,9 @@ export class ExpenseController {
       logger.info(`Analyzing receipt: ${req.file.originalname} (${req.file.size} bytes)`);
 
       try {
-        // Step 1: Initialize AI service with user settings (loads MCP client too)
+        // Step 1: Initialize AI service with user settings (loads MCP client too).
+        // Per-request instance — the service holds per-user client/model state.
+        const expenseExtractionService = new ExpenseExtractionService();
         await expenseExtractionService.initialize(userId);
 
         // Step 2: Extract text from PDF using user's MCP server
@@ -607,10 +607,12 @@ export class ExpenseController {
       // Analyze with AI - let AI determine treatment
       logger.info(`[Depreciation] Analyzing expense ${id} with AI for user ${userId}`);
       
-      // Initialize AI service with user settings
-      await this.aiDepreciationService.initialize(userId);
+      // Initialize AI service with user settings.
+      // Per-request instance — the service holds per-user client/model state.
+      const aiDepreciationService = new AIDepreciationService();
+      await aiDepreciationService.initialize(userId);
       
-      const analysis = await this.aiDepreciationService.analyzeExpense({
+      const analysis = await aiDepreciationService.analyzeExpense({
         id: expense.id,
         description: expense.description || '',
         notes: expense.notes || '', // Include notes for better context
