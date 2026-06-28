@@ -13,6 +13,7 @@
  */
 
 import rateLimit from 'express-rate-limit';
+import { RequestHandler } from 'express';
 import { logger } from '../utils/logger';
 
 /**
@@ -56,3 +57,32 @@ export const passwordResetRateLimiter = rateLimit({
     res.status(options.statusCode).json(options.message);
   },
 });
+
+/**
+ * Global API rate limiter — OPT-IN via RATE_LIMIT_ENABLED=true.
+ *
+ * Disabled by default on purpose: it keys on req.ip, so it is only safe once
+ * `trust proxy` is configured (TRUST_PROXY) to surface the real client IP behind
+ * Traefik/Nginx — otherwise all traffic shares the proxy IP and every user is
+ * throttled together. Generous defaults so normal use is never blocked; tune via
+ * GLOBAL_RATE_LIMIT_WINDOW_MS / GLOBAL_RATE_LIMIT_MAX.
+ *
+ * In-memory store (fine for a single backend replica). For multi-replica, swap in
+ * a shared store (e.g. rate-limit-redis against the existing Redis service).
+ */
+const globalEnabled = process.env.RATE_LIMIT_ENABLED === 'true';
+
+export const globalRateLimiter: RequestHandler = globalEnabled
+  ? rateLimit({
+      windowMs: envInt('GLOBAL_RATE_LIMIT_WINDOW_MS', 60 * 1000),
+      max: envInt('GLOBAL_RATE_LIMIT_MAX', 300),
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { error: 'Too Many Requests', message: 'Too many requests. Please slow down.' },
+      skip: (req) => req.path === '/health' || req.path === '/api/health',
+      handler: (req, res, _next, options) => {
+        logger.warn(`[RateLimit] Global limit exceeded for IP ${req.ip} on ${req.path}`);
+        res.status(options.statusCode).json(options.message);
+      },
+    })
+  : (_req, _res, next) => next();
