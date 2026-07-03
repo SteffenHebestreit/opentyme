@@ -182,6 +182,15 @@
     "toolArguments": "Arguments",
     "toolResult": "Result",
     "open": "Open AI assistant",
-    "close": "Close AI assistant"
+    "close": "Close AI assistant",
+    "approvalTitle": "Approve these changes?",
+    "willRun": "Will run",
+    "willSkip": "Will be skipped",
+    "approveAll": "Approve all",
+    "approveSelected": "Approve selected",
+    "rejectAll": "Reject all",
+    "approvalHint": "Tap an item to toggle whether it runs.",
+    "editArgs": "Edit arguments before approving",
+    "invalidJson": "Not a valid JSON object"
   }
 }

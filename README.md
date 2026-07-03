@@ -61,7 +61,7 @@ docker compose up -d
 - **Expenses** — receipt upload (S3), tax breakdown, AfA depreciation schedules
 - **Reports** — VAT (Umsatzsteuervoranmeldung), EÜR, invoice/expense/time reports; export to PDF/CSV/XLSX
 - **Email** — per-user SMTP, MJML template editor with live preview
-- **AI assistant** — conversational access to all your data; configurable provider (local LLM, OpenAI-compatible)
+- **AI assistant** — agentic access to all your data: it plans, calls the app's API as tools (role-filtered, relevance-curated), and every create/update/delete pauses for your **approve / edit / reject** in a batch approval card. Configurable provider (local LLM via LM Studio, any OpenAI-compatible API)
 - **Addon system** — manifest-driven plugins; slot-based frontend injection; AI tool registration
 
 ---
@@ -77,6 +77,21 @@ KEYCLOAK_ADMIN_CLIENT_SECRET=...
 STORAGE_ACCESS_KEY=...
 STORAGE_SECRET_KEY=...
 ```
+
+See [docs/security-hardening.md](docs/security-hardening.md) for safe secret rotation on a
+running stack. Optional subsystems are documented in `.env.example`: AI tuning, global API
+rate limiting (`TRUST_PROXY` + `RATE_LIMIT_ENABLED`), Sentry error tracking (`SENTRY_DSN`),
+and off-site backup mirroring (`BACKUP_MIRROR_DIR`).
+
+---
+
+## Backups
+
+The built-in scheduler (Settings → System) creates daily archives of the database, storage,
+and config. Every archive is **verified restorable** before being marked completed, retention
+prunes old copies automatically, and setting `BACKUP_MIRROR_DIR` (plus a bind mount, see
+docker-compose.yml) mirrors each verified archive to a NAS/remote path — with retention
+applied to the mirror too. Release history: [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -116,6 +131,14 @@ Notes:
 ## AI Assistant (optional)
 
 Enable in **Settings → AI**. Any OpenAI-compatible API works (local LLM via LM Studio, self-hosted, or cloud).
+
+How it works: the OpenAPI spec becomes the assistant's tool set (curated per request by
+relevance and role), reads execute automatically, and **all writes pause for a batch
+approval card** where each proposed action can be approved, argument-edited, or rejected.
+Composite tools like `log_time_entry` resolve project names and compute durations
+server-side so the model never guesses UUIDs or does arithmetic. Tuning knobs and the
+LM Studio operator checklist (e.g. `preserve_thinking`) live in
+[docs/ai-architecture-notes.md](docs/ai-architecture-notes.md).
 
 Set `INTERNAL_API_URL=http://localhost:8000` in the backend environment so the assistant can call the API on the user's behalf.
 
@@ -190,15 +213,21 @@ Addons receive `context.ai` in `initialize()` — three paths:
 ## Testing
 
 ```bash
-# Backend unit tests
+# Backend unit tests (starts the test DB via the same profile)
 docker compose --profile test run --rm backend-tests
 
-# Frontend unit tests
-docker compose --profile test run --rm frontend-tests
+# Backend tests with coverage
+docker compose --profile test run --rm backend-tests-coverage
 
-# E2E (Playwright)
-docker compose --profile test run --rm playwright
+# Frontend unit tests (jest, no containers needed)
+cd frontend && npm run test:unit
+
+# E2E (Playwright, against the running stack)
+docker compose --profile test run --rm frontend-ui-tests
 ```
+
+CI (GitHub Actions) gates every PR on backend type-check + lint and frontend
+type-check + lint + build + unit tests.
 
 ---
 

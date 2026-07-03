@@ -182,6 +182,15 @@
     "toolArguments": "Argumente",
     "toolResult": "Ergebnis",
     "open": "KI-Assistent öffnen",
-    "close": "KI-Assistent schließen"
+    "close": "KI-Assistent schließen",
+    "approvalTitle": "Diese Änderungen genehmigen?",
+    "willRun": "Wird ausgeführt",
+    "willSkip": "Wird übersprungen",
+    "approveAll": "Alle genehmigen",
+    "approveSelected": "Auswahl genehmigen",
+    "rejectAll": "Alle ablehnen",
+    "approvalHint": "Eintrag antippen, um ihn zu überspringen.",
+    "editArgs": "Argumente vor der Genehmigung bearbeiten",
+    "invalidJson": "Kein gültiges JSON-Objekt"
   }
 }
