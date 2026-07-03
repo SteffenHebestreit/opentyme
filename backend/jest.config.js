@@ -9,6 +9,10 @@ module.exports = {
   transform: {
     '^.+\\.ts$': 'ts-jest',
   },
+  moduleNameMapper: {
+    // uuid ships ESM-only; map to a deterministic CJS stub for tests
+    '^uuid$': '<rootDir>/tests/mocks/uuid.ts',
+  },
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   globalSetup: '<rootDir>/tests/global-setup.ts',
   globalTeardown: '<rootDir>/tests/global-teardown.ts',
