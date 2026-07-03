@@ -302,6 +302,14 @@ async function ensureSchemaUpgrades(): Promise<void> {
       `ALTER TABLE system_backup_schedule ADD COLUMN IF NOT EXISTS last_run_status VARCHAR(50)`
     );
 
+    // Composite index for the hottest time-entry access path: per-user,
+    // per-project, date-ranged queries (summaries, patterns, back-fill checks).
+    // The existing single-column indexes can't serve the combined filter well.
+    await db.query(
+      `CREATE INDEX IF NOT EXISTS idx_time_entries_user_project_date
+       ON time_entries (user_id, project_id, entry_date)`
+    );
+
     // Recurring invoice schedules (retainers). Each row is a template that the
     // recurring-invoice scheduler uses to generate draft invoices on a cadence.
     await db.query(`

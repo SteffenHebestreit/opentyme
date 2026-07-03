@@ -2001,6 +2001,13 @@ CREATE INDEX idx_time_entries_user_id ON public.time_entries USING btree (user_i
 
 
 --
+-- Name: idx_time_entries_user_project_date; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_time_entries_user_project_date ON public.time_entries USING btree (user_id, project_id, entry_date);
+
+
+--
 -- Name: invoice_details_view _RETURN; Type: RULE; Schema: public; Owner: -
 --
 

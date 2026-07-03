@@ -11,6 +11,7 @@ services:
     container_name: opentyme-backend
     command: npm run dev  # Use dev-watch wrapper (node --watch + restart loop) for development
     restart: always
+    mem_limit: 1536m  # observed ~700MiB; 2x headroom
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
@@ -101,6 +102,8 @@ services:
         - GITLAB_ADDON_TOKEN=${GITLAB_ADDON_TOKEN:-}
         - OPENTYME_ADDONS=${OPENTYME_ADDONS:-}
     container_name: opentyme-frontend
+    restart: unless-stopped
+    mem_limit: 768m  # observed ~210MiB
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
       - "4173:4173"
@@ -147,6 +150,8 @@ services:
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"
 
   frontend-ui-tests:
+    profiles:
+      - test # test infra — not part of the running stack; start via --profile test
     image: mcr.microsoft.com/playwright:v1.49.1-noble
     working_dir: /app
     volumes:
@@ -172,6 +177,8 @@ services:
   db:
     image: postgres:17-alpine
     container_name: opentyme-db
+    restart: unless-stopped
+    mem_limit: 768m  # observed ~60MiB; room for growth
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-opentyme}
       - POSTGRES_USER=postgres
@@ -194,6 +201,8 @@ services:
   keycloak-db:
     image: postgres:17-alpine
     container_name: opentyme-keycloak-db
+    restart: unless-stopped
+    mem_limit: 512m  # observed ~36MiB
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_USER=keycloak_user
@@ -213,6 +222,8 @@ services:
 
   # PostgreSQL Database for Testing
   opentyme-test-db:
+    profiles:
+      - test # test infra — not part of the running stack; start via --profile test
     image: postgres:17-alpine
     container_name: opentyme-test-db
     environment:
@@ -281,6 +292,8 @@ services:
   redis:
     image: redis:7.4-alpine
     container_name: opentyme-redis
+    restart: unless-stopped
+    mem_limit: 256m  # observed ~6MiB
     volumes:
       - redis_data:/data
     ports:
@@ -298,6 +311,8 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.0.7
     container_name: opentyme-keycloak
+    restart: unless-stopped
+    mem_limit: 1536m  # observed ~690MiB (JVM); 2x headroom
     entrypoint:
       - /bin/sh
       - /opt/keycloak/data/import/init-keycloak.sh
@@ -355,6 +370,8 @@ services:
   traefik:
     image: traefik:v2.11
     container_name: opentyme-traefik
+    restart: unless-stopped
+    mem_limit: 256m  # observed ~55MiB
     command:
       - "--configFile=/etc/traefik/traefik.yml"
     ports:
@@ -386,6 +403,8 @@ services:
   mailhog:
     image: mailhog/mailhog:v1.0.1
     container_name: opentyme-mailhog
+    restart: unless-stopped
+    mem_limit: 128m  # observed ~3MiB
     ports:
       - "1025:1025"  # SMTP server
       - "8025:8025"  # Web UI
@@ -416,6 +435,8 @@ services:
       args:
         - ENABLED_TOOLS=file_converter
     container_name: opentyme-mcp-server
+    restart: unless-stopped
+    mem_limit: 512m  # observed ~195MiB
     environment:
       - HOST=0.0.0.0
       - PORT=8000
@@ -458,6 +479,8 @@ services:
   seaweedfs:
     image: chrislusf/seaweedfs:latest
     container_name: opentyme-seaweedfs
+    restart: unless-stopped
+    mem_limit: 512m  # observed ~115MiB
     command: ["server", "-s3", "-dir=/data", "-s3.port=8333", "-s3.config=/etc/seaweedfs/s3.json"]
     ports:
       - "8333:8333"  # S3 API (exposed to host for direct access and migration tooling)
@@ -511,6 +534,8 @@ services:
   nginx:
     image: nginx:1.27-alpine
     container_name: opentyme-nginx
+    restart: unless-stopped
+    mem_limit: 128m  # observed ~6MiB
     ports:
       - "${NGINX_PORT:-8888}:80"  # Changed to avoid conflict with Traefik
     volumes:

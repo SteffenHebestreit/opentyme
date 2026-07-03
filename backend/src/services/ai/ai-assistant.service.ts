@@ -26,6 +26,7 @@ import {
   loadHistory,
 } from './conversation-history.service';
 import { streamChatCompletion } from './llm-stream.service';
+import { safeParseArgs, stableCallKey, parseToolArguments } from './tool-call-utils';
 import { buildSystemPrompt } from './system-prompt.builder';
 import { LLMTool, validateToolArguments } from './openapi-tool-builder.service';
 import { selectTools } from './tool-selection.service';
@@ -41,52 +42,6 @@ export interface ToolApprovalDecision {
 }
 
 const MAX_ITERATIONS = Number(process.env.AI_MAX_ITERATIONS) || 12;
-
-function safeParseArgs(raw: string): Record<string, unknown> {
-  try {
-    return JSON.parse(raw || '{}');
-  } catch {
-    return {};
-  }
-}
-
-/** Recursively sorts object keys for a stable serialization. */
-function sortKeysDeep(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortKeysDeep);
-  if (value && typeof value === 'object') {
-    const out: Record<string, unknown> = {};
-    for (const k of Object.keys(value as Record<string, unknown>).sort()) {
-      out[k] = sortKeysDeep((value as Record<string, unknown>)[k]);
-    }
-    return out;
-  }
-  return value;
-}
-
-/** Stable identity of a tool call (name + normalized arguments) for repeat detection. */
-function stableCallKey(tc: LLMToolCall): string {
-  return `${tc.function.name}::${JSON.stringify(sortKeysDeep(safeParseArgs(tc.function.arguments)))}`;
-}
-
-/**
- * Parses tool-call arguments leniently: unwinds double-stringified JSON (a
- * documented local-model habit) and, on failure, reports a precise error so the
- * model can repair the call — instead of silently executing with {}.
- */
-function parseToolArguments(
-  raw: string
-): { ok: true; args: Record<string, unknown> } | { ok: false; error: string } {
-  try {
-    let v: unknown = JSON.parse(raw || '{}');
-    if (typeof v === 'string') v = JSON.parse(v);
-    if (v && typeof v === 'object' && !Array.isArray(v)) {
-      return { ok: true, args: v as Record<string, unknown> };
-    }
-    return { ok: false, error: `arguments must be a JSON object, got ${Array.isArray(v) ? 'array' : typeof v}` };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
-  }
-}
 
 // Loop guards (OpenHands-style stuck detection, sized down for short chats):
 // a given identical call may execute at most twice per run, and a tool that
