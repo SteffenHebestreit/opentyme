@@ -261,11 +261,11 @@ export function roundTimerToQuarters(startDate: Date, endDate: Date): {
   endTime: Date;
   durationHours: number;
 } {
-  let roundedStart = roundStartTimeToQuarter(startDate);
+  const roundedStart = roundStartTimeToQuarter(startDate);
   let roundedEnd = roundEndTimeToQuarter(endDate);
   
   // Calculate duration in hours
-  let durationMs = roundedEnd.getTime() - roundedStart.getTime();
+  const durationMs = roundedEnd.getTime() - roundedStart.getTime();
   let durationHours = durationMs / (1000 * 60 * 60);
   
   // Ensure minimum 15 minutes (0.25 hours)

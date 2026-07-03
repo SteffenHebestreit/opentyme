@@ -6,14 +6,9 @@ export const useClients = () => {
 
   const getAllClients = useQuery({
     queryKey: ['clients'],
-    queryFn: clientService.fetchClients,
+    queryFn: () => clientService.fetchClients(),
   });
 
-  const getClient = (id: string) => useQuery({
-    queryKey: ['clients', id],
-    queryFn: () => clientService.fetchClient(id),
-    enabled: !!id,
-  });
 
   const createClient = useMutation({
     mutationFn: clientService.createClient,
@@ -39,7 +34,6 @@ export const useClients = () => {
 
   return {
     getAllClients,
-    getClient,
     createClient,
     updateClient,
     deleteClient,

@@ -112,8 +112,8 @@ export const getAssetRegister = async (req: Request, res: Response): Promise<voi
   try {
     const pool = getDbClient();
     
-    let whereConditions = ['user_id = $1', 'depreciation_type = $2'];
-    let params: any[] = [userId, 'partial'];
+    const whereConditions = ['user_id = $1', 'depreciation_type = $2'];
+    const params: any[] = [userId, 'partial'];
     let paramCount = 2;
 
     if (year) {

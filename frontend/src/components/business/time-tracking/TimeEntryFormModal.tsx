@@ -354,7 +354,7 @@ export const TimeEntryFormModal: FC<TimeEntryFormModalProps> = ({
         return;
       }
 
-      let startMinutes = startHour * 60 + startMin;
+      const startMinutes = startHour * 60 + startMin;
       let endMinutes = endHour * 60 + endMin;
 
       // Cross-midnight: add 24 h to end time
@@ -423,7 +423,7 @@ export const TimeEntryFormModal: FC<TimeEntryFormModalProps> = ({
       const [startHour, startMin] = values.start_time.split(':').map(Number);
       const [endHour, endMin] = values.end_time.split(':').map(Number);
 
-      let startMinutes = startHour * 60 + startMin;
+      const startMinutes = startHour * 60 + startMin;
       let endMinutes = endHour * 60 + endMin;
 
       // Allow cross-midnight: treat end < start as next-day end

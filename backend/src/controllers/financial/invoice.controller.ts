@@ -742,7 +742,7 @@ export class InvoiceController {
     try {
       // Determine client_id for the invoice
       let finalClientId = client_id; // Use destructured value
-      let projectIdForQuery = project_id; // Use destructured value
+      const projectIdForQuery = project_id; // Use destructured value
 
       // Resolve project currency: project → user settings → 'EUR'
       let resolvedCurrency = 'EUR';
@@ -1382,7 +1382,8 @@ export class InvoiceController {
       // doc.on('pageAdded', drawFooter);
 
       // Always buffer the PDF to prevent sending corrupted data on error
-      let pdfBuffers: Buffer[] = [];
+      const pdfBuffers: Buffer[] = [];
+      // eslint-disable-next-line @typescript-eslint/no-var-requires -- lazy require keeps stream setup local
       const bufferStream = new (require('stream').PassThrough)();
       bufferStream.on('data', (chunk: Buffer) => pdfBuffers.push(chunk));
       
@@ -1609,6 +1610,7 @@ export class InvoiceController {
         // Sanitize description to prevent PDFKit infinite loop
         const safeDescription = (item.description || '')
           .toString()
+          // eslint-disable-next-line no-control-regex -- intentionally strips control chars for PDF text
           .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove control characters
           .replace(/\s+/g, ' ') // Normalize whitespace
           .trim()
@@ -2375,7 +2377,8 @@ export class InvoiceController {
         bufferPages: true
       });
 
-      let pdfBuffers: Buffer[] = [];
+      const pdfBuffers: Buffer[] = [];
+      // eslint-disable-next-line @typescript-eslint/no-var-requires -- lazy require keeps stream setup local
       const bufferStream = new (require('stream').PassThrough)();
       bufferStream.on('data', (chunk: Buffer) => pdfBuffers.push(chunk));
       
@@ -2686,7 +2689,8 @@ export class InvoiceController {
         bufferPages: true
       });
 
-      let pdfBuffers: Buffer[] = [];
+      const pdfBuffers: Buffer[] = [];
+      // eslint-disable-next-line @typescript-eslint/no-var-requires -- lazy require keeps stream setup local
       const bufferStream = new (require('stream').PassThrough)();
       bufferStream.on('data', (chunk: Buffer) => pdfBuffers.push(chunk));
       

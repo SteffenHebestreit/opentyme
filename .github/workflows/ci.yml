@@ -6,10 +6,11 @@ on:
   pull_request:
 
 # Notes:
-# - Required gates (must pass): backend type-check, frontend build, frontend unit tests.
-# - Non-blocking gates (continue-on-error): lint and backend tests + frontend type-check.
-#   These surface the existing backlog without blocking; promote them to required
-#   once the backlog is cleared (remove the `continue-on-error: true` lines).
+# - Required gates (must pass): backend type-check, backend + frontend lint
+#   (error-free as of 2026-07; warnings don't fail), frontend build, frontend
+#   unit tests.
+# - Non-blocking gates (continue-on-error): backend tests (need CI DB validation)
+#   and frontend type-check (~97-error backlog). Promote once cleared.
 
 jobs:
   backend:
@@ -49,7 +50,6 @@ jobs:
           DATABASE_URL: postgresql://postgres:testpass@localhost:5432/opentyme_test
       - name: Lint
         run: npx eslint . --ext .ts,.js
-        continue-on-error: true # promote to required once the lint backlog is cleared
 
   frontend:
     name: Frontend
@@ -74,4 +74,3 @@ jobs:
         continue-on-error: true # promote to required once the type backlog is cleared
       - name: Lint
         run: npx eslint . --ext js,jsx,ts,tsx
-        continue-on-error: true # promote to required once the lint backlog is cleared

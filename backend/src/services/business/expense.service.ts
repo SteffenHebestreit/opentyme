@@ -143,7 +143,7 @@ export class ExpenseService {
     if (endDate) endDate.setHours(0, 0, 0, 0);
 
     // Start from the recurrence_start_date, which is when the recurring expense should begin
-    let currentDate = new Date(startDate);
+    const currentDate = new Date(startDate);
 
     // Generate expenses for all past occurrences up to and including today
     while (currentDate <= today) {
@@ -228,7 +228,7 @@ export class ExpenseService {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Reset time to start of day
     
-    let currentOccurrence = new Date(startDate);
+    const currentOccurrence = new Date(startDate);
     currentOccurrence.setHours(0, 0, 0, 0);
 
     // If start date is in the future, return it as-is

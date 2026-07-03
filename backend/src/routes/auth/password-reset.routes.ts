@@ -5,7 +5,6 @@ import { EmailService } from '../../services/external/email.service';
 import { passwordResetRateLimiter } from '../../middleware/rate-limit.middleware';
 
 // These will be injected by the main app or a route-specific DI mechanism
-let passwordResetController: PasswordResetController;
 
 const router = Router();
 
@@ -16,7 +15,7 @@ const router = Router();
 // This is a simplified setup. In a larger app, you'd use proper DI.
 const userService = new UserService(); // This should ideally be a singleton instance
 const emailService = new EmailService();
-passwordResetController = new PasswordResetController(userService, emailService);
+const passwordResetController = new PasswordResetController(userService, emailService);
 
 
 router.post('/request', passwordResetRateLimiter, passwordResetController.requestPasswordReset);

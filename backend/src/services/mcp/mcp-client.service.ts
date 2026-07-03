@@ -30,7 +30,6 @@ export class MCPClientService {
 
   constructor() {
     // Gateway runs on host machine (Windows) at port 3100
-    // @ts-ignore - process is available in Node.js runtime
     this.gatewayUrl = process.env.MCP_GATEWAY_URL || 'http://host.docker.internal:3100';
   }
 

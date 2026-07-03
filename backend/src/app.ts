@@ -1,4 +1,4 @@
-import express, { Express, Request, Response } from 'express';
+import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -113,7 +113,7 @@ app.get('/', (req: Request, res: Response) => {
 });
 
 // Error handling middleware - must be last
-app.use((err: Error, req: Request, res: Response, next: Function) => {
+app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
   logger.error('Unhandled error:', { error: err.message, stack: err.stack, path: req.path });
   captureException(err, { path: req.path, method: req.method });
 

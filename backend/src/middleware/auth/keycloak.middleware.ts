@@ -1,4 +1,3 @@
-/// <reference path="../../types/express.d.ts" />
 import { Request, Response, NextFunction } from 'express';
 import { kcAdminClient } from '../../config/keycloak.config';
 import axios from 'axios';

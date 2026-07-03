@@ -761,7 +761,7 @@ Respond with ONLY valid JSON - nothing before the opening {, nothing after the c
       logger.debug('Parsing JSON:', jsonStr.substring(0, 200));
       
       // Clean up common JSON issues
-      let cleanedJson = jsonStr
+      const cleanedJson = jsonStr
         .replace(/\n/g, ' ')  // Remove newlines within strings
         .replace(/\r/g, '')    // Remove carriage returns
         .replace(/\t/g, ' ')   // Replace tabs with spaces
@@ -771,7 +771,7 @@ Respond with ONLY valid JSON - nothing before the opening {, nothing after the c
       
       // Log sources immediately after parsing
       logger.info(`[AI Response] ===== SOURCES CHECK =====`);
-      logger.info(`[AI Response] Sources field exists: ${parsed.hasOwnProperty('sources')}`);
+      logger.info(`[AI Response] Sources field exists: ${Object.prototype.hasOwnProperty.call(parsed, 'sources')}`);
       logger.info(`[AI Response] Sources value: ${JSON.stringify(parsed.sources)}`);
       logger.info(`[AI Response] Sources count: ${parsed.sources?.length || 0}`);
 

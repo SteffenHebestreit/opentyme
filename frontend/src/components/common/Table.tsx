@@ -83,7 +83,7 @@ export const Table = <T extends { id?: string | number }>({
 
   // Process data: Sort -> Group -> Paginate
   const processedData = useMemo(() => {
-    let processed = [...data];
+    const processed = [...data];
 
     // 1. Sort
     if (internalSort && !onSort) {

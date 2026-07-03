@@ -16,5 +16,15 @@ module.exports = {
     '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     '@typescript-eslint/no-explicit-any': 'warn',
     'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+    // while(true) is idiomatic for SSE/stream read loops
+    'no-constant-condition': ['error', { checkLoops: false }],
   },
+  overrides: [
+    {
+      files: ['*.d.ts'],
+      rules: {
+        'no-var': 'off', // global augmentation requires var
+      },
+    },
+  ],
 };

@@ -327,8 +327,8 @@ export class PaymentController {
     const validatedBody = req.body;
     const { client_id, amount, payment_type, payment_method, transaction_id, payment_date, notes, exclude_from_tax, invoice_ids } = validatedBody; 
 
-    let setParts = [];
-    let values: any[] = [];
+    const setParts = [];
+    const values: any[] = [];
 
     if (client_id !== undefined) {
         setParts.push(`client_id = $${values.length + 1}`); 

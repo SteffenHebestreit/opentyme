@@ -118,7 +118,7 @@ export class TimeEntryService {
       LEFT JOIN clients c ON p.client_id = c.id
     `;
     const values: any[] = [];
-    let conditions: string[] = [];
+    const conditions: string[] = [];
 
     // ALWAYS filter by user_id for multi-tenant isolation
     conditions.push(`te.user_id = $${values.length + 1}`);
@@ -225,7 +225,7 @@ export class TimeEntryService {
    */
   async update(id: string, timeEntryData: UpdateTimeEntryDto): Promise<ITimeEntry | null> {
     const db = getDbClient();
-    let setParts = [];
+    const setParts = [];
     const values: any[] = [];
     let paramIndex = 1;
 

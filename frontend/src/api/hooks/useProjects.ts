@@ -6,14 +6,9 @@ export const useProjects = () => {
 
   const getAllProjects = useQuery({
     queryKey: ['projects'],
-    queryFn: projectService.fetchProjects,
+    queryFn: () => projectService.fetchProjects(),
   });
 
-  const getProject = (id: string) => useQuery({
-    queryKey: ['projects', id],
-    queryFn: () => projectService.fetchProject(id),
-    enabled: !!id,
-  });
 
   const createProject = useMutation({
     mutationFn: projectService.createProject,
@@ -39,7 +34,6 @@ export const useProjects = () => {
 
   return {
     getAllProjects,
-    getProject,
     createProject,
     updateProject,
     deleteProject,

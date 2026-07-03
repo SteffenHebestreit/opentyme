@@ -288,17 +288,6 @@ export default function InvoiceList({ startDate: propStartDate, endDate: propEnd
     }
   };
 
-  if (!state.isAuthenticated) {
-    return (
-      <div className="p-6">
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{t('title')}</h1>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{t('noAuth')}</p>
-        </div>
-      </div>
-    );
-  }
-
   // Calculate summary statistics
   const totalInvoiced = useMemo(() => {
     return filteredInvoices.reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0);
@@ -311,6 +300,18 @@ export default function InvoiceList({ startDate: propStartDate, endDate: propEnd
   const unpaidInvoices = useMemo(() => {
     return filteredInvoices.filter(inv => inv.status !== 'paid' && inv.status !== 'draft').reduce((sum, inv) => sum + Number(inv.total_amount || 0), 0);
   }, [filteredInvoices]);
+
+
+  if (!state.isAuthenticated) {
+    return (
+      <div className="p-6">
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{t('title')}</h1>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{t('noAuth')}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

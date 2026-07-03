@@ -124,7 +124,7 @@ const ProjectProfitabilityChart: React.FC = () => {
     return () => {
       if (chartRef.current) {
         chartRef.current.destroy();
-      };
+      }
     };
   }, [data, t]);
 
