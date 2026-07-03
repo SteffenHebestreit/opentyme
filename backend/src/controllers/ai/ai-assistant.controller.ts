@@ -266,7 +266,7 @@ export async function getConversation(req: Request, res: Response): Promise<void
     }
 
     const msgResult = await db.query(
-      `SELECT id, role, content, tool_calls, tool_call_id, tool_name, created_at
+      `SELECT id, role, content, tool_calls, tool_call_id, tool_name, metadata, created_at
        FROM ai_messages
        WHERE conversation_id = $1
        ORDER BY created_at ASC`,
