@@ -163,7 +163,13 @@ export async function getTimePattern(req: Request, res: Response): Promise<void>
     type Block = { startMin: number | null; endMin: number | null; hours: number };
     const days = new Map<string, { dow: number; blocks: Block[] }>();
     for (const row of result.rows) {
-      const dateStr = (row.entry_date instanceof Date ? row.entry_date.toISOString() : String(row.entry_date)).slice(0, 10);
+      // pg parses DATE at process-LOCAL midnight; format with LOCAL components
+      // (not toISOString/UTC) so the calendar date survives any container TZ.
+      const d = row.entry_date;
+      const dateStr =
+        d instanceof Date
+          ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+          : String(d).slice(0, 10);
       let day = days.get(dateStr);
       if (!day) {
         day = { dow: new Date(dateStr + 'T00:00:00Z').getUTCDay(), blocks: [] };

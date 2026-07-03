@@ -2299,6 +2299,8 @@ CREATE TABLE IF NOT EXISTS public.ai_messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ai_messages_conversation_id ON public.ai_messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_ai_messages_conv_created ON public.ai_messages(conversation_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_messages_pending ON public.ai_messages(conversation_id) WHERE metadata->>'status' = 'awaiting_approval';
 
 -- Migration: add STT columns to existing settings tables (idempotent)
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS stt_enabled boolean DEFAULT false;

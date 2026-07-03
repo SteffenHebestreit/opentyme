@@ -153,7 +153,7 @@ export async function loadHistory(
       `SELECT role, content, tool_calls, tool_call_id, tool_name, created_at
        FROM ai_messages
        WHERE conversation_id = $1 AND created_at >= $2
-       ORDER BY created_at ASC
+       ORDER BY created_at ASC, id ASC
        LIMIT $3`,
       [conversationId, anchor, HISTORY_LIMIT * 2]
     );
@@ -166,7 +166,7 @@ export async function loadHistory(
       `SELECT role, content, tool_calls, tool_call_id, tool_name, created_at
        FROM ai_messages
        WHERE conversation_id = $1
-       ORDER BY created_at DESC
+       ORDER BY created_at DESC, id DESC
        LIMIT $2`,
       [conversationId, HISTORY_LIMIT]
     );

@@ -26,7 +26,7 @@ import {
   loadHistory,
 } from './conversation-history.service';
 import { streamChatCompletion } from './llm-stream.service';
-import { safeParseArgs, stableCallKey, parseToolArguments } from './tool-call-utils';
+import { safeParseArgs, sortKeysDeep, parseToolArguments } from './tool-call-utils';
 import { buildSystemPrompt } from './system-prompt.builder';
 import { LLMTool, validateToolArguments } from './openapi-tool-builder.service';
 import { selectTools } from './tool-selection.service';
@@ -241,8 +241,10 @@ export class AIAssistantService {
       return;
     }
 
+    const claimedId = pendingRow.rows[0].id as string;
     const pending = (pendingRow.rows[0].metadata?.pending ?? []) as LLMToolCall[];
     const decisions = new Map(approvals.map((a) => [a.toolCallId, a.decision]));
+    const processedIds = new Set<string>();
 
     try {
       // Rebuild context from history. The pending write tool_calls are still
@@ -265,13 +267,9 @@ export class AIAssistantService {
             message: 'User declined this action; it was not performed.',
           });
           emit({ type: EventType.TOOL_CALL_RESULT, toolCallId: tc.id, content: resultContent });
-          await db.query(
-            `INSERT INTO ai_messages (conversation_id, role, content, tool_call_id, tool_name)
-             VALUES ($1, 'tool', $2, $3, $4)`,
-            [conversationId, resultContent, tc.id, tc.function.name]
-          );
-          messages.push({ role: 'tool', content: resultContent, tool_call_id: tc.id, name: tc.function.name });
+          await this.recordToolResult(tc, conversationId, messages, emit, resultContent);
         }
+        processedIds.add(tc.id);
       }
 
       // Re-select tools for the original request, then continue the loop.
@@ -287,6 +285,24 @@ export class AIAssistantService {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error(`[AI] resumeRun error: ${message}`);
+
+      // The claim consumed the approval before the work was done — re-arm it
+      // for the writes that were NOT yet processed so the user can retry
+      // Approve instead of silently losing the actions. Already-processed
+      // writes are excluded to prevent double execution on retry.
+      const remaining = pending.filter((tc) => !processedIds.has(tc.id));
+      if (remaining.length > 0) {
+        try {
+          await db.query(`UPDATE ai_messages SET metadata = $1 WHERE id = $2`, [
+            JSON.stringify({ status: 'awaiting_approval', pending: remaining }),
+            claimedId,
+          ]);
+          logger.warn(`[AI] Re-armed approval ${claimedId} with ${remaining.length} unprocessed action(s) after failure`);
+        } catch (rearmErr: unknown) {
+          logger.error(`[AI] Failed to re-arm approval ${claimedId}: ${String(rearmErr)}`);
+        }
+      }
+
       emit({ type: EventType.RUN_ERROR, message, code: 'INTERNAL' });
     }
   }
@@ -300,13 +316,26 @@ export class AIAssistantService {
   private async supersedeStaleApprovals(conversationId: string): Promise<void> {
     const db = pool();
     const stale = await db.query(
-      `SELECT id, metadata FROM ai_messages
+      `SELECT id FROM ai_messages
        WHERE conversation_id = $1 AND role = 'assistant' AND metadata->>'status' = 'awaiting_approval'`,
       [conversationId]
     );
 
     for (const row of stale.rows) {
-      const pending = (row.metadata?.pending ?? []) as LLMToolCall[];
+      // Atomically CLAIM the row first — a concurrent /approve that wins the
+      // race keeps its real results and we skip ours, so a tool_call_id can
+      // never receive both an executed and a 'superseded' result. jsonb_set
+      // preserves the pending list for audit.
+      const claimed = await db.query(
+        `UPDATE ai_messages
+         SET metadata = jsonb_set(metadata, '{status}', '"superseded"')
+         WHERE id = $1 AND metadata->>'status' = 'awaiting_approval'
+         RETURNING metadata`,
+        [row.id]
+      );
+      if (claimed.rows.length === 0) continue; // lost the race to /approve
+
+      const pending = (claimed.rows[0].metadata?.pending ?? []) as LLMToolCall[];
       for (const tc of pending) {
         await db.query(
           `INSERT INTO ai_messages (conversation_id, role, content, tool_call_id, tool_name)
@@ -322,10 +351,6 @@ export class AIAssistantService {
           ]
         );
       }
-      await db.query(`UPDATE ai_messages SET metadata = $1 WHERE id = $2`, [
-        JSON.stringify({ status: 'superseded' }),
-        row.id,
-      ]);
       logger.info(`[AI] Superseded stale approval ${row.id} (${pending.length} pending action(s))`);
     }
   }
@@ -379,6 +404,12 @@ export class AIAssistantService {
         }
 
         if (toolCalls.length === 0) {
+          // An all-reasoning reply strips to '' — fall through to the tool-free
+          // wrap-up instead of persisting an empty assistant message.
+          if (!content) {
+            logger.warn('[AI] Final response was empty after think-stripping — forcing wrap-up');
+            break;
+          }
           // Final response — persist and finish (flag a truncated answer).
           const finalText =
             finishReason === 'length' ? `${content}\n\n[Reply truncated by the output token limit]` : content;
@@ -414,7 +445,18 @@ export class AIAssistantService {
         const batchSeen = new Set<string>();
         const executable: LLMToolCall[] = [];
         for (const tc of toolCalls) {
-          const key = stableCallKey(tc);
+          // Parse and CANONICALIZE first: everything downstream — dedupe keys,
+          // the approval card, the persisted pending list, and execution — must
+          // see one canonical single-encoded form (double-stringified args are
+          // unwound here), and malformed args must not share an identity key
+          // with valid empty-args calls.
+          const parsedArgs = parseToolArguments(tc.function.arguments);
+          if (parsedArgs.ok) {
+            tc.function.arguments = JSON.stringify(sortKeysDeep(parsedArgs.args));
+          }
+          const key = parsedArgs.ok
+            ? `${tc.function.name}::${tc.function.arguments}`
+            : `${tc.function.name}::RAW::${tc.function.arguments}`;
 
           if (batchSeen.has(key)) {
             await this.recordSyntheticResult(tc, conversationId, messages, emit, {
@@ -441,17 +483,16 @@ export class AIAssistantService {
             continue;
           }
 
-          // Validate arguments against the tool schema BEFORE execution or
-          // approval: field-path-level repair messages fix most local-model
-          // format errors in one retry, and invalid writes never reach the
-          // approval card.
-          const parsedArgs = parseToolArguments(tc.function.arguments);
           if (!parsedArgs.ok) {
             await this.recordSyntheticResult(tc, conversationId, messages, emit, {
               error: `Invalid tool arguments (${parsedArgs.error}). Re-send this call with the arguments as one valid JSON object matching the tool schema.`,
             });
             continue;
           }
+
+          // Schema validation BEFORE execution or approval: field-path repair
+          // messages fix most local-model format errors in one retry, and
+          // invalid writes never reach the approval card.
           const validation = validateToolArguments(tc.function.name, parsedArgs.args);
           if (!validation.ok) {
             await this.recordSyntheticResult(tc, conversationId, messages, emit, {
@@ -467,27 +508,35 @@ export class AIAssistantService {
         const writes = executable.filter((tc) => isWriteTool(tc.function.name));
         const reads = executable.filter((tc) => !isWriteTool(tc.function.name));
 
-        // Auto-run all reads first (in parallel — they have no inter-dependencies).
+        // Execute all reads in parallel, but PERSIST results sequentially in the
+        // original tool-call order — completion-order persistence makes next
+        // turn's loaded history diverge from the prompt prefix the model just
+        // saw, silently defeating the KV-cache stability machinery.
         const readOutcomes = await Promise.all(
-          reads.map((tc) =>
-            this.executeAndRecord(tc, conversationId, bearerToken, roles, messages, emit).then((r) => ({
-              tc,
-              isError: r.isError,
-            }))
-          )
+          reads.map((tc) => this.executeCall(tc, bearerToken, roles, emit).then((r) => ({ tc, ...r })))
         );
+        for (const { tc, resultContent } of readOutcomes) {
+          await this.recordToolResult(tc, conversationId, messages, emit, resultContent);
+        }
 
-        // Per-tool circuit breaker: consecutive execution failures disable the
-        // tool for the remainder of the run so the model switches approach
-        // instead of hammering a broken endpoint.
-        for (const { tc, isError } of readOutcomes) {
-          const name = tc.function.name;
-          const streak = isError ? (errorStreaks.get(name) ?? 0) + 1 : 0;
+        // Per-tool circuit breaker. Only infrastructure failures count (5xx /
+        // transport errors) — 4xx are model-input errors the model can repair —
+        // and one model response increments a tool's streak at most once, so a
+        // single batch of parallel failures can't exhaust the breaker.
+        const failedTools = new Set<string>();
+        const succeededTools = new Set<string>();
+        for (const { tc, isInfraError } of readOutcomes) {
+          (isInfraError ? failedTools : succeededTools).add(tc.function.name);
+        }
+        for (const name of succeededTools) errorStreaks.set(name, 0);
+        for (const name of failedTools) {
+          if (succeededTools.has(name)) continue; // mixed outcome — not a broken tool
+          const streak = (errorStreaks.get(name) ?? 0) + 1;
           errorStreaks.set(name, streak);
           if (streak >= CIRCUIT_BREAK_ERRORS && !disabledTools.has(name)) {
             disabledTools.add(name);
             activeTools = activeTools.filter((t) => t.function.name !== name);
-            logger.warn(`[AI] Circuit breaker: disabled ${name} after ${streak} consecutive failures`);
+            logger.warn(`[AI] Circuit breaker: disabled ${name} after ${streak} consecutive failing rounds`);
           }
         }
 
@@ -539,20 +588,17 @@ export class AIAssistantService {
   }
 
   /**
-   * Executes a single tool call: emits lifecycle events, runs it, persists +
-   * appends the result. Returns whether execution failed (feeds the circuit
-   * breaker). Malformed arguments are NOT executed — the model gets a precise
-   * repair message instead (and it doesn't count as a tool failure).
+   * Executes a single tool call and emits its lifecycle events — persistence is
+   * separate (recordToolResult) so parallel execution can persist in a
+   * deterministic order. Malformed arguments are NOT executed — the model gets
+   * a precise repair message (isInfraError=false: model-side, not tool-side).
    */
-  private async executeAndRecord(
+  private async executeCall(
     tc: LLMToolCall,
-    conversationId: string,
     bearerToken: string,
     roles: string[],
-    messages: ConversationMessage[],
     emit: EventEmitter
-  ): Promise<{ isError: boolean }> {
-    const db = pool();
+  ): Promise<{ resultContent: string; isError: boolean; isInfraError: boolean }> {
     const tcId = tc.id;
     const tcName = tc.function.name;
 
@@ -562,6 +608,7 @@ export class AIAssistantService {
 
     let resultContent: string;
     let isError = false;
+    let isInfraError = false;
     const parsed = parseToolArguments(tc.function.arguments);
     if (!parsed.ok) {
       resultContent = JSON.stringify({
@@ -571,6 +618,7 @@ export class AIAssistantService {
       try {
         const result = await executeToolCall(tcName, parsed.args, bearerToken, roles, this.abortSignal);
         isError = result.status >= 400 || result.error !== undefined;
+        isInfraError = result.status >= 500 || result.error !== undefined;
         // Explicit error envelope: a bare 4xx body like {"message":"Not found"}
         // looks structurally identical to success data to the model — mark
         // failures unambiguously so it never mistakes an error for a result.
@@ -580,19 +628,44 @@ export class AIAssistantService {
       } catch (toolErr: unknown) {
         const msg = toolErr instanceof Error ? toolErr.message : String(toolErr);
         isError = true;
+        isInfraError = true;
         resultContent = JSON.stringify({ error: `Tool execution failed: ${msg}` });
       }
     }
 
     emit({ type: EventType.TOOL_CALL_RESULT, toolCallId: tcId, content: resultContent.slice(0, 8000) });
+    return { resultContent, isError, isInfraError };
+  }
 
+  /** Persists a tool result and appends it to the in-memory message list. */
+  private async recordToolResult(
+    tc: LLMToolCall,
+    conversationId: string,
+    messages: ConversationMessage[],
+    _emit: EventEmitter,
+    resultContent: string
+  ): Promise<void> {
+    const db = pool();
     await db.query(
       `INSERT INTO ai_messages (conversation_id, role, content, tool_call_id, tool_name)
        VALUES ($1, 'tool', $2, $3, $4)`,
-      [conversationId, resultContent, tcId, tcName]
+      [conversationId, resultContent, tc.id, tc.function.name]
     );
-    messages.push({ role: 'tool', content: resultContent, tool_call_id: tcId, name: tcName });
-    return { isError };
+    messages.push({ role: 'tool', content: resultContent, tool_call_id: tc.id, name: tc.function.name });
+  }
+
+  /** Executes one tool call and immediately persists its result (resume path). */
+  private async executeAndRecord(
+    tc: LLMToolCall,
+    conversationId: string,
+    bearerToken: string,
+    roles: string[],
+    messages: ConversationMessage[],
+    emit: EventEmitter
+  ): Promise<{ isError: boolean }> {
+    const outcome = await this.executeCall(tc, bearerToken, roles, emit);
+    await this.recordToolResult(tc, conversationId, messages, emit, outcome.resultContent);
+    return { isError: outcome.isError };
   }
 
   /**

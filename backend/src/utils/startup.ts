@@ -310,6 +310,18 @@ async function ensureSchemaUpgrades(): Promise<void> {
        ON time_entries (user_id, project_id, entry_date)`
     );
 
+    // AI chat hot paths: the per-turn history window (ORDER BY created_at with
+    // LIMIT) and the pending-approval lookups (metadata status filter) — both
+    // grow with conversation age without these.
+    await db.query(
+      `CREATE INDEX IF NOT EXISTS idx_ai_messages_conv_created
+       ON ai_messages (conversation_id, created_at)`
+    );
+    await db.query(
+      `CREATE INDEX IF NOT EXISTS idx_ai_messages_pending
+       ON ai_messages (conversation_id) WHERE metadata->>'status' = 'awaiting_approval'`
+    );
+
     // Recurring invoice schedules (retainers). Each row is a template that the
     // recurring-invoice scheduler uses to generate draft invoices on a cadence.
     await db.query(`

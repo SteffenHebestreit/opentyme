@@ -93,3 +93,33 @@ budget on top of the existing window + tool-result caps.
 
 Restored earlier (same research thread): chat history + pending-approval card after
 page reload.
+
+## Adversarial self-review (pre-push, 8 finder angles + verify pass)
+Fixed immediately: approval re-arm on post-claim failure; atomic supersede claim
+(no more approve/new-message race or metadata stomp); 404-only thread-wipe on
+reload restore; canonical tool-argument encoding everywhere (approval card shows
+exactly what executes; malformed args no longer share identity with valid calls);
+stream-time <think> suppression (UI == persisted == A2A; empty-after-strip replies
+fall to wrap-up); circuit breaker counts only infra failures (5xx/transport) and
+once per round; TZ-safe calendar dates in get_time_pattern; deterministic tool-
+result persistence order + ORDER BY id tiebreakers; ai_messages composite +
+partial-pending indexes; conversation fetch bounded to newest 200.
+
+Deferred (verified but consciously not churned now):
+- Consolidate the two stuck-guards (batch-signature guard preempts the repeat
+  guard's repair message for consecutive identical batches).
+- Dead defensive parse branch in executeCall (unreachable from both call paths).
+- Shared persistToolResult already added; supersede/reject paths could also share
+  the synthetic-emit shape; 7× insights catch blocks → one helper in
+  insights-shared.ts (also stop echoing raw DB errors to the model).
+- Sticky tool set: FIFO eviction (Map.set doesn't refresh order), in-memory only
+  (lost on redeploy — follow-up turns like "yes, create it" lose context);
+  CORE_TOOL_NAMES has no startup existence check against built tools.
+- Resume re-embeds the same user message per approve click (sticky fast path).
+- Dead underscore-parked frontend state (ExpenseDetailModal notes UI — dead on
+  origin/main too; ExpensesPage statusFilter; WeeklyHoursChart selectedTask;
+  TimeEntryTable onStop/isStoppingId props) — delete rather than park.
+- backup verify: stream tar listing instead of 10MB maxBuffer (false-fail at
+  ~100k+ archive entries).
+- think-strip regex duplicated in expense-extraction (divergent dangling-block
+  handling); frontend/backend JSON helpers can't share without a common package.

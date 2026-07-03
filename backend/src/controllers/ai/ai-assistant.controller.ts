@@ -265,11 +265,16 @@ export async function getConversation(req: Request, res: Response): Promise<void
       return;
     }
 
+    // Bounded: return only the newest 200 messages (in chronological order) —
+    // the client displays at most that many, and threads live indefinitely.
     const msgResult = await db.query(
-      `SELECT id, role, content, tool_calls, tool_call_id, tool_name, metadata, created_at
-       FROM ai_messages
-       WHERE conversation_id = $1
-       ORDER BY created_at ASC`,
+      `SELECT * FROM (
+         SELECT id, role, content, tool_calls, tool_call_id, tool_name, metadata, created_at
+         FROM ai_messages
+         WHERE conversation_id = $1
+         ORDER BY created_at DESC, id DESC
+         LIMIT 200
+       ) sub ORDER BY created_at ASC, id ASC`,
       [id]
     );
 

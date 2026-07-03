@@ -72,6 +72,51 @@ export async function streamChatCompletion(options: StreamChatOptions): Promise<
   const pendingToolCalls: Map<number, LLMToolCall> = new Map();
   let hasEmittedTextStart = false;
 
+  // Stream-time <think> suppression. Stripping only the final content is not
+  // enough: raw deltas reach the chat UI and external A2A consumers, and the
+  // live stream would diverge from the persisted message. This stateful filter
+  // removes think spans as they stream, holding back a possible partial tag at
+  // each chunk boundary.
+  let inThink = false;
+  let tagCarry = '';
+  const partialSuffix = (s: string, tag: string): number => {
+    for (let k = Math.min(tag.length - 1, s.length); k > 0; k--) {
+      if (tag.startsWith(s.slice(-k))) return k;
+    }
+    return 0;
+  };
+  const filterThink = (text: string): string => {
+    let s = tagCarry + text;
+    tagCarry = '';
+    let out = '';
+    while (s.length > 0) {
+      if (inThink) {
+        const end = s.indexOf('</think>');
+        if (end === -1) {
+          const p = partialSuffix(s, '</think>');
+          if (p > 0) tagCarry = s.slice(-p);
+          s = '';
+        } else {
+          inThink = false;
+          s = s.slice(end + '</think>'.length);
+        }
+      } else {
+        const start = s.indexOf('<think>');
+        if (start === -1) {
+          const p = partialSuffix(s, '<think>');
+          out += p > 0 ? s.slice(0, -p) : s;
+          if (p > 0) tagCarry = s.slice(-p);
+          s = '';
+        } else {
+          out += s.slice(0, start);
+          inThink = true;
+          s = s.slice(start + '<think>'.length);
+        }
+      }
+    }
+    return out;
+  };
+
   // Sampling: Qwen's function-calling guidance recommends temperature 0.7 /
   // top_p 0.8 for Qwen3-class models and explicitly warns that near-greedy
   // decoding CAUSES repetition and endless tool-call loops on these models
@@ -140,14 +185,17 @@ export async function streamChatCompletion(options: StreamChatOptions): Promise<
           const delta = choice?.delta;
           if (!delta) continue;
 
-          // Text content
+          // Text content (think spans removed before anything sees them)
           if (delta.content) {
-            if (!hasEmittedTextStart) {
-              emit({ type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant' });
-              hasEmittedTextStart = true;
+            const cleaned = filterThink(delta.content);
+            if (cleaned) {
+              if (!hasEmittedTextStart) {
+                emit({ type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant' });
+                hasEmittedTextStart = true;
+              }
+              emit({ type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta: cleaned });
+              accumulatedContent += cleaned;
             }
-            emit({ type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta: delta.content });
-            accumulatedContent += delta.content;
           }
 
           // Tool calls
@@ -183,11 +231,15 @@ export async function streamChatCompletion(options: StreamChatOptions): Promise<
     });
   });
 
+  // A held-back partial that never became a tag is real content after all.
+  if (!inThink && tagCarry) accumulatedContent += tagCarry;
+
   if (hasEmittedTextStart) {
     emit({ type: EventType.TEXT_MESSAGE_END, messageId });
   }
 
   return {
+    // stripThinking stays as a belt-and-braces pass (case variants, missed spans)
     content: stripThinking(accumulatedContent),
     toolCalls: Array.from(pendingToolCalls.values()),
     finishReason,

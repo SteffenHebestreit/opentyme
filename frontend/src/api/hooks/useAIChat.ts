@@ -110,10 +110,15 @@ export function useAIChat() {
           );
         }
       })
-      .catch(() => {
-        // Conversation gone (deleted / other device) — start fresh.
-        localStorage.removeItem(THREAD_STORAGE_KEY);
-        setThreadId(null);
+      .catch((err: unknown) => {
+        // Only a 404 means the conversation is actually gone. Transient
+        // failures (backend restart, network blip, token refresh) must NOT
+        // discard the thread — it may hold a pending write-approval.
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 404) {
+          localStorage.removeItem(THREAD_STORAGE_KEY);
+          setThreadId(null);
+        }
       });
   }, [threadId]);
 
