@@ -162,7 +162,13 @@ export async function approveRun(req: Request, res: Response): Promise<void> {
     .filter(
       (a) => a && typeof a.toolCallId === 'string' && (a.decision === 'approve' || a.decision === 'reject')
     )
-    .map((a) => ({ toolCallId: a.toolCallId, decision: a.decision }));
+    .map((a) => ({
+      toolCallId: a.toolCallId,
+      decision: a.decision,
+      ...(a.editedArguments && typeof a.editedArguments === 'object' && !Array.isArray(a.editedArguments)
+        ? { editedArguments: a.editedArguments }
+        : {}),
+    }));
 
   const bearerToken = req.headers.authorization ?? '';
 

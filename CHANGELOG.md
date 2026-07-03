@@ -22,6 +22,9 @@
   (composite: project resolved by NAME server-side, duration computed server-side; collapses
   the resolve→compute→create chain to one reviewable call).
 - **Resume fast path**: approving no longer pays an embedding round trip.
+- **Approve-with-edit**: correct a proposed action's arguments directly in the approval card
+  (pencil icon, schema-validated) instead of rejecting and re-looping; the executed edit is
+  recorded truthfully in the conversation.
 - Chat history and pending approval cards are restored after a page reload; transient fetch
   failures no longer discard the conversation.
 - Timezone-correct dates in the system prompt and pattern analysis.

@@ -186,6 +186,8 @@ export interface ApprovalAction {
 export interface ApprovalDecision {
   toolCallId: string;
   decision: 'approve' | 'reject';
+  /** Approve-with-edit: corrected arguments to execute instead of the proposed ones. */
+  editedArguments?: Record<string, unknown>;
 }
 
 export interface ApproveActionsOptions {

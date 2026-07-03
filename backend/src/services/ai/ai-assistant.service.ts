@@ -39,6 +39,8 @@ export type { ConversationMessage } from './conversation-history.service';
 export interface ToolApprovalDecision {
   toolCallId: string;
   decision: 'approve' | 'reject';
+  /** Approve-with-edit: corrected arguments to execute instead of the proposed ones. */
+  editedArguments?: Record<string, unknown>;
 }
 
 const MAX_ITERATIONS = Number(process.env.AI_MAX_ITERATIONS) || 12;
@@ -243,7 +245,7 @@ export class AIAssistantService {
 
     const claimedId = pendingRow.rows[0].id as string;
     const pending = (pendingRow.rows[0].metadata?.pending ?? []) as LLMToolCall[];
-    const decisions = new Map(approvals.map((a) => [a.toolCallId, a.decision]));
+    const decisions = new Map(approvals.map((a) => [a.toolCallId, a]));
     const processedIds = new Set<string>();
 
     try {
@@ -258,9 +260,34 @@ export class AIAssistantService {
 
       // Apply each pending write decision.
       for (const tc of pending) {
-        const decision = decisions.get(tc.id) ?? 'reject';
+        const approval = decisions.get(tc.id);
+        const decision = approval?.decision ?? 'reject';
         if (decision === 'approve') {
-          await this.executeAndRecord(tc, conversationId, bearerToken, roles, messages, emit);
+          // Approve-with-edit: the user corrected the arguments. Validate the
+          // edit against the tool schema, execute with the corrected values,
+          // and record the edit in the result so model and history stay truthful.
+          if (approval?.editedArguments && typeof approval.editedArguments === 'object') {
+            const validation = validateToolArguments(tc.function.name, approval.editedArguments);
+            if (!validation.ok) {
+              const resultContent = JSON.stringify({
+                error: `User-edited arguments were invalid (${validation.errors.join('; ')}); the action was NOT executed. Propose the call again if still needed.`,
+              });
+              emit({ type: EventType.TOOL_CALL_RESULT, toolCallId: tc.id, content: resultContent });
+              await this.recordToolResult(tc, conversationId, messages, emit, resultContent);
+              processedIds.add(tc.id);
+              continue;
+            }
+            tc.function.arguments = JSON.stringify(sortKeysDeep(approval.editedArguments));
+            const outcome = await this.executeCall(tc, bearerToken, roles, emit);
+            const wrapped = JSON.stringify({
+              edited_by_user: true,
+              executed_arguments: approval.editedArguments,
+              result: safeParseArgs(outcome.resultContent),
+            });
+            await this.recordToolResult(tc, conversationId, messages, emit, wrapped);
+          } else {
+            await this.executeAndRecord(tc, conversationId, bearerToken, roles, messages, emit);
+          }
         } else {
           const resultContent = JSON.stringify({
             declined: true,

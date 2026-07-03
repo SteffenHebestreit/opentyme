@@ -167,6 +167,31 @@ describe('AIAssistantService orchestration', () => {
     expect(events.some((e) => e.type === 'RUN_FINISHED')).toBe(true);
   });
 
+  it('resume executes user-EDITED arguments and records the edit truthfully', async () => {
+    const pending = [makeCall('w1', 'post_time_entries', { hours: 3 })];
+    claimRows = [{ id: 'amsg-1', metadata: { status: 'resolved', pending } }];
+    llmRounds = [{ content: 'Done.', toolCalls: [], finishReason: 'stop' }];
+
+    const svc = new AIAssistantService();
+    await svc.initialize('user-1');
+    await svc.resumeRun(
+      'user-1',
+      CONV,
+      [{ toolCallId: 'w1', decision: 'approve', editedArguments: { hours: 2 } }],
+      'User',
+      'u@x',
+      'en',
+      'Bearer t',
+      [],
+      emit
+    );
+
+    expect(execCalls).toEqual([{ name: 'post_time_entries', args: { hours: 2 } }]); // edited value executed
+    const recorded = queries.find((q) => q.sql.includes("'tool'") && q.params[2] === 'w1');
+    expect(String(recorded?.params[1])).toContain('edited_by_user');
+    expect(events.some((e) => e.type === 'RUN_FINISHED')).toBe(true);
+  });
+
   it('resume with no pending approval (double click) reports NO_PENDING and executes nothing', async () => {
     claimRows = []; // atomic claim finds nothing — already claimed
     const svc = new AIAssistantService();

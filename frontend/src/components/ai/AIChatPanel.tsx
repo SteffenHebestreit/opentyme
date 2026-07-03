@@ -5,9 +5,9 @@
 
 import { useEffect, useRef, useState, KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Send, Square, Trash2, ChevronRight, ChevronDown, Wrench, Mic, MicOff, Check, ShieldAlert, X } from 'lucide-react';
+import { Send, Square, Trash2, ChevronRight, ChevronDown, Wrench, Mic, MicOff, Check, ShieldAlert, X, Pencil } from 'lucide-react';
 import type { UIMessage, PendingApproval } from '../../api/hooks/useAIChat';
-import type { ApprovalDecision } from '../../api/services/ai-chat.service';
+import type { ApprovalAction, ApprovalDecision } from '../../api/services/ai-chat.service';
 import { startRecording } from '../../api/services/ai-transcription.service';
 import type { RecordingHandle } from '../../api/services/ai-transcription.service';
 import { Slot } from '../../plugins/slots/Slot';
@@ -110,6 +110,9 @@ function ApprovalCard({
 }) {
   const { t } = useTranslation('common');
   const [rejected, setRejected] = useState<Set<string>>(new Set());
+  // Approve-with-edit: raw JSON text per action while the user is editing it.
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [editing, setEditing] = useState<Set<string>>(new Set());
 
   const toggle = (id: string) =>
     setRejected((prev) => {
@@ -119,18 +122,48 @@ function ApprovalCard({
       return next;
     });
 
+  const toggleEdit = (a: ApprovalAction) =>
+    setEditing((prev) => {
+      const next = new Set(prev);
+      if (next.has(a.toolCallId)) {
+        next.delete(a.toolCallId);
+      } else {
+        next.add(a.toolCallId);
+        setEdits((e) => ({ [a.toolCallId]: JSON.stringify(a.arguments, null, 2), ...e }));
+      }
+      return next;
+    });
+
+  /** Parsed edit for an action: undefined = unedited, null = invalid JSON. */
+  const parsedEdit = (id: string): Record<string, unknown> | null | undefined => {
+    if (!editing.has(id) || edits[id] === undefined) return undefined;
+    try {
+      const v = JSON.parse(edits[id]);
+      return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const hasInvalidEdit = approval.actions.some((a) => !rejected.has(a.toolCallId) && parsedEdit(a.toolCallId) === null);
+
   const submit = (mode: 'all' | 'none' | 'selected') => {
-    const decisions: ApprovalDecision[] = approval.actions.map((a) => ({
-      toolCallId: a.toolCallId,
-      decision:
+    const decisions: ApprovalDecision[] = approval.actions.map((a) => {
+      const decision =
         mode === 'all'
           ? 'approve'
           : mode === 'none'
             ? 'reject'
             : rejected.has(a.toolCallId)
               ? 'reject'
-              : 'approve',
-    }));
+              : 'approve';
+      const edited = decision === 'approve' ? parsedEdit(a.toolCallId) : undefined;
+      return {
+        toolCallId: a.toolCallId,
+        decision,
+        ...(edited && JSON.stringify(edited) !== JSON.stringify(a.arguments) ? { editedArguments: edited } : {}),
+      } as ApprovalDecision;
+    });
     onApprove(decisions);
   };
 
@@ -146,39 +179,74 @@ function ApprovalCard({
       <div className="space-y-1.5 mb-2.5">
         {approval.actions.map((a) => {
           const isRejected = rejected.has(a.toolCallId);
+          const isEditing = editing.has(a.toolCallId) && !isRejected;
+          const editInvalid = parsedEdit(a.toolCallId) === null;
           const argsText = formatArgs(a.arguments);
           return (
-            <button
+            <div
               key={a.toolCallId}
-              onClick={() => toggle(a.toolCallId)}
-              title={isRejected ? t('ai.willSkip', 'Will be skipped') : t('ai.willRun', 'Will run')}
-              className={`flex w-full items-start gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-colors ${
+              className={`rounded-lg border px-2.5 py-1.5 transition-colors ${
                 isRejected
-                  ? 'border-gray-200 dark:border-gray-700 bg-gray-100/60 dark:bg-gray-800/40 opacity-50 line-through'
+                  ? 'border-gray-200 dark:border-gray-700 bg-gray-100/60 dark:bg-gray-800/40 opacity-50'
                   : 'border-emerald-300/50 dark:border-emerald-600/40 bg-white/70 dark:bg-gray-800/60'
               }`}
             >
-              <span className="shrink-0 mt-0.5">
-                {isRejected ? (
-                  <X size={12} className="text-gray-400" />
-                ) : (
-                  <Check size={12} className="text-emerald-500" />
-                )}
-              </span>
-              <span className="min-w-0">
-                <span className="font-mono font-medium text-gray-700 dark:text-gray-200">{a.toolName}</span>
-                {argsText && (
-                  <span className="block text-[11px] text-gray-500 dark:text-gray-400 break-words">{argsText}</span>
-                )}
-              </span>
-            </button>
+              <div className="flex w-full items-start gap-2">
+                <button
+                  onClick={() => toggle(a.toolCallId)}
+                  title={isRejected ? t('ai.willSkip', 'Will be skipped') : t('ai.willRun', 'Will run')}
+                  className={`flex flex-1 items-start gap-2 text-left min-w-0 ${isRejected ? 'line-through' : ''}`}
+                >
+                  <span className="shrink-0 mt-0.5">
+                    {isRejected ? (
+                      <X size={12} className="text-gray-400" />
+                    ) : (
+                      <Check size={12} className="text-emerald-500" />
+                    )}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="font-mono font-medium text-gray-700 dark:text-gray-200">{a.toolName}</span>
+                    {argsText && !isEditing && (
+                      <span className="block text-[11px] text-gray-500 dark:text-gray-400 break-words">{argsText}</span>
+                    )}
+                  </span>
+                </button>
+                <button
+                  onClick={() => toggleEdit(a)}
+                  disabled={isRejected}
+                  title={t('ai.editArgs', 'Edit arguments before approving')}
+                  className={`shrink-0 p-1 rounded transition-colors disabled:opacity-30 ${
+                    isEditing
+                      ? 'text-amber-600 dark:text-amber-400 bg-amber-100/60 dark:bg-amber-900/30'
+                      : 'text-gray-400 hover:text-amber-600 dark:hover:text-amber-400'
+                  }`}
+                >
+                  <Pencil size={12} />
+                </button>
+              </div>
+              {isEditing && (
+                <textarea
+                  value={edits[a.toolCallId] ?? ''}
+                  onChange={(e) => setEdits((prev) => ({ ...prev, [a.toolCallId]: e.target.value }))}
+                  rows={4}
+                  spellCheck={false}
+                  className={`mt-1.5 w-full rounded-md border bg-gray-50 dark:bg-gray-900 p-1.5 font-mono text-[10px] text-gray-700 dark:text-gray-300 focus:outline-none ${
+                    editInvalid ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'
+                  }`}
+                />
+              )}
+              {isEditing && editInvalid && (
+                <div className="mt-0.5 text-[10px] text-red-500">{t('ai.invalidJson', 'Not a valid JSON object')}</div>
+              )}
+            </div>
           );
         })}
       </div>
       <div className="flex items-center gap-2">
         <button
-          onClick={() => submit(rejected.size === 0 ? 'all' : 'selected')}
-          className="flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 font-medium transition-colors"
+          onClick={() => submit(rejected.size === 0 && editing.size === 0 ? 'all' : 'selected')}
+          disabled={hasInvalidEdit}
+          className="flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {rejected.size === 0 ? t('ai.approveAll', 'Approve all') : t('ai.approveSelected', 'Approve selected')}
         </button>
