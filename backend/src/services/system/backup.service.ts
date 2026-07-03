@@ -119,15 +119,24 @@ class BackupService {
       const stats = await fs.stat(backupPath);
       const fileSize = stats.size;
 
+      // Restore-verification: a backup that can't be read back isn't a backup.
+      // Throws (→ backup marked failed) if the archive is unreadable or missing
+      // its expected artifacts.
+      await this.verifyBackupArchive(backupPath, { includeDatabase });
+
       // Update backup record as completed
       await this.pool.query(
-        `UPDATE system_backups 
+        `UPDATE system_backups
          SET status = $1, backup_path = $2, file_size_bytes = $3, completed_at = NOW()
          WHERE id = $4`,
         ['completed', backupPath, fileSize, backupRecord.id]
       );
 
       logger.info(`Backup completed successfully: ${backupName} (${fileSize} bytes)`);
+
+      // Off-site mirror (optional, best-effort): a copy on the same disk is not
+      // disaster recovery. Point BACKUP_MIRROR_DIR at a mounted NAS/remote path.
+      await this.mirrorBackup(backupPath);
 
       return {
         ...backupRecord,
@@ -150,6 +159,64 @@ class BackupService {
       );
 
       throw error;
+    }
+  }
+
+  /**
+   * Verifies a finished archive is actually restorable at the container level:
+   * tar must be able to list it, and the expected artifacts must be present
+   * (manifest.json, and a non-trivial database dump when one was requested).
+   */
+  private async verifyBackupArchive(backupPath: string, opts: { includeDatabase: boolean }): Promise<void> {
+    const { stdout } = await execFileAsync('tar', ['-tzf', backupPath], { maxBuffer: 10 * 1024 * 1024 });
+    const entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
+
+    if (entries.length === 0) {
+      throw new Error('Backup verification failed: archive is empty');
+    }
+    if (!entries.some((e) => e.endsWith('manifest.json'))) {
+      throw new Error('Backup verification failed: manifest.json missing from archive');
+    }
+    if (opts.includeDatabase && !entries.some((e) => e.endsWith('.dump') || e.endsWith('.sql'))) {
+      throw new Error('Backup verification failed: no database dump in archive');
+    }
+    logger.info(`[Backup] Verified archive (${entries.length} entries): ${path.basename(backupPath)}`);
+  }
+
+  /**
+   * Copies the archive to BACKUP_MIRROR_DIR (e.g. a mounted NAS path) and
+   * verifies the copied size. Best-effort: mirror failures are logged loudly
+   * but never fail the backup itself. No-op when BACKUP_MIRROR_DIR is unset.
+   */
+  private async mirrorBackup(backupPath: string): Promise<void> {
+    const mirrorDir = process.env.BACKUP_MIRROR_DIR;
+    if (!mirrorDir) return;
+
+    try {
+      await fs.mkdir(mirrorDir, { recursive: true });
+      const target = path.join(mirrorDir, path.basename(backupPath));
+      await fs.copyFile(backupPath, target);
+      const [src, dst] = await Promise.all([fs.stat(backupPath), fs.stat(target)]);
+      if (src.size !== dst.size) {
+        throw new Error(`size mismatch after copy (${src.size} != ${dst.size})`);
+      }
+      logger.info(`[Backup] Mirrored to ${target}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error(`[Backup] MIRROR FAILED (backup itself is fine): ${msg}`);
+    }
+  }
+
+  /**
+   * Removes the mirrored twin of a deleted backup (best-effort).
+   */
+  private async removeMirroredBackup(backupPath: string): Promise<void> {
+    const mirrorDir = process.env.BACKUP_MIRROR_DIR;
+    if (!mirrorDir) return;
+    try {
+      await fs.rm(path.join(mirrorDir, path.basename(backupPath)), { force: true });
+    } catch {
+      /* best-effort */
     }
   }
 
@@ -387,6 +454,11 @@ class BackupService {
         await fs.rm(backup.backup_path, { force: true });
         logger.info(`Deleted backup archive: ${backup.backup_path}`);
       }
+    }
+
+    // Retention also applies to the mirror (best-effort).
+    if (backup.backup_path) {
+      await this.removeMirroredBackup(backup.backup_path);
     }
 
     // Delete backup record

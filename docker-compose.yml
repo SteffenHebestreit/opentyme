@@ -51,6 +51,9 @@ services:
       - MCP_SERVER_URL=http://mcp-server:8000
       - AI_ENABLED=${AI_ENABLED:-false}
       - INTERNAL_API_URL=http://localhost:8000
+      # Off-site backup mirror (path INSIDE the container — add a matching bind
+      # mount below, e.g. "/mnt/nas/opentyme-backups:/mirror")
+      - BACKUP_MIRROR_DIR=${BACKUP_MIRROR_DIR:-}
       # Addon installation
       - GITHUB_ADDON_TOKEN=${GITHUB_ADDON_TOKEN:-}
       - GITLAB_ADDON_TOKEN=${GITLAB_ADDON_TOKEN:-}
@@ -59,6 +62,9 @@ services:
       - ./backend:/usr/src/app  # Enabled for development
       - /usr/src/app/node_modules
       - ./backups:/usr/src/app/backups  # Persistent backup storage
+      # Off-site mirror target — uncomment and point at a NAS/remote mount,
+      # then set BACKUP_MIRROR_DIR=/mirror in .env:
+      # - /mnt/nas/opentyme-backups:/mirror
       - /var/run/docker.sock:/var/run/docker.sock  # Docker socket for MCP Gateway access
     depends_on:
       - db
