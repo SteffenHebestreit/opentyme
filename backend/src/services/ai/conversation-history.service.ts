@@ -5,6 +5,7 @@
  */
 
 import { pool } from '../../utils/database';
+import { BoundedLru } from '../../utils/bounded-lru';
 
 // ---- Shared types -----------------------------------------------------------
 
@@ -125,16 +126,7 @@ export function applyToolContextBudget(messages: ConversationMessage[]): Convers
 // down to TRIM_TO so the anchor then holds for many turns. In-memory (single
 // replica); losing an anchor on restart just means one full re-prefill.
 const TRIM_TO = Math.max(10, Math.floor(HISTORY_LIMIT * 0.75));
-const windowAnchors = new Map<string, unknown>();
-const MAX_TRACKED_ANCHORS = 500;
-
-function rememberAnchor(conversationId: string, createdAt: unknown): void {
-  if (windowAnchors.size >= MAX_TRACKED_ANCHORS && !windowAnchors.has(conversationId)) {
-    const oldest = windowAnchors.keys().next().value;
-    if (oldest !== undefined) windowAnchors.delete(oldest);
-  }
-  windowAnchors.set(conversationId, createdAt);
-}
+const windowAnchors = new BoundedLru<unknown>(500);
 
 /**
  * Loads the recent message window for a conversation in chronological,
@@ -178,7 +170,7 @@ export async function loadHistory(
     rows = rows.slice(-TRIM_TO);
   }
   if (rows.length > 0) {
-    rememberAnchor(conversationId, rows[0].created_at);
+    windowAnchors.set(conversationId, rows[0].created_at);
   }
 
   return normalizeHistoryWindow(

@@ -7,8 +7,7 @@
 
 import { Request, Response } from 'express';
 import { pool } from '../../../utils/database';
-import { logger } from '../../../utils/logger';
-import { userId } from './insights-shared';
+import { userId, handleInsightsError } from './insights-shared';
 
 // ── GET /api/insights/time-summary ──────────────────────────────────────────
 
@@ -98,9 +97,7 @@ export async function getTimeSummary(req: Request, res: Response): Promise<void>
       })),
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.error(`[Insights] getTimeSummary: ${msg}`);
-    res.status(500).json({ error: msg });
+    handleInsightsError(res, 'getTimeSummary', err);
   }
 }
 
@@ -227,8 +224,6 @@ export async function getTimePattern(req: Request, res: Response): Promise<void>
       note: 'Per-weekday averages from REAL entries. Reproduce these blocks exactly when back-logging; the gaps between consecutive blocks are the recurring breaks (e.g. kindergarten pickup). Do not invent generic blocks. Skip weekdays not listed (no historical work) and days that already have entries.',
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.error(`[Insights] getTimePattern: ${msg}`);
-    res.status(500).json({ error: msg });
+    handleInsightsError(res, 'getTimePattern', err);
   }
 }

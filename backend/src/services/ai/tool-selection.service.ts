@@ -13,6 +13,7 @@
 
 import axios from 'axios';
 import { logger } from '../../utils/logger';
+import { BoundedLru } from '../../utils/bounded-lru';
 import { getToolsWithMeta, LLMTool, ToolWithMeta } from './openapi-tool-builder.service';
 
 // ~20 tools is the documented reliability cliff for small local models
@@ -114,26 +115,32 @@ export interface SelectToolsOptions {
 // We therefore grow a conversation's tool set append-only and sort it
 // deterministically; if it outgrows the ceiling, we reset once to the current
 // selection (one cache miss, then stable again).
-const conversationTools = new Map<string, Set<string>>();
-const MAX_TRACKED_CONVERSATIONS = 500;
+const conversationTools = new BoundedLru<Set<string>>(500);
 const STICKY_CEILING = Math.floor(MAX_TOOLS * 1.5);
-
-function rememberConversationTools(conversationId: string, names: Set<string>): void {
-  if (conversationTools.size >= MAX_TRACKED_CONVERSATIONS && !conversationTools.has(conversationId)) {
-    const oldest = conversationTools.keys().next().value;
-    if (oldest !== undefined) conversationTools.delete(oldest);
-  }
-  conversationTools.set(conversationId, names);
-}
 
 /**
  * Returns the curated, role-filtered set of tools for a single run:
  * the core set plus the most relevant remaining tools, capped at AI_MAX_TOOLS.
  */
+// One-time sanity check: CORE_TOOL_NAMES are hardcoded while most tool names
+// are derived from route paths — a route rename would silently shrink the core
+// set (losing e.g. entity resolution) with no error. Warn loudly instead.
+let coreValidated = false;
+function validateCoreToolNames(allNames: Set<string>): void {
+  if (coreValidated) return;
+  coreValidated = true;
+  const missing = [...CORE_TOOL_NAMES].filter((n) => !allNames.has(n));
+  if (missing.length > 0) {
+    logger.error(`[AI ToolSelection] CORE tools missing from the built tool set (route renamed?): ${missing.join(', ')}`);
+  }
+}
+
 export async function selectTools(opts: SelectToolsOptions): Promise<LLMTool[]> {
   const { userMessage, roles, apiUrl, apiKey, conversationId } = opts;
 
-  const allowed = getToolsWithMeta().filter((t) => isToolAllowedForRoles(t.tags, roles));
+  const allMeta = getToolsWithMeta();
+  validateCoreToolNames(new Set(allMeta.map((t) => t.tool.function.name)));
+  const allowed = allMeta.filter((t) => isToolAllowedForRoles(t.tags, roles));
   const core = allowed.filter((t) => CORE_TOOL_NAMES.has(t.tool.function.name));
   const rest = allowed.filter((t) => !CORE_TOOL_NAMES.has(t.tool.function.name));
 
@@ -204,7 +211,7 @@ function finalizeSelection(
         logger.info(`[AI ToolSelection] Sticky set exceeded ${STICKY_CEILING} — resetting to current selection`);
       }
     }
-    rememberConversationTools(conversationId, names);
+    conversationTools.set(conversationId, names);
   }
 
   return allowed

@@ -42,9 +42,7 @@ interface TimeEntryTableProps {
   entries: TimeEntry[];
   onEdit: (entry: TimeEntry) => void;
   onDelete: (entry: TimeEntry) => void;
-  onStop?: (entry: TimeEntry) => void;
   isDeletingId?: string | null;
-  isStoppingId?: string | null;
 }
 
 /**
@@ -215,9 +213,7 @@ export const TimeEntryTable: FC<TimeEntryTableProps> = ({
   entries,
   onEdit,
   onDelete,
-  onStop: _onStop,
   isDeletingId,
-  isStoppingId: _isStoppingId,
 }) => {
   const { t } = useTranslation('time-tracking');
   const userLocale = navigator.language || 'de-DE';

@@ -6,8 +6,7 @@
 
 import { Request, Response } from 'express';
 import { pool } from '../../../utils/database';
-import { logger } from '../../../utils/logger';
-import { userId } from './insights-shared';
+import { userId, handleInsightsError } from './insights-shared';
 
 // ── GET /api/insights/revenue-summary ───────────────────────────────────────
 
@@ -117,9 +116,7 @@ export async function getRevenueSummary(req: Request, res: Response): Promise<vo
       groups,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.error(`[Insights] getRevenueSummary: ${msg}`);
-    res.status(500).json({ error: msg });
+    handleInsightsError(res, 'getRevenueSummary', err);
   }
 }
 
@@ -180,9 +177,7 @@ export async function getExpenseSummary(req: Request, res: Response): Promise<vo
       })),
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.error(`[Insights] getExpenseSummary: ${msg}`);
-    res.status(500).json({ error: msg });
+    handleInsightsError(res, 'getExpenseSummary', err);
   }
 }
 
@@ -273,8 +268,6 @@ export async function getProfitSummary(req: Request, res: Response): Promise<voi
       },
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.error(`[Insights] getProfitSummary: ${msg}`);
-    res.status(500).json({ error: msg });
+    handleInsightsError(res, 'getProfitSummary', err);
   }
 }

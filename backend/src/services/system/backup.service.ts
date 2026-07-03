@@ -10,7 +10,7 @@
  */
 
 import { Pool } from 'pg';
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs/promises';
@@ -168,19 +168,42 @@ class BackupService {
    * (manifest.json, and a non-trivial database dump when one was requested).
    */
   private async verifyBackupArchive(backupPath: string, opts: { includeDatabase: boolean }): Promise<void> {
-    const { stdout } = await execFileAsync('tar', ['-tzf', backupPath], { maxBuffer: 10 * 1024 * 1024 });
-    const entries = stdout.split('\n').map((e) => e.trim()).filter(Boolean);
+    // Stream the listing instead of buffering it: a large storage tree can push
+    // the listing past any maxBuffer, and an overflow would falsely mark a
+    // perfectly good backup as failed.
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn('tar', ['-tzf', backupPath]);
+      let entryCount = 0;
+      let hasManifest = false;
+      let hasDump = false;
+      let tail = '';
 
-    if (entries.length === 0) {
-      throw new Error('Backup verification failed: archive is empty');
-    }
-    if (!entries.some((e) => e.endsWith('manifest.json'))) {
-      throw new Error('Backup verification failed: manifest.json missing from archive');
-    }
-    if (opts.includeDatabase && !entries.some((e) => e.endsWith('.dump') || e.endsWith('.sql'))) {
-      throw new Error('Backup verification failed: no database dump in archive');
-    }
-    logger.info(`[Backup] Verified archive (${entries.length} entries): ${path.basename(backupPath)}`);
+      const consume = (line: string): void => {
+        const entry = line.trim();
+        if (!entry) return;
+        entryCount++;
+        if (entry.endsWith('manifest.json')) hasManifest = true;
+        if (entry.endsWith('.dump') || entry.endsWith('.sql')) hasDump = true;
+      };
+
+      proc.stdout.on('data', (chunk: Buffer) => {
+        const lines = (tail + chunk.toString()).split('\n');
+        tail = lines.pop() ?? '';
+        lines.forEach(consume);
+      });
+      proc.on('error', reject);
+      proc.on('close', (code) => {
+        consume(tail);
+        if (code !== 0) return reject(new Error(`Backup verification failed: tar exited with code ${code}`));
+        if (entryCount === 0) return reject(new Error('Backup verification failed: archive is empty'));
+        if (!hasManifest) return reject(new Error('Backup verification failed: manifest.json missing from archive'));
+        if (opts.includeDatabase && !hasDump) {
+          return reject(new Error('Backup verification failed: no database dump in archive'));
+        }
+        logger.info(`[Backup] Verified archive (${entryCount} entries): ${path.basename(backupPath)}`);
+        resolve();
+      });
+    });
   }
 
   /**

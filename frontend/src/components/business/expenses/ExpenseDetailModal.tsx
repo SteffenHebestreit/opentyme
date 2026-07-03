@@ -36,9 +36,6 @@ export function ExpenseDetailModal({
   
   const [isEditing, setIsEditing] = useState(false);
   const [editedExpense, setEditedExpense] = useState<any>(null);
-  const [approvalNotes, setApprovalNotes] = useState('');
-  const [showNotesInput, _setShowNotesInput] = useState(false);
-  const [pendingAction, _setPendingAction] = useState<'approve' | 'reject' | null>(null);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [showReceiptPreview, setShowReceiptPreview] = useState(false);
   const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string | null>(null);
@@ -819,18 +816,6 @@ export function ExpenseDetailModal({
                     </div>
                   )}
 
-                {/* Approval Notes Input */}
-                {showNotesInput && (
-                  <div className="mt-4">
-                    <Textarea
-                      label={pendingAction === 'reject' ? 'Rejection Reason (Required)' : 'Approval Notes (Optional)'}
-                      value={approvalNotes}
-                      onChange={(e) => setApprovalNotes(e.target.value)}
-                      rows={3}
-                      placeholder={pendingAction === 'reject' ? 'Please explain why this expense is being rejected...' : 'Optional notes about this approval...'}
-                    />
-                  </div>
-                )}
             </div>
 
             {/* Addon injection point: expense detail actions

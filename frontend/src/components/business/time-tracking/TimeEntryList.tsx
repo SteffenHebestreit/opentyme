@@ -503,9 +503,7 @@ export default function TimeEntryList() {
           entries={sortedEntries}
           onEdit={openEditModal}
           onDelete={handleDelete}
-          onStop={activeEntry ? handleStopTimer : undefined}
           isDeletingId={deletingId}
-          isStoppingId={stoppingId}
         />
       )}
 

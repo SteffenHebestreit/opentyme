@@ -7,8 +7,7 @@
 
 import { Request, Response } from 'express';
 import { pool } from '../../../utils/database';
-import { logger } from '../../../utils/logger';
-import { userId } from './insights-shared';
+import { userId, handleInsightsError } from './insights-shared';
 
 // ── GET /api/insights/client-overview ───────────────────────────────────────
 
@@ -94,9 +93,7 @@ export async function getClientOverview(req: Request, res: Response): Promise<vo
       projects: projectsRes.rows,
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.error(`[Insights] getClientOverview: ${msg}`);
-    res.status(500).json({ error: msg });
+    handleInsightsError(res, 'getClientOverview', err);
   }
 }
 
@@ -205,8 +202,6 @@ export async function getProjectOverview(req: Request, res: Response): Promise<v
       },
     });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.error(`[Insights] getProjectOverview: ${msg}`);
-    res.status(500).json({ error: msg });
+    handleInsightsError(res, 'getProjectOverview', err);
   }
 }

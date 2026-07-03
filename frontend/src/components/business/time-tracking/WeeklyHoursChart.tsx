@@ -80,7 +80,6 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
 }) => {
   const { t, i18n } = useTranslation('time-tracking');
   const [selectedProject, setSelectedProject] = useState<string>('all');
-  const [_selectedTask, _setSelectedTask] = useState<string>('all');
   const [groupMode, setGroupMode] = useState<GroupMode>('none');
   const [showFilters, setShowFilters] = useState(false);
   

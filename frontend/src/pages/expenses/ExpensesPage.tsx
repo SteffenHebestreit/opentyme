@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { useExpenses, useExpenseSummary, useTriggerRecurringExpenses } from '@/hooks/api/useExpenses';
 import { useQuery } from '@tanstack/react-query';
 import { getDepreciationSummary } from '@/api/services/depreciation.service';
-import { ExpenseStatus } from '@/api/types';
 import { AddExpenseModal } from '@/components/business/expenses/AddExpenseModal';
 import { ExpenseDetailModal } from '@/components/business/expenses/ExpenseDetailModal';
 import { RecurringExpensesManager } from '@/components/business/expenses/RecurringExpensesManager';
@@ -62,7 +61,6 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
   const [activeTab, setActiveTab] = useState<'expenses' | 'recurring'>('expenses');
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [statusFilter, _setStatusFilter] = useState<string>('all');
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(null);
   const chartRef = useRef<HTMLCanvasElement>(null);
@@ -75,7 +73,6 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
     date_from: propStartDate,
     date_to: propEndDate,
     category: categoryFilter !== 'all' ? categoryFilter : undefined,
-    status: statusFilter !== 'all' ? (statusFilter as ExpenseStatus) : undefined,
     search: searchTerm || undefined,
     limit: 0, // Request all expenses (no limit) for complete chart data
   };
@@ -776,7 +773,7 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
                 {t('noExpenses')}
               </h3>
               <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                {searchTerm || categoryFilter !== 'all' || statusFilter !== 'all'
+                {searchTerm || categoryFilter !== 'all'
                   ? t('tryAdjustingFilters')
                   : t('noExpensesMessage')}
               </p>

@@ -379,7 +379,6 @@ export class AIAssistantService {
 
     try {
       let finalized = false;
-      let lastSignature = '';
 
       for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
         const { content, toolCalls, finishReason } = await this.callLLM(messages, activeTools, emit);
@@ -421,13 +420,11 @@ export class AIAssistantService {
           break;
         }
 
-        // No-progress guard: identical tool-call batch two iterations in a row → stop looping.
-        const signature = JSON.stringify(toolCalls.map((tc) => [tc.function.name, tc.function.arguments]));
-        if (signature === lastSignature) {
-          logger.warn('[AI] No-progress loop detected — breaking out of tool loop');
-          break;
-        }
-        lastSignature = signature;
+        // Stuck detection is handled by ONE mechanism: the per-call repeat guard
+        // below (identical call executes at most twice, then gets a corrective
+        // synthetic result). The old whole-batch signature break was removed —
+        // it fired first and silently ended the run before the model ever saw
+        // the repair message; MAX_ITERATIONS remains the hard stop.
 
         // Persist assistant message with tool_calls (capture id for approval metadata).
         const inserted = await db.query(
