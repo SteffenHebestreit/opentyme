@@ -56,12 +56,21 @@ export async function streamChatCompletion(options: StreamChatOptions): Promise<
   const pendingToolCalls: Map<number, LLMToolCall> = new Map();
   let hasEmittedTextStart = false;
 
+  // Sampling: Qwen's function-calling guidance recommends temperature 0.7 /
+  // top_p 0.8 for Qwen3-class models and explicitly warns that near-greedy
+  // decoding CAUSES repetition and endless tool-call loops on these models
+  // (qwen.readthedocs.io function_call docs; model card discussions). Safety
+  // against runaway behavior comes from the loop guards + HITL, not low temp.
   const requestBody: Record<string, unknown> = {
     model,
     messages: applyToolContextBudget(messages),
     stream: true,
-    temperature: Number(process.env.AI_TEMPERATURE ?? '0.2'),
+    temperature: Number(process.env.AI_TEMPERATURE ?? '0.7'),
+    top_p: Number(process.env.AI_TOP_P ?? '0.8'),
   };
+  if (process.env.AI_PRESENCE_PENALTY) {
+    requestBody.presence_penalty = Number(process.env.AI_PRESENCE_PENALTY);
+  }
   if (tools.length > 0 && toolChoice !== 'none') {
     requestBody.tools = tools;
     requestBody.tool_choice = toolChoice;
