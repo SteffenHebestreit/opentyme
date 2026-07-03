@@ -20,7 +20,6 @@ import {
   Calculator,
   FileSpreadsheet,
   Calendar,
-  Check,
   Loader2,
   Info,
   FolderArchive,

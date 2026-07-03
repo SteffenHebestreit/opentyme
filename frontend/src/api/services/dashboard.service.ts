@@ -7,34 +7,7 @@ import {
   TimeEntry,
 } from '../types';
 
-const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] as const;
-
-function toStartOfDay(date: Date): Date {
-  const result = new Date(date);
-  result.setHours(0, 0, 0, 0);
-  return result;
-}
-
-function toEndOfDay(date: Date): Date {
-  const result = new Date(date);
-  result.setHours(23, 59, 59, 999);
-  return result;
-}
-
-function startOfWeek(date: Date): Date {
-  const result = toStartOfDay(date);
-  const day = result.getDay();
-  const diff = (day + 6) % 7; // convert Sunday=0 to Monday-based index
-  result.setDate(result.getDate() - diff);
-  return result;
-}
-
-function endOfWeek(date: Date): Date {
-  const start = startOfWeek(date);
-  start.setDate(start.getDate() + 6);
-  return toEndOfDay(start);
-}
 
 function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1, 0, 0, 0, 0);
@@ -42,12 +15,6 @@ function startOfMonth(date: Date): Date {
 
 function endOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
-}
-
-function addDays(date: Date, amount: number): Date {
-  const result = new Date(date);
-  result.setDate(result.getDate() + amount);
-  return result;
 }
 
 function subMonths(date: Date, amount: number): Date {
@@ -62,18 +29,6 @@ function parseISO(dateString: string): Date {
   return new Date(dateString);
 }
 
-function isAfter(date: Date, comparison: Date): boolean {
-  return date.getTime() >= comparison.getTime();
-}
-
-function isBefore(date: Date, comparison: Date): boolean {
-  return date.getTime() <= comparison.getTime();
-}
-
-function differenceInMinutes(laterDate: Date, earlierDate: Date): number {
-  return Math.round((laterDate.getTime() - earlierDate.getTime()) / 60000);
-}
-
 function safeParse(dateString: string | null | undefined): Date | null {
   if (!dateString) return null;
   const parsed = parseISO(dateString);
@@ -81,22 +36,6 @@ function safeParse(dateString: string | null | undefined): Date | null {
     return null;
   }
   return parsed;
-}
-
-function calculateDurationMinutes(entry: TimeEntry): number {
-  if (entry.duration_minutes !== null && entry.duration_minutes !== undefined) {
-    return entry.duration_minutes;
-  }
-
-  const start = safeParse(entry.start_time);
-  const end = safeParse(entry.end_time ?? undefined);
-
-  if (!start || !end) {
-    return 0;
-  }
-
-  const minutes = differenceInMinutes(end, start);
-  return minutes > 0 ? minutes : 0;
 }
 
 function computeWeeklyHours(timeEntries: TimeEntry[], now: Date) {
@@ -169,13 +108,9 @@ export async function fetchDashboardData(): Promise<DashboardData> {
   const timeEntries = timeEntriesResponse.data;
 
   const now = new Date();
-  const weekStart = startOfWeek(now);
-  const weekEnd = endOfWeek(now);
 
   // Calculate uninvoiced amount: (Total billable hours × rate) - Total invoiced net amount
   // This represents work done but not yet billed
-  const currentYear = now.getFullYear();
-  const yearStart = new Date(currentYear, 0, 1);
   
   // Calculate revenue for this month and last month (based on billable hours × rates)
   const thisMonthStart = startOfMonth(now);

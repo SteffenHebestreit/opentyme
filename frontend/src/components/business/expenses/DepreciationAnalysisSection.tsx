@@ -35,7 +35,7 @@ interface DepreciationAnalysisSectionProps {
 
 export const DepreciationAnalysisSection: React.FC<DepreciationAnalysisSectionProps> = ({
   expenseId,
-  netAmount,
+  netAmount: _netAmount,
   expenseDate,
   existingAnalysis,
   isEditing,
@@ -51,8 +51,8 @@ export const DepreciationAnalysisSection: React.FC<DepreciationAnalysisSectionPr
     category: '',
   });
 
-  const { mutate: analyze, isLoading: isAnalyzing, data: analysisData, reset: resetAnalysis } = useAnalyzeDepreciation(expenseId);
-  const { mutate: updateSettings, isLoading: isUpdating } = useUpdateDepreciation(expenseId);
+  const { mutate: analyze, isPending: isAnalyzing, data: analysisData, reset: resetAnalysis } = useAnalyzeDepreciation(expenseId);
+  const { mutate: updateSettings, isPending: isUpdating } = useUpdateDepreciation(expenseId);
 
   // Parse existing analysis if available  
   // analysisData format: { eligible: true, analysis: {...} }

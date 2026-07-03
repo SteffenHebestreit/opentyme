@@ -80,7 +80,7 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
 }) => {
   const { t, i18n } = useTranslation('time-tracking');
   const [selectedProject, setSelectedProject] = useState<string>('all');
-  const [selectedTask, setSelectedTask] = useState<string>('all');
+  const [_selectedTask, _setSelectedTask] = useState<string>('all');
   const [groupMode, setGroupMode] = useState<GroupMode>('none');
   const [showFilters, setShowFilters] = useState(false);
   
@@ -224,7 +224,7 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
       );
       
       const datasets = allProjects.map(projectName => ({
-        label: projectName,
+        label: projectName ?? '',
         data: dailyHours.map(day => day.projectHours[projectName!] || 0),
         backgroundColor: getProjectChartColor(projectName!),
         borderWidth: 0,
@@ -240,7 +240,7 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
       );
       
       const datasets = allTasks.map((taskName, index) => ({
-        label: taskName,
+        label: taskName ?? '',
         data: dailyHours.map(day => day.taskHours[taskName!] || 0),
         backgroundColor: getProjectChartColor(taskName! + index),
         borderWidth: 0,
@@ -256,7 +256,7 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
       );
       
       const datasets = allClients.map((clientName, index) => ({
-        label: clientName,
+        label: clientName ?? '',
         data: dailyHours.map(day => day.clientHours[clientName!] || 0),
         backgroundColor: getProjectChartColor(clientName! + index),
         borderWidth: 0,

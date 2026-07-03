@@ -215,9 +215,9 @@ export const TimeEntryTable: FC<TimeEntryTableProps> = ({
   entries,
   onEdit,
   onDelete,
-  onStop,
+  onStop: _onStop,
   isDeletingId,
-  isStoppingId,
+  isStoppingId: _isStoppingId,
 }) => {
   const { t } = useTranslation('time-tracking');
   const userLocale = navigator.language || 'de-DE';
@@ -318,7 +318,7 @@ export const TimeEntryTable: FC<TimeEntryTableProps> = ({
     return b[0].localeCompare(a[0]);
   };
 
-  const groupHeaderRender = (groupKey: string, groupItems: TimeEntry[], isExpanded: boolean, toggle: () => void) => {
+  const groupHeaderRender = (_groupKey: string, groupItems: TimeEntry[], isExpanded: boolean, _toggle: () => void) => {
     // Calculate group metadata
     const firstEntry = groupItems[0];
     const date = firstEntry.entry_date || (firstEntry.start_time ? new Date(firstEntry.start_time).toISOString().split('T')[0] : 'unknown');

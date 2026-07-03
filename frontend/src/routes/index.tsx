@@ -20,7 +20,8 @@ import AIChatWidget from '@/components/ai/AIChatWidget';
 import { authGuardLoader } from './loaders/authGuardLoader';
 
 /** Wraps a dynamic `import()` of a default-exported page into a React Router lazy module. */
-const page = (factory: () => Promise<{ default: ComponentType<unknown> }>) => () =>
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- route pages take no props; any admits every component signature
+const page = (factory: () => Promise<{ default: ComponentType<any> }>) => () =>
   factory().then((m) => ({ Component: m.default }));
 
 /**

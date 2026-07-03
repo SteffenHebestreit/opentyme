@@ -41,7 +41,7 @@ ChartJS.register(
  * @returns Bar chart showing depreciation schedule
  */
 const DepreciationScheduleChart: React.FC = () => {
-  const { t } = useTranslation('dashboard');
+  const { t: _t } = useTranslation('dashboard');
   const [years, setYears] = useState(5);
   const { data, isLoading, error } = useQuery({
     queryKey: ['depreciation-schedule', years],
@@ -85,7 +85,7 @@ const DepreciationScheduleChart: React.FC = () => {
               const value = context.parsed.y;
               const yearData = data.schedule[context.dataIndex];
               return [
-                `Abschreibung: ${formatCurrency(value)}`,
+                `Abschreibung: ${formatCurrency(value ?? 0)}`,
                 `Vermögenswerte: ${yearData.assets.length}`,
               ];
             },

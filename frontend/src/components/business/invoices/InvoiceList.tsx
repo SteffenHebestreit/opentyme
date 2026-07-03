@@ -158,7 +158,7 @@ export default function InvoiceList({ startDate: propStartDate, endDate: propEnd
     const projectMap = new Map(projects.map((project) => [project.id, project.name]));
     return filteredInvoices.map((invoice) => ({
       ...invoice,
-      project_name: invoice.project_id ? projectMap.get(invoice.project_id) ?? null : null,
+      project_name: invoice.project_id ? projectMap.get(invoice.project_id) : undefined,
     }));
   }, [filteredInvoices, projects]);
 
@@ -222,9 +222,9 @@ export default function InvoiceList({ startDate: propStartDate, endDate: propEnd
           // Include invoice fields that may have been updated
           due_date: payload.due_date,
           issue_date: payload.issue_date,
-          delivery_date: payload.delivery_date,
-          notes: payload.notes,
-          invoice_headline: payload.invoice_headline,
+          delivery_date: payload.delivery_date ?? undefined,
+          notes: payload.notes ?? undefined,
+          invoice_headline: payload.invoice_headline ?? undefined,
           items: lineItems?.map(item => ({
             description: item.description,
             quantity: item.quantity,

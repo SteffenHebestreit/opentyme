@@ -209,7 +209,7 @@ export function TaxPrepaymentDetailModal({
                 {t('fields.periodStart')}
               </label>
               <p className="mt-1 text-base text-gray-900 dark:text-white">
-                {formatDate(prepayment.period_start)}
+                {prepayment.period_start ? formatDate(prepayment.period_start) : '—'}
               </p>
             </div>
 
@@ -218,7 +218,7 @@ export function TaxPrepaymentDetailModal({
                 {t('fields.periodEnd')}
               </label>
               <p className="mt-1 text-base text-gray-900 dark:text-white">
-                {formatDate(prepayment.period_end)}
+                {prepayment.period_end ? formatDate(prepayment.period_end) : '—'}
               </p>
             </div>
 

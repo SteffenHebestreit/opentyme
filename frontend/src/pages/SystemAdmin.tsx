@@ -27,8 +27,7 @@ import {
 import { backupService } from '../api/services/backup.service';
 import Modal from '../components/ui/Modal';
 import { Input } from '../components/forms/Input';
-import { Table, Column, Badge, Tabs, TabPanel, PageHeader, LoadingSpinner, EmptyState } from '../components/common';
-import type { Tab } from '../components/common/Tabs';
+import { Table, Column, Badge, Tabs, TabPanel } from '../components/common';
 import type { BadgeVariant } from '../components/common/Badge';
 
 interface Backup {
@@ -394,7 +393,7 @@ export default function SystemAdmin() {
           { id: 'schedules', label: t('tabs.schedules'), icon: Calendar }
         ]}
         activeTab={activeTab}
-        onChange={setActiveTab}
+        onChange={(tabId) => setActiveTab(tabId as 'backups' | 'schedules')}
       />
 
       {/* Backups Tab */}

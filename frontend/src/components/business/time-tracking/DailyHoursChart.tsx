@@ -86,7 +86,7 @@ function getProjectColor(projectName: string): string {
 
 export const DailyHoursChart: FC<DailyHoursChartProps> = ({
   timeEntries,
-  projects,
+  projects: _projects,
   selectedDate,
   onDateChange,
 }) => {

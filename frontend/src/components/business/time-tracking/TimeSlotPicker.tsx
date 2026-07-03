@@ -121,7 +121,7 @@ function getProjectColor(projectId: string, projects: Project[]): string {
  * @component
  */
 export const TimeSlotPicker: FC<TimeSlotPickerProps> = ({
-  selectedDate,
+  selectedDate: _selectedDate,
   timeEntries,
   projects,
   onStartTimeChange,

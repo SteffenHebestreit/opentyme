@@ -164,7 +164,6 @@ export function RecurringExpensesManager() {
   const { t } = useTranslation('expenses');
   const [editingExpense, setEditingExpense] = useState<RecurringExpense | null>(null);
   const triggerRecurring = useTriggerRecurringExpenses();
-  const queryClient = useQueryClient();
 
   const { data: recurringExpenses = [], isLoading, refetch } = useQuery({
     queryKey: ['recurring-expenses'],

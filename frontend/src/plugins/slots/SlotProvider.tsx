@@ -7,7 +7,7 @@
 
 import React, { createContext, useContext, useMemo, ReactNode } from 'react';
 import { frontendPluginRegistry } from '../plugin-registry';
-import { LoadedSlotComponent, SlotContext } from '../../types/plugin.types';
+import { LoadedSlotComponent } from '../../types/plugin.types';
 import { usePlugins } from '../../api/hooks/usePlugins';
 
 interface SlotProviderContextType {

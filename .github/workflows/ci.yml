@@ -7,10 +7,10 @@ on:
 
 # Notes:
 # - Required gates (must pass): backend type-check, backend + frontend lint
-#   (error-free as of 2026-07; warnings don't fail), frontend build, frontend
-#   unit tests.
-# - Non-blocking gates (continue-on-error): backend tests (need CI DB validation)
-#   and frontend type-check (~97-error backlog). Promote once cleared.
+#   (error-free as of 2026-07; warnings don't fail), frontend type-check,
+#   frontend build, frontend unit tests.
+# - Non-blocking gate (continue-on-error): backend tests — promote once the
+#   postgres service-container setup is validated in a real CI run.
 
 jobs:
   backend:
@@ -71,6 +71,5 @@ jobs:
         run: npm run test:unit
       - name: Type-check
         run: npx tsc --noEmit
-        continue-on-error: true # promote to required once the type backlog is cleared
       - name: Lint
         run: npx eslint . --ext js,jsx,ts,tsx

@@ -114,7 +114,7 @@ export const MetricsGrid: FC<MetricsGridProps> = ({ metrics }) => {
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {metricConfig.map(({ key, label, icon: Icon, accent, formatter }) => {
         const value = metrics[key];
-        const displayValue = formatter ? formatter(value) : value.toLocaleString();
+        const displayValue = formatter ? formatter(Number(value)) : value.toLocaleString();
 
         return (
           <div

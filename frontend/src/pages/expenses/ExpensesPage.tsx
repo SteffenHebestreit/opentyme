@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useExpenses, useExpenseSummary, useTriggerRecurringExpenses } from '@/hooks/api/useExpenses';
 import { useQuery } from '@tanstack/react-query';
 import { getDepreciationSummary } from '@/api/services/depreciation.service';
-import { ExpenseCategory, ExpenseStatus } from '@/api/types';
+import { ExpenseStatus } from '@/api/types';
 import { AddExpenseModal } from '@/components/business/expenses/AddExpenseModal';
 import { ExpenseDetailModal } from '@/components/business/expenses/ExpenseDetailModal';
 import { RecurringExpensesManager } from '@/components/business/expenses/RecurringExpensesManager';
@@ -20,8 +20,7 @@ import {
   LinearScale,
   PointElement,
   LineElement,
-  LineController,
-  ChartOptions
+  LineController
 } from 'chart.js';
 
 // Register Chart.js components
@@ -63,7 +62,7 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
   const [activeTab, setActiveTab] = useState<'expenses' | 'recurring'>('expenses');
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, _setStatusFilter] = useState<string>('all');
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(null);
   const chartRef = useRef<HTMLCanvasElement>(null);
@@ -117,14 +116,6 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
   ];
 
   // Status options
-  const statusOptions = [
-    { value: 'all', label: t('status.all') },
-    { value: 'pending', label: t('status.pending') },
-    { value: 'approved', label: t('status.approved') },
-    { value: 'rejected', label: t('status.rejected') },
-    { value: 'reimbursed', label: t('status.reimbursed') },
-  ];
-
   // Get category label
   const getCategoryLabel = (category: string) => {
     const option = categoryOptions.find(opt => opt.value === category);

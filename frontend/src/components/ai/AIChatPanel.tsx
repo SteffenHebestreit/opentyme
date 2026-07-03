@@ -3,7 +3,7 @@
  * Supports text input and speech input (fast-whisper / Qwen3 ASR).
  */
 
-import React, { useEffect, useRef, useState, KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Send, Square, Trash2, ChevronRight, ChevronDown, Wrench, Mic, MicOff, Check, ShieldAlert, X } from 'lucide-react';
 import type { UIMessage, PendingApproval } from '../../api/hooks/useAIChat';

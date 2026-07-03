@@ -7,6 +7,7 @@ import { TaxPrepaymentDetailModal } from '@/components/business/tax-prepayments/
 import { CustomSelect } from '@/components/forms';
 import { formatCurrency } from '@/utils/currency';
 import { Table, Column, LoadingSpinner, PageHeader, StatCard, EmptyState, Badge } from '@/components/common';
+import { Alert } from '@/components/common/Alert';
 import { BadgeVariant } from '@/components/common/Badge';
 import { Plus, Wallet, TrendingUp, FileText } from 'lucide-react';
 
@@ -106,6 +107,7 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
       paid: 'green',
       planned: 'yellow',
       cancelled: 'red',
+      refund: 'blue',
     };
     return variants[status] || 'gray';
   };

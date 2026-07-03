@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useApp } from '../../store/AppContext'
@@ -25,7 +25,6 @@ export default function Header() {
   const { t, i18n } = useTranslation('common')
   const { state, dispatch } = useApp()
   const { isAuthenticated, user, isAdmin, logout } = useAuth()
-  const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [addonMenuOpen, setAddonMenuOpen] = useState(false)

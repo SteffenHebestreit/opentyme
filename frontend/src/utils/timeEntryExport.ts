@@ -430,7 +430,6 @@ export async function exportTimeEntriesAsPDF(
   const totalHours = entries.reduce((sum, entry) => sum + (entry.duration_hours || 0), 0);
   const billableHours = entries.reduce((sum, entry) => sum + (entry.billable ? (entry.duration_hours || 0) : 0), 0);
   const nonBillableHours = totalHours - billableHours;
-  const totalEntries = entries.length;
   
   const docDefinition: TDocumentDefinitions = {
     pageSize: 'A4',
@@ -581,7 +580,7 @@ export async function exportTimeEntriesAsPDF(
   
   taskContent.push({ text: '', pageBreak: 'after' as any });
   
-  docDefinition.content.push(...taskContent);
+  (docDefinition.content as Content[]).push(...taskContent);
   
   // --- PAGE 2: Daily Summary ---
   const dailyContent: Content[] = [
@@ -616,7 +615,7 @@ export async function exportTimeEntriesAsPDF(
   
   dailyContent.push({ text: '', pageBreak: 'after' as any });
   
-  docDefinition.content.push(...dailyContent);
+  (docDefinition.content as Content[]).push(...dailyContent);
   
   // --- PAGE 3: Detailed Entries ---
   const detailContent: Content[] = [
@@ -659,7 +658,7 @@ export async function exportTimeEntriesAsPDF(
   
   detailContent.push({ text: '', pageBreak: 'after' as any });
   
-  docDefinition.content.push(...detailContent);
+  (docDefinition.content as Content[]).push(...detailContent);
   
   // --- FINAL PAGE: Summary (not counted in page numbers) ---
   const summaryContent: Content[] = [
@@ -700,7 +699,7 @@ export async function exportTimeEntriesAsPDF(
 
   // Client Summary Table
   if (clientSummary.length > 0) {
-    summaryContent.push(
+    (summaryContent as unknown[]).push(
       { text: 'Stunden nach Kunde', style: 'summarySubtitle', margin: [0, 10, 0, 5] as [number, number, number, number] },
       {
         table: {
@@ -713,9 +712,9 @@ export async function exportTimeEntriesAsPDF(
               { text: 'Abrechenbar', bold: true, fontSize: 9, fillColor: '#4F46E5', color: '#FFFFFF', alignment: 'right' },
             ],
             ...clientSummary.map((client, index) => [
-              { text: client.clientName, fontSize: 9, fillColor: index % 2 === 0 ? '#F3F4F6' : null },
-              { text: formatHours(client.totalHours), fontSize: 9, alignment: 'right', fillColor: index % 2 === 0 ? '#F3F4F6' : null },
-              { text: formatHours(client.billableHours), fontSize: 9, alignment: 'right', fillColor: index % 2 === 0 ? '#F3F4F6' : null },
+              { text: client.clientName, fontSize: 9, fillColor: index % 2 === 0 ? '#F3F4F6' : undefined },
+              { text: formatHours(client.totalHours), fontSize: 9, alignment: 'right', fillColor: index % 2 === 0 ? '#F3F4F6' : undefined },
+              { text: formatHours(client.billableHours), fontSize: 9, alignment: 'right', fillColor: index % 2 === 0 ? '#F3F4F6' : undefined },
             ]),
           ],
         },
@@ -726,7 +725,7 @@ export async function exportTimeEntriesAsPDF(
 
   // Project Summary Table
   if (projectSummary.length > 0) {
-    summaryContent.push(
+    (summaryContent as unknown[]).push(
       { text: 'Stunden nach Projekt', style: 'summarySubtitle', margin: [0, 10, 0, 5] as [number, number, number, number] },
       {
         table: {
@@ -740,10 +739,10 @@ export async function exportTimeEntriesAsPDF(
               { text: 'Abrechenbar', bold: true, fontSize: 9, fillColor: '#4F46E5', color: '#FFFFFF', alignment: 'right' },
             ],
             ...projectSummary.map((project, index) => [
-              { text: project.projectName, fontSize: 9, fillColor: index % 2 === 0 ? '#F3F4F6' : null },
-              { text: project.clientName || '-', fontSize: 9, fillColor: index % 2 === 0 ? '#F3F4F6' : null },
-              { text: formatHours(project.totalHours), fontSize: 9, alignment: 'right', fillColor: index % 2 === 0 ? '#F3F4F6' : null },
-              { text: formatHours(project.billableHours), fontSize: 9, alignment: 'right', fillColor: index % 2 === 0 ? '#F3F4F6' : null },
+              { text: project.projectName, fontSize: 9, fillColor: index % 2 === 0 ? '#F3F4F6' : undefined },
+              { text: project.clientName || '-', fontSize: 9, fillColor: index % 2 === 0 ? '#F3F4F6' : undefined },
+              { text: formatHours(project.totalHours), fontSize: 9, alignment: 'right', fillColor: index % 2 === 0 ? '#F3F4F6' : undefined },
+              { text: formatHours(project.billableHours), fontSize: 9, alignment: 'right', fillColor: index % 2 === 0 ? '#F3F4F6' : undefined },
             ]),
           ],
         },
@@ -774,7 +773,7 @@ export async function exportTimeEntriesAsPDF(
     { text: `Generiert am: ${new Date().toLocaleDateString('de-DE')} um ${new Date().toLocaleTimeString('de-DE')}`, style: 'filterText', alignment: 'center' },
   );
   
-  docDefinition.content.push(...summaryContent);
+  (docDefinition.content as Content[]).push(...summaryContent);
   
   // Generate and download PDF
   pdfMake.createPdf(docDefinition).download(filename);

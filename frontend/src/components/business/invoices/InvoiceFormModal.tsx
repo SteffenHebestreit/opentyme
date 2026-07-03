@@ -15,7 +15,7 @@ import { useInvoiceTextTemplates } from '../../../hooks/api/useInvoiceTextTempla
 import { useInvoice } from '../../../hooks/api/useInvoices';
 import { CURRENCIES } from '../../../utils/currency';
 import { AVAILABLE_PLACEHOLDERS, getPlaceholderPreview } from '../../../utils/placeholders';
-import { InvoiceLineItemEditor, LineItemFormData, createEmptyLineItem, lineItemsToPayload } from './InvoiceLineItemEditor';
+import { InvoiceLineItemEditor, LineItemFormData, lineItemsToPayload } from './InvoiceLineItemEditor';
 
 interface InvoiceFormModalProps {
   open: boolean;

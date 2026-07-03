@@ -51,22 +51,6 @@ type GroupMode = 'none' | 'project' | 'task' | 'client';
 /**
  * Gets the start and end of the current month in Europe/Berlin timezone.
  */
-function getCurrentMonth(): { start: Date; end: Date; startStr: string; endStr: string } {
-  // Get current date in Europe/Berlin timezone as YYYY-MM-DD
-  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Berlin' });
-  const today = new Date(todayStr + 'T00:00:00'); // Parse as local date
-  
-  const start = new Date(today.getFullYear(), today.getMonth(), 1);
-  const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  
-  return { 
-    start, 
-    end,
-    startStr: start.toISOString().split('T')[0],
-    endStr: end.toISOString().split('T')[0],
-  };
-}
-
 /**
  * Gets Monday of the week for a given date.
  */
@@ -307,7 +291,7 @@ export const MonthlyHoursChart: FC<MonthlyHoursChartProps> = ({
       );
       
       const datasets = allProjects.map(projectName => ({
-        label: projectName,
+        label: projectName ?? '',
         data: periodHours.map(period => period.projectHours[projectName!] || 0),
         backgroundColor: getProjectChartColor(projectName!),
         borderWidth: 0,
@@ -323,7 +307,7 @@ export const MonthlyHoursChart: FC<MonthlyHoursChartProps> = ({
       );
       
       const datasets = allTasks.map((taskName, index) => ({
-        label: taskName,
+        label: taskName ?? '',
         data: periodHours.map(period => period.taskHours[taskName!] || 0),
         backgroundColor: getProjectChartColor(taskName! + index), // Use index for variation
         borderWidth: 0,
@@ -339,7 +323,7 @@ export const MonthlyHoursChart: FC<MonthlyHoursChartProps> = ({
       );
       
       const datasets = allClients.map((clientName, index) => ({
-        label: clientName,
+        label: clientName ?? '',
         data: periodHours.map(period => period.clientHours[clientName!] || 0),
         backgroundColor: getProjectChartColor(clientName! + index), // Use index for variation
         borderWidth: 0,
@@ -494,7 +478,7 @@ export const MonthlyHoursChart: FC<MonthlyHoursChartProps> = ({
               >
                 <option value="all">{t('charts.filters.allTasks')}</option>
                 {availableTasks.map(task => (
-                  <option key={task} value={task}>
+                  <option key={task ?? ''} value={task ?? ''}>
                     {task}
                   </option>
                 ))}

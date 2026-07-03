@@ -9,6 +9,7 @@ export interface User {
 }
 
 interface AppState {
+  activeProjectId?: string | null;
   user: User | null;
   isAuthenticated: boolean;
   theme: 'light' | 'dark'; // For future dark/light theme implementation

@@ -1,4 +1,4 @@
-import { useExpense, useDeleteExpense, useApproveExpense, useUpdateExpense, useUploadReceipt, useDeleteReceipt, useRecurringGeneratedExpenses } from '@/hooks/api/useExpenses';
+import { useExpense, useDeleteExpense, useUpdateExpense, useUploadReceipt, useDeleteReceipt, useRecurringGeneratedExpenses } from '@/hooks/api/useExpenses';
 import { formatCurrency } from '@/utils/currency';
 import { Textarea, Input, CustomSelect } from '@/components/forms';
 import { Modal } from '@/components/ui/Modal';
@@ -30,7 +30,6 @@ export function ExpenseDetailModal({
     isOpen && !!expense?.is_recurring
   );
   const deleteExpense = useDeleteExpense();
-  const approveExpense = useApproveExpense();
   const updateExpense = useUpdateExpense();
   const uploadReceipt = useUploadReceipt();
   const deleteReceipt = useDeleteReceipt();
@@ -38,8 +37,8 @@ export function ExpenseDetailModal({
   const [isEditing, setIsEditing] = useState(false);
   const [editedExpense, setEditedExpense] = useState<any>(null);
   const [approvalNotes, setApprovalNotes] = useState('');
-  const [showNotesInput, setShowNotesInput] = useState(false);
-  const [pendingAction, setPendingAction] = useState<'approve' | 'reject' | null>(null);
+  const [showNotesInput, _setShowNotesInput] = useState(false);
+  const [pendingAction, _setPendingAction] = useState<'approve' | 'reject' | null>(null);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [showReceiptPreview, setShowReceiptPreview] = useState(false);
   const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string | null>(null);
@@ -103,47 +102,6 @@ export function ExpenseDetailModal({
       onClose();
     } catch (error) {
       console.error('Failed to delete expense:', error);
-    }
-  };
-
-  const handleApprove = async () => {
-    try {
-      await approveExpense.mutateAsync({
-        expenseId,
-        status: 'approved',
-        notes: approvalNotes || undefined,
-      });
-      onExpenseUpdated();
-      setApprovalNotes('');
-      setShowNotesInput(false);
-      setPendingAction(null);
-      onClose();
-    } catch (error) {
-      console.error('Failed to approve expense:', error);
-      alert('Failed to approve expense. Please try again.');
-    }
-  };
-
-  const handleReject = async () => {
-    if (!approvalNotes.trim()) {
-      alert('Please provide a reason for rejection.');
-      return;
-    }
-
-    try {
-      await approveExpense.mutateAsync({
-        expenseId,
-        status: 'rejected',
-        notes: approvalNotes,
-      });
-      onExpenseUpdated();
-      setApprovalNotes('');
-      setShowNotesInput(false);
-      setPendingAction(null);
-      onClose();
-    } catch (error) {
-      console.error('Failed to reject expense:', error);
-      alert('Failed to reject expense. Please try again.');
     }
   };
 
@@ -237,22 +195,6 @@ export function ExpenseDetailModal({
       console.error('Failed to delete receipt:', error);
       alert('Failed to delete receipt. Please try again.');
     }
-  };
-
-  const initiateApproval = (action: 'approve' | 'reject') => {
-    setPendingAction(action);
-    if (action === 'reject') {
-      setShowNotesInput(true);
-    } else {
-      // For approval, show optional notes input
-      setShowNotesInput(true);
-    }
-  };
-
-  const cancelAction = () => {
-    setPendingAction(null);
-    setShowNotesInput(false);
-    setApprovalNotes('');
   };
 
   if (!isOpen) return null;

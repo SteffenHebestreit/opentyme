@@ -34,7 +34,7 @@ interface PaymentsPageProps {
 
 export default function PaymentsPage({ startDate: propStartDate, endDate: propEndDate, onNavigateToInvoice }: PaymentsPageProps = {}) {
   const { t } = useTranslation('payments');
-  const { state } = useApp();
+  const { state: _state } = useApp();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('all');

@@ -8,6 +8,15 @@ export interface Client {
   address: string | null;
   notes: string | null;
   status: ClientStatus;
+  billing_contact_person?: string | null;
+  billing_email?: string | null;
+  billing_phone?: string | null;
+  billing_address?: string | null;
+  billing_city?: string | null;
+  billing_state?: string | null;
+  billing_postal_code?: string | null;
+  billing_country?: string | null;
+  billing_tax_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -51,6 +60,7 @@ export interface Project {
   updated_at: string;
   client_name?: string | null;
   total_tracked_hours?: number | null;
+  client?: { id: string; name: string } | null;
 }
 
 export interface ProjectPayload {
@@ -294,7 +304,7 @@ export interface DashboardData {
   recentInvoices: Invoice[];
 }
 
-export type PaymentType = 'payment' | 'refund' | 'expense';
+export type PaymentType = 'payment' | 'refund' | 'expense' | 'vat_refund' | 'income_tax_refund';
 
 export interface LinkedInvoice {
   invoice_id: string;
