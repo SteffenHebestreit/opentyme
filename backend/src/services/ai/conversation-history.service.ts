@@ -118,30 +118,76 @@ export function applyToolContextBudget(messages: ConversationMessage[]): Convers
 
 // ---- Loading -------------------------------------------------------------------
 
+// Window hysteresis (prefix-cache friendly). A plain "newest N" window shifts
+// its start by one on every message, so the prompt prefix changes every turn
+// and the local inference server re-prefills the whole conversation. Instead we
+// anchor the window start and only move it when the window overflows — trimming
+// down to TRIM_TO so the anchor then holds for many turns. In-memory (single
+// replica); losing an anchor on restart just means one full re-prefill.
+const TRIM_TO = Math.max(10, Math.floor(HISTORY_LIMIT * 0.75));
+const windowAnchors = new Map<string, unknown>();
+const MAX_TRACKED_ANCHORS = 500;
+
+function rememberAnchor(conversationId: string, createdAt: unknown): void {
+  if (windowAnchors.size >= MAX_TRACKED_ANCHORS && !windowAnchors.has(conversationId)) {
+    const oldest = windowAnchors.keys().next().value;
+    if (oldest !== undefined) windowAnchors.delete(oldest);
+  }
+  windowAnchors.set(conversationId, createdAt);
+}
+
 /**
- * Loads the most-recent HISTORY_LIMIT messages for a conversation in
- * chronological, API-valid order.
+ * Loads the recent message window for a conversation in chronological,
+ * API-valid order, keeping the window start stable across turns (hysteresis).
  */
 export async function loadHistory(
   conversationId: string,
   keepDanglingIds?: ReadonlySet<string>
 ): Promise<ConversationMessage[]> {
   const db = pool();
-  const result = await db.query(
-    `SELECT role, content, tool_calls, tool_call_id, tool_name
-     FROM ai_messages
-     WHERE conversation_id = $1
-     ORDER BY created_at DESC
-     LIMIT $2`,
-    [conversationId, HISTORY_LIMIT]
-  );
+
+  let rows: Array<Record<string, unknown>> | null = null;
+  const anchor = windowAnchors.get(conversationId);
+  if (anchor !== undefined) {
+    const r = await db.query(
+      `SELECT role, content, tool_calls, tool_call_id, tool_name, created_at
+       FROM ai_messages
+       WHERE conversation_id = $1 AND created_at >= $2
+       ORDER BY created_at ASC
+       LIMIT $3`,
+      [conversationId, anchor, HISTORY_LIMIT * 2]
+    );
+    // Anchor stale (no rows) or window runaway (hit the safety limit) → refetch.
+    if (r.rows.length > 0 && r.rows.length < HISTORY_LIMIT * 2) rows = r.rows;
+  }
+
+  if (!rows) {
+    const r = await db.query(
+      `SELECT role, content, tool_calls, tool_call_id, tool_name, created_at
+       FROM ai_messages
+       WHERE conversation_id = $1
+       ORDER BY created_at DESC
+       LIMIT $2`,
+      [conversationId, HISTORY_LIMIT]
+    );
+    rows = r.rows.reverse();
+  }
+
+  // Overflow → trim once to TRIM_TO newest messages; the new anchor then holds.
+  if (rows.length > HISTORY_LIMIT) {
+    rows = rows.slice(-TRIM_TO);
+  }
+  if (rows.length > 0) {
+    rememberAnchor(conversationId, rows[0].created_at);
+  }
+
   return normalizeHistoryWindow(
-    result.rows.reverse().map((row) => ({
+    rows.map((row) => ({
       role: row.role as ConversationMessage['role'],
-      content: row.content,
-      ...(row.tool_calls ? { tool_calls: row.tool_calls } : {}),
-      ...(row.tool_call_id ? { tool_call_id: row.tool_call_id } : {}),
-      ...(row.tool_name ? { name: row.tool_name } : {}),
+      content: row.content as string | null,
+      ...(row.tool_calls ? { tool_calls: row.tool_calls as LLMToolCall[] } : {}),
+      ...(row.tool_call_id ? { tool_call_id: row.tool_call_id as string } : {}),
+      ...(row.tool_name ? { name: row.tool_name as string } : {}),
     })),
     keepDanglingIds
   );

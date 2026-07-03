@@ -15,7 +15,9 @@ import axios from 'axios';
 import { logger } from '../../utils/logger';
 import { getToolsWithMeta, LLMTool, ToolWithMeta } from './openapi-tool-builder.service';
 
-const MAX_TOOLS = Number(process.env.AI_MAX_TOOLS) || 24;
+// ~20 tools is the documented reliability cliff for small local models
+// (arXiv 2411.15399; OpenAI function-calling guide: "aim for fewer than 20").
+const MAX_TOOLS = Number(process.env.AI_MAX_TOOLS) || 20;
 const EMBED_MODEL = process.env.AI_EMBED_MODEL || 'text-embedding-qwen3-embedding-0.6b';
 const USE_EMBEDDINGS = (process.env.AI_TOOL_EMBEDDINGS ?? 'true') !== 'false';
 
@@ -100,6 +102,28 @@ export interface SelectToolsOptions {
   roles: string[];
   apiUrl?: string;
   apiKey?: string;
+  /** Enables sticky per-conversation selection (prefix-cache friendly). */
+  conversationId?: string;
+}
+
+// Sticky per-conversation tool selection (in-memory; single backend replica).
+// Local inference servers only reuse their prompt/KV cache when the prompt
+// prefix — which includes the rendered tool list — is byte-identical across
+// turns. Reselecting tools from scratch each turn busts that cache and forces
+// a full re-prefill of the conversation (documented: hermes-agent #27339).
+// We therefore grow a conversation's tool set append-only and sort it
+// deterministically; if it outgrows the ceiling, we reset once to the current
+// selection (one cache miss, then stable again).
+const conversationTools = new Map<string, Set<string>>();
+const MAX_TRACKED_CONVERSATIONS = 500;
+const STICKY_CEILING = Math.floor(MAX_TOOLS * 1.5);
+
+function rememberConversationTools(conversationId: string, names: Set<string>): void {
+  if (conversationTools.size >= MAX_TRACKED_CONVERSATIONS && !conversationTools.has(conversationId)) {
+    const oldest = conversationTools.keys().next().value;
+    if (oldest !== undefined) conversationTools.delete(oldest);
+  }
+  conversationTools.set(conversationId, names);
 }
 
 /**
@@ -107,7 +131,7 @@ export interface SelectToolsOptions {
  * the core set plus the most relevant remaining tools, capped at AI_MAX_TOOLS.
  */
 export async function selectTools(opts: SelectToolsOptions): Promise<LLMTool[]> {
-  const { userMessage, roles, apiUrl, apiKey } = opts;
+  const { userMessage, roles, apiUrl, apiKey, conversationId } = opts;
 
   const allowed = getToolsWithMeta().filter((t) => isToolAllowedForRoles(t.tags, roles));
   const core = allowed.filter((t) => CORE_TOOL_NAMES.has(t.tool.function.name));
@@ -115,7 +139,7 @@ export async function selectTools(opts: SelectToolsOptions): Promise<LLMTool[]> 
 
   const budget = Math.max(0, MAX_TOOLS - core.length);
   if (rest.length <= budget) {
-    return [...core, ...rest].map((t) => t.tool);
+    return finalizeSelection([...core, ...rest], allowed, conversationId);
   }
 
   let ranked: ToolWithMeta[];
@@ -154,5 +178,37 @@ export async function selectTools(opts: SelectToolsOptions): Promise<LLMTool[]> 
     `[AI ToolSelection] ${core.length} core + ${selected.length}/${rest.length} ranked ` +
       `(${usedEmbeddings ? 'embeddings' : 'lexical'}); ${allowed.length} allowed for roles [${roles.join(',')}]`
   );
-  return [...core, ...selected].map((t) => t.tool);
+  return finalizeSelection([...core, ...selected], allowed, conversationId);
+}
+
+/**
+ * Applies sticky per-conversation union (bounded) and deterministic ordering,
+ * then returns the tool definitions. Deterministic name order keeps the
+ * serialized tool list byte-stable so the inference server's prefix cache
+ * survives across turns.
+ */
+function finalizeSelection(
+  picked: ToolWithMeta[],
+  allowed: ToolWithMeta[],
+  conversationId?: string
+): LLMTool[] {
+  let names = new Set(picked.map((t) => t.tool.function.name));
+
+  if (conversationId) {
+    const prev = conversationTools.get(conversationId);
+    if (prev) {
+      const union = new Set([...prev, ...names]);
+      if (union.size <= STICKY_CEILING) {
+        names = union;
+      } else {
+        logger.info(`[AI ToolSelection] Sticky set exceeded ${STICKY_CEILING} — resetting to current selection`);
+      }
+    }
+    rememberConversationTools(conversationId, names);
+  }
+
+  return allowed
+    .filter((t) => names.has(t.tool.function.name))
+    .sort((a, b) => a.tool.function.name.localeCompare(b.tool.function.name))
+    .map((t) => t.tool);
 }
