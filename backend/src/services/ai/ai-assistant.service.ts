@@ -5,104 +5,42 @@
  *
  * Write tool calls (create/update/delete) are never executed automatically: the
  * run pauses and emits TOOL_APPROVAL_REQUIRED, then resumeRun() continues once the
- * user approves or rejects the proposed actions.
+ * user approves or rejects the proposed actions. If the user instead sends a new
+ * message, the pending approval is superseded (declined results are persisted) so
+ * the history stays a valid API message sequence and stale writes can't run later.
+ *
+ * Collaborators: system-prompt.builder (prompt), conversation-history.service
+ * (types, loading, normalization, context budget), llm-stream.service (streaming
+ * chat-completions), tool-selection.service (curation + role policy),
+ * tool-executor.service (HTTP/custom tool dispatch).
  */
 
 import axios, { AxiosInstance } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
-
-// AG-UI event type constants (local — avoids @ag-ui/core ESM bundling issues)
-const EventType = {
-  RUN_STARTED: 'RUN_STARTED',
-  RUN_FINISHED: 'RUN_FINISHED',
-  RUN_ERROR: 'RUN_ERROR',
-  TEXT_MESSAGE_START: 'TEXT_MESSAGE_START',
-  TEXT_MESSAGE_CONTENT: 'TEXT_MESSAGE_CONTENT',
-  TEXT_MESSAGE_END: 'TEXT_MESSAGE_END',
-  TOOL_CALL_START: 'TOOL_CALL_START',
-  TOOL_CALL_ARGS: 'TOOL_CALL_ARGS',
-  TOOL_CALL_END: 'TOOL_CALL_END',
-  TOOL_CALL_RESULT: 'TOOL_CALL_RESULT',
-  TOOL_APPROVAL_REQUIRED: 'TOOL_APPROVAL_REQUIRED',
-} as const;
 import { logger } from '../../utils/logger';
 import { pool } from '../../utils/database';
+import { EventType, EventEmitter } from './ai-events';
+import {
+  ConversationMessage,
+  LLMToolCall,
+  loadHistory,
+} from './conversation-history.service';
+import { streamChatCompletion } from './llm-stream.service';
+import { buildSystemPrompt } from './system-prompt.builder';
 import { LLMTool } from './openapi-tool-builder.service';
 import { selectTools } from './tool-selection.service';
 import { executeToolCall, isWriteTool } from './tool-executor.service';
-import { buildSystemPromptExtensions } from './system-prompt-registry.service';
 
-// ---- Types ----------------------------------------------------------------
-
-export interface ConversationMessage {
-  role: 'user' | 'assistant' | 'tool' | 'system';
-  content: string | null;
-  tool_calls?: LLMToolCall[];
-  tool_call_id?: string;
-  name?: string;
-}
-
-interface LLMToolCall {
-  id: string;
-  type: 'function';
-  function: {
-    name: string;
-    arguments: string;
-  };
-}
-
-interface LLMStreamChunk {
-  choices?: Array<{
-    delta?: {
-      content?: string;
-      tool_calls?: Array<{
-        index?: number;
-        id?: string;
-        type?: string;
-        function?: {
-          name?: string;
-          arguments?: string;
-        };
-      }>;
-    };
-    finish_reason?: string;
-  }>;
-}
+// Re-exported for existing importers (controller, A2A adapter).
+export type { EventEmitter } from './ai-events';
+export type { ConversationMessage } from './conversation-history.service';
 
 export interface ToolApprovalDecision {
   toolCallId: string;
   decision: 'approve' | 'reject';
 }
 
-// AG-UI emitter callback – caller passes res.write binding
-export type EventEmitter = (event: Record<string, unknown>) => void;
-
-// Number of most-recent messages to load as context for each run.
-const HISTORY_LIMIT = Number(process.env.AI_HISTORY_LIMIT) || 40;
 const MAX_ITERATIONS = Number(process.env.AI_MAX_ITERATIONS) || 12;
-// Max cumulative characters of tool-result content sent to the model per call.
-const TOOL_CONTEXT_BUDGET = Number(process.env.AI_TOOL_CONTEXT_BUDGET) || 24000;
-
-/**
- * Ensures the loaded history window is valid for the chat-completions API:
- * every `tool` message must follow an assistant message (within the window)
- * that introduced its tool_call_id. Drops orphan tool results left at the
- * front of the window when their originating assistant message was trimmed off.
- */
-function sanitizeHistoryWindow(messages: ConversationMessage[]): ConversationMessage[] {
-  const knownToolCallIds = new Set<string>();
-  const result: ConversationMessage[] = [];
-  for (const msg of messages) {
-    if (msg.role === 'assistant' && msg.tool_calls) {
-      for (const tc of msg.tool_calls) knownToolCallIds.add(tc.id);
-    }
-    if (msg.role === 'tool' && (!msg.tool_call_id || !knownToolCallIds.has(msg.tool_call_id))) {
-      continue; // orphan tool result — drop it
-    }
-    result.push(msg);
-  }
-  return result;
-}
 
 function safeParseArgs(raw: string): Record<string, unknown> {
   try {
@@ -110,30 +48,6 @@ function safeParseArgs(raw: string): Record<string, unknown> {
   } catch {
     return {};
   }
-}
-
-/**
- * Returns a copy of the messages with older tool-result contents truncated so the
- * cumulative tool context stays within budget. Keeps the most recent results intact
- * and never drops messages (preserves assistant/tool pairing).
- */
-function applyToolContextBudget(messages: ConversationMessage[]): ConversationMessage[] {
-  const result = messages.map((m) => ({ ...m }));
-  let total = 0;
-  for (let i = result.length - 1; i >= 0; i--) {
-    const m = result[i];
-    if (m.role !== 'tool' || !m.content) continue;
-    if (total >= TOOL_CONTEXT_BUDGET) {
-      m.content = '[older tool result omitted to save context]';
-      continue;
-    }
-    total += m.content.length;
-    if (total > TOOL_CONTEXT_BUDGET) {
-      const keep = Math.max(0, m.content.length - (total - TOOL_CONTEXT_BUDGET));
-      m.content = m.content.slice(0, keep) + '…[truncated]';
-    }
-  }
-  return result;
 }
 
 // ---- Service ----------------------------------------------------------------
@@ -222,6 +136,11 @@ export class AIAssistantService {
       }
     }
 
+    // A new user message supersedes any approval still waiting in this
+    // conversation. Persist declined results BEFORE the user message so the
+    // stored sequence stays valid and /approve can no longer run stale writes.
+    await this.supersedeStaleApprovals(conversationId);
+
     // Persist user message
     await db.query(
       `INSERT INTO ai_messages (conversation_id, role, content) VALUES ($1, 'user', $2)`,
@@ -247,9 +166,9 @@ export class AIAssistantService {
       return;
     }
 
-    const history = await this.loadHistory(conversationId);
+    const history = await loadHistory(conversationId);
     const messages: ConversationMessage[] = [
-      { role: 'system', content: this.buildSystemPrompt(userFullName, userEmail, language) },
+      { role: 'system', content: buildSystemPrompt(userFullName, userEmail, language) },
       ...history,
     ];
 
@@ -317,10 +236,13 @@ export class AIAssistantService {
     const decisions = new Map(approvals.map((a) => [a.toolCallId, a.decision]));
 
     try {
-      // Rebuild context from history (includes the assistant tool_calls + read results).
+      // Rebuild context from history. The pending write tool_calls are still
+      // legitimately unanswered — exempt them from synthetic-result injection,
+      // since real results are appended below.
+      const keepDangling = new Set(pending.map((tc) => tc.id));
       const messages: ConversationMessage[] = [
-        { role: 'system', content: this.buildSystemPrompt(userFullName, userEmail, language) },
-        ...(await this.loadHistory(conversationId)),
+        { role: 'system', content: buildSystemPrompt(userFullName, userEmail, language) },
+        ...(await loadHistory(conversationId, keepDangling)),
       ];
 
       // Apply each pending write decision.
@@ -366,6 +288,45 @@ export class AIAssistantService {
   }
 
   /**
+   * Supersedes approvals still awaiting a decision in this conversation:
+   * persists a declined tool result for each pending write (keeping the stored
+   * message sequence API-valid) and flips their status so /approve can no
+   * longer execute them.
+   */
+  private async supersedeStaleApprovals(conversationId: string): Promise<void> {
+    const db = pool();
+    const stale = await db.query(
+      `SELECT id, metadata FROM ai_messages
+       WHERE conversation_id = $1 AND role = 'assistant' AND metadata->>'status' = 'awaiting_approval'`,
+      [conversationId]
+    );
+
+    for (const row of stale.rows) {
+      const pending = (row.metadata?.pending ?? []) as LLMToolCall[];
+      for (const tc of pending) {
+        await db.query(
+          `INSERT INTO ai_messages (conversation_id, role, content, tool_call_id, tool_name)
+           VALUES ($1, 'tool', $2, $3, $4)`,
+          [
+            conversationId,
+            JSON.stringify({
+              declined: true,
+              message: 'Not executed — superseded by a new user message before approval.',
+            }),
+            tc.id,
+            tc.function.name,
+          ]
+        );
+      }
+      await db.query(`UPDATE ai_messages SET metadata = $1 WHERE id = $2`, [
+        JSON.stringify({ status: 'superseded' }),
+        row.id,
+      ]);
+      logger.info(`[AI] Superseded stale approval ${row.id} (${pending.length} pending action(s))`);
+    }
+  }
+
+  /**
    * Runs the tool-calling loop until the model produces a final answer, the
    * iteration budget is exhausted, or write tool calls require approval — in
    * which case the run pauses (emits TOOL_APPROVAL_REQUIRED) and returns.
@@ -386,7 +347,7 @@ export class AIAssistantService {
       let lastSignature = '';
 
       for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-        const { content, toolCalls } = await this.callLLM(messages, tools, conversationId, emit);
+        const { content, toolCalls } = await this.callLLM(messages, tools, emit);
 
         if (toolCalls.length === 0) {
           // Final response — persist and finish
@@ -450,7 +411,7 @@ export class AIAssistantService {
       // If the loop ended without a natural-language answer (iteration cap reached or
       // no-progress break), force one tool-free call so the user always gets a reply.
       if (!finalized) {
-        const wrapUp = await this.callLLM(messages, [], conversationId, emit, 'none');
+        const wrapUp = await this.callLLM(messages, [], emit, 'none');
         const finalText =
           wrapUp.content ||
           'I reached the step limit before fully finishing. Here is what I completed so far — let me know if you want me to continue.';
@@ -508,168 +469,22 @@ export class AIAssistantService {
     messages.push({ role: 'tool', content: resultContent, tool_call_id: tcId, name: tcName });
   }
 
-  /** Loads the most-recent N messages for a conversation in chronological, API-valid order. */
-  private async loadHistory(conversationId: string): Promise<ConversationMessage[]> {
-    const db = pool();
-    const result = await db.query(
-      `SELECT role, content, tool_calls, tool_call_id, tool_name
-       FROM ai_messages
-       WHERE conversation_id = $1
-       ORDER BY created_at DESC
-       LIMIT $2`,
-      [conversationId, HISTORY_LIMIT]
-    );
-    return sanitizeHistoryWindow(
-      result.rows.reverse().map((row) => ({
-        role: row.role as ConversationMessage['role'],
-        content: row.content,
-        ...(row.tool_calls ? { tool_calls: row.tool_calls } : {}),
-        ...(row.tool_call_id ? { tool_call_id: row.tool_call_id } : {}),
-        ...(row.tool_name ? { name: row.tool_name } : {}),
-      }))
-    );
-  }
-
-  private buildSystemPrompt(userFullName: string, userEmail: string, language: string): string {
-    const today = new Date().toISOString().split('T')[0];
-    return `You are the AI assistant for OpenTYME, a time tracking and invoicing application for freelancers and small businesses.
-Today is ${today}. User: ${userFullName} (${userEmail}).
-You have tools that call the application REST API on the user's behalf.
-Always fetch real data rather than guessing. Summarize results concisely and helpfully.
-When creating or modifying data, confirm what was done.
-Always respond in the user's preferred language: ${language}.
-
-CRITICAL — follow user-provided values exactly:
-- When the user specifies dates, times, descriptions, task names, or any other values, use them EXACTLY as given. NEVER substitute, invent, or change user-provided values.
-- If the user says "today", use ${today}. If the user says a specific date, use that exact date.
-- If the user provides specific start/end times, use those exact times — do NOT change them.
-- If the user corrects you, re-read their original request carefully and use the correct values. Do NOT repeat the same mistake.
-- When creating multiple entries in one request, each entry must match the user's specifications individually.
-
-IMPORTANT — use the right tool for the job:
-- For totals, sums, averages or any aggregation over time entries → use get_time_summary (never fetch raw time entry lists to calculate)
-- For revenue, invoice totals or earnings in a period → use get_revenue_summary
-- For expense totals or spending breakdowns → use get_expense_summary
-- For profit/loss or net earnings → use get_profit_summary
-- For a full picture of one client (hours + invoices) → use get_client_overview
-- For a full picture of one project (hours, budget, invoices) → use get_project_overview
-- Only use get_time_entries / get_invoices / get_expenses when the user explicitly wants to see the individual records (not totals).
-- All date parameters use YYYY-MM-DD format. "This month" = start_date ${new Date().toISOString().slice(0, 7)}-01, end_date ${today}.
-
-WORKFLOW FOR MULTI-STEP REQUESTS — plan, then act:
-1. Resolve entities first. When the user names a project, client or task, look it up (e.g. get_projects, get_clients) and match by name. If the match is ambiguous or missing, ASK the user instead of guessing.
-2. Gather the data you need with read tools, using filters and date ranges so you fetch only what's relevant. Prefer the summary/overview tools for totals and averages; only read raw lists when you need individual records (e.g. to derive patterns like average daily hours or typical start/end times).
-3. For anything that CREATES, CHANGES or DELETES data: FIRST state your concrete plan in clear natural language (e.g. the exact entries you intend to create, with dates/hours/times), THEN issue the tool calls. Creates, updates and deletes always require the user's explicit approval before they take effect, so make your plan easy to review.
-4. Act only on what the user asked, matching each item to their specifications exactly.
-
-REPRODUCING OR EXTRAPOLATING FROM HISTORY (any records — time entries, invoice items, expenses, …):
-- When the user asks for "the same as before" or to continue an existing pattern, first read the ACTUAL historical records (with filters), then match the observed values and structure exactly — real times, amounts, gaps, descriptions and counts. Never substitute round or generic values for what the data actually shows.
-- For time entries specifically, call get_time_pattern (with the project_id) to get the real per-weekday blocks and breaks, and reproduce those exact blocks rather than computing a generic schedule yourself.
-- Reproduce the real structure, including splits and recurring gaps (e.g. a regular midday break), and compute any derived figures precisely from the source values.
-- Skip cases the history shows the user doesn't do, and skip records that already exist.
-- If the history is sparse, inconsistent or ambiguous, say what you found and ask the user to confirm before creating anything.
-
-FILTERING DATA:
-- Narrow results at the source via query parameters (date ranges, status, project/client filters, search) rather than retrieving everything and filtering afterwards.
-- When a result set is large, summarize it and offer to show specifics on request.${buildSystemPromptExtensions()}`;
-  }
-
-  /**
-   * Calls the LLM with streaming, emitting TEXT_MESSAGE_* events for text chunks.
-   * Returns the accumulated content and any tool_calls.
-   */
-  private async callLLM(
+  /** Streams one chat-completion round via the shared LLM client. */
+  private callLLM(
     messages: ConversationMessage[],
     tools: LLMTool[],
-    _conversationId: string,
     emit: EventEmitter,
     toolChoice: 'auto' | 'none' = 'auto'
-  ): Promise<{ content: string; toolCalls: LLMToolCall[] }> {
-    const messageId = uuidv4();
-    let accumulatedContent = '';
-    const pendingToolCalls: Map<number, LLMToolCall> = new Map();
-    let hasEmittedTextStart = false;
-
-    const requestBody: Record<string, unknown> = {
+  ): ReturnType<typeof streamChatCompletion> {
+    return streamChatCompletion({
+      client: this.client!,
       model: this.model,
-      messages: applyToolContextBudget(messages),
-      stream: true,
-      temperature: Number(process.env.AI_TEMPERATURE ?? '0.2'),
-    };
-    if (tools.length > 0 && toolChoice !== 'none') {
-      requestBody.tools = tools;
-      requestBody.tool_choice = toolChoice;
-    }
-
-    const response = await this.client!.post('/chat/completions', requestBody, {
-      responseType: 'stream',
+      messages,
+      tools,
+      emit,
+      toolChoice,
       signal: this.abortSignal,
     });
-    const stream = response.data as NodeJS.ReadableStream;
-
-    await new Promise<void>((resolve, reject) => {
-      let buffer = '';
-
-      stream.on('data', (chunk: Buffer) => {
-        buffer += chunk.toString();
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed === 'data: [DONE]') continue;
-          if (!trimmed.startsWith('data: ')) continue;
-
-          try {
-            const parsed: LLMStreamChunk = JSON.parse(trimmed.slice(6));
-            const delta = parsed.choices?.[0]?.delta;
-            if (!delta) continue;
-
-            // Text content
-            if (delta.content) {
-              if (!hasEmittedTextStart) {
-                emit({ type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant' });
-                hasEmittedTextStart = true;
-              }
-              emit({ type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta: delta.content });
-              accumulatedContent += delta.content;
-            }
-
-            // Tool calls
-            if (delta.tool_calls) {
-              for (const tcDelta of delta.tool_calls) {
-                const idx = tcDelta.index ?? 0;
-                if (!pendingToolCalls.has(idx)) {
-                  pendingToolCalls.set(idx, {
-                    id: tcDelta.id || uuidv4(),
-                    type: 'function',
-                    function: { name: '', arguments: '' },
-                  });
-                }
-                const tc = pendingToolCalls.get(idx)!;
-                if (tcDelta.id) tc.id = tcDelta.id;
-                if (tcDelta.function?.name) tc.function.name += tcDelta.function.name;
-                if (tcDelta.function?.arguments) tc.function.arguments += tcDelta.function.arguments;
-              }
-            }
-          } catch {
-            // Ignore malformed SSE lines
-          }
-        }
-      });
-
-      stream.on('end', () => resolve());
-      stream.on('error', (err: Error) => reject(err));
-    });
-
-    if (hasEmittedTextStart) {
-      emit({ type: EventType.TEXT_MESSAGE_END, messageId });
-    }
-
-    return {
-      content: accumulatedContent,
-      toolCalls: Array.from(pendingToolCalls.values()),
-    };
   }
 }
 
