@@ -65,7 +65,31 @@ documentation and issue trackers), compared against this codebase.
 - **Per-iteration re-curation of tools** — only if missing-tool failures are observed.
 - **List-response field projection** — only if 8k truncation is observed in logs.
 
-## Open (research incomplete — session limit)
-Three lenses did not complete and can be re-run: HITL products deep-dive,
-context/memory management, streaming/AG-UI protocol evolution (includes the known
-pending-approval-lost-on-reload gap).
+## Round 2 (all five lenses complete; gap analysis + 2-lens adversarial verify ran)
+55 findings total; 8 concrete gaps proposed against the code, 7 survived both
+adversarial reviewers and were integrated:
+- **Stream-stall watchdog** — axios timeout only covers time-to-first-byte; a mid-
+  stream stall hung the run forever. Idle timer (AI_STREAM_IDLE_TIMEOUT_MS) destroys
+  the stream so the loop errors out cleanly.
+- **Atomic approval claim** — two concurrent /approve requests could double-execute
+  the pending writes (SELECT→execute→UPDATE race). Now a single atomic UPDATE…
+  RETURNING claims the newest pending row; the loser gets NO_PENDING.
+- **Schema validation before execution/approval** — required keys, primitive types,
+  enums checked against the OpenAPI-derived schema with field-path repair messages;
+  invalid writes never reach the approval card.
+- **finish_reason + max_tokens** — output capped (AI_MAX_OUTPUT_TOKENS); truncated
+  tool calls are discarded with a retry instruction instead of executing garbage;
+  truncated final answers are flagged.
+- **`<think>` hygiene** — Qwen3 reasoning blocks stripped from the final content
+  before persisting/replaying (incl. dangling unclosed blocks).
+- **Timezone-correct dates** — "today"/"this month" in the prompt now use the app
+  timezone (getCurrentDate), not UTC; CET users no longer get yesterday's date for
+  the first hours after midnight.
+- **Explicit error envelope** — failed tool results are wrapped as
+  {error:true, http_status, body} so a 404 body can't read as success data.
+
+Refuted by the verify panel (over-engineering at this scale): a whole-prompt token
+budget on top of the existing window + tool-result caps.
+
+Restored earlier (same research thread): chat history + pending-approval card after
+page reload.

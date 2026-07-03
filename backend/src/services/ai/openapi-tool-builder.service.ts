@@ -133,6 +133,7 @@ function buildParameters(
 // Cache
 let toolsCache: LLMTool[] | null = null;
 const operationMap = new Map<string, OperationInfo>();
+const toolSchemaMap = new Map<string, LLMToolFunction['parameters']>();
 
 export function buildTools(): LLMTool[] {
   if (toolsCache) return toolsCache;
@@ -179,6 +180,7 @@ export function buildTools(): LLMTool[] {
         pathTemplate: path,
         tags: (op.tags as string[]) || [],
       });
+      toolSchemaMap.set(safeName, tool.function.parameters);
     }
   }
 
@@ -195,6 +197,7 @@ export function buildTools(): LLMTool[] {
       },
     });
     operationMap.set(safeName, { method: 'CUSTOM', pathTemplate: def.name, tags: ['Custom'] });
+    toolSchemaMap.set(safeName, def.parameters);
   }
 
   toolsCache = tools;
@@ -206,6 +209,72 @@ export function buildTools(): LLMTool[] {
 export function getOperationByName(name: string): OperationInfo | undefined {
   if (!toolsCache) buildTools();
   return operationMap.get(name);
+}
+
+function matchesType(value: unknown, type: string): boolean {
+  switch (type) {
+    case 'string':
+      return typeof value === 'string';
+    case 'number':
+      return typeof value === 'number' || (typeof value === 'string' && value !== '' && !Number.isNaN(Number(value)));
+    case 'integer':
+      return (
+        (typeof value === 'number' && Number.isInteger(value)) ||
+        (typeof value === 'string' && /^-?\d+$/.test(value))
+      );
+    case 'boolean':
+      return typeof value === 'boolean' || value === 'true' || value === 'false';
+    case 'array':
+      return Array.isArray(value);
+    case 'object':
+      return !!value && typeof value === 'object' && !Array.isArray(value);
+    default:
+      return true;
+  }
+}
+
+function describeValue(value: unknown): string {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  return typeof value;
+}
+
+/**
+ * Lenient pre-execution validation of tool-call arguments against the tool's
+ * JSON schema: required keys present, primitive types plausible (string-encoded
+ * numbers/booleans are accepted — HTTP query params are strings anyway), enum
+ * membership. Unknown keys are ignored. Field-path-level messages let the model
+ * repair the call in one retry instead of burning a failed HTTP round-trip.
+ */
+export function validateToolArguments(
+  toolName: string,
+  args: Record<string, unknown>
+): { ok: true } | { ok: false; errors: string[] } {
+  if (!toolsCache) buildTools();
+  const schema = toolSchemaMap.get(toolName);
+  if (!schema) return { ok: true }; // unknown tool — handled by the executor
+
+  const errors: string[] = [];
+  for (const req of schema.required ?? []) {
+    const v = args[req];
+    if (v === undefined || v === null || v === '') {
+      errors.push(`missing required parameter "${req}"`);
+    }
+  }
+  for (const [key, value] of Object.entries(args)) {
+    if (value === undefined || value === null) continue;
+    const prop = (schema.properties ?? {})[key] as Record<string, unknown> | undefined;
+    if (!prop) continue;
+    const type = prop.type as string | undefined;
+    if (type && !matchesType(value, type)) {
+      errors.push(`parameter "${key}" must be ${type}, got ${describeValue(value)}`);
+    }
+    const allowed = prop.enum as unknown[] | undefined;
+    if (allowed && !allowed.includes(value)) {
+      errors.push(`parameter "${key}" must be one of ${JSON.stringify(allowed)}`);
+    }
+  }
+  return errors.length > 0 ? { ok: false, errors } : { ok: true };
 }
 
 /**
