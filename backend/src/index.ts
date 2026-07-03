@@ -8,6 +8,7 @@ import invoiceReminderScheduler from './services/financial/invoice-reminder-sche
 import recurringInvoiceScheduler from './services/financial/recurring-invoice-scheduler.service';
 import { mcpClient } from './services/mcp/mcp-client.service';
 import { initObservability, installProcessHandlers } from './utils/observability';
+import { registerCoreAiTools } from './services/ai/core-tools';
 
 const port = process.env.PORT || 8000;
 
@@ -86,6 +87,10 @@ async function startServer() {
 // Initialize error tracking + process-level safety nets before starting.
 initObservability();
 installProcessHandlers();
+
+// Core composite AI tools must be registered before the first AI request
+// builds the (cached) tool list.
+registerCoreAiTools();
 
 // Start the application
 startServer();

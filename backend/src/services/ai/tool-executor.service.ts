@@ -42,7 +42,7 @@ export async function executeToolCall(
   const customTool = getCustomToolByName(toolName);
   if (customTool) {
     try {
-      const result = await customTool.execute(args);
+      const result = await customTool.execute(args, { bearerToken });
       logger.debug(`[AI ToolExecutor] Custom tool ${toolName} executed successfully`);
       return { status: 200, data: result };
     } catch (err: unknown) {

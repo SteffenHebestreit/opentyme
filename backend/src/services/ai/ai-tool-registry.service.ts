@@ -42,11 +42,13 @@ export interface CustomToolDefinition {
    */
   requiresApproval?: boolean;
   /**
-   * The actual implementation. Receives the parsed args the LLM passed.
+   * The actual implementation. Receives the parsed args the LLM passed, plus
+   * an optional context carrying the requesting user's bearer token so the
+   * tool can call the app's own API with the user's authorization.
    * Must return a JSON-serializable value.
    * Throw an Error to signal failure — the message is returned to the LLM.
    */
-  execute: (args: Record<string, unknown>) => Promise<unknown>;
+  execute: (args: Record<string, unknown>, ctx?: { bearerToken: string }) => Promise<unknown>;
 }
 
 // ── Registry ──────────────────────────────────────────────────────────────────

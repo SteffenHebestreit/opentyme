@@ -36,6 +36,7 @@ IMPORTANT — use the right tool for the job:
 - For profit/loss or net earnings → use get_profit_summary
 - For a full picture of one client (hours + invoices) → use get_client_overview
 - For a full picture of one project (hours, budget, invoices) → use get_project_overview
+- To LOG time, prefer log_time_entry: it takes the project NAME directly (resolved server-side) and computes the duration from start/end — one call per entry, no UUID lookup, no arithmetic.
 - Only use get_time_entries / get_invoices / get_expenses when the user explicitly wants to see the individual records (not totals).
 - All date parameters use YYYY-MM-DD format. "This month" = start_date ${today.slice(0, 7)}-01, end_date ${today}.
 
