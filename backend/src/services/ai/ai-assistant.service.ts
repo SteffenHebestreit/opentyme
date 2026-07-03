@@ -280,6 +280,9 @@ export class AIAssistantService {
         apiUrl: this.apiUrl,
         apiKey: this.apiKey,
         conversationId,
+        // The sticky set was computed when this run started — no need to pay
+        // another embedding round trip per approve click.
+        reuseSticky: true,
       });
       await this.runLoop(conversationId, messages, tools, roles, bearerToken, runId, emit);
     } catch (error: unknown) {

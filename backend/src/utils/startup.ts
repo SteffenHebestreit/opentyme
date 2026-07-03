@@ -310,6 +310,10 @@ async function ensureSchemaUpgrades(): Promise<void> {
        ON time_entries (user_id, project_id, entry_date)`
     );
 
+    // Durable per-conversation AI state (sticky tool set) — survives restarts
+    // so follow-up turns keep their context and the prompt prefix stays stable.
+    await db.query(`ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS metadata JSONB`);
+
     // AI chat hot paths: the per-turn history window (ORDER BY created_at with
     // LIMIT) and the pending-approval lookups (metadata status filter) — both
     // grow with conversation age without these.

@@ -13,6 +13,7 @@
 
 import axios from 'axios';
 import { logger } from '../../utils/logger';
+import { pool } from '../../utils/database';
 import { BoundedLru } from '../../utils/bounded-lru';
 import { getToolsWithMeta, LLMTool, ToolWithMeta } from './openapi-tool-builder.service';
 
@@ -105,6 +106,12 @@ export interface SelectToolsOptions {
   apiKey?: string;
   /** Enables sticky per-conversation selection (prefix-cache friendly). */
   conversationId?: string;
+  /**
+   * Resume path: the sticky set was just computed for this conversation's last
+   * user message — reuse it directly instead of paying another embedding
+   * round trip per approve click.
+   */
+  reuseSticky?: boolean;
 }
 
 // Sticky per-conversation tool selection (in-memory; single backend replica).
@@ -117,6 +124,46 @@ export interface SelectToolsOptions {
 // selection (one cache miss, then stable again).
 const conversationTools = new BoundedLru<Set<string>>(500);
 const STICKY_CEILING = Math.floor(MAX_TOOLS * 1.5);
+
+/**
+ * Loads a conversation's sticky tool set: memory first, then the durable copy
+ * on ai_conversations.metadata (survives restarts/redeploys — without it a
+ * terse follow-up like "yes, create it" would be re-ranked from scratch with
+ * no signal and lose the tools the conversation was using).
+ */
+async function loadStickySet(conversationId: string): Promise<Set<string> | undefined> {
+  const cached = conversationTools.get(conversationId);
+  if (cached) return cached;
+  try {
+    const r = await pool().query(
+      `SELECT metadata->'sticky_tools' AS names FROM ai_conversations WHERE id = $1`,
+      [conversationId]
+    );
+    const names = r.rows[0]?.names;
+    if (Array.isArray(names) && names.length > 0) {
+      const set = new Set<string>(names.filter((n): n is string => typeof n === 'string'));
+      conversationTools.set(conversationId, set);
+      return set;
+    }
+  } catch (err: unknown) {
+    logger.warn(`[AI ToolSelection] Failed to load sticky tools: ${String(err)}`);
+  }
+  return undefined;
+}
+
+/** Persists the sticky set (best-effort; selection still works from memory). */
+async function persistStickySet(conversationId: string, names: Set<string>): Promise<void> {
+  try {
+    await pool().query(
+      `UPDATE ai_conversations
+       SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{sticky_tools}', $2::jsonb)
+       WHERE id = $1`,
+      [conversationId, JSON.stringify([...names].sort())]
+    );
+  } catch (err: unknown) {
+    logger.warn(`[AI ToolSelection] Failed to persist sticky tools: ${String(err)}`);
+  }
+}
 
 /**
  * Returns the curated, role-filtered set of tools for a single run:
@@ -136,11 +183,23 @@ function validateCoreToolNames(allNames: Set<string>): void {
 }
 
 export async function selectTools(opts: SelectToolsOptions): Promise<LLMTool[]> {
-  const { userMessage, roles, apiUrl, apiKey, conversationId } = opts;
+  const { userMessage, roles, apiUrl, apiKey, conversationId, reuseSticky } = opts;
 
   const allMeta = getToolsWithMeta();
   validateCoreToolNames(new Set(allMeta.map((t) => t.tool.function.name)));
   const allowed = allMeta.filter((t) => isToolAllowedForRoles(t.tags, roles));
+
+  // Resume fast path: reuse the set already selected for this conversation.
+  if (reuseSticky && conversationId) {
+    const sticky = await loadStickySet(conversationId);
+    if (sticky && sticky.size > 0) {
+      return allowed
+        .filter((t) => sticky.has(t.tool.function.name))
+        .sort((a, b) => a.tool.function.name.localeCompare(b.tool.function.name))
+        .map((t) => t.tool);
+    }
+  }
+
   const core = allowed.filter((t) => CORE_TOOL_NAMES.has(t.tool.function.name));
   const rest = allowed.filter((t) => !CORE_TOOL_NAMES.has(t.tool.function.name));
 
@@ -192,26 +251,30 @@ export async function selectTools(opts: SelectToolsOptions): Promise<LLMTool[]> 
  * Applies sticky per-conversation union (bounded) and deterministic ordering,
  * then returns the tool definitions. Deterministic name order keeps the
  * serialized tool list byte-stable so the inference server's prefix cache
- * survives across turns.
+ * survives across turns. The resulting set is persisted (only when it changed)
+ * so it survives restarts.
  */
-function finalizeSelection(
+async function finalizeSelection(
   picked: ToolWithMeta[],
   allowed: ToolWithMeta[],
   conversationId?: string
-): LLMTool[] {
+): Promise<LLMTool[]> {
   let names = new Set(picked.map((t) => t.tool.function.name));
 
   if (conversationId) {
-    const prev = conversationTools.get(conversationId);
+    const prev = await loadStickySet(conversationId);
+    let changed = true;
     if (prev) {
       const union = new Set([...prev, ...names]);
       if (union.size <= STICKY_CEILING) {
+        changed = union.size !== prev.size; // union ⊇ prev, so equal size = same set
         names = union;
       } else {
         logger.info(`[AI ToolSelection] Sticky set exceeded ${STICKY_CEILING} — resetting to current selection`);
       }
     }
     conversationTools.set(conversationId, names);
+    if (changed) await persistStickySet(conversationId, names);
   }
 
   return allowed
