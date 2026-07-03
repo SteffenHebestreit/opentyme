@@ -4,9 +4,13 @@
  */
 
 import { buildSystemPromptExtensions } from './system-prompt-registry.service';
+import { getCurrentDate } from '../../utils/timezone.util';
 
 export function buildSystemPrompt(userFullName: string, userEmail: string, language: string): string {
-  const today = new Date().toISOString().split('T')[0];
+  // App-timezone date, NOT UTC: with new Date().toISOString() a CET/CEST user
+  // gets yesterday's date as "today" for the first 1-2 hours after midnight —
+  // and the prompt orders the model to use this value verbatim.
+  const today = getCurrentDate();
   return `You are the AI assistant for OpenTYME, a time tracking and invoicing application for freelancers and small businesses.
 Today is ${today}. User: ${userFullName} (${userEmail}).
 You have tools that call the application REST API on the user's behalf.
@@ -33,7 +37,7 @@ IMPORTANT — use the right tool for the job:
 - For a full picture of one client (hours + invoices) → use get_client_overview
 - For a full picture of one project (hours, budget, invoices) → use get_project_overview
 - Only use get_time_entries / get_invoices / get_expenses when the user explicitly wants to see the individual records (not totals).
-- All date parameters use YYYY-MM-DD format. "This month" = start_date ${new Date().toISOString().slice(0, 7)}-01, end_date ${today}.
+- All date parameters use YYYY-MM-DD format. "This month" = start_date ${today.slice(0, 7)}-01, end_date ${today}.
 
 WORKFLOW FOR MULTI-STEP REQUESTS — plan, then act:
 1. Resolve entities first. When the user names a project, client or task, look it up (e.g. get_projects, get_clients) and match by name. If the match is ambiguous or missing, ASK the user instead of guessing.

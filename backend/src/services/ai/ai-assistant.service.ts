@@ -27,7 +27,7 @@ import {
 } from './conversation-history.service';
 import { streamChatCompletion } from './llm-stream.service';
 import { buildSystemPrompt } from './system-prompt.builder';
-import { LLMTool } from './openapi-tool-builder.service';
+import { LLMTool, validateToolArguments } from './openapi-tool-builder.service';
 import { selectTools } from './tool-selection.service';
 import { executeToolCall, isWriteTool } from './tool-executor.service';
 
@@ -263,11 +263,21 @@ export class AIAssistantService {
       return;
     }
 
-    // Find the pending approval (single-use).
+    // Atomically CLAIM the newest pending approval (single-use). A plain
+    // SELECT-then-UPDATE lets two concurrent /approve requests (double-click,
+    // network retry) both read 'awaiting_approval' and execute the writes
+    // twice. The status recheck in the outer WHERE makes the second request
+    // find zero rows. jsonb_set preserves the pending list for audit.
     const pendingRow = await db.query(
-      `SELECT id, metadata FROM ai_messages
-       WHERE conversation_id = $1 AND role = 'assistant' AND metadata->>'status' = 'awaiting_approval'
-       ORDER BY created_at DESC LIMIT 1`,
+      `UPDATE ai_messages
+       SET metadata = jsonb_set(metadata, '{status}', '"resolved"')
+       WHERE id = (
+         SELECT id FROM ai_messages
+         WHERE conversation_id = $1 AND role = 'assistant' AND metadata->>'status' = 'awaiting_approval'
+         ORDER BY created_at DESC LIMIT 1
+       )
+       AND metadata->>'status' = 'awaiting_approval'
+       RETURNING id, metadata`,
       [conversationId]
     );
     if (pendingRow.rows.length === 0) {
@@ -276,7 +286,6 @@ export class AIAssistantService {
       return;
     }
 
-    const assistantMsgId = pendingRow.rows[0].id as string;
     const pending = (pendingRow.rows[0].metadata?.pending ?? []) as LLMToolCall[];
     const decisions = new Map(approvals.map((a) => [a.toolCallId, a.decision]));
 
@@ -309,12 +318,6 @@ export class AIAssistantService {
           messages.push({ role: 'tool', content: resultContent, tool_call_id: tc.id, name: tc.function.name });
         }
       }
-
-      // Mark the approval resolved (single-use).
-      await db.query(`UPDATE ai_messages SET metadata = $1 WHERE id = $2`, [
-        JSON.stringify({ status: 'resolved' }),
-        assistantMsgId,
-      ]);
 
       // Re-select tools for the original request, then continue the loop.
       const lastUser = [...messages].reverse().find((m) => m.role === 'user');
@@ -399,13 +402,34 @@ export class AIAssistantService {
       let lastSignature = '';
 
       for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
-        const { content, toolCalls } = await this.callLLM(messages, activeTools, emit);
+        const { content, toolCalls, finishReason } = await this.callLLM(messages, activeTools, emit);
+
+        // Output hit the token cap mid-tool-call: the argument JSON is
+        // untrustworthy — discard the partial calls and ask for a leaner retry.
+        if (finishReason === 'length' && toolCalls.length > 0) {
+          logger.warn('[AI] Output truncated mid-tool-call — discarding partial calls');
+          if (content) {
+            await db.query(
+              `INSERT INTO ai_messages (conversation_id, role, content) VALUES ($1, 'assistant', $2)`,
+              [conversationId, content]
+            );
+            messages.push({ role: 'assistant', content });
+          }
+          messages.push({
+            role: 'system',
+            content:
+              'Your previous reply was cut off by the output token limit before the tool calls completed. Continue more concisely: issue fewer or smaller tool calls, or give a shorter answer.',
+          });
+          continue;
+        }
 
         if (toolCalls.length === 0) {
-          // Final response — persist and finish
+          // Final response — persist and finish (flag a truncated answer).
+          const finalText =
+            finishReason === 'length' ? `${content}\n\n[Reply truncated by the output token limit]` : content;
           await db.query(
             `INSERT INTO ai_messages (conversation_id, role, content) VALUES ($1, 'assistant', $2)`,
-            [conversationId, content]
+            [conversationId, finalText]
           );
           finalized = true;
           break;
@@ -458,6 +482,25 @@ export class AIAssistantService {
           if (timesSeen > MAX_IDENTICAL_CALLS) {
             await this.recordSyntheticResult(tc, conversationId, messages, emit, {
               error: `You already called ${tc.function.name} with these exact arguments ${MAX_IDENTICAL_CALLS} times — the result will not change. Take a different approach or give your final answer.`,
+            });
+            continue;
+          }
+
+          // Validate arguments against the tool schema BEFORE execution or
+          // approval: field-path-level repair messages fix most local-model
+          // format errors in one retry, and invalid writes never reach the
+          // approval card.
+          const parsedArgs = parseToolArguments(tc.function.arguments);
+          if (!parsedArgs.ok) {
+            await this.recordSyntheticResult(tc, conversationId, messages, emit, {
+              error: `Invalid tool arguments (${parsedArgs.error}). Re-send this call with the arguments as one valid JSON object matching the tool schema.`,
+            });
+            continue;
+          }
+          const validation = validateToolArguments(tc.function.name, parsedArgs.args);
+          if (!validation.ok) {
+            await this.recordSyntheticResult(tc, conversationId, messages, emit, {
+              error: `Invalid arguments for ${tc.function.name}: ${validation.errors.join('; ')}. Fix these parameters and call the tool again.`,
             });
             continue;
           }
@@ -573,7 +616,12 @@ export class AIAssistantService {
       try {
         const result = await executeToolCall(tcName, parsed.args, bearerToken, roles, this.abortSignal);
         isError = result.status >= 400 || result.error !== undefined;
-        resultContent = JSON.stringify(result.data ?? result.error ?? '');
+        // Explicit error envelope: a bare 4xx body like {"message":"Not found"}
+        // looks structurally identical to success data to the model — mark
+        // failures unambiguously so it never mistakes an error for a result.
+        resultContent = isError
+          ? JSON.stringify({ error: true, http_status: result.status, body: result.data ?? result.error ?? '' })
+          : JSON.stringify(result.data ?? '');
       } catch (toolErr: unknown) {
         const msg = toolErr instanceof Error ? toolErr.message : String(toolErr);
         isError = true;
