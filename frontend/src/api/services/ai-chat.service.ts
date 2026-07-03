@@ -24,13 +24,22 @@ export interface ConversationWithMessages extends Conversation {
   messages: ConversationMessage[];
 }
 
+/** Persisted tool-call record (OpenAI function-calling shape). */
+export interface ToolCallRecord {
+  id: string;
+  type: 'function';
+  function: { name: string; arguments: string };
+}
+
 export interface ConversationMessage {
   id: string;
   role: 'user' | 'assistant' | 'tool';
   content: string | null;
-  tool_calls?: unknown;
+  tool_calls?: ToolCallRecord[] | null;
   tool_call_id?: string;
   tool_name?: string;
+  /** Approval state for assistant messages that proposed writes. */
+  metadata?: { status?: string; pending?: ToolCallRecord[] } | null;
   created_at: string;
 }
 

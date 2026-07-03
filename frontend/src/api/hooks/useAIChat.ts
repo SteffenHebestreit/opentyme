@@ -4,11 +4,11 @@
  * and localStorage persistence of threadId.
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { EventType } from '../../types/ag-ui-events';
 import type { AgentEvent } from '../../types/ag-ui-events';
-import { streamChat, approveActions } from '../services/ai-chat.service';
-import type { ApprovalAction, ApprovalDecision } from '../services/ai-chat.service';
+import { streamChat, approveActions, getConversation } from '../services/ai-chat.service';
+import type { ApprovalAction, ApprovalDecision, ToolCallRecord } from '../services/ai-chat.service';
 
 export type MessageRole = 'user' | 'assistant' | 'tool_call' | 'tool_result';
 
@@ -36,6 +36,14 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function safeParseJson(raw: string): Record<string, unknown> {
+  try {
+    return JSON.parse(raw || '{}');
+  } catch {
+    return {};
+  }
+}
+
 export function useAIChat() {
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -49,6 +57,65 @@ export function useAIChat() {
 
   const abortRef = useRef<AbortController | null>(null);
   const currentAssistantIdRef = useRef<string | null>(null);
+  const didRestoreRef = useRef(false);
+
+  // Restore the persisted conversation after a page reload: the threadId
+  // survives in localStorage but messages and any pending write-approval only
+  // live in React state. Both are durably stored server-side, so refetch them
+  // once on mount — otherwise a reload silently hides an awaiting approval.
+  useEffect(() => {
+    if (!threadId || didRestoreRef.current) return;
+    didRestoreRef.current = true;
+
+    getConversation(threadId)
+      .then((conv) => {
+        const restored: UIMessage[] = [];
+        for (const m of conv.messages) {
+          if (m.role === 'user') {
+            restored.push({ id: m.id, role: 'user', content: m.content ?? '' });
+          } else if (m.role === 'assistant') {
+            if (m.content) restored.push({ id: m.id, role: 'assistant', content: m.content });
+            for (const tc of m.tool_calls ?? []) {
+              restored.push({
+                id: `${m.id}-${tc.id}`,
+                role: 'tool_call',
+                content: '',
+                toolCallId: tc.id,
+                toolName: tc.function?.name,
+                toolArgs: tc.function?.arguments ?? '',
+              });
+            }
+          } else if (m.role === 'tool') {
+            restored.push({ id: m.id, role: 'tool_result', content: m.content ?? '', toolCallId: m.tool_call_id });
+          }
+        }
+        // Don't clobber anything the user did while the fetch was in flight.
+        setMessages((prev) => (prev.length > 0 ? prev : restored.slice(-MAX_DISPLAY_MESSAGES)));
+
+        // Restore an approval that is still awaiting a decision.
+        const awaiting = [...conv.messages]
+          .reverse()
+          .find((m) => m.role === 'assistant' && m.metadata?.status === 'awaiting_approval');
+        const pending: ToolCallRecord[] = awaiting?.metadata?.pending ?? [];
+        if (awaiting && pending.length > 0) {
+          setPendingApproval((prev) =>
+            prev ?? {
+              planText: awaiting.content ?? '',
+              actions: pending.map((tc) => ({
+                toolCallId: tc.id,
+                toolName: tc.function.name,
+                arguments: safeParseJson(tc.function.arguments),
+              })),
+            }
+          );
+        }
+      })
+      .catch(() => {
+        // Conversation gone (deleted / other device) — start fresh.
+        localStorage.removeItem(THREAD_STORAGE_KEY);
+        setThreadId(null);
+      });
+  }, [threadId]);
 
   const appendMessage = useCallback((msg: UIMessage) => {
     setMessages((prev) => {
