@@ -123,3 +123,33 @@ Deferred (verified but consciously not churned now):
   ~100k+ archive entries).
 - think-strip regex duplicated in expense-extraction (divergent dangling-block
   handling); frontend/backend JSON helpers can't share without a common package.
+
+## Delta self-review (post-fix commits 9eae8ca..HEAD, 4 finder angles on Opus)
+Fixed: at-most-once resume (mark writes processed BEFORE execution, so a crash
+mid-write never re-arms → no duplicate time entries on retry); supersession-aware
+re-arm (skip if a newer user message exists + status-guarded UPDATE); edited args
+execute on a CLONE (shared pending/audit list stays = the model's proposal);
+stream `<think>` filter is case-insensitive (matches the /gi final pass; no live
+CoT leak on <THINK>); think end-flush emits the held-back tail as a delta (live ==
+persisted); backup tar verify discards stderr (no pipe-fill deadlock on a corrupt
+archive); log_time_entry task_name/description optional (were `required` yet
+documented as ""-if-absent, which validateToolArguments rejected — broke the
+flagship back-logging workflow); empty-project guard in resolveProject; bounded
+no-forward-progress break (stuck identical-batch loop stops in ~2 rounds after the
+repair message instead of running to MAX_ITERATIONS).
+
+Consciously deferred (single backend replica; documented, not fixed):
+- **No per-conversation serialization.** `/run` and `/approve` are independent SSE
+  endpoints; the approval lifecycle relies on atomic single-row claims rather than
+  a conversation lock. Residual windows: (a) runLoop arms the approval metadata a
+  moment after inserting the assistant row, so a supersede scanning in that gap
+  sees no awaiting_approval row; (b) sticky-tool-set persist is a read-modify-write
+  that last-writer-wins under two concurrent same-conversation turns. Both are rare
+  (a user rarely fires two turns at once), self-heal (sticky set re-unions next
+  turn; a mis-armed write still needs an explicit Approve), and would be closed
+  properly by a Postgres advisory lock keyed on conversation_id if multi-replica or
+  observed contention ever makes it worth the complexity.
+- Cosmetic: parallel read-result cards can display in completion order live but
+  load in call order on reload (results key by tool_call_id, so correctness holds);
+  approve-with-edit live emit shows the raw tool result while the persisted form is
+  the wrapped edited_by_user envelope.

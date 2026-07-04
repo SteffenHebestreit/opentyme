@@ -89,11 +89,15 @@ export async function streamChatCompletion(options: StreamChatOptions): Promise<
     let s = tagCarry + text;
     tagCarry = '';
     let out = '';
+    // Case-INSENSITIVE matching (search a lowercased copy, slice the original)
+    // so <THINK>/<Think> variants are stripped from the live stream too — the
+    // final stripThinking pass is /gi, and the two must agree.
     while (s.length > 0) {
+      const lower = s.toLowerCase();
       if (inThink) {
-        const end = s.indexOf('</think>');
+        const end = lower.indexOf('</think>');
         if (end === -1) {
-          const p = partialSuffix(s, '</think>');
+          const p = partialSuffix(lower, '</think>');
           if (p > 0) tagCarry = s.slice(-p);
           s = '';
         } else {
@@ -101,9 +105,9 @@ export async function streamChatCompletion(options: StreamChatOptions): Promise<
           s = s.slice(end + '</think>'.length);
         }
       } else {
-        const start = s.indexOf('<think>');
+        const start = lower.indexOf('<think>');
         if (start === -1) {
-          const p = partialSuffix(s, '<think>');
+          const p = partialSuffix(lower, '<think>');
           out += p > 0 ? s.slice(0, -p) : s;
           if (p > 0) tagCarry = s.slice(-p);
           s = '';
@@ -231,8 +235,16 @@ export async function streamChatCompletion(options: StreamChatOptions): Promise<
     });
   });
 
-  // A held-back partial that never became a tag is real content after all.
-  if (!inThink && tagCarry) accumulatedContent += tagCarry;
+  // A held-back partial that never became a tag is real content after all —
+  // emit it as a final delta too so the live stream matches the persisted text.
+  if (!inThink && tagCarry) {
+    if (!hasEmittedTextStart) {
+      emit({ type: EventType.TEXT_MESSAGE_START, messageId, role: 'assistant' });
+      hasEmittedTextStart = true;
+    }
+    emit({ type: EventType.TEXT_MESSAGE_CONTENT, messageId, delta: tagCarry });
+    accumulatedContent += tagCarry;
+  }
 
   if (hasEmittedTextStart) {
     emit({ type: EventType.TEXT_MESSAGE_END, messageId });

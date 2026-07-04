@@ -29,6 +29,21 @@
   failures no longer discard the conversation.
 - Timezone-correct dates in the system prompt and pattern analysis.
 
+### AI assistant — delta self-review fixes
+- **At-most-once approved writes**: a write that executed but whose result failed to
+  record is no longer re-armed, so retrying Approve can't create a duplicate entry.
+- **Supersession-aware recovery**: a failed resume won't resurrect an approval that a
+  newer user message already superseded; approve-with-edit executes on a clone so the
+  stored proposal/audit stays intact.
+- `log_time_entry` `task_name`/`description` are optional (were wrongly `required` yet
+  documented as blank-if-absent — broke the back-logging workflow); empty project name
+  is rejected with a clear message.
+- Stream `<think>` filter is case-insensitive (no live chain-of-thought leak on
+  `<THINK>`), and a held-back partial tag is emitted so live == persisted text.
+- Backup tar verification discards stderr (a corrupt archive can no longer deadlock it).
+- Bounded no-forward-progress break: a stuck identical-batch loop stops after a couple
+  of rounds (once the repair message has been delivered) instead of running to the cap.
+
 ### Reliability & operations
 - Backups are **verified restorable** before being marked completed (streamed tar listing) and
   can mirror off-site (`BACKUP_MIRROR_DIR`), with retention pruning both copies.

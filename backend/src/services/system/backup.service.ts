@@ -172,7 +172,10 @@ class BackupService {
     // the listing past any maxBuffer, and an overflow would falsely mark a
     // perfectly good backup as failed.
     await new Promise<void>((resolve, reject) => {
-      const proc = spawn('tar', ['-tzf', backupPath]);
+      // Discard stderr rather than pipe it: a corrupt archive can emit enough
+      // per-member warnings to fill an unread stderr pipe, which would block tar
+      // and hang this promise forever. Non-zero exit is still surfaced below.
+      const proc = spawn('tar', ['-tzf', backupPath], { stdio: ['ignore', 'pipe', 'ignore'] });
       let entryCount = 0;
       let hasManifest = false;
       let hasDump = false;

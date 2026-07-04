@@ -50,6 +50,11 @@ const MAX_ITERATIONS = Number(process.env.AI_MAX_ITERATIONS) || 12;
 // fails this many times consecutively is disabled for the rest of the run.
 const MAX_IDENTICAL_CALLS = 2;
 const CIRCUIT_BREAK_ERRORS = 3;
+// If this many consecutive rounds produce tool calls but NONE are executable
+// (all deduped / circuit-broken / repeat-capped / invalid), the model is stuck
+// in a loop the per-call repair message hasn't broken — stop calling the LLM
+// and wrap up instead of spinning to MAX_ITERATIONS.
+const MAX_NO_PROGRESS_ROUNDS = 2;
 
 // ---- Service ----------------------------------------------------------------
 
@@ -258,8 +263,12 @@ export class AIAssistantService {
         ...(await loadHistory(conversationId, keepDangling)),
       ];
 
-      // Apply each pending write decision.
+      // Apply each pending write decision. Mark each processed BEFORE any
+      // side-effecting execution: a write we START must never be re-armed on
+      // failure, so a crash mid-write cannot produce a duplicate on retry
+      // (at-most-once). Only the untouched tail is re-armed in the catch.
       for (const tc of pending) {
+        processedIds.add(tc.id);
         const approval = decisions.get(tc.id);
         const decision = approval?.decision ?? 'reject';
         if (decision === 'approve') {
@@ -274,11 +283,15 @@ export class AIAssistantService {
               });
               emit({ type: EventType.TOOL_CALL_RESULT, toolCallId: tc.id, content: resultContent });
               await this.recordToolResult(tc, conversationId, messages, emit, resultContent);
-              processedIds.add(tc.id);
               continue;
             }
-            tc.function.arguments = JSON.stringify(sortKeysDeep(approval.editedArguments));
-            const outcome = await this.executeCall(tc, bearerToken, roles, emit);
+            // Execute a CLONE carrying the edited args — never mutate the shared
+            // pending object, so the stored proposal / audit list stays intact.
+            const editedCall: LLMToolCall = {
+              ...tc,
+              function: { ...tc.function, arguments: JSON.stringify(sortKeysDeep(approval.editedArguments)) },
+            };
+            const outcome = await this.executeCall(editedCall, bearerToken, roles, emit);
             const wrapped = JSON.stringify({
               edited_by_user: true,
               executed_arguments: approval.editedArguments,
@@ -296,7 +309,6 @@ export class AIAssistantService {
           emit({ type: EventType.TOOL_CALL_RESULT, toolCallId: tc.id, content: resultContent });
           await this.recordToolResult(tc, conversationId, messages, emit, resultContent);
         }
-        processedIds.add(tc.id);
       }
 
       // Re-select tools for the original request, then continue the loop.
@@ -316,18 +328,31 @@ export class AIAssistantService {
       const message = error instanceof Error ? error.message : String(error);
       logger.error(`[AI] resumeRun error: ${message}`);
 
-      // The claim consumed the approval before the work was done — re-arm it
-      // for the writes that were NOT yet processed so the user can retry
-      // Approve instead of silently losing the actions. Already-processed
-      // writes are excluded to prevent double execution on retry.
+      // Recovery: the claim consumed the approval before the work finished.
+      // Re-arm ONLY the writes we never started (processedIds is marked before
+      // execution → excludes anything with a possible side effect: at-most-once),
+      // and ONLY if no newer user message has arrived meanwhile — otherwise that
+      // message's supersede should win and we must not resurrect a stale write.
+      // The status guard on the UPDATE closes the same race at write time.
       const remaining = pending.filter((tc) => !processedIds.has(tc.id));
       if (remaining.length > 0) {
         try {
-          await db.query(`UPDATE ai_messages SET metadata = $1 WHERE id = $2`, [
-            JSON.stringify({ status: 'awaiting_approval', pending: remaining }),
-            claimedId,
-          ]);
-          logger.warn(`[AI] Re-armed approval ${claimedId} with ${remaining.length} unprocessed action(s) after failure`);
+          const superseded = await db.query(
+            `SELECT 1 FROM ai_messages
+             WHERE conversation_id = $1 AND role = 'user'
+               AND created_at > (SELECT created_at FROM ai_messages WHERE id = $2)
+             LIMIT 1`,
+            [conversationId, claimedId]
+          );
+          if (superseded.rows.length > 0) {
+            logger.warn(`[AI] Not re-arming approval ${claimedId}: superseded by a newer user message`);
+          } else {
+            await db.query(
+              `UPDATE ai_messages SET metadata = $1 WHERE id = $2 AND metadata->>'status' = 'resolved'`,
+              [JSON.stringify({ status: 'awaiting_approval', pending: remaining }), claimedId]
+            );
+            logger.warn(`[AI] Re-armed approval ${claimedId} with ${remaining.length} unprocessed action(s) after failure`);
+          }
         } catch (rearmErr: unknown) {
           logger.error(`[AI] Failed to re-arm approval ${claimedId}: ${String(rearmErr)}`);
         }
@@ -406,6 +431,7 @@ export class AIAssistantService {
     const errorStreaks = new Map<string, number>();
     const disabledTools = new Set<string>();
     let activeTools = tools;
+    let noProgressRounds = 0;
 
     try {
       let finalized = false;
@@ -530,6 +556,19 @@ export class AIAssistantService {
 
           executable.push(tc);
         }
+
+        // No-forward-progress break: every call this round was suppressed with a
+        // synthetic result (the model keeps repeating suppressed calls). The
+        // synthetic feedback is already in `messages`; give it a couple of rounds
+        // to react, then stop rather than burning LLM calls up to MAX_ITERATIONS.
+        if (executable.length === 0) {
+          if (++noProgressRounds >= MAX_NO_PROGRESS_ROUNDS) {
+            logger.warn('[AI] No executable tool calls for consecutive rounds — breaking to wrap-up');
+            break;
+          }
+          continue;
+        }
+        noProgressRounds = 0;
 
         // Split into reads (auto-run) and writes (require approval).
         const writes = executable.filter((tc) => isWriteTool(tc.function.name));

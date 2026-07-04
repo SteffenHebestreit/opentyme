@@ -192,6 +192,52 @@ describe('AIAssistantService orchestration', () => {
     expect(events.some((e) => e.type === 'RUN_FINISHED')).toBe(true);
   });
 
+  it('at-most-once: an executed write whose result-record fails is NOT re-armed (no double execution)', async () => {
+    // w1 approved: its tool executes, but recording the result throws (DB blip).
+    // w2 is never reached. The re-arm must exclude w1 (already executed) and
+    // include only w2 (never started).
+    const pending = [makeCall('w1', 'post_time_entries', { a: 1 }), makeCall('w2', 'post_time_entries', { a: 2 })];
+    claimRows = [{ id: 'amsg-1', metadata: { status: 'resolved', pending } }];
+
+    const baseQuery = hooks.__query;
+    hooks.__query = async (sql: string, params?: unknown[]) => {
+      // Fail the INSERT of w1's tool result, AFTER its executeToolCall side effect.
+      if (sql.includes("'tool'") && params?.[2] === 'w1') {
+        queries.push({ sql, params: params ?? [] });
+        throw new Error('simulated DB failure while recording w1 result');
+      }
+      return baseQuery(sql, params);
+    };
+
+    const svc = new AIAssistantService();
+    await svc.initialize('user-1');
+    await svc.resumeRun(
+      'user-1',
+      CONV,
+      [
+        { toolCallId: 'w1', decision: 'approve' },
+        { toolCallId: 'w2', decision: 'approve' },
+      ],
+      'User',
+      'u@x',
+      'en',
+      'Bearer t',
+      [],
+      emit
+    );
+
+    // w1 executed exactly once; w2 never executed (loop threw before reaching it).
+    expect(execCalls).toEqual([{ name: 'post_time_entries', args: { a: 1 } }]);
+    // Re-arm UPDATE must carry only w2 — w1 is excluded so a retry cannot re-run it.
+    const rearm = queries.find(
+      (q) => q.sql.includes('SET metadata') && String(q.params[0]).includes('awaiting_approval')
+    );
+    expect(rearm).toBeDefined();
+    const rearmed = JSON.parse(String(rearm!.params[0])) as { pending: Array<{ id: string }> };
+    expect(rearmed.pending.map((t) => t.id)).toEqual(['w2']);
+    expect(events.some((e) => e.type === 'RUN_ERROR')).toBe(true);
+  });
+
   it('resume with no pending approval (double click) reports NO_PENDING and executes nothing', async () => {
     claimRows = []; // atomic claim finds nothing — already claimed
     const svc = new AIAssistantService();

@@ -30,7 +30,9 @@ async function resolveProject(
   project: string,
   bearerToken: string
 ): Promise<{ id: string; name: string }> {
-  if (UUID_RE.test(project)) return { id: project, name: project };
+  const trimmed = project.trim();
+  if (!trimmed) throw new Error('project is required (a project name or UUID)');
+  if (UUID_RE.test(trimmed)) return { id: trimmed, name: trimmed };
 
   const res = await axios.get(`${INTERNAL_BASE_URL}/api/projects`, {
     headers: { Authorization: bearerToken },
@@ -41,7 +43,7 @@ async function resolveProject(
     name: string;
   }>;
 
-  const needle = project.trim().toLowerCase();
+  const needle = trimmed.toLowerCase();
   const exact = projects.filter((p) => p.name.toLowerCase() === needle);
   if (exact.length === 1) return exact[0];
   const partial = projects.filter((p) => p.name.toLowerCase().includes(needle));
@@ -71,10 +73,10 @@ export function registerCoreAiTools(): void {
         entry_date: { type: 'string', description: 'Date of the work, YYYY-MM-DD' },
         start_time: { type: 'string', description: 'Start time, HH:MM (24h)' },
         end_time: { type: 'string', description: 'End time, HH:MM (24h), after start_time (same day)' },
-        task_name: { type: 'string', description: 'Task label; empty string if none' },
-        description: { type: 'string', description: 'Description; empty string if none' },
+        task_name: { type: 'string', description: 'Optional task label; omit if none' },
+        description: { type: 'string', description: 'Optional description; omit if none' },
       },
-      required: ['project', 'entry_date', 'start_time', 'end_time', 'task_name', 'description'],
+      required: ['project', 'entry_date', 'start_time', 'end_time'],
     },
     execute: async (args, ctx) => {
       if (!ctx?.bearerToken) throw new Error('log_time_entry requires an authenticated context');
