@@ -72,28 +72,56 @@ describe('ExpenseDepreciationService.calculateDepreciationSchedule', () => {
     expect(schedule[0].is_final_year).toBe(true);
   });
 
-  it('always sums to the net amount across a range of years and start months (invariant)', async () => {
-    for (const years of [2, 4, 5]) {
-      for (const month of [0, 3, 9]) {
-        const id = await makeExpense(999.99);
-        await depreciation.calculateDepreciationSchedule(id, TEST_USER_ID, years, new Date(2024, month, 1));
-        const schedule = await depreciation.getDepreciationSchedule(id, TEST_USER_ID);
-        expect(schedule).toHaveLength(years);
-        expect(sum(schedule)).toBeCloseTo(999.99, 2);
+  it('always sums to the net amount across a range of years, start months, and methods (invariant)', async () => {
+    for (const method of ['linear', 'degressive'] as const) {
+      for (const years of [2, 4, 5]) {
+        for (const month of [0, 3, 9]) {
+          const id = await makeExpense(999.99);
+          await depreciation.calculateDepreciationSchedule(id, TEST_USER_ID, years, new Date(2024, month, 1), method);
+          const schedule = await depreciation.getDepreciationSchedule(id, TEST_USER_ID);
+          expect(schedule).toHaveLength(years);
+          expect(sum(schedule)).toBeCloseTo(999.99, 2);
+          expect(parseFloat(schedule[years - 1].remaining_value)).toBeCloseTo(0, 2);
+        }
       }
     }
   });
 
-  it("currently treats 'degressive' as linear (documents the unimplemented method)", async () => {
-    const linId = await makeExpense(1200);
-    await depreciation.calculateDepreciationSchedule(linId, TEST_USER_ID, 3, new Date(2024, 0, 1), 'linear');
-    const linear = await depreciation.getDepreciationSchedule(linId, TEST_USER_ID);
+  it('degressive AfA is front-loaded (declining balance) then switches to straight-line', async () => {
+    // years=10 → linear rate 10%, degressive rate min(2×10%, 20%) = 20% of book.
+    const id = await makeExpense(10000);
+    await depreciation.calculateDepreciationSchedule(id, TEST_USER_ID, 10, new Date(2024, 0, 1), 'degressive');
+    const schedule = await depreciation.getDepreciationSchedule(id, TEST_USER_ID);
+    const amounts = nums(schedule);
 
-    const degId = await makeExpense(1200);
-    await depreciation.calculateDepreciationSchedule(degId, TEST_USER_ID, 3, new Date(2024, 0, 1), 'degressive');
-    const degressive = await depreciation.getDepreciationSchedule(degId, TEST_USER_ID);
+    expect(schedule).toHaveLength(10);
+    expect(amounts[0]).toBeCloseTo(2000, 2); // 20% of 10000
+    expect(amounts[1]).toBeCloseTo(1600, 2); // 20% of remaining 8000
+    // Strictly declining while degressive, never increasing (flat once switched).
+    for (let i = 1; i < amounts.length; i++) {
+      expect(amounts[i]).toBeLessThanOrEqual(amounts[i - 1] + 0.01);
+    }
+    expect(sum(schedule)).toBeCloseTo(10000, 2);
+    expect(parseFloat(schedule[9].remaining_value)).toBeCloseTo(0, 2);
+    // Front-loaded vs linear: first-year degressive deduction exceeds linear (1000).
+    expect(amounts[0]).toBeGreaterThan(10000 / 10);
+  });
 
-    // Known limitation: degressive is not implemented, so both are identical.
-    expect(nums(degressive)).toEqual(nums(linear));
+  it('respects DEPRECIATION_DEGRESSIVE_FACTOR / _CAP overrides', async () => {
+    const prevFactor = process.env.DEPRECIATION_DEGRESSIVE_FACTOR;
+    const prevCap = process.env.DEPRECIATION_DEGRESSIVE_CAP;
+    process.env.DEPRECIATION_DEGRESSIVE_FACTOR = '2.5';
+    process.env.DEPRECIATION_DEGRESSIVE_CAP = '0.25';
+    try {
+      const id = await makeExpense(10000);
+      await depreciation.calculateDepreciationSchedule(id, TEST_USER_ID, 10, new Date(2024, 0, 1), 'degressive');
+      const schedule = await depreciation.getDepreciationSchedule(id, TEST_USER_ID);
+      // rate = min(2.5 × 10%, 25%) = 25% → first year 2500.
+      expect(parseFloat(schedule[0].amount)).toBeCloseTo(2500, 2);
+      expect(sum(schedule)).toBeCloseTo(10000, 2);
+    } finally {
+      process.env.DEPRECIATION_DEGRESSIVE_FACTOR = prevFactor;
+      process.env.DEPRECIATION_DEGRESSIVE_CAP = prevCap;
+    }
   });
 });

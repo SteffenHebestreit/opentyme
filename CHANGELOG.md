@@ -29,6 +29,20 @@
   failures no longer discard the conversation.
 - Timezone-correct dates in the system prompt and pattern analysis.
 
+### Depreciation (AfA)
+- **Degressive AfA implemented** (declining-balance per §7(2) EStG): a fixed
+  percentage of the remaining book value each year with the mandatory switch to
+  straight-line, first-year month pro-rata, and an exact sum to net_amount. The
+  rate `min(FACTOR × linear, CAP)` is configurable (`DEPRECIATION_DEGRESSIVE_FACTOR`
+  / `_CAP`, default the 2024 rule 2× / 20%) because the legal cap is year-dated.
+  Previously the UI's Degressive option silently produced a linear schedule.
+- **Single-year fix**: a 1-year schedule with a mid-year start now depreciates
+  the full net amount (was only the pro-rated fraction).
+- **Exact totals**: each year rounds to cents and the last year absorbs the
+  residual, so the schedule sums to net_amount and closes at 0 book value.
+- New `expense-depreciation.service.test.ts` (6 tests) covers linear, degressive,
+  the invariant, and the rate overrides.
+
 ### AI assistant — delta self-review fixes
 - **At-most-once approved writes**: a write that executed but whose result failed to
   record is no longer re-armed, so retrying Approve can't create a duplicate entry.

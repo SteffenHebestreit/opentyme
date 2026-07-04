@@ -6,7 +6,6 @@
  */
 
 import { getDbClient } from '../../utils/database';
-import { logger } from '../../utils/logger';
 import { Expense } from '../../models/business/expense.model';
 
 export class ExpenseDepreciationService {
@@ -47,59 +46,31 @@ export class ExpenseDepreciationService {
 
       const netAmount = parseFloat(expenseResult.rows[0].net_amount);
 
-      // NOTE: only LINEAR depreciation is implemented. The frontend exposes a
-      // "degressive" option and it is persisted on the expense, but the schedule
-      // is still computed linearly here. German degressive AfA has a legally
-      // dated rate cap (and a switch-to-linear rule), so it must be implemented
-      // deliberately rather than approximated — warn loudly so the mismatch is
-      // visible instead of silently producing a mislabelled schedule.
-      if (method === 'degressive') {
-        logger.warn(
-          `[Depreciation] 'degressive' requested for expense ${expenseId} but not implemented — falling back to LINEAR. The schedule will not match a true degressive AfA.`
-        );
-      }
-
       // Delete existing schedule entries
       await client.query(
         'DELETE FROM expense_depreciation_schedule WHERE expense_id = $1',
         [expenseId]
       );
 
-      // Calculate annual depreciation amount (linear method)
-      const annualDepreciation = netAmount / years;
-
-      // Calculate pro-rata for first year (months remaining in year)
+      // First year is pro-rated by the number of months the asset is held that
+      // calendar year (German AfA: 1/12 per month from the acquisition month).
       const startMonth = startDate.getMonth() + 1; // 1-12
-      const monthsInFirstYear = 13 - startMonth; // Remaining months including start month
-      const firstYearAmount = (annualDepreciation / 12) * monthsInFirstYear;
-
-      // Generate schedule entries. Every stored amount is rounded to cents, and
-      // the last year absorbs the accumulated rounding residual, so the schedule
-      // sums EXACTLY to net_amount (total AfA must equal the depreciable base;
-      // rounding each year independently otherwise drifts by a cent or two).
-      const round2 = (n: number): number => Math.round(n * 100) / 100;
+      const monthsInFirstYear = 13 - startMonth; // remaining months incl. start month
       const startYear = startDate.getFullYear();
-      let cumulativeAmount = 0;
 
+      // Per-year amounts. Every value is rounded to cents and the LAST year
+      // absorbs the accumulated rounding residual, so the schedule sums EXACTLY
+      // to net_amount and the closing book value is 0.
+      const yearAmounts =
+        method === 'degressive'
+          ? this.buildDegressiveAmounts(netAmount, years, monthsInFirstYear)
+          : this.buildLinearAmounts(netAmount, years, monthsInFirstYear);
+
+      const round2 = (n: number): number => Math.round(n * 100) / 100;
+      let cumulativeAmount = 0;
       for (let i = 0; i < years; i++) {
         const year = startYear + i;
-        let yearAmount: number;
-
-        if (i === years - 1) {
-          // Last year - remaining amount to reach net_amount. Checked BEFORE the
-          // first-year branch so a single-year schedule (years === 1, where
-          // i === 0 is also the last year) depreciates the full net amount
-          // rather than only the pro-rated first-year fraction.
-          yearAmount = round2(netAmount - cumulativeAmount);
-        } else if (i === 0) {
-          // First year - pro-rata
-          yearAmount = round2(firstYearAmount);
-        } else {
-          // Full years
-          yearAmount = round2(annualDepreciation);
-        }
-
-        cumulativeAmount = round2(cumulativeAmount + yearAmount);
+        cumulativeAmount = round2(cumulativeAmount + yearAmounts[i]);
         const remainingValue = round2(netAmount - cumulativeAmount);
         const isFinalYear = i === years - 1;
 
@@ -107,7 +78,7 @@ export class ExpenseDepreciationService {
           `INSERT INTO expense_depreciation_schedule
            (expense_id, user_id, year, amount, cumulative_amount, remaining_value, is_final_year)
            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-          [expenseId, userId, year, yearAmount, cumulativeAmount, remainingValue, isFinalYear]
+          [expenseId, userId, year, yearAmounts[i], cumulativeAmount, remainingValue, isFinalYear]
         );
       }
 
@@ -118,6 +89,76 @@ export class ExpenseDepreciationService {
     } finally {
       client.release();
     }
+  }
+
+  /**
+   * Linear AfA: equal annual amounts, first year pro-rated by months held, and
+   * the final year absorbs the rounding residual so the schedule sums to net.
+   */
+  private buildLinearAmounts(netAmount: number, years: number, monthsInFirstYear: number): number[] {
+    const round2 = (n: number): number => Math.round(n * 100) / 100;
+    const annual = netAmount / years;
+    const firstYear = (annual / 12) * monthsInFirstYear;
+    const amounts: number[] = [];
+    let cumulative = 0;
+    for (let i = 0; i < years; i++) {
+      let amount: number;
+      if (i === years - 1) {
+        amount = round2(netAmount - cumulative); // residual (also the years===1 case)
+      } else if (i === 0) {
+        amount = round2(firstYear);
+      } else {
+        amount = round2(annual);
+      }
+      amounts.push(amount);
+      cumulative = round2(cumulative + amount);
+    }
+    return amounts;
+  }
+
+  /**
+   * Degressive (declining-balance) AfA per German §7(2) EStG:
+   * a fixed percentage of the *remaining book value* each year, with a mandatory
+   * switch to straight-line over the remaining life once that yields at least as
+   * much (Übergang zur linearen AfA). The rate is min(factor × linear-rate, cap).
+   *
+   * The factor/cap are legally dated and depend on the acquisition year (e.g.
+   * 2.5×/25% for 2020–2022, 2×/20% for 2024, 3×/30% for mid-2025 onward), so they
+   * are configurable via DEPRECIATION_DEGRESSIVE_FACTOR / _CAP and DEFAULT to the
+   * 2024 rule (2× / 20%). Operators must set them to match the asset's applicable
+   * year. The first year is pro-rated by months held; the last year absorbs the
+   * residual so the schedule still sums exactly to net_amount.
+   */
+  private buildDegressiveAmounts(netAmount: number, years: number, monthsInFirstYear: number): number[] {
+    const round2 = (n: number): number => Math.round(n * 100) / 100;
+    const factor = Number(process.env.DEPRECIATION_DEGRESSIVE_FACTOR ?? '2');
+    const cap = Number(process.env.DEPRECIATION_DEGRESSIVE_CAP ?? '0.20');
+    const rate = Math.min(factor * (1 / years), cap);
+
+    const amounts: number[] = [];
+    let book = netAmount;
+    let switched = false;
+    for (let i = 0; i < years; i++) {
+      const remainingYears = years - i;
+      const proRata = i === 0 ? monthsInFirstYear / 12 : 1;
+      let amount: number;
+      if (i === years - 1) {
+        amount = round2(book); // final year: whatever book value remains
+      } else {
+        const degressive = book * rate * proRata;
+        const straightLine = (book / remainingYears) * proRata;
+        // Switch to straight-line once it is at least as large, and stay there.
+        if (switched || straightLine >= degressive) {
+          switched = true;
+          amount = round2(straightLine);
+        } else {
+          amount = round2(degressive);
+        }
+      }
+      amounts.push(amount);
+      book = round2(book - amount);
+    }
+    return amounts;
   }
 
   /**
