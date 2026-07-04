@@ -47,6 +47,18 @@ export class ExpenseDepreciationService {
 
       const netAmount = parseFloat(expenseResult.rows[0].net_amount);
 
+      // NOTE: only LINEAR depreciation is implemented. The frontend exposes a
+      // "degressive" option and it is persisted on the expense, but the schedule
+      // is still computed linearly here. German degressive AfA has a legally
+      // dated rate cap (and a switch-to-linear rule), so it must be implemented
+      // deliberately rather than approximated — warn loudly so the mismatch is
+      // visible instead of silently producing a mislabelled schedule.
+      if (method === 'degressive') {
+        logger.warn(
+          `[Depreciation] 'degressive' requested for expense ${expenseId} but not implemented — falling back to LINEAR. The schedule will not match a true degressive AfA.`
+        );
+      }
+
       // Delete existing schedule entries
       await client.query(
         'DELETE FROM expense_depreciation_schedule WHERE expense_id = $1',
@@ -61,7 +73,11 @@ export class ExpenseDepreciationService {
       const monthsInFirstYear = 13 - startMonth; // Remaining months including start month
       const firstYearAmount = (annualDepreciation / 12) * monthsInFirstYear;
 
-      // Generate schedule entries
+      // Generate schedule entries. Every stored amount is rounded to cents, and
+      // the last year absorbs the accumulated rounding residual, so the schedule
+      // sums EXACTLY to net_amount (total AfA must equal the depreciable base;
+      // rounding each year independently otherwise drifts by a cent or two).
+      const round2 = (n: number): number => Math.round(n * 100) / 100;
       const startYear = startDate.getFullYear();
       let cumulativeAmount = 0;
 
@@ -69,19 +85,22 @@ export class ExpenseDepreciationService {
         const year = startYear + i;
         let yearAmount: number;
 
-        if (i === 0) {
+        if (i === years - 1) {
+          // Last year - remaining amount to reach net_amount. Checked BEFORE the
+          // first-year branch so a single-year schedule (years === 1, where
+          // i === 0 is also the last year) depreciates the full net amount
+          // rather than only the pro-rated first-year fraction.
+          yearAmount = round2(netAmount - cumulativeAmount);
+        } else if (i === 0) {
           // First year - pro-rata
-          yearAmount = firstYearAmount;
-        } else if (i === years - 1) {
-          // Last year - remaining amount to reach net_amount
-          yearAmount = netAmount - cumulativeAmount;
+          yearAmount = round2(firstYearAmount);
         } else {
           // Full years
-          yearAmount = annualDepreciation;
+          yearAmount = round2(annualDepreciation);
         }
 
-        cumulativeAmount += yearAmount;
-        const remainingValue = netAmount - cumulativeAmount;
+        cumulativeAmount = round2(cumulativeAmount + yearAmount);
+        const remainingValue = round2(netAmount - cumulativeAmount);
         const isFinalYear = i === years - 1;
 
         await client.query(
