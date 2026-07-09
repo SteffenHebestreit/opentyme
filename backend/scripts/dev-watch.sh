@@ -5,7 +5,11 @@
 
 while true; do
   echo "[DEV-WATCH] Starting application..."
-  node -r ts-node/register src/index.ts
+  # TS_NODE_FILES=true makes ts-node load ambient .d.ts files (e.g.
+  # src/types/express.d.ts, which augments Request with .user/.kauth). Without
+  # it, ts-node only checks files reachable via imports and fails to compile the
+  # Keycloak middleware. Mirrors nodemon.json's env.
+  TS_NODE_FILES=true node -r ts-node/register src/index.ts
   EXIT_CODE=$?
   
   echo "[DEV-WATCH] Process exited with code $EXIT_CODE"
