@@ -51,6 +51,16 @@ http:
         permanent: true
 
 tls:
+  # Wildcard cert for *.opentyme.k2o (and opentyme.k2o). The stable file names
+  # local-dev.crt/.key are produced by scripts/generate-local-certs.sh so this
+  # config stays domain-agnostic. Also set as the default certificate so any
+  # request (including SNI-less / unexpected hosts) is served this cert instead
+  # of Traefik's built-in self-signed "TRAEFIK DEFAULT CERT".
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /letsencrypt/local/local-dev.crt
+        keyFile: /letsencrypt/local/local-dev.key
   certificates:
     - certFile: /letsencrypt/local/local-dev.crt
       keyFile: /letsencrypt/local/local-dev.key
