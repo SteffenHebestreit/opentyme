@@ -81,7 +81,12 @@ export async function emailReport(req: Request, res: Response): Promise<void> {
         }
         case 'time-tracking': {
           const report = await reportService.generateTimeTrackingReport(userId, dateFrom, dateTo);
-          pdfBuffer = await reportPDFService.generateTimeTrackingReportPDF(report, lang as 'en' | 'de', currency);
+          pdfBuffer = await reportPDFService.generateTimeTrackingReportPDF(
+            report,
+            lang as 'en' | 'de',
+            currency,
+            { worker: await reportPDFService.getWorkerFooterInfo(userId) },
+          );
           break;
         }
         default:

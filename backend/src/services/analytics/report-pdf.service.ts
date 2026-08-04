@@ -72,6 +72,32 @@ function applyTheme(theme?: PdfTheme): () => void {
   return () => { COLORS = saved; };
 }
 
+/**
+ * Fetches the worker identity (name + email) for the time-tracking PDF footer
+ * from the same `settings` company data shown on the Konfiguration page and used
+ * on invoices (company_name / company_email). Returns undefined when no usable
+ * identity is configured, so the footer degrades to page numbers only.
+ */
+export async function getWorkerFooterInfo(
+  userId: string
+): Promise<{ name?: string; email?: string } | undefined> {
+  try {
+    const pool = getDbClient();
+    const result = await pool.query(
+      'SELECT company_name, company_email FROM settings WHERE user_id = $1',
+      [userId]
+    );
+    const row = result.rows[0];
+    if (!row) return undefined;
+    const name = (row.company_name || '').toString().trim();
+    const email = (row.company_email || '').toString().trim();
+    if (!name && !email) return undefined;
+    return { name: name || undefined, email: email || undefined };
+  } catch {
+    return undefined;
+  }
+}
+
 // Translations
 const translations = {
   en: {
@@ -1242,7 +1268,13 @@ async function generateTimeTrackingReportPDF(
   data: TimeTrackingReport,
   lang: 'en' | 'de' = 'de',
   currency: string = 'EUR',
-  metadata?: { headline?: string; description?: string; footer?: string },
+  metadata?: {
+    headline?: string;
+    description?: string;
+    footer?: string;
+    /** Identity of the person the tracked hours belong to. Rendered in the page footer. */
+    worker?: { name?: string; email?: string };
+  },
   hidePrices: boolean = false
 ): Promise<Buffer> {
   const dateRange = `${moment(data.period.start_date).format('DD.MM.YYYY')} - ${moment(data.period.end_date).format('DD.MM.YYYY')}`;
@@ -1638,21 +1670,33 @@ async function generateTimeTrackingReportPDF(
         ]
   );
 
-  // Simple sequential page numbering
+  // Worker identity for the footer, so every page is attributable to the person
+  // whose hours these are (needed for the signed timesheet handed to the end-customer).
+  const workerName = metadata?.worker?.name?.trim();
+  const workerEmail = metadata?.worker?.email?.trim();
+  const workerFooterText = [workerName, workerEmail].filter(Boolean).join(' · ');
+  const workerLabel = lang === 'en' ? 'Employee' : 'Mitarbeiter';
+
+  // Footer: worker identity on the left, sequential page number on the right.
+  // The last page is the summary/sign-off page and is excluded from the numbering.
   const customFooter = (currentPage: number, pageCount: number): Content => {
-    // Summary page (last page) - no footer
-    if (currentPage === pageCount) {
-      return { text: '', margin: [0, 0, 0, 0] } as Content;
-    }
-    
+    const isSummaryPage = currentPage === pageCount;
     return {
+      margin: [20, 15, 20, 0],
       columns: [
         {
-          text: `Seite ${currentPage} von ${pageCount - 1}`,
-          alignment: 'center',
+          width: '*',
+          text: workerFooterText ? `${workerLabel}: ${workerFooterText}` : '',
+          alignment: 'left',
           fontSize: 8,
           color: '#64748b',
-          margin: [0, 20, 0, 0],
+        },
+        {
+          width: 'auto',
+          text: isSummaryPage ? '' : `Seite ${currentPage} von ${pageCount - 1}`,
+          alignment: 'right',
+          fontSize: 8,
+          color: '#64748b',
         },
       ],
     } as Content;
@@ -1832,6 +1876,54 @@ async function generateTimeTrackingReportPDF(
       },
     );
 
+    // Sign-off block: the end-customer confirms the hours listed above so the
+    // sheet can be countersigned and billed to the contracted HR organisation.
+    // Rendered once at the very end and kept together on a single page.
+    const isEn = lang === 'en';
+    const signatureLine = (): any => ({
+      canvas: [{ type: 'line', x1: 0, y1: 0, x2: 200, y2: 0, lineWidth: 0.7, lineColor: '#334155' }],
+    });
+    content.push({
+      unbreakable: true,
+      margin: [0, 30, 0, 0],
+      stack: [
+        {
+          text: isEn ? 'Confirmation by the client' : 'Bestätigung durch den Auftraggeber',
+          fontSize: 12,
+          bold: true,
+          margin: [0, 0, 0, 8],
+          color: COLORS.primary,
+        },
+        {
+          text: isEn
+            ? 'The hours listed above are hereby confirmed as accurate.'
+            : 'Die vorstehend aufgeführten Stunden werden hiermit als korrekt bestätigt.',
+          fontSize: 9,
+          color: '#334155',
+          margin: [0, 0, 0, 45],
+        },
+        {
+          columns: [
+            {
+              width: '45%',
+              stack: [
+                signatureLine(),
+                { text: isEn ? 'Place, date' : 'Ort, Datum', fontSize: 9, color: '#64748b', margin: [0, 4, 0, 0] },
+              ],
+            },
+            { width: '10%', text: '' },
+            {
+              width: '45%',
+              stack: [
+                signatureLine(),
+                { text: isEn ? 'Signature (client)' : 'Unterschrift (Auftraggeber / Endkunde)', fontSize: 9, color: '#64748b', margin: [0, 4, 0, 0] },
+              ],
+            },
+          ],
+        },
+      ],
+    } as any);
+
     return content;
   };
 
@@ -1887,4 +1979,5 @@ export default {
   generateTimeTrackingReportPDF,
   getUserPdfTheme,
   applyTheme,
+  getWorkerFooterInfo,
 };

@@ -504,6 +504,9 @@ export class ReportController {
         headline: headline as string | undefined,
         description: description as string | undefined,
         footer: footer as string | undefined,
+        // Worker identity for the footer + sign-off page, taken from the company
+        // settings (Konfiguration page) so the end-customer sees whose hours they confirm.
+        worker: await reportPDFService.getWorkerFooterInfo(userId),
       };
 
       const report = await reportService.generateTimeTrackingReport(

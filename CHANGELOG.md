@@ -89,6 +89,13 @@
 - Route-level code splitting + vendor chunking: initial JS ~4.4 MB → ~190 kB entry
   (+ on-demand chunks); pdfmake/exceljs/chart.js load only when used.
 
+### Reports & time tracking
+- Timesheet (Zeiterfassung) PDF is now a signable proof-of-work sheet: every page footer
+  shows the worker identity (`Mitarbeiter: <name> · <email>`, taken from the company settings
+  on the Konfiguration page), and the final page carries an end-customer sign-off block
+  (Ort/Datum + Unterschrift, "Bestätigung durch den Auftraggeber"). Applies to the PDF
+  download, emailed report, and email-attachment paths.
+
 ## v1.3.0 — Agentic AI assistant
 - Human-in-the-loop write approval (batch approve/reject), per-request tool curation with
   role enforcement, plan-then-act prompting, correctness fixes (concurrency, history window,

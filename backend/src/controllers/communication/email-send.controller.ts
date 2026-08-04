@@ -85,7 +85,8 @@ async function generateReportPdfBuffer(
       }
       case 'time-tracking': {
         const report = await reportService.generateTimeTrackingReport(userId, dateFrom, dateTo);
-        return await reportPDFService.generateTimeTrackingReportPDF(report, lang, currency, undefined, hidePrices);
+        const worker = await reportPDFService.getWorkerFooterInfo(userId);
+        return await reportPDFService.generateTimeTrackingReportPDF(report, lang, currency, { worker }, hidePrices);
       }
       default:
         throw new Error(`Unknown report type: "${reportType}"`);
