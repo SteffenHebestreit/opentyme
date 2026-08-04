@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased (since v1.3.0)
+## Unreleased (since v1.4.0)
+
+## v1.4.0 (2026-08-04)
 
 ### AI assistant
 - **Research-backed loop hardening** (validated against 2025/26 agent practice; sources in
