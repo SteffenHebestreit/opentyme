@@ -314,6 +314,12 @@ async function ensureSchemaUpgrades(): Promise<void> {
     // so follow-up turns keep their context and the prompt prefix stays stable.
     await db.query(`ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS metadata JSONB`);
 
+    // VAT number belonging to the separate billing address. Distinct from
+    // clients.tax_id, which is the client entity's own tax ID.
+    await db.query(
+      `ALTER TABLE clients ADD COLUMN IF NOT EXISTS billing_tax_id VARCHAR(100)`
+    );
+
     // AI chat hot paths: the per-turn history window (ORDER BY created_at with
     // LIMIT) and the pending-approval lookups (metadata status filter) — both
     // grow with conversation age without these.

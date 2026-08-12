@@ -2,6 +2,24 @@
 
 ## Unreleased (since v1.4.0)
 
+### Clients — billing fields
+- **Saving a client no longer fails with a 400.** The controller's Joi whitelists never
+  gained the billing fields that the form, the service and the `clients` table already
+  supported, and Joi rejects unknown keys — so any client carrying a Rechnungs-E-Mail
+  (or any billing address value) was rejected outright on both create and update. Both
+  schemas now share one `billingFields` block so they can't drift apart again; malformed
+  values and genuinely unknown keys are still rejected.
+- **The separate-billing-address checkbox persists.** `use_separate_billing_address` was
+  local UI state that was never submitted, while the invoice PDF branches on it to pick the
+  recipient — so a filled-in billing address never actually reached an invoice. The form now
+  sends it, and prefers the stored flag when reopening (falling back to inferring from the
+  data for clients saved earlier).
+- New `billing_tax_id` column on `clients` (the billing address's VAT number, distinct from
+  the client's own `tax_id`); the form field existed with nothing behind it. Applied
+  additively at startup, so existing databases pick it up on the next boot.
+- New `client.controller.test.ts` pins the validation regression; `billing_tax_id`
+  round-trips are covered in the service tests.
+
 ## v1.4.0 (2026-08-04)
 
 ### AI assistant

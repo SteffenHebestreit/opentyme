@@ -232,8 +232,11 @@ export const ClientFormModal: FC<ClientFormModalProps> = ({
     };
   }, [initialClient]);
 
-  // State to toggle billing address section visibility (billing_email is top-level, excluded here)
+  // State to toggle billing address section visibility (billing_email is top-level, excluded here).
+  // Prefer the persisted flag; fall back to inferring from the data for clients
+  // saved before use_separate_billing_address was submitted by this form.
   const hasBillingData = initialClient && (
+    initialClient.use_separate_billing_address ||
     initialClient.billing_contact_person ||
     initialClient.billing_phone ||
     initialClient.billing_address ||
@@ -266,6 +269,7 @@ export const ClientFormModal: FC<ClientFormModalProps> = ({
     const payload: ClientPayload = {
       name: values.name.trim(),
       status: values.status,
+      use_separate_billing_address: showBillingAddress,
       email: values.email.trim() ? values.email.trim() : undefined,
       phone: values.phone.trim() ? values.phone.trim() : undefined,
       address: values.address.trim() ? values.address.trim() : undefined,

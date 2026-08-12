@@ -36,14 +36,15 @@ export class ClientService {
       INSERT INTO clients (
         user_id, name, email, phone, address, notes, status,
         use_separate_billing_address, billing_contact_person, billing_email, billing_phone,
-        billing_address, billing_city, billing_state, billing_postal_code, billing_country
+        billing_address, billing_city, billing_state, billing_postal_code, billing_country,
+        billing_tax_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-      RETURNING 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      RETURNING
         id, user_id, name, email, phone, address, notes, status,
         use_separate_billing_address, billing_contact_person, billing_email, billing_phone,
         billing_address, billing_city, billing_state, billing_postal_code, billing_country,
-        created_at, updated_at
+        billing_tax_id, created_at, updated_at
     `;
     const values = [
       clientData.user_id,
@@ -62,6 +63,7 @@ export class ClientService {
       clientData.billing_state || null,
       clientData.billing_postal_code || null,
       clientData.billing_country || null,
+      clientData.billing_tax_id || null,
     ];
 
     try {
@@ -103,7 +105,7 @@ export class ClientService {
         id, user_id, name, email, phone, address, notes, status,
         use_separate_billing_address, billing_contact_person, billing_email, billing_phone,
         billing_address, billing_city, billing_state, billing_postal_code, billing_country,
-        created_at, updated_at 
+        billing_tax_id, created_at, updated_at
       FROM clients
     `;
     const values: any[] = [];
@@ -158,7 +160,7 @@ export class ClientService {
         id, user_id, name, email, phone, address, notes, status,
         use_separate_billing_address, billing_contact_person, billing_email, billing_phone,
         billing_address, billing_city, billing_state, billing_postal_code, billing_country,
-        created_at, updated_at 
+        billing_tax_id, created_at, updated_at
       FROM clients 
       WHERE id = $1
     `;
@@ -233,9 +235,13 @@ export class ClientService {
       setParts.push(`billing_postal_code = $${paramIndex++}`); 
       values.push(clientData.billing_postal_code || null); 
     }
-    if (clientData.billing_country !== undefined) { 
-      setParts.push(`billing_country = $${paramIndex++}`); 
-      values.push(clientData.billing_country || null); 
+    if (clientData.billing_country !== undefined) {
+      setParts.push(`billing_country = $${paramIndex++}`);
+      values.push(clientData.billing_country || null);
+    }
+    if (clientData.billing_tax_id !== undefined) {
+      setParts.push(`billing_tax_id = $${paramIndex++}`);
+      values.push(clientData.billing_tax_id || null);
     }
 
     if (setParts.length === 0) {
@@ -246,12 +252,12 @@ export class ClientService {
     const queryText = `
       UPDATE clients 
       SET ${setParts.join(', ')}, updated_at = CURRENT_TIMESTAMP 
-      WHERE id = $${paramIndex} 
-      RETURNING 
+      WHERE id = $${paramIndex}
+      RETURNING
         id, user_id, name, email, phone, address, notes, status,
         use_separate_billing_address, billing_contact_person, billing_email, billing_phone,
         billing_address, billing_city, billing_state, billing_postal_code, billing_country,
-        created_at, updated_at
+        billing_tax_id, created_at, updated_at
     `;
     values.push(id);
 

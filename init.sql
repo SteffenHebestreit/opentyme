@@ -159,6 +159,7 @@ CREATE TABLE public.clients (
     billing_state character varying(100),
     billing_postal_code character varying(20),
     billing_country character varying(100),
+    billing_tax_id character varying(100),
     status character varying(20) DEFAULT 'active'::character varying,
     notes text,
     is_active boolean DEFAULT true,

@@ -31,6 +31,7 @@ export type ClientStatus = 'active' | 'inactive'; // Can be expanded
  * @property {string} [billing_state] - Billing state/province (optional)
  * @property {string} [billing_postal_code] - Billing postal/ZIP code (optional)
  * @property {string} [billing_country] - Billing country (optional)
+ * @property {string} [billing_tax_id] - Billing tax ID/VAT number (optional)
  * @property {string} [notes] - Additional notes about the client (optional)
  * @property {ClientStatus} [status] - The client's status (defaults to 'active')
  * 
@@ -67,8 +68,9 @@ export interface CreateClientDto {
   billing_state?: string | null;
   billing_postal_code?: string | null;
   billing_country?: string | null;
+  billing_tax_id?: string | null;
   notes?: string | null;
-  status?: ClientStatus; 
+  status?: ClientStatus;
 }
 
 /**
@@ -112,6 +114,7 @@ export interface UpdateClientDto extends Partial<CreateClientDto> {}
  * @property {string | null} billing_state - Billing state/province
  * @property {string | null} billing_postal_code - Billing postal/ZIP code
  * @property {string | null} billing_country - Billing country
+ * @property {string | null} billing_tax_id - Billing tax ID/VAT number
  * @property {string | null} notes - Additional notes about the client
  * @property {ClientStatus} status - The client's current status ('active' or 'inactive')
  * @property {Date} created_at - Timestamp when the client was created
@@ -139,6 +142,7 @@ export interface BaseClient {
   billing_state: string | null;
   billing_postal_code: string | null;
   billing_country: string | null;
+  billing_tax_id: string | null;
   notes: string | null;
   status: ClientStatus;
   created_at: Date;

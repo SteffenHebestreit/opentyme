@@ -8,6 +8,7 @@ export interface Client {
   address: string | null;
   notes: string | null;
   status: ClientStatus;
+  use_separate_billing_address?: boolean;
   billing_contact_person?: string | null;
   billing_email?: string | null;
   billing_phone?: string | null;
@@ -28,6 +29,7 @@ export interface ClientPayload {
   address?: string | null;
   notes?: string | null;
   status?: ClientStatus;
+  use_separate_billing_address?: boolean;
   billing_contact_person?: string | null;
   billing_email?: string | null;
   billing_phone?: string | null;

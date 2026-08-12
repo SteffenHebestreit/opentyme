@@ -6,8 +6,28 @@ import { logger } from '../../utils/logger';
 const clientService = new ClientService();
 
 /**
+ * Billing address fields shared by the create and update schemas.
+ * These mirror the columns written by ClientService — keep the two in sync,
+ * since Joi rejects unknown keys and any drift surfaces as a 400.
+ * @constant {Record<string, Joi.Schema>}
+ */
+const billingFields = {
+  use_separate_billing_address: Joi.boolean().optional(),
+  billing_contact_person: Joi.string().max(255).optional().allow(''),
+  billing_email: Joi.string().email().optional().allow(''),
+  billing_phone: Joi.string().max(50).optional().allow(''),
+  billing_address: Joi.string().max(500).optional().allow(''),
+  billing_city: Joi.string().max(100).optional().allow(''),
+  billing_state: Joi.string().max(100).optional().allow(''),
+  billing_postal_code: Joi.string().max(20).optional().allow(''),
+  billing_country: Joi.string().max(100).optional().allow(''),
+  billing_tax_id: Joi.string().max(100).optional().allow('')
+};
+
+/**
  * Joi validation schema for creating a new client.
- * Validates name (required), email, phone, address, notes, and status fields.
+ * Validates name (required), email, phone, address, notes, status and the
+ * optional separate billing address fields.
  * @constant {Joi.ObjectSchema}
  */
 const createClientSchema = Joi.object({
@@ -16,7 +36,8 @@ const createClientSchema = Joi.object({
   phone: Joi.string().max(50).optional().allow(''),
   address: Joi.string().max(500).optional().allow(''), // Adjusted max for address
   notes: Joi.string().optional().allow(''),
-  status: Joi.string().valid('active', 'inactive').default('active') // Default to active
+  status: Joi.string().valid('active', 'inactive').default('active'), // Default to active
+  ...billingFields
 });
 
 /**
@@ -31,7 +52,8 @@ const updateClientSchema = Joi.object({
   phone: Joi.string().max(50).optional().allow('').empty(''),
   address: Joi.string().max(500).optional().allow('').empty(''),
   notes: Joi.string().optional().allow(''),
-  status: Joi.string().valid('active', 'inactive').optional()
+  status: Joi.string().valid('active', 'inactive').optional(),
+  ...billingFields
 }).min(1); // At least one field must be provided for an update
 
 /**

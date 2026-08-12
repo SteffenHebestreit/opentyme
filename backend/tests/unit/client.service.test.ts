@@ -119,6 +119,7 @@ describe('ClientService', () => {
         billing_state: 'FC',
         billing_postal_code: '12345',
         billing_country: 'USA',
+        billing_tax_id: 'US123456789',
       };
 
       const client = await clientService.create(clientData);
@@ -129,6 +130,7 @@ describe('ClientService', () => {
       expect(client.billing_address).toBe('456 Billing St');
       expect(client.billing_city).toBe('Finance City');
       expect(client.billing_country).toBe('USA');
+      expect(client.billing_tax_id).toBe('US123456789');
     });
   });
 
@@ -251,6 +253,7 @@ describe('ClientService', () => {
         billing_state: 'BL',
         billing_postal_code: '54321',
         billing_country: 'CAN',
+        billing_tax_id: 'CA987654321',
       });
 
       expect(updated?.use_separate_billing_address).toBe(true);
@@ -258,6 +261,7 @@ describe('ClientService', () => {
       expect(updated?.billing_email).toBe('billing@update.com');
       expect(updated?.billing_city).toBe('Billtown');
       expect(updated?.billing_country).toBe('CAN');
+      expect(updated?.billing_tax_id).toBe('CA987654321');
     });
 
     it('should return null when updating non-existent client', async () => {
