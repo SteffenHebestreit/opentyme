@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased (since v1.4.0)
+## Unreleased (since v1.4.1)
+
+## v1.4.1 (2026-08-12)
 
 ### Clients — billing fields
 - **Saving a client no longer fails with a 400.** The controller's Joi whitelists never
