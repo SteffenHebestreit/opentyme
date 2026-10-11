@@ -22,16 +22,67 @@ export interface LLMTool {
   function: LLMToolFunction;
 }
 
+export interface PathParamSchema {
+  type?: string;
+  format?: string;
+}
+
 interface OperationInfo {
   method: string;
   pathTemplate: string;
   tags: string[];
+  /** Declared path parameters (name → schema) — validated before URL substitution. */
+  pathParams: Record<string, PathParamSchema>;
 }
 
 export interface ToolWithMeta {
   tool: LLMTool;
   method: string;
+  /** OpenAPI path template ('/api/...'); the registry name for custom tools. */
+  pathTemplate: string;
   tags: string[];
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Validates one path-parameter value BEFORE it is substituted into the URL.
+ * Rejects anything that could change the request path ('.', '..', '/', '\\')
+ * and enforces the spec's `format: uuid` / `format: date` (and integer type).
+ * Returns an error message for the model, or null when the value is safe.
+ */
+export function checkPathParam(name: string, value: unknown, schema?: PathParamSchema): string | null {
+  if (value === undefined || value === null || value === '') return `missing required path parameter "${name}"`;
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    return `path parameter "${name}" must be a string, got ${describeValue(value)}`;
+  }
+  const v = String(value).trim();
+  if (v === '' || v === '.' || v === '..' || v.includes('/') || v.includes('\\')) {
+    return `path parameter "${name}" is not a valid identifier`;
+  }
+  if (schema?.format === 'uuid' && !UUID_RE.test(v)) return `path parameter "${name}" must be a UUID`;
+  if (schema?.format === 'date' && !DATE_RE.test(v)) return `path parameter "${name}" must be a date (YYYY-MM-DD)`;
+  if (schema?.type === 'integer' && !/^-?\d+$/.test(v)) return `path parameter "${name}" must be an integer`;
+  return null;
+}
+
+/**
+ * True when the operation's success response is declared with content types
+ * that are all non-JSON (PDF/ZIP/CSV/binary downloads): the assistant can't
+ * use such bodies, and buffering them would only waste memory and context.
+ * Operations that declare no content at all are kept.
+ */
+function hasOnlyNonJsonSuccess(op: Record<string, unknown>): boolean {
+  const responses = (op.responses as Record<string, Record<string, unknown>> | undefined) ?? {};
+  const types: string[] = [];
+  for (const [code, response] of Object.entries(responses)) {
+    if (!/^2\d\d$/.test(code) && code !== '2XX') continue;
+    const content = response?.content as Record<string, unknown> | undefined;
+    if (content) types.push(...Object.keys(content));
+  }
+  if (types.length === 0) return false;
+  return !types.some((t) => /^application\/(.+\+)?json\b/i.test(t));
 }
 
 const BLOCKED_PREFIXES = [
@@ -94,9 +145,10 @@ function stripExamples(props: Record<string, unknown>): Record<string, unknown> 
 function buildParameters(
   operation: Record<string, unknown>,
   components: Record<string, unknown>
-): { properties: Record<string, unknown>; required: string[] } {
+): { properties: Record<string, unknown>; required: string[]; pathParams: Record<string, PathParamSchema> } {
   const properties: Record<string, unknown> = {};
   const required: string[] = [];
+  const pathParams: Record<string, PathParamSchema> = {};
 
   // Path & query parameters
   const params = (operation.parameters as Array<Record<string, unknown>>) || [];
@@ -107,8 +159,14 @@ function buildParameters(
         ...schema,
         description: param.description || undefined,
       };
-      if (param.required) {
+      if (param.required || param.in === 'path') {
         required.push(param.name as string);
+      }
+      if (param.in === 'path') {
+        pathParams[param.name as string] = {
+          ...(typeof schema.type === 'string' ? { type: schema.type } : {}),
+          ...(typeof schema.format === 'string' ? { format: schema.format } : {}),
+        };
       }
     }
   }
@@ -127,7 +185,7 @@ function buildParameters(
     }
   }
 
-  return { properties: stripExamples(properties), required };
+  return { properties: stripExamples(properties), required: [...new Set(required)], pathParams };
 }
 
 // Cache
@@ -151,6 +209,10 @@ export function buildTools(): LLMTool[] {
       if (!['get', 'post', 'put', 'patch', 'delete'].includes(method)) continue;
 
       const op = operation as Record<string, unknown>;
+      // Binary downloads (invoice PDFs, the tax-package ZIP, …) are useless to
+      // the model and would be buffered whole — don't expose them as tools.
+      if (hasOnlyNonJsonSuccess(op)) continue;
+
       const name = (op.operationId as string) || normalizeName(method, path);
       const safeName = name
         .replace(/[^a-zA-Z0-9_]/g, '_')
@@ -159,7 +221,7 @@ export function buildTools(): LLMTool[] {
 
       const description = [op.summary, op.description].filter(Boolean).join(' — ').slice(0, 512) || `${method.toUpperCase()} ${path}`;
 
-      const { properties, required } = buildParameters(op, components);
+      const { properties, required, pathParams } = buildParameters(op, components);
 
       const tool: LLMTool = {
         type: 'function',
@@ -177,8 +239,11 @@ export function buildTools(): LLMTool[] {
       tools.push(tool);
       operationMap.set(safeName, {
         method: method.toUpperCase(),
-        pathTemplate: path,
+        // A few annotations use Express-style ':id' segments — normalize them to
+        // OpenAPI '{id}' so the executor can substitute (and validate) them.
+        pathTemplate: path.replace(/:([A-Za-z_][A-Za-z0-9_]*)/g, '{$1}'),
         tags: (op.tags as string[]) || [],
+        pathParams,
       });
       toolSchemaMap.set(safeName, tool.function.parameters);
     }
@@ -196,7 +261,7 @@ export function buildTools(): LLMTool[] {
         parameters: def.parameters,
       },
     });
-    operationMap.set(safeName, { method: 'CUSTOM', pathTemplate: def.name, tags: ['Custom'] });
+    operationMap.set(safeName, { method: 'CUSTOM', pathTemplate: def.name, tags: ['Custom'], pathParams: {} });
     toolSchemaMap.set(safeName, def.parameters);
   }
 
@@ -255,7 +320,15 @@ export function validateToolArguments(
   if (!schema) return { ok: true }; // unknown tool — handled by the executor
 
   const errors: string[] = [];
+  // Path parameters: checked first and strictly (format + path-segment safety)
+  // so the model gets a precise repair message before execution or approval.
+  const pathParams = operationMap.get(toolName)?.pathParams ?? {};
+  for (const [name, paramSchema] of Object.entries(pathParams)) {
+    const problem = checkPathParam(name, args[name], paramSchema);
+    if (problem) errors.push(problem);
+  }
   for (const req of schema.required ?? []) {
+    if (req in pathParams) continue; // reported above
     const v = args[req];
     if (v === undefined || v === null || v === '') {
       errors.push(`missing required parameter "${req}"`);
@@ -285,6 +358,11 @@ export function getToolsWithMeta(): ToolWithMeta[] {
   const tools = buildTools();
   return tools.map((t) => {
     const info = operationMap.get(t.function.name);
-    return { tool: t, method: info?.method ?? 'GET', tags: info?.tags ?? [] };
+    return {
+      tool: t,
+      method: info?.method ?? 'GET',
+      pathTemplate: info?.pathTemplate ?? '',
+      tags: info?.tags ?? [],
+    };
   });
 }

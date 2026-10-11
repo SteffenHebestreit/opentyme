@@ -40,8 +40,14 @@ export const TOOL_CONTEXT_BUDGET = Number(process.env.AI_TOOL_CONTEXT_BUDGET) ||
  * Makes a loaded history window valid for the chat-completions API:
  *
  * 1. Drops orphan tool results whose originating assistant message was trimmed
- *    off the front of the window.
- * 2. Injects a synthetic "not executed" tool result for every assistant
+ *    off the front of the window (and duplicate results for the same call).
+ * 2. Moves every tool result directly behind the assistant message that issued
+ *    the call (the latest preceding assistant declaring that tool_call id).
+ *    Overlapping runs or late approvals can persist
+ *    assistant(tool_calls) → user → tool, which OpenAI-compatible servers reject.
+ *    Results keep their persisted relative order, so a well-formed history is
+ *    returned unchanged (prompt-prefix stability).
+ * 3. Injects a synthetic "not executed" tool result for every assistant
  *    tool_call that never received one (e.g. writes whose approval was
  *    abandoned before this state was persisted) — dangling tool_calls are an
  *    invalid sequence for OpenAI-compatible APIs.
@@ -53,28 +59,30 @@ export function normalizeHistoryWindow(
   messages: ConversationMessage[],
   keepDanglingIds: ReadonlySet<string> = new Set()
 ): ConversationMessage[] {
-  // Pass 1: drop orphan tool results.
-  const knownToolCallIds = new Set<string>();
-  const filtered: ConversationMessage[] = [];
+  const blocks: Array<{ msg: ConversationMessage; results: ConversationMessage[] }> = [];
+  // tool_call id → index of the latest assistant block that declared it.
+  const owner = new Map<string, number>();
+
   for (const msg of messages) {
-    if (msg.role === 'assistant' && msg.tool_calls) {
-      for (const tc of msg.tool_calls) knownToolCallIds.add(tc.id);
-    }
-    if (msg.role === 'tool' && (!msg.tool_call_id || !knownToolCallIds.has(msg.tool_call_id))) {
+    if (msg.role === 'tool') {
+      const idx = msg.tool_call_id ? owner.get(msg.tool_call_id) : undefined;
+      if (idx === undefined) continue; // orphan: its assistant message is not in the window
+      const block = blocks[idx];
+      if (block.results.some((r) => r.tool_call_id === msg.tool_call_id)) continue; // duplicate
+      block.results.push(msg);
       continue;
     }
-    filtered.push(msg);
+    blocks.push({ msg, results: [] });
+    if (msg.role === 'assistant' && msg.tool_calls) {
+      for (const tc of msg.tool_calls) owner.set(tc.id, blocks.length - 1);
+    }
   }
 
-  // Pass 2: answer dangling tool_calls with synthetic results, right after
-  // their assistant message so the tool block stays contiguous.
-  const answered = new Set(
-    filtered.filter((m) => m.role === 'tool' && m.tool_call_id).map((m) => m.tool_call_id as string)
-  );
   const result: ConversationMessage[] = [];
-  for (const msg of filtered) {
-    result.push(msg);
+  for (const { msg, results } of blocks) {
+    result.push(msg, ...results);
     if (msg.role === 'assistant' && msg.tool_calls) {
+      const answered = new Set(results.map((r) => r.tool_call_id));
       for (const tc of msg.tool_calls) {
         if (!answered.has(tc.id) && !keepDanglingIds.has(tc.id)) {
           result.push({

@@ -49,11 +49,22 @@ declare namespace jest {
   type HookCallback = (done?: DoneCallback) => void | Promise<void>;
   type ProvidesCallback = ((cb: DoneCallback) => void | undefined) | (() => PromiseLike<unknown>);
 
+  /** it.each / describe.each — table-driven tests (row arrays or template literals) */
+  interface Each {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    <T extends any[] | [any]>(cases: ReadonlyArray<T>): (name: string, fn: (...args: T) => any, timeout?: number) => void;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    <T>(cases: ReadonlyArray<T>): (name: string, fn: (arg: T, done?: DoneCallback) => any, timeout?: number) => void;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (strings: TemplateStringsArray, ...placeholders: any[]): (name: string, fn: (arg: any) => any, timeout?: number) => void;
+  }
+
   interface ItBlock {
     (name: string, fn?: ProvidesCallback, timeout?: number): void;
     only(name: string, fn?: ProvidesCallback, timeout?: number): void;
     skip(name: string, fn?: ProvidesCallback, timeout?: number): void;
     todo(name: string): void;
+    each: Each;
   }
 
   interface DescribeBlock {
@@ -61,6 +72,7 @@ declare namespace jest {
     only(name: string, fn: () => void): void;
     skip(name: string, fn?: () => void): void;
     todo(name: string): void;
+    each: Each;
   }
 
   interface AsymmetricMatcher {

@@ -5,9 +5,10 @@
 
 import axios from 'axios';
 import { logger } from '../../utils/logger';
-import { getOperationByName } from './openapi-tool-builder.service';
+import { checkPathParam, getOperationByName } from './openapi-tool-builder.service';
 import { getCustomToolByName } from './ai-tool-registry.service';
 import { isToolAllowedForRoles } from './tool-selection.service';
+import { safeToolErrorMessage } from './tool-call-utils';
 
 export interface ToolResult {
   status: number;
@@ -29,6 +30,9 @@ export function isWriteTool(toolName: string): boolean {
 }
 
 const MAX_RESPONSE_CHARS = 8000;
+// Hard cap on what a tool call may buffer — results are trimmed to
+// MAX_RESPONSE_CHARS for the model anyway.
+const MAX_CONTENT_LENGTH = 2 * 1024 * 1024;
 const INTERNAL_BASE_URL = process.env.INTERNAL_API_URL ?? 'http://localhost:8000';
 
 export async function executeToolCall(
@@ -48,7 +52,7 @@ export async function executeToolCall(
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       logger.error(`[AI ToolExecutor] Custom tool ${toolName} error: ${message}`);
-      return { status: 500, error: message };
+      return { status: 500, error: safeToolErrorMessage(err) };
     }
   }
 
@@ -60,23 +64,28 @@ export async function executeToolCall(
 
   // Defense in depth: refuse tools the user's roles may not use, even if the
   // model selected one it shouldn't (the API's own authz remains the backstop).
-  if (roles && !isToolAllowedForRoles(operation.tags, roles)) {
+  if (roles && !isToolAllowedForRoles(operation, roles)) {
     logger.warn(`[AI ToolExecutor] Role-blocked tool ${toolName} for roles [${roles.join(',')}]`);
     return { status: 403, error: `You do not have permission to use ${toolName}.` };
   }
 
   const { method, pathTemplate } = operation;
 
-  // Substitute path parameters
+  // Substitute path parameters — each value is validated first (declared
+  // format, no '.', '..' or '/' segments) so a model-supplied id can never
+  // redirect the request to a different route.
   let url = pathTemplate;
   const remainingArgs = { ...args };
   const pathParamMatches = pathTemplate.match(/\{([^}]+)\}/g) || [];
   for (const match of pathParamMatches) {
     const paramName = match.slice(1, -1);
-    if (remainingArgs[paramName] !== undefined) {
-      url = url.replace(match, encodeURIComponent(String(remainingArgs[paramName])));
-      delete remainingArgs[paramName];
+    const problem = checkPathParam(paramName, remainingArgs[paramName], operation.pathParams?.[paramName]);
+    if (problem) {
+      logger.warn(`[AI ToolExecutor] Rejected path parameter for ${toolName}: ${problem}`);
+      return { status: 400, error: `Invalid arguments for ${toolName}: ${problem}.` };
     }
+    url = url.replace(match, encodeURIComponent(String(remainingArgs[paramName]).trim()));
+    delete remainingArgs[paramName];
   }
 
   // Separate query params vs body
@@ -96,12 +105,18 @@ export async function executeToolCall(
         'Content-Type': 'application/json',
       },
       timeout: 30000,
+      maxContentLength: MAX_CONTENT_LENGTH,
       signal,
       validateStatus: () => true, // don't throw on non-2xx
     });
 
     let responseData = response.data;
-    const serialized = JSON.stringify(responseData);
+    const contentType = String(response.headers?.['content-type'] ?? '');
+    if (contentType && !/json|text\//i.test(contentType)) {
+      // Binary payloads (PDF, ZIP, images) are meaningless to the model.
+      responseData = { _note: `Binary response (${contentType.split(';')[0]}) omitted.` };
+    }
+    const serialized = JSON.stringify(responseData) ?? '';
     if (serialized.length > MAX_RESPONSE_CHARS) {
       if (Array.isArray(responseData)) {
         // Keep as many complete items as fit within the char budget
@@ -129,6 +144,14 @@ export async function executeToolCall(
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(`[AI ToolExecutor] Error calling ${method} ${url}: ${message}`);
-    return { status: 500, error: message };
+    // No raw transport text (internal host/port) in results that reach the client.
+    const code = (error as { code?: string })?.code;
+    const tooLarge = /maxContentLength/i.test(message);
+    return {
+      status: 500,
+      error: tooLarge
+        ? 'The API response was too large to process. Narrow the request with filters.'
+        : `The API request failed${code ? ` (${code})` : ''}.`,
+    };
   }
 }

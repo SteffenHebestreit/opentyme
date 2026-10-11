@@ -8,6 +8,14 @@
  * user approves or rejects the proposed actions. If the user instead sends a new
  * message, the pending approval is superseded (declined results are persisted) so
  * the history stays a valid API message sequence and stale writes can't run later.
+ * TOOL_APPROVAL_REQUIRED carries a batchId (the assistant message holding the
+ * pending actions); /approve may echo it, and a stale one is refused.
+ *
+ * Cancellation: the controller aborts the run's signal when the client goes
+ * away. Reads and LLM calls stop; an approved write already in flight is never
+ * aborted (it finishes and is recorded), unstarted ones are re-armed. Only one
+ * run per conversation is active at a time (run-lock.ts). RUN_ERROR events
+ * carry generic messages with stable codes (toRunErrorEvent).
  *
  * Collaborators: system-prompt.builder (prompt), conversation-history.service
  * (types, loading, normalization, context budget), llm-stream.service (streaming
@@ -25,12 +33,20 @@ import {
   LLMToolCall,
   loadHistory,
 } from './conversation-history.service';
-import { streamChatCompletion } from './llm-stream.service';
-import { safeParseArgs, sortKeysDeep, parseToolArguments } from './tool-call-utils';
+import {
+  streamChatCompletion,
+  LLMError,
+  LLM_ERROR_MESSAGES,
+  isAbortError,
+  abortError,
+} from './llm-stream.service';
+import { safeParseArgs, sortKeysDeep, parseToolArguments, safeToolErrorMessage } from './tool-call-utils';
 import { buildSystemPrompt } from './system-prompt.builder';
 import { LLMTool, validateToolArguments } from './openapi-tool-builder.service';
 import { selectTools } from './tool-selection.service';
 import { executeToolCall, isWriteTool } from './tool-executor.service';
+import { getCustomToolByName } from './ai-tool-registry.service';
+import { runLockKey, tryAcquireRunLock, releaseRunLock } from './run-lock';
 
 // Re-exported for existing importers (controller, A2A adapter).
 export type { EventEmitter } from './ai-events';
@@ -44,6 +60,27 @@ export interface ToolApprovalDecision {
 }
 
 const MAX_ITERATIONS = Number(process.env.AI_MAX_ITERATIONS) || 12;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Maps a failed run to its AG-UI RUN_ERROR event — or null when the run was
+ * cancelled because the client went away (nobody is listening; stop quietly).
+ * Clients only ever get a generic message plus a stable code: never raw
+ * axios/Postgres text or internal hostnames (those are logged instead).
+ */
+export function toRunErrorEvent(error: unknown, signal?: AbortSignal, where = 'run'): Record<string, unknown> | null {
+  if (isAbortError(error) || signal?.aborted) {
+    logger.info(`[AI] ${where}: cancelled by the client`);
+    return null;
+  }
+  if (error instanceof LLMError) {
+    // Upstream detail was already logged during classification.
+    return { type: EventType.RUN_ERROR, message: error.message, code: error.code };
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  logger.error(`[AI] ${where} error: ${message}`);
+  return { type: EventType.RUN_ERROR, message: LLM_ERROR_MESSAGES.INTERNAL, code: 'INTERNAL' };
+}
 
 // Loop guards (OpenHands-style stuck detection, sized down for short chats):
 // a given identical call may execute at most twice per run, and a tool that
@@ -124,12 +161,18 @@ export class AIAssistantService {
 
     // Resolve or create conversation
     let conversationId = threadId;
+    let ownedLock: string | null = null;
     if (!conversationId) {
       const result = await db.query(
         `INSERT INTO ai_conversations (user_id, title) VALUES ($1, $2) RETURNING id`,
         [userId, userMessage.slice(0, 100)]
       );
       conversationId = result.rows[0].id as string;
+      // Existing threads are locked by the controller (HTTP 409 before SSE);
+      // a brand-new thread is locked from creation on, so a follow-up request
+      // on it (the client learns the id from RUN_STARTED) is refused as well.
+      ownedLock = runLockKey(userId, conversationId);
+      tryAcquireRunLock(ownedLock);
     } else {
       // Verify ownership
       const check = await db.query(
@@ -141,6 +184,36 @@ export class AIAssistantService {
         return;
       }
     }
+
+    try {
+      await this.runNewMessage(
+        conversationId,
+        userMessage,
+        userFullName,
+        userEmail,
+        language,
+        bearerToken,
+        roles,
+        runId,
+        emit
+      );
+    } finally {
+      if (ownedLock) releaseRunLock(ownedLock);
+    }
+  }
+
+  private async runNewMessage(
+    conversationId: string,
+    userMessage: string,
+    userFullName: string,
+    userEmail: string,
+    language: string,
+    bearerToken: string,
+    roles: string[],
+    runId: string,
+    emit: EventEmitter
+  ): Promise<void> {
+    const db = pool();
 
     // A new user message supersedes any approval still waiting in this
     // conversation. Persist declined results BEFORE the user message so the
@@ -203,7 +276,9 @@ export class AIAssistantService {
     bearerToken: string,
     roles: string[],
     emit: EventEmitter,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    /** Id of the approval batch the client is answering (TOOL_APPROVAL_REQUIRED.batchId). */
+    batchId?: string | null
   ): Promise<void> {
     const runId = uuidv4();
     const db = pool();
@@ -225,6 +300,21 @@ export class AIAssistantService {
       return;
     }
 
+    // An explicit batchId must name the conversation's CURRENT awaiting batch;
+    // anything else (an older card, another tab's stale view) is refused
+    // without executing or declining anything. Absent → legacy behaviour.
+    const hasBatchId = batchId !== undefined && batchId !== null;
+    const staleApproval = () =>
+      emit({
+        type: EventType.RUN_ERROR,
+        message: 'These actions are no longer awaiting approval.',
+        code: 'STALE_APPROVAL',
+      });
+    if (hasBatchId && (typeof batchId !== 'string' || !UUID_RE.test(batchId))) {
+      staleApproval();
+      return;
+    }
+
     // Atomically CLAIM the newest pending approval (single-use). A plain
     // SELECT-then-UPDATE lets two concurrent /approve requests (double-click,
     // network retry) both read 'awaiting_approval' and execute the writes
@@ -239,12 +329,14 @@ export class AIAssistantService {
          ORDER BY created_at DESC LIMIT 1
        )
        AND metadata->>'status' = 'awaiting_approval'
+       AND ($2::uuid IS NULL OR id = $2::uuid)
        RETURNING id, metadata`,
-      [conversationId]
+      [conversationId, hasBatchId ? batchId : null]
     );
     if (pendingRow.rows.length === 0) {
-      emit({ type: EventType.RUN_ERROR, message: 'No pending actions to approve.', code: 'NO_PENDING' });
-      emit({ type: EventType.RUN_FINISHED, threadId: conversationId, runId });
+      // AG-UI: an errored run ends with RUN_ERROR only (no RUN_FINISHED after it).
+      if (hasBatchId) staleApproval();
+      else emit({ type: EventType.RUN_ERROR, message: 'No pending actions to approve.', code: 'NO_PENDING' });
       return;
     }
 
@@ -268,6 +360,11 @@ export class AIAssistantService {
       // failure, so a crash mid-write cannot produce a duplicate on retry
       // (at-most-once). Only the untouched tail is re-armed in the catch.
       for (const tc of pending) {
+        // Client gone (or stopped): never START another write. The write that
+        // was in flight was deliberately not abortable and has completed and
+        // been recorded; the untouched tail is re-armed in the catch below so
+        // the user can still decide on it after reconnecting.
+        if (this.abortSignal?.aborted) throw abortError();
         processedIds.add(tc.id);
         const approval = decisions.get(tc.id);
         const decision = approval?.decision ?? 'reject';
@@ -291,7 +388,7 @@ export class AIAssistantService {
               ...tc,
               function: { ...tc.function, arguments: JSON.stringify(sortKeysDeep(approval.editedArguments)) },
             };
-            const outcome = await this.executeCall(editedCall, bearerToken, roles, emit);
+            const outcome = await this.executeCall(editedCall, bearerToken, roles, emit, false);
             const wrapped = JSON.stringify({
               edited_by_user: true,
               executed_arguments: approval.editedArguments,
@@ -311,6 +408,11 @@ export class AIAssistantService {
         }
       }
 
+      if (this.abortSignal?.aborted) {
+        logger.info('[AI] resumeRun: client gone after the approved actions completed — not continuing');
+        return;
+      }
+
       // Re-select tools for the original request, then continue the loop.
       const lastUser = [...messages].reverse().find((m) => m.role === 'user');
       const tools = await selectTools({
@@ -325,9 +427,6 @@ export class AIAssistantService {
       });
       await this.runLoop(conversationId, messages, tools, roles, bearerToken, runId, emit);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.error(`[AI] resumeRun error: ${message}`);
-
       // Recovery: the claim consumed the approval before the work finished.
       // Re-arm ONLY the writes we never started (processedIds is marked before
       // execution → excludes anything with a possible side effect: at-most-once),
@@ -358,7 +457,8 @@ export class AIAssistantService {
         }
       }
 
-      emit({ type: EventType.RUN_ERROR, message, code: 'INTERNAL' });
+      const event = toRunErrorEvent(error, this.abortSignal, 'resumeRun');
+      if (event) emit(event);
     }
   }
 
@@ -437,6 +537,7 @@ export class AIAssistantService {
       let finalized = false;
 
       for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+        if (this.abortSignal?.aborted) throw abortError();
         const { content, toolCalls, finishReason } = await this.callLLM(messages, activeTools, emit);
 
         // Output hit the token cap mid-tool-call: the argument JSON is
@@ -482,14 +583,40 @@ export class AIAssistantService {
         // it fired first and silently ended the run before the model ever saw
         // the repair message; MAX_ITERATIONS remains the hard stop.
 
+        // Parse and CANONICALIZE every call BEFORE anything is persisted:
+        // the stored history, the in-memory context, dedupe keys, the approval
+        // card, the pending list and execution must all see one canonical
+        // single-encoded form (double-stringified args are unwound here).
+        // Unparseable arguments are stored as '{}' — replaying the raw broken
+        // JSON would make strict servers reject the whole history — while the
+        // dedupe identity keeps the raw text so a malformed call never shares a
+        // key with a valid empty-args call. Duplicate/missing ids get fresh ones
+        // (each id must receive exactly one tool result).
+        const seenIds = new Set<string>();
+        const prepared = toolCalls.map((raw) => {
+          const parsedArgs = parseToolArguments(raw.function.arguments);
+          const id = raw.id && !seenIds.has(raw.id) ? raw.id : uuidv4();
+          seenIds.add(id);
+          const tc: LLMToolCall = {
+            id,
+            type: 'function',
+            function: {
+              name: raw.function.name,
+              arguments: parsedArgs.ok ? JSON.stringify(sortKeysDeep(parsedArgs.args)) : '{}',
+            },
+          };
+          return { tc, parsedArgs, rawArgs: raw.function.arguments };
+        });
+        const cleanCalls = prepared.map((p) => p.tc);
+
         // Persist assistant message with tool_calls (capture id for approval metadata).
         const inserted = await db.query(
           `INSERT INTO ai_messages (conversation_id, role, content, tool_calls) VALUES ($1, 'assistant', $2, $3) RETURNING id`,
-          [conversationId, content || null, JSON.stringify(toolCalls)]
+          [conversationId, content || null, JSON.stringify(cleanCalls)]
         );
         const assistantMsgId = inserted.rows[0].id as string;
 
-        messages.push({ role: 'assistant', content: content || null, tool_calls: toolCalls });
+        messages.push({ role: 'assistant', content: content || null, tool_calls: cleanCalls });
 
         // Partition the batch: duplicates within one response (documented local-
         // server bug), calls to circuit-broken tools, and identical calls already
@@ -497,19 +624,10 @@ export class AIAssistantService {
         // execute (reads) or go to approval (writes).
         const batchSeen = new Set<string>();
         const executable: LLMToolCall[] = [];
-        for (const tc of toolCalls) {
-          // Parse and CANONICALIZE first: everything downstream — dedupe keys,
-          // the approval card, the persisted pending list, and execution — must
-          // see one canonical single-encoded form (double-stringified args are
-          // unwound here), and malformed args must not share an identity key
-          // with valid empty-args calls.
-          const parsedArgs = parseToolArguments(tc.function.arguments);
-          if (parsedArgs.ok) {
-            tc.function.arguments = JSON.stringify(sortKeysDeep(parsedArgs.args));
-          }
+        for (const { tc, parsedArgs, rawArgs } of prepared) {
           const key = parsedArgs.ok
             ? `${tc.function.name}::${tc.function.arguments}`
-            : `${tc.function.name}::RAW::${tc.function.arguments}`;
+            : `${tc.function.name}::RAW::${rawArgs}`;
 
           if (batchSeen.has(key)) {
             await this.recordSyntheticResult(tc, conversationId, messages, emit, {
@@ -606,18 +724,27 @@ export class AIAssistantService {
           }
         }
 
+        // Pre-approval resolution (e.g. log_time_entry resolves the project
+        // name to the exact project + id): the card shows what will actually be
+        // written, and a refused call (ambiguous/unknown) goes back to the model
+        // as a tool result instead of reaching the card.
+        const approvable = await this.prepareWrites(writes, bearerToken, conversationId, messages, emit);
+
         // If the model proposed any writes, pause for human approval and end the run.
-        if (writes.length > 0) {
+        if (approvable.length > 0) {
           await db.query(`UPDATE ai_messages SET metadata = $1 WHERE id = $2`, [
-            JSON.stringify({ status: 'awaiting_approval', pending: writes }),
+            JSON.stringify({ status: 'awaiting_approval', pending: approvable }),
             assistantMsgId,
           ]);
           emit({
             type: EventType.TOOL_APPROVAL_REQUIRED,
             threadId: conversationId,
             runId,
+            // The approval batch = the assistant message holding the pending
+            // actions; /approve may echo it back to refuse stale decisions.
+            batchId: assistantMsgId,
             planText: content || '',
-            actions: writes.map((tc) => ({
+            actions: approvable.map((tc) => ({
               toolCallId: tc.id,
               toolName: tc.function.name,
               arguments: safeParseArgs(tc.function.arguments),
@@ -647,10 +774,43 @@ export class AIAssistantService {
 
       emit({ type: EventType.RUN_FINISHED, threadId: conversationId, runId });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.error(`[AI] runLoop error: ${message}`);
-      emit({ type: EventType.RUN_ERROR, message, code: 'INTERNAL' });
+      const event = toRunErrorEvent(error, this.abortSignal, 'runLoop');
+      if (event) emit(event);
     }
+  }
+
+  /**
+   * Runs the optional `prepare` step of custom write tools before the approval
+   * pause. Returns the calls to put on the approval card (with the reviewed
+   * arguments); refused calls get their error recorded as the tool result.
+   * The assistant message keeps the model's original arguments — the pending
+   * list (what executes after approval) carries the prepared ones.
+   */
+  private async prepareWrites(
+    writes: LLMToolCall[],
+    bearerToken: string,
+    conversationId: string,
+    messages: ConversationMessage[],
+    emit: EventEmitter
+  ): Promise<LLMToolCall[]> {
+    const approvable: LLMToolCall[] = [];
+    for (const tc of writes) {
+      const custom = getCustomToolByName(tc.function.name);
+      if (!custom?.prepare) {
+        approvable.push(tc);
+        continue;
+      }
+      try {
+        const reviewed = await custom.prepare(safeParseArgs(tc.function.arguments), { bearerToken });
+        approvable.push({ ...tc, function: { ...tc.function, arguments: JSON.stringify(sortKeysDeep(reviewed)) } });
+      } catch (err: unknown) {
+        logger.info(`[AI] ${tc.function.name} refused before approval (returned to the model)`);
+        await this.recordSyntheticResult(tc, conversationId, messages, emit, {
+          error: `${tc.function.name} was not proposed: ${safeToolErrorMessage(err)}`,
+        });
+      }
+    }
+    return approvable;
   }
 
   /**
@@ -663,7 +823,13 @@ export class AIAssistantService {
     tc: LLMToolCall,
     bearerToken: string,
     roles: string[],
-    emit: EventEmitter
+    emit: EventEmitter,
+    /**
+     * Approved writes pass false: a write already in flight must never be
+     * cancelled by a client disconnect — an aborted request that actually
+     * succeeded server-side would be recorded as failed and proposed again.
+     */
+    abortable = true
   ): Promise<{ resultContent: string; isError: boolean; isInfraError: boolean }> {
     const tcId = tc.id;
     const tcName = tc.function.name;
@@ -682,7 +848,13 @@ export class AIAssistantService {
       });
     } else {
       try {
-        const result = await executeToolCall(tcName, parsed.args, bearerToken, roles, this.abortSignal);
+        const result = await executeToolCall(
+          tcName,
+          parsed.args,
+          bearerToken,
+          roles,
+          abortable ? this.abortSignal : undefined
+        );
         isError = result.status >= 400 || result.error !== undefined;
         isInfraError = result.status >= 500 || result.error !== undefined;
         // Explicit error envelope: a bare 4xx body like {"message":"Not found"}
@@ -729,7 +901,8 @@ export class AIAssistantService {
     messages: ConversationMessage[],
     emit: EventEmitter
   ): Promise<{ isError: boolean }> {
-    const outcome = await this.executeCall(tc, bearerToken, roles, emit);
+    // Resume path = approved writes: not abortable (see executeCall).
+    const outcome = await this.executeCall(tc, bearerToken, roles, emit, false);
     await this.recordToolResult(tc, conversationId, messages, emit, outcome.resultContent);
     return { isError: outcome.isError };
   }

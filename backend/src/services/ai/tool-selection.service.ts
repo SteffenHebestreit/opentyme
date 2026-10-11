@@ -23,13 +23,28 @@ const MAX_TOOLS = Number(process.env.AI_MAX_TOOLS) || 20;
 const EMBED_MODEL = process.env.AI_EMBED_MODEL || 'text-embedding-qwen3-embedding-0.6b';
 const USE_EMBEDDINGS = (process.env.AI_TOOL_EMBEDDINGS ?? 'true') !== 'false';
 
-// Tags only admins may use.
-const ADMIN_ONLY_TAGS = new Set<string>([
-  'Admin',
-  'Admin - Tax Rates',
-  'Admin - Invoice Templates',
-  'User Profile (Admin)',
-]);
+/**
+ * Admin-only API operations, mirrored from the role middleware the routes
+ * ACTUALLY use (requireAdmin / requireRole) — not from OpenAPI tag names: the
+ * "Admin - Tax Rates" / "Admin - Invoice Templates" routes carry no role
+ * requirement and serve per-user data, so every user may use them.
+ *
+ *  - routes/system/backup.routes.ts: router.use(requireAdmin) → all of /api/system/backups
+ *  - routes/system/initialization.routes.ts: router.use(requireAdmin), mounted at
+ *    /api/system → every /api/system/* request that reaches it
+ *  - routes/auth/auth.routes.ts: GET/PUT /api/auth/profile/:id, GET /api/auth/users/all
+ *
+ * /auth and /system/backups are also excluded from tool generation
+ * (BLOCKED_PREFIXES); this is the defence-in-depth gate.
+ * tests/unit/ai-tool-safety.test.ts fails when a route file starts using a role
+ * guard that is not reflected here.
+ */
+const ADMIN_ONLY_ROUTES: Array<{ method?: string; path: RegExp }> = [
+  { path: /^\/api\/system(\/|$)/ },
+  { method: 'GET', path: /^\/api\/auth\/profile\/\{[^}]+\}$/ },
+  { method: 'PUT', path: /^\/api\/auth\/profile\/\{[^}]+\}$/ },
+  { method: 'GET', path: /^\/api\/auth\/users\/all$/ },
+];
 
 // Always-available tools: entity resolution + summaries/overviews. These survive
 // curation so name→id resolution and aggregate queries always work.
@@ -48,13 +63,15 @@ const CORE_TOOL_NAMES = new Set<string>([
   'log_time_entry',
 ]);
 
-export function isAdminOnlyTool(tags: string[]): boolean {
-  return tags.some((t) => ADMIN_ONLY_TAGS.has(t));
+/** Whether the API operation behind a tool requires the admin role. */
+export function isAdminOnlyOperation(op: { method: string; pathTemplate: string }): boolean {
+  const method = op.method.toUpperCase();
+  return ADMIN_ONLY_ROUTES.some((r) => (!r.method || r.method === method) && r.path.test(op.pathTemplate));
 }
 
-/** Whether the given roles may use a tool with these tags. */
-export function isToolAllowedForRoles(tags: string[], roles: string[]): boolean {
-  if (!isAdminOnlyTool(tags)) return true;
+/** Whether the given roles may use the tool for this operation. */
+export function isToolAllowedForRoles(op: { method: string; pathTemplate: string }, roles: string[]): boolean {
+  if (!isAdminOnlyOperation(op)) return true;
   return roles.includes('admin');
 }
 
@@ -188,7 +205,7 @@ export async function selectTools(opts: SelectToolsOptions): Promise<LLMTool[]> 
 
   const allMeta = getToolsWithMeta();
   validateCoreToolNames(new Set(allMeta.map((t) => t.tool.function.name)));
-  const allowed = allMeta.filter((t) => isToolAllowedForRoles(t.tags, roles));
+  const allowed = allMeta.filter((t) => isToolAllowedForRoles(t, roles));
 
   // Resume fast path: reuse the set already selected for this conversation.
   if (reuseSticky && conversationId) {

@@ -5,7 +5,7 @@
  * normalization, duplicate/repeat detection, context budgeting).
  */
 
-import { parseToolArguments, stableCallKey } from '../../src/services/ai/tool-call-utils';
+import { parseToolArguments, stableCallKey, safeToolErrorMessage } from '../../src/services/ai/tool-call-utils';
 import {
   normalizeHistoryWindow,
   applyToolContextBudget,
@@ -68,6 +68,22 @@ describe('stableCallKey', () => {
   });
 });
 
+describe('safeToolErrorMessage', () => {
+  it('hides axios transport details (internal host:port) but keeps the code/status', () => {
+    const transport = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:8000'), {
+      isAxiosError: true,
+      code: 'ECONNREFUSED',
+    });
+    expect(safeToolErrorMessage(transport)).toBe('The API request failed (ECONNREFUSED).');
+    const http = Object.assign(new Error('Request failed'), { isAxiosError: true, response: { status: 401 } });
+    expect(safeToolErrorMessage(http)).toBe('The API request failed (HTTP 401).');
+  });
+
+  it('keeps deliberate tool error messages for the model', () => {
+    expect(safeToolErrorMessage(new Error('Project name "x" is ambiguous'))).toBe('Project name "x" is ambiguous');
+  });
+});
+
 describe('normalizeHistoryWindow', () => {
   const assistantWithCall = (id: string): ConversationMessage => ({
     role: 'assistant',
@@ -110,6 +126,74 @@ describe('normalizeHistoryWindow', () => {
     const msgs: ConversationMessage[] = [assistantWithCall('tc1')];
     const out = normalizeHistoryWindow(msgs, new Set(['tc1']));
     expect(out).toEqual(msgs);
+  });
+
+  it('moves tool results directly behind their assistant message (overlapping runs)', () => {
+    // Persisted by two overlapping runs: assistant(tool_calls) → user → tool.
+    const msgs: ConversationMessage[] = [
+      { role: 'user', content: 'first' },
+      assistantWithCall('tc1'),
+      { role: 'user', content: 'second' },
+      toolResult('tc1'),
+      { role: 'assistant', content: 'answer' },
+    ];
+    const out = normalizeHistoryWindow(msgs);
+    expect(out.map((m) => `${m.role}:${m.tool_call_id ?? m.content ?? ''}`)).toEqual([
+      'user:first',
+      'assistant:',
+      'tool:tc1',
+      'user:second',
+      'assistant:answer',
+    ]);
+    expect(out.filter((m) => m.role === 'tool')).toHaveLength(1); // no synthetic duplicate
+  });
+
+  it('keeps the persisted order of several results and regroups each under its own assistant', () => {
+    const multi: ConversationMessage = {
+      role: 'assistant',
+      content: null,
+      tool_calls: [call('a', 'get_projects', {}), call('b', 'get_clients', {})],
+    };
+    const msgs: ConversationMessage[] = [
+      multi,
+      toolResult('b'),
+      { role: 'user', content: 'interleaved' },
+      assistantWithCall('c'),
+      toolResult('a'),
+      toolResult('c'),
+    ];
+    const out = normalizeHistoryWindow(msgs);
+    expect(out.map((m) => m.tool_call_id ?? m.content ?? m.role)).toEqual([
+      'assistant',
+      'b',
+      'a',
+      'interleaved',
+      'assistant',
+      'c',
+    ]);
+  });
+
+  it('drops a duplicate result for the same tool_call id', () => {
+    const msgs: ConversationMessage[] = [assistantWithCall('tc1'), toolResult('tc1'), toolResult('tc1')];
+    expect(normalizeHistoryWindow(msgs)).toHaveLength(2);
+  });
+
+  it('attaches a result to the LATEST preceding assistant that declared a reused id', () => {
+    const msgs: ConversationMessage[] = [
+      assistantWithCall('call_0'),
+      { ...toolResult('call_0'), content: 'first' },
+      { role: 'user', content: 'again' },
+      assistantWithCall('call_0'),
+      { ...toolResult('call_0'), content: 'second' },
+    ];
+    const out = normalizeHistoryWindow(msgs);
+    expect(out.map((m) => (m.role === 'assistant' ? 'assistant' : m.content))).toEqual([
+      'assistant',
+      'first',
+      'again',
+      'assistant',
+      'second',
+    ]);
   });
 });
 

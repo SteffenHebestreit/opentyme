@@ -1,9 +1,15 @@
 import { Request, Response } from 'express';
 import { logger } from '../../utils/logger';
 import { pool } from '../../utils/database';
-import { AIAssistantService, ToolApprovalDecision } from '../../services/ai/ai-assistant.service';
+import {
+  AIAssistantService,
+  ToolApprovalDecision,
+  toRunErrorEvent,
+} from '../../services/ai/ai-assistant.service';
 import { openTyMEAgentCard } from '../../services/ai/a2a-agent.service';
-import { transcriptionService } from '../../services/ai/transcription.service';
+import { transcriptionService, TranscriptionError } from '../../services/ai/transcription.service';
+import { normalizeLanguage } from '../../services/ai/system-prompt.builder';
+import { runLockKey, tryAcquireRunLock, releaseRunLock } from '../../services/ai/run-lock';
 
 // ── Guardrails ────────────────────────────────────────────────────────────────
 
@@ -39,10 +45,72 @@ function checkRateLimit(userId: string): boolean {
   return true;
 }
 
+// ── SSE plumbing ──────────────────────────────────────────────────────────────
+
+const RUN_IN_PROGRESS_BODY = {
+  error: 'The assistant is still working on this conversation. Wait for it to finish.',
+  code: 'RUN_IN_PROGRESS',
+};
+
+/**
+ * Starts an SSE response and returns the event emitter plus the run's
+ * AbortSignal and a finish() for the finally block.
+ *
+ * - `Cache-Control: no-transform` makes the global compression() middleware
+ *   skip this response (it would otherwise gzip/brotli-buffer the stream, so
+ *   neither events nor keep-alive pings reached the client live); `flush()` is
+ *   still called after each write in case a compressor is ever in front.
+ * - The run is cancelled when the CLIENT goes away: `res` 'close' before the
+ *   response finished. (`req` 'close' cannot be used — on Node ≥ 22 it has
+ *   already fired once the request body was consumed, so the old listener
+ *   never cancelled anything.)
+ */
+export function openSseStream(res: Response): {
+  emit: (event: Record<string, unknown>) => void;
+  signal: AbortSignal;
+  finish: () => void;
+} {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  const flushable = res as Response & { flush?: () => void };
+  const write = (chunk: string): void => {
+    if (res.writableEnded || res.destroyed) return; // client gone — drop silently
+    try {
+      res.write(chunk);
+      flushable.flush?.();
+    } catch {
+      /* connection already closed */
+    }
+  };
+
+  const abort = new AbortController();
+  res.on('close', () => {
+    if (!res.writableFinished) abort.abort();
+  });
+
+  // Keep the SSE stream alive through proxies.
+  const keepAlive = setInterval(() => write(': ping\n\n'), 15000);
+
+  return {
+    emit: (event) => write(`data: ${JSON.stringify(event)}\n\n`),
+    signal: abort.signal,
+    finish: () => {
+      clearInterval(keepAlive);
+      write('data: [DONE]\n\n');
+      if (!res.writableEnded) res.end();
+    },
+  };
+}
+
 /**
  * POST /api/ai/run
  * AG-UI SSE streaming endpoint.
- * Body: { message: string, threadId?: string }
+ * Body: { message: string, threadId?: string, language?: string ('de' | 'en'; others → 'en') }
+ * 409 { error, code: 'RUN_IN_PROGRESS' } when the thread already has an active run.
  */
 export async function runStream(req: Request, res: Response): Promise<void> {
   const { message, threadId, language } = req.body as { message: string; threadId?: string; language?: string };
@@ -73,38 +141,27 @@ export async function runStream(req: Request, res: Response): Promise<void> {
   }
 
   // threadId must be a valid UUID if provided
-  if (threadId !== undefined && threadId !== null && !UUID_RE.test(threadId)) {
+  if (threadId !== undefined && threadId !== null && (typeof threadId !== 'string' || !UUID_RE.test(threadId))) {
     res.status(400).json({ error: 'Invalid threadId format' });
     return;
   }
 
+  // One active run per conversation — refuse BEFORE the SSE stream starts.
+  // (A new thread is locked by the service as soon as it has been created.)
+  const lockKey = threadId ? runLockKey(userId, threadId) : null;
+  if (lockKey && !tryAcquireRunLock(lockKey)) {
+    res.status(409).json(RUN_IN_PROGRESS_BODY);
+    return;
+  }
+
   const bearerToken = req.headers.authorization ?? '';
-
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
-  res.flushHeaders();
-
-  const emit = (event: Record<string, unknown>): void => {
-    res.write(`data: ${JSON.stringify(event)}\n\n`);
-  };
-
-  // Cancel the run if the client disconnects; keep the SSE stream alive through proxies.
-  const abort = new AbortController();
-  req.on('close', () => abort.abort());
-  const keepAlive = setInterval(() => {
-    try {
-      res.write(': ping\n\n');
-    } catch {
-      /* connection already closed */
-    }
-  }, 15000);
+  let sse: ReturnType<typeof openSseStream> | undefined;
 
   // A fresh instance per request — the service holds per-user client/model state
   // that must not be shared across concurrent requests.
   const svc = new AIAssistantService();
   try {
+    sse = openSseStream(res);
     await svc.initialize(userId);
     await svc.runStream(
       userId,
@@ -112,20 +169,18 @@ export async function runStream(req: Request, res: Response): Promise<void> {
       trimmed,
       req.user?.fullName ?? req.user?.username ?? 'User',
       req.user?.email ?? '',
-      language ?? 'en',
+      normalizeLanguage(language),
       bearerToken,
       req.user?.roles ?? [],
-      emit,
-      abort.signal
+      sse.emit,
+      sse.signal
     );
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    logger.error(`[AI Controller] runStream error: ${msg}`);
-    emit({ type: 'RUN_ERROR', message: msg, code: 'INTERNAL' });
+    const event = toRunErrorEvent(error, sse?.signal, 'runStream controller');
+    if (event) sse?.emit(event);
   } finally {
-    clearInterval(keepAlive);
-    res.write('data: [DONE]\n\n');
-    res.end();
+    if (lockKey) releaseRunLock(lockKey);
+    sse?.finish();
   }
 }
 
@@ -134,11 +189,17 @@ export async function runStream(req: Request, res: Response): Promise<void> {
  * AG-UI SSE endpoint. Resumes a run paused for write approval: executes the
  * approved write tool calls (rejected ones are recorded as declined), then
  * continues the assistant loop.
- * Body: { approvals: [{ toolCallId, decision }], language? }
+ * Body: { approvals: [{ toolCallId, decision, editedArguments? }], language?, batchId? }
+ * batchId (TOOL_APPROVAL_REQUIRED.batchId) — when given and not the current
+ * awaiting batch, the run fails with RUN_ERROR STALE_APPROVAL and nothing runs.
  */
 export async function approveRun(req: Request, res: Response): Promise<void> {
   const { conversationId } = req.params;
-  const { approvals, language } = req.body as { approvals?: ToolApprovalDecision[]; language?: string };
+  const { approvals, language, batchId } = req.body as {
+    approvals?: ToolApprovalDecision[];
+    language?: string;
+    batchId?: unknown;
+  };
 
   const userId = req.user?.id;
   if (!userId) {
@@ -172,28 +233,17 @@ export async function approveRun(req: Request, res: Response): Promise<void> {
 
   const bearerToken = req.headers.authorization ?? '';
 
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
-  res.flushHeaders();
+  // One active run per conversation — refuse BEFORE the SSE stream starts.
+  const lockKey = runLockKey(userId, conversationId);
+  if (!tryAcquireRunLock(lockKey)) {
+    res.status(409).json(RUN_IN_PROGRESS_BODY);
+    return;
+  }
 
-  const emit = (event: Record<string, unknown>): void => {
-    res.write(`data: ${JSON.stringify(event)}\n\n`);
-  };
-
-  const abort = new AbortController();
-  req.on('close', () => abort.abort());
-  const keepAlive = setInterval(() => {
-    try {
-      res.write(': ping\n\n');
-    } catch {
-      /* connection already closed */
-    }
-  }, 15000);
-
+  let sse: ReturnType<typeof openSseStream> | undefined;
   const svc = new AIAssistantService();
   try {
+    sse = openSseStream(res);
     await svc.initialize(userId);
     await svc.resumeRun(
       userId,
@@ -201,20 +251,20 @@ export async function approveRun(req: Request, res: Response): Promise<void> {
       sanitized,
       req.user?.fullName ?? req.user?.username ?? 'User',
       req.user?.email ?? '',
-      language ?? 'en',
+      normalizeLanguage(language),
       bearerToken,
       req.user?.roles ?? [],
-      emit,
-      abort.signal
+      sse.emit,
+      sse.signal,
+      // Non-string values are passed through so the service reports them as stale.
+      batchId === undefined || batchId === null ? undefined : (batchId as string)
     );
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    logger.error(`[AI Controller] approveRun error: ${msg}`);
-    emit({ type: 'RUN_ERROR', message: msg, code: 'INTERNAL' });
+    const event = toRunErrorEvent(error, sse?.signal, 'approveRun controller');
+    if (event) sse?.emit(event);
   } finally {
-    clearInterval(keepAlive);
-    res.write('data: [DONE]\n\n');
-    res.end();
+    releaseRunLock(lockKey);
+    sse?.finish();
   }
 }
 
@@ -255,6 +305,11 @@ export async function getConversation(req: Request, res: Response): Promise<void
 
   if (!userId) {
     res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  // Not a UUID → cannot exist (and would make Postgres throw a 500).
+  if (!UUID_RE.test(id)) {
+    res.status(404).json({ error: 'Conversation not found' });
     return;
   }
 
@@ -303,6 +358,10 @@ export async function deleteConversation(req: Request, res: Response): Promise<v
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
+  if (!UUID_RE.test(id)) {
+    res.status(404).json({ error: 'Conversation not found' });
+    return;
+  }
 
   try {
     const db = pool();
@@ -349,7 +408,7 @@ export async function transcribeAudio(req: Request, res: Response): Promise<void
 
   const file = (req as Request & { file?: Express.Multer.File }).file;
   if (!file) {
-    res.status(400).json({ error: 'No audio file provided (field: audio)' });
+    res.status(400).json({ error: 'No audio file provided (field: audio)', code: 'NO_AUDIO' });
     return;
   }
 
@@ -357,8 +416,15 @@ export async function transcribeAudio(req: Request, res: Response): Promise<void
     const result = await transcriptionService.transcribe(file.buffer, file.mimetype, userId);
     res.json(result);
   } catch (error: unknown) {
+    // Classified errors carry a client-safe message + stable code
+    // (STT_DISABLED 400, STT_UNREACHABLE 503, STT_TIMEOUT 504, STT_FAILED 502);
+    // upstream bodies and hostnames are only logged by the service.
+    if (error instanceof TranscriptionError) {
+      res.status(error.status).json({ error: error.message, code: error.code });
+      return;
+    }
     const msg = error instanceof Error ? error.message : String(error);
     logger.error(`[AI Controller] transcribeAudio error: ${msg}`);
-    res.status(500).json({ error: msg });
+    res.status(500).json({ error: 'Transcription failed', code: 'INTERNAL' });
   }
 }

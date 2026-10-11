@@ -11,14 +11,21 @@
 const hooks = globalThis as unknown as {
   __query: (sql: string, params?: unknown[]) => Promise<{ rows: unknown[]; rowCount?: number }>;
   __llm: (opts: unknown) => Promise<{ content: string; toolCalls: unknown[]; finishReason: string | null }>;
-  __exec: (name: string, args: Record<string, unknown>) => Promise<{ status: number; data?: unknown; error?: string }>;
+  __exec: (
+    name: string,
+    args: Record<string, unknown>,
+    signal?: AbortSignal
+  ) => Promise<{ status: number; data?: unknown; error?: string }>;
   __validate: (name: string, args: Record<string, unknown>) => { ok: true } | { ok: false; errors: string[] };
+  __customTools: Record<string, unknown>;
 };
 
 jest.mock('../../src/utils/database', () => ({
   pool: () => ({ query: (sql: string, params?: unknown[]) => hooks.__query(sql, params) }),
 }));
 jest.mock('../../src/services/ai/llm-stream.service', () => ({
+  // Keep the real error classes/helpers (LLMError, isAbortError, …); stub the network call.
+  ...jest.requireActual('../../src/services/ai/llm-stream.service'),
   streamChatCompletion: (opts: unknown) => hooks.__llm(opts),
 }));
 jest.mock('../../src/services/ai/tool-selection.service', () => ({
@@ -26,8 +33,17 @@ jest.mock('../../src/services/ai/tool-selection.service', () => ({
   isToolAllowedForRoles: () => true,
 }));
 jest.mock('../../src/services/ai/tool-executor.service', () => ({
-  executeToolCall: (name: string, args: Record<string, unknown>) => hooks.__exec(name, args),
-  isWriteTool: (name: string) => /^(post|put|patch|delete)_/.test(name),
+  executeToolCall: (
+    name: string,
+    args: Record<string, unknown>,
+    _token: string,
+    _roles: string[],
+    signal?: AbortSignal
+  ) => hooks.__exec(name, args, signal),
+  isWriteTool: (name: string) => /^(post|put|patch|delete)_/.test(name) || name === 'log_time_entry',
+}));
+jest.mock('../../src/services/ai/ai-tool-registry.service', () => ({
+  getCustomToolByName: (name: string) => hooks.__customTools[name],
 }));
 jest.mock('../../src/services/ai/openapi-tool-builder.service', () => ({
   validateToolArguments: (name: string, args: Record<string, unknown>) => hooks.__validate(name, args),
@@ -40,6 +56,8 @@ jest.mock('../../src/services/ai/conversation-history.service', () => ({
 }));
 
 import { AIAssistantService, ToolApprovalDecision } from '../../src/services/ai/ai-assistant.service';
+import { LLMError } from '../../src/services/ai/llm-stream.service';
+import { isRunActive, runLockKey } from '../../src/services/ai/run-lock';
 
 const CONV = '123e4567-e89b-12d3-a456-426614174999';
 
@@ -62,6 +80,7 @@ describe('AIAssistantService orchestration', () => {
   let llmRounds: Array<{ content: string; toolCalls: any[]; finishReason: string | null }>;
   let llmCallCount: number;
   let execCalls: Array<{ name: string; args: Record<string, unknown> }>;
+  let execSignals: Array<AbortSignal | undefined>;
   let execResult: (name: string) => { status: number; data?: unknown; error?: string };
   let claimRows: unknown[];
 
@@ -73,8 +92,10 @@ describe('AIAssistantService orchestration', () => {
     llmRounds = [];
     llmCallCount = 0;
     execCalls = [];
+    execSignals = [];
     execResult = () => ({ status: 200, data: { ok: true } });
     claimRows = [];
+    hooks.__customTools = {};
 
     hooks.__query = async (sql: string, params?: unknown[]) => {
       queries.push({ sql, params: params ?? [] });
@@ -85,7 +106,11 @@ describe('AIAssistantService orchestration', () => {
       }
       if (sql.includes('INSERT INTO ai_conversations')) return { rows: [{ id: CONV }] };
       if (sql.includes('SELECT id FROM ai_conversations')) return { rows: [{ id: CONV }] };
-      if (sql.includes('RETURNING id, metadata')) return { rows: claimRows };
+      if (sql.includes('RETURNING id, metadata')) {
+        // Mirrors the claim's "($2::uuid IS NULL OR id = $2::uuid)" batch filter.
+        const batch = params?.[1];
+        return { rows: claimRows.filter((r: any) => batch == null || r.id === batch) };
+      }
       if (sql.includes('RETURNING id')) return { rows: [{ id: `amsg-${queries.length}` }] };
       return { rows: [] };
     };
@@ -94,8 +119,9 @@ describe('AIAssistantService orchestration', () => {
       llmCallCount++;
       return round ?? { content: 'done', toolCalls: [], finishReason: 'stop' };
     };
-    hooks.__exec = async (name, args) => {
+    hooks.__exec = async (name, args, signal) => {
       execCalls.push({ name, args });
+      execSignals.push(signal);
       return execResult(name);
     };
     hooks.__validate = () => ({ ok: true });
@@ -246,6 +272,253 @@ describe('AIAssistantService orchestration', () => {
 
     expect(execCalls).toHaveLength(0);
     expect(events.some((e) => e.type === 'RUN_ERROR' && e.code === 'NO_PENDING')).toBe(true);
+    // AG-UI: an errored run ends with RUN_ERROR — nothing after it.
+    expect(events[events.length - 1]).toMatchObject({ type: 'RUN_ERROR', code: 'NO_PENDING' });
+    expect(events.some((e) => e.type === 'RUN_FINISHED')).toBe(false);
+  });
+
+  describe('approval batches (batchId)', () => {
+    const BATCH = '0f8fad5b-d9cb-469f-a165-70867728950e';
+    const OTHER = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+
+    it('emits batchId = id of the assistant message holding the pending actions', async () => {
+      llmRounds = [
+        { content: 'Plan.', toolCalls: [makeCall('w1', 'post_time_entries', { a: 1 })], finishReason: 'tool_calls' },
+      ];
+      await run();
+
+      const approval = events.find((e) => e.type === 'TOOL_APPROVAL_REQUIRED') as any;
+      const assistantInsert = queries.find((q) => q.sql.includes("'assistant'") && q.sql.includes('RETURNING id'));
+      const metaUpdate = queries.find(
+        (q) => q.sql.includes('SET metadata') && String(q.params[0]).includes('awaiting_approval')
+      );
+      expect(approval.batchId).toBeDefined();
+      expect(metaUpdate!.params[1]).toBe(approval.batchId); // same row as the pending list
+      expect(assistantInsert).toBeDefined();
+    });
+
+    it('executes when batchId matches the current awaiting batch', async () => {
+      claimRows = [{ id: BATCH, metadata: { status: 'resolved', pending: [makeCall('w1', 'post_time_entries', { a: 1 })] } }];
+      llmRounds = [{ content: 'Created.', toolCalls: [], finishReason: 'stop' }];
+      const svc = new AIAssistantService();
+      await svc.initialize('user-1');
+      await svc.resumeRun('user-1', CONV, [{ toolCallId: 'w1', decision: 'approve' }], 'U', 'u@x', 'en', 'B', [], emit, undefined, BATCH);
+
+      expect(execCalls).toHaveLength(1);
+      const claim = queries.find((q) => q.sql.includes('RETURNING id, metadata'));
+      expect(claim!.params[1]).toBe(BATCH);
+      expect(events.some((e) => e.type === 'RUN_FINISHED')).toBe(true);
+    });
+
+    it('refuses a stale batchId with STALE_APPROVAL — nothing executed or declined', async () => {
+      claimRows = [{ id: BATCH, metadata: { status: 'resolved', pending: [makeCall('w1', 'post_time_entries', { a: 1 })] } }];
+      const svc = new AIAssistantService();
+      await svc.initialize('user-1');
+      await svc.resumeRun('user-1', CONV, [{ toolCallId: 'w1', decision: 'approve' }], 'U', 'u@x', 'en', 'B', [], emit, undefined, OTHER);
+
+      expect(execCalls).toHaveLength(0);
+      expect(queries.some((q) => q.sql.includes("'tool'"))).toBe(false); // no declined results either
+      expect(events[events.length - 1]).toMatchObject({ type: 'RUN_ERROR', code: 'STALE_APPROVAL' });
+      expect(events.some((e) => e.type === 'RUN_FINISHED')).toBe(false);
+    });
+
+    it('treats a malformed batchId as stale without querying', async () => {
+      const svc = new AIAssistantService();
+      await svc.initialize('user-1');
+      await svc.resumeRun('user-1', CONV, [{ toolCallId: 'w1', decision: 'approve' }], 'U', 'u@x', 'en', 'B', [], emit, undefined, 'not-a-uuid');
+
+      expect(queries.some((q) => q.sql.includes('RETURNING id, metadata'))).toBe(false);
+      expect(events.some((e) => e.type === 'RUN_ERROR' && e.code === 'STALE_APPROVAL')).toBe(true);
+    });
+
+    it('without batchId keeps the legacy behaviour (claims the newest awaiting batch)', async () => {
+      claimRows = [{ id: BATCH, metadata: { status: 'resolved', pending: [makeCall('w1', 'post_time_entries', { a: 1 })] } }];
+      llmRounds = [{ content: 'ok', toolCalls: [], finishReason: 'stop' }];
+      const svc = new AIAssistantService();
+      await svc.initialize('user-1');
+      await svc.resumeRun('user-1', CONV, [{ toolCallId: 'w1', decision: 'approve' }], 'U', 'u@x', 'en', 'B', [], emit);
+
+      const claim = queries.find((q) => q.sql.includes('RETURNING id, metadata'));
+      expect(claim!.params[1]).toBeNull();
+      expect(execCalls).toHaveLength(1);
+    });
+  });
+
+  describe('client disconnect (abort)', () => {
+    it('does not abort an approved write in flight, and re-arms the untouched rest', async () => {
+      const pending = [makeCall('w1', 'post_time_entries', { a: 1 }), makeCall('w2', 'post_time_entries', { a: 2 })];
+      claimRows = [{ id: 'amsg-1', metadata: { status: 'resolved', pending } }];
+      const abort = new AbortController();
+      // The client disconnects while w1 is executing.
+      hooks.__exec = async (name, args, signal) => {
+        execCalls.push({ name, args });
+        execSignals.push(signal);
+        abort.abort();
+        return { status: 201, data: { id: 'created' } };
+      };
+
+      const svc = new AIAssistantService();
+      await svc.initialize('user-1');
+      await svc.resumeRun(
+        'user-1',
+        CONV,
+        [
+          { toolCallId: 'w1', decision: 'approve' },
+          { toolCallId: 'w2', decision: 'approve' },
+        ],
+        'U',
+        'u@x',
+        'en',
+        'B',
+        [],
+        emit,
+        abort.signal
+      );
+
+      // w1 ran WITHOUT the abort signal and its success was recorded as such…
+      expect(execCalls).toEqual([{ name: 'post_time_entries', args: { a: 1 } }]);
+      expect(execSignals[0]).toBeUndefined();
+      const w1Result = queries.find((q) => q.sql.includes("'tool'") && q.params[2] === 'w1');
+      expect(String(w1Result!.params[1])).toContain('created');
+      // …w2 was never started and is re-armed for a later decision…
+      const rearm = queries.find(
+        (q) => q.sql.includes('SET metadata') && String(q.params[0]).includes('awaiting_approval')
+      );
+      expect(JSON.parse(String(rearm!.params[0])).pending.map((t: any) => t.id)).toEqual(['w2']);
+      // …and the run stops quietly: no further LLM round, no RUN_ERROR to a closed socket.
+      expect(llmCallCount).toBe(0);
+      expect(events.some((e) => e.type === 'RUN_ERROR')).toBe(false);
+    });
+
+    it('passes the abort signal to read tools and stops the loop once aborted', async () => {
+      const abort = new AbortController();
+      llmRounds = [
+        { content: '', toolCalls: [makeCall('t1', 'get_projects', {})], finishReason: 'tool_calls' },
+        { content: 'never', toolCalls: [], finishReason: 'stop' },
+      ];
+      hooks.__exec = async (name, args, signal) => {
+        execCalls.push({ name, args });
+        execSignals.push(signal);
+        abort.abort(); // client goes away during the read
+        return { status: 200, data: [] };
+      };
+      const svc = new AIAssistantService();
+      await svc.initialize('user-1');
+      await svc.runStream('user-1', CONV, 'hello', 'User', 'u@x', 'en', 'Bearer t', [], emit, abort.signal);
+
+      expect(execSignals[0]).toBe(abort.signal);
+      expect(llmCallCount).toBe(1); // no second round after the abort
+      expect(events.some((e) => e.type === 'RUN_ERROR')).toBe(false);
+    });
+  });
+
+  describe('RUN_ERROR classification', () => {
+    it('forwards LLM failures with their code and a generic message', async () => {
+      hooks.__llm = async () => {
+        throw new LLMError('LLM_UNREACHABLE', 'connect ECONNREFUSED 10.0.0.5:1234');
+      };
+      await run();
+      const err = events.find((e) => e.type === 'RUN_ERROR') as any;
+      expect(err.code).toBe('LLM_UNREACHABLE');
+      expect(err.message).not.toContain('10.0.0.5');
+    });
+
+    it('maps unexpected errors to INTERNAL without leaking their text', async () => {
+      hooks.__llm = async () => {
+        throw new Error('relation "ai_messages" does not exist at db.internal:5432');
+      };
+      await run();
+      const err = events.find((e) => e.type === 'RUN_ERROR') as any;
+      expect(err.code).toBe('INTERNAL');
+      expect(err.message).not.toMatch(/relation|db\.internal/);
+    });
+  });
+
+  describe('tool-call persistence', () => {
+    it('persists canonicalized arguments, and {} for unparseable ones', async () => {
+      llmRounds = [
+        {
+          content: '',
+          toolCalls: [
+            makeCall('c1', 'get_projects', JSON.stringify(JSON.stringify({ b: 2, a: 1 }))), // double-encoded
+            makeCall('c2', 'get_clients', '{broken'),
+          ],
+          finishReason: 'tool_calls',
+        },
+        { content: 'done', toolCalls: [], finishReason: 'stop' },
+      ];
+      await run();
+
+      const insert = queries.find((q) => q.sql.includes('tool_calls) VALUES'));
+      const stored = JSON.parse(String(insert!.params[2]));
+      expect(stored[0].function.arguments).toBe('{"a":1,"b":2}');
+      expect(stored[1].function.arguments).toBe('{}');
+      // The malformed call still gets a repair message (not executed).
+      const repair = events.find((e) => e.type === 'TOOL_CALL_RESULT' && e.toolCallId === 'c2') as any;
+      expect(String(repair.content)).toContain('Invalid tool arguments');
+      expect(execCalls.map((c) => c.name)).toEqual(['get_projects']);
+    });
+  });
+
+  describe('run lock for new conversations', () => {
+    it('holds the lock on a newly created thread during the run and releases it afterwards', async () => {
+      let lockedDuringRun = false;
+      hooks.__llm = async () => {
+        lockedDuringRun = isRunActive(runLockKey('user-1', CONV));
+        return { content: 'hi', toolCalls: [], finishReason: 'stop' };
+      };
+      const svc = new AIAssistantService();
+      await svc.initialize('user-1');
+      await svc.runStream('user-1', null, 'hello', 'User', 'u@x', 'en', 'Bearer t', [], emit);
+
+      expect(lockedDuringRun).toBe(true);
+      expect(isRunActive(runLockKey('user-1', CONV))).toBe(false);
+    });
+  });
+
+  describe('pre-approval preparation (log_time_entry)', () => {
+    it('shows the resolved project on the approval card and stores it in the pending list', async () => {
+      hooks.__customTools = {
+        log_time_entry: {
+          prepare: async (args: Record<string, unknown>) => ({ ...args, project: 'Acme Website', project_id: 'p-1' }),
+        },
+      };
+      llmRounds = [
+        {
+          content: 'Logging.',
+          toolCalls: [makeCall('l1', 'log_time_entry', { project: 'acme', entry_date: '2026-10-05' })],
+          finishReason: 'tool_calls',
+        },
+      ];
+      await run();
+
+      const approval = events.find((e) => e.type === 'TOOL_APPROVAL_REQUIRED') as any;
+      expect(approval.actions[0].arguments).toMatchObject({ project: 'Acme Website', project_id: 'p-1' });
+      const metaUpdate = queries.find(
+        (q) => q.sql.includes('SET metadata') && String(q.params[0]).includes('awaiting_approval')
+      );
+      expect(String(metaUpdate!.params[0])).toContain('p-1');
+    });
+
+    it('refuses an ambiguous project before approval and lets the model ask', async () => {
+      hooks.__customTools = {
+        log_time_entry: {
+          prepare: async () => {
+            throw new Error('Project name "acme" is ambiguous — it matches: Acme A, Acme B.');
+          },
+        },
+      };
+      llmRounds = [
+        { content: '', toolCalls: [makeCall('l1', 'log_time_entry', { project: 'acme' })], finishReason: 'tool_calls' },
+        { content: 'Which Acme project?', toolCalls: [], finishReason: 'stop' },
+      ];
+      await run();
+
+      expect(events.some((e) => e.type === 'TOOL_APPROVAL_REQUIRED')).toBe(false);
+      const refused = events.find((e) => e.type === 'TOOL_CALL_RESULT' && e.toolCallId === 'l1') as any;
+      expect(String(refused.content)).toContain('ambiguous');
+      expect(llmCallCount).toBe(2); // model got the error back and answered
+    });
   });
 
   it('deduplicates byte-identical tool calls within one response', async () => {

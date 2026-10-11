@@ -49,6 +49,15 @@ export interface CustomToolDefinition {
    * Throw an Error to signal failure — the message is returned to the LLM.
    */
   execute: (args: Record<string, unknown>, ctx?: { bearerToken: string }) => Promise<unknown>;
+  /**
+   * Optional pre-approval step for write tools: runs BEFORE the approval card
+   * is shown (read-only — it must not mutate data). Return the arguments the
+   * user should review (e.g. a project name resolved to its exact name + id).
+   * Throw an Error to refuse the call (ambiguous / not found): the message is
+   * returned to the LLM as the tool result so it can ask the user, and no
+   * approval card is shown.
+   */
+  prepare?: (args: Record<string, unknown>, ctx: { bearerToken: string }) => Promise<Record<string, unknown>>;
 }
 
 // ── Registry ──────────────────────────────────────────────────────────────────

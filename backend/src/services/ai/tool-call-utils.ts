@@ -51,3 +51,18 @@ export function parseToolArguments(
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
+
+/**
+ * Message of a tool failure that is safe to hand to the model and the client:
+ * transport errors from axios (which embed internal host:port) collapse to a
+ * generic text with the error code / HTTP status; errors a tool threw on
+ * purpose (e.g. "project name is ambiguous …") keep their message.
+ */
+export function safeToolErrorMessage(err: unknown): string {
+  const e = err as { message?: string; code?: string; isAxiosError?: boolean; response?: { status?: number } };
+  if (e && typeof e === 'object' && e.isAxiosError) {
+    if (e.response?.status) return `The API request failed (HTTP ${e.response.status}).`;
+    return `The API request failed${e.code ? ` (${e.code})` : ''}.`;
+  }
+  return err instanceof Error ? err.message : String(err);
+}
