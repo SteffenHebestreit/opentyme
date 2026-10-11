@@ -6,8 +6,14 @@
 
 import { Request, Response } from 'express';
 import { ExpenseService } from '../../../services/business/expense.service';
-import { AIDepreciationService } from '../../../services/financial/ai-depreciation.service';
-import { analyzeDepreciationDraftSchema } from '../../../schemas/business/expense.schema';
+import {
+  AIDepreciationService,
+  DepreciationAnalysis,
+} from '../../../services/financial/ai-depreciation.service';
+import {
+  analyzeDepreciationDraftSchema,
+  expenseIdSchema,
+} from '../../../schemas/business/expense.schema';
 import { logger } from '../../../utils/logger';
 
 export class ExpenseDepreciationController {
@@ -29,12 +35,17 @@ export class ExpenseDepreciationController {
         return;
       }
 
+      const { error: idError } = expenseIdSchema.validate(req.params, { allowUnknown: true });
+      if (idError) {
+        res.status(404).json({ error: 'Expense not found', code: 'NOT_FOUND' });
+        return;
+      }
       const { id } = req.params;
 
       // Get expense details
       const expense = await this.expenseService.getExpenseById(id, userId);
       if (!expense) {
-        res.status(404).json({ error: 'Expense not found' });
+        res.status(404).json({ error: 'Expense not found', code: 'NOT_FOUND' });
         return;
       }
 
@@ -51,7 +62,7 @@ export class ExpenseDepreciationController {
       await this.expenseService.clearAIAnalysis(userId, id);
 
       // Analyze with AI - let AI determine treatment
-      logger.info(`[Depreciation] Analyzing expense ${id} with AI for user ${userId}`);
+      logger.info(`[Depreciation] Analyzing expense ${id} for user ${userId}`);
 
       // Initialize AI service with user settings.
       // Per-request instance — the service holds per-user client/model state.
@@ -75,13 +86,21 @@ export class ExpenseDepreciationController {
 
       const formattedResponse = this.formatAnalysis(analysis, netAmount, expense.category);
 
-      // Save the AI analysis response to database so it can be displayed when reopening the expense
-      logger.info(`[Depreciation] Saving AI analysis response for expense ${id}`);
-      await this.expenseService.saveAIAnalysis(userId, id, formattedResponse.analysis);
+      // Save the AI analysis response to database so it can be displayed when
+      // reopening the expense. A rules-based fallback is not an AI analysis
+      // and is not stored in ai_analysis_response.
+      if (analysis.source === 'ai') {
+        logger.info(`[Depreciation] Saving AI analysis response for expense ${id}`);
+        await this.expenseService.saveAIAnalysis(userId, id, formattedResponse.analysis);
+      } else {
+        logger.info(
+          `[Depreciation] Rules-based result for expense ${id} (${analysis.ai_error_code ?? 'no AI'}), not stored`
+        );
+      }
 
       res.status(200).json(formattedResponse);
     } catch (error: any) {
-      logger.error('[Depreciation] Analysis error:', error);
+      logger.error('[Depreciation] Analysis error:', { message: error?.message, stack: error?.stack });
 
       // Clear AI analysis on failure
       const { id } = req.params;
@@ -95,7 +114,7 @@ export class ExpenseDepreciationController {
         }
       }
 
-      res.status(500).json({ error: 'Internal server error', message: error.message });
+      res.status(500).json({ error: 'Depreciation analysis failed', code: 'INTERNAL' });
     }
   };
 
@@ -104,7 +123,7 @@ export class ExpenseDepreciationController {
    * DepreciationAnalysis interface expects. Shared by the saved-expense and
    * draft endpoints so the two can never drift apart.
    */
-  private formatAnalysis(analysis: any, netAmount: number, fallbackCategory?: string) {
+  private formatAnalysis(analysis: DepreciationAnalysis, netAmount: number, fallbackCategory?: string) {
     // Map old/deprecated category names to new ones
     const categoryMapping: { [key: string]: string } = {
       'hardware': 'computer', // Old "hardware" → new "computer"
@@ -118,10 +137,20 @@ export class ExpenseDepreciationController {
       ? (categoryMapping[analysis.suggested_category] || analysis.suggested_category)
       : fallbackCategory;
 
+    // `source` / `ai_error_code` (API contract §5) are repeated at the top
+    // level so a caller can branch on them without digging into `analysis`;
+    // inside `analysis` they travel with the stored copy.
+    const provenance = {
+      source: analysis.source,
+      ...(analysis.ai_error_code ? { ai_error_code: analysis.ai_error_code } : {}),
+    };
+
     // Transform AI response to match frontend interface
     return {
       eligible: true,
+      ...provenance,
       analysis: {
+        ...provenance,
         recommendation: analysis.recommendation,
         depreciation_type: analysis.recommendation,
         depreciation_years: analysis.suggested_years || null,
@@ -166,9 +195,7 @@ export class ExpenseDepreciationController {
         return;
       }
 
-      logger.info(
-        `[Depreciation] Analyzing draft expense "${value.description}" for user ${userId}`
-      );
+      logger.info(`[Depreciation] Analyzing draft expense for user ${userId}`);
 
       // Per-request instance — the service holds per-user client/model state.
       const aiDepreciationService = new AIDepreciationService();
@@ -192,7 +219,7 @@ export class ExpenseDepreciationController {
         message: error?.message,
         stack: error?.stack,
       });
-      res.status(500).json({ error: 'Internal server error', message: error.message });
+      res.status(500).json({ error: 'Depreciation analysis failed', code: 'INTERNAL' });
     }
   };
 

@@ -8,7 +8,43 @@
 import axios, { AxiosInstance } from 'axios';
 import { logger } from '../../utils/logger';
 import { getDbClient } from '../../utils/database';
-import { MCPClientService } from './mcp-client.service';
+import { classifyUpstreamError } from '../../utils/upstream-error';
+import {
+  DocumentConverterClient,
+  DocumentConversionError,
+  DEFAULT_DOCUMENT_CONVERTER_URL,
+} from './mcp-client.service';
+
+/**
+ * Stable error codes of the receipt analysis (API contract: the frontend
+ * translates them; see expense-receipt.controller.ts for the HTTP mapping).
+ */
+export type ReceiptAnalysisErrorCode =
+  /** The document converted fine but holds no readable text. */
+  | 'NO_TEXT'
+  /** The document converter or the AI server could not be reached. */
+  | 'AI_UNREACHABLE'
+  /** The document converter or the AI server did not answer in time. */
+  | 'AI_TIMEOUT'
+  /** The AI server rejected the configured API key (401/403). */
+  | 'AI_AUTH'
+  /** The AI server answered, but not with a usable extraction. */
+  | 'AI_INVALID_RESPONSE'
+  /** The document converter answered with an error. */
+  | 'EXTRACTION_FAILED';
+
+export class ReceiptAnalysisError extends Error {
+  readonly code: ReceiptAnalysisErrorCode;
+  /** Which upstream failed — lets the client say what to check. */
+  readonly service: 'converter' | 'llm';
+
+  constructor(code: ReceiptAnalysisErrorCode, service: 'converter' | 'llm', message: string) {
+    super(message);
+    this.name = 'ReceiptAnalysisError';
+    this.code = code;
+    this.service = service;
+  }
+}
 
 /**
  * Extracted expense data structure
@@ -127,89 +163,86 @@ const EXTRACTION_JSON_SCHEMA = {
  */
 export class ExpenseExtractionService {
   private client: AxiosInstance | null = null;
-  private mcpClient: MCPClientService | null = null;
+  private converter: DocumentConverterClient | null = null;
   private apiUrl: string | undefined = undefined;
   private apiKey: string | null = null;
   private model: string = 'llama-3.2-3b-instruct';
   private enabled: boolean = false;
 
   /**
-   * Initialize the AI service with settings from database
+   * Load the user's settings and set up the clients.
+   *
+   * The document converter is always set up — with AI disabled the receipt
+   * endpoint still returns the raw extracted text. The LLM client is only
+   * created when AI is enabled.
    */
   async initialize(userId: string): Promise<void> {
+    let settings: any = null;
     try {
-      // Fetch user settings
-      const settings = await this.getUserSettings(userId);
-
-      if (!settings || !settings.ai_enabled) {
-        logger.info('AI extraction is disabled in settings');
-        this.enabled = false;
-        return;
-      }
-
-      this.enabled = true;
-      this.apiUrl = settings.ai_api_url || 'http://localhost:1234/v1';
-      this.apiKey = settings.ai_api_key || '';
-      this.model = settings.ai_model || 'qwen/qwen3-v1-30b';
-
-      // Initialize MCP client with user's server URL
-      const mcpServerUrl = settings.mcp_server_url || 'http://mcp-server:8000';
-      this.mcpClient = new MCPClientService(mcpServerUrl);
-      logger.info(`MCP client initialized with URL: ${mcpServerUrl}`);
-
-      // Create axios client for OpenAI-compatible API
-      this.client = axios.create({
-        baseURL: this.apiUrl,
-        timeout: 180000, // 3 minutes — large local models can be slow
-        headers: {
-          'Content-Type': 'application/json',
-          ...(this.apiKey && { 'Authorization': `Bearer ${this.apiKey}` }),
-        },
-      });
-
-      logger.info(`AI extraction initialized: ${this.apiUrl} (model: ${this.model})`);
+      settings = await this.getUserSettings(userId);
     } catch (error: any) {
-      logger.error('Failed to initialize AI extraction service:', error.message);
-      this.enabled = false;
+      logger.error('Failed to load AI extraction settings:', error.message);
     }
+
+    const converterUrl =
+      settings?.mcp_server_url || process.env.MCP_SERVER_URL || DEFAULT_DOCUMENT_CONVERTER_URL;
+    this.converter = new DocumentConverterClient(converterUrl);
+
+    if (!settings || !settings.ai_enabled) {
+      logger.info('AI extraction is disabled in settings');
+      this.enabled = false;
+      this.client = null;
+      return;
+    }
+
+    this.enabled = true;
+    this.apiUrl = settings.ai_api_url || 'http://localhost:1234/v1';
+    this.apiKey = settings.ai_api_key || '';
+    this.model = settings.ai_model || 'qwen/qwen3-v1-30b';
+
+    // Create axios client for OpenAI-compatible API
+    this.client = axios.create({
+      baseURL: this.apiUrl,
+      timeout: 180000, // 3 minutes — large local models can be slow
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.apiKey && { 'Authorization': `Bearer ${this.apiKey}` }),
+      },
+    });
+
+    logger.info(`AI extraction initialized (model: ${this.model})`);
   }
 
   /**
    * Get user settings from database
    */
   private async getUserSettings(userId: string): Promise<any> {
-    try {
-      const pool = getDbClient();
-      const result = await pool.query(
-        `SELECT 
-          ai_enabled,
-          ai_provider,
-          ai_api_url,
-          ai_api_key,
-          ai_model,
-          mcp_server_url,
-          mcp_server_api_key
-        FROM settings 
-        WHERE user_id = $1`,
-        [userId]
-      );
+    const pool = getDbClient();
+    const result = await pool.query(
+      `SELECT 
+        ai_enabled,
+        ai_provider,
+        ai_api_url,
+        ai_api_key,
+        ai_model,
+        mcp_server_url
+      FROM settings 
+      WHERE user_id = $1`,
+      [userId]
+    );
 
-      if (result.rows.length === 0) {
-        logger.warn(`No settings found for user ${userId}, using defaults`);
-        return {
-          ai_enabled: false,
-          ai_api_url: 'http://localhost:1234/v1',
-          ai_api_key: '',
-          ai_model: 'qwen/qwen3-v1-30b',
-          mcp_server_url: 'http://mcp-server:8000',
-        };
-      }
-
-      return result.rows[0];
-    } catch (error: any) {
-      logger.error(`Failed to load settings for user ${userId}:`, error.message);
-      throw error;
+    if (result.rows.length === 0) {
+      logger.warn(`No settings found for user ${userId}, using defaults`);
+      return {
+        ai_enabled: false,
+        ai_api_url: 'http://localhost:1234/v1',
+        ai_api_key: '',
+        ai_model: 'qwen/qwen3-v1-30b',
+        mcp_server_url: DEFAULT_DOCUMENT_CONVERTER_URL,
+      };
     }
+
+    return result.rows[0];
   }
 
   /**
@@ -220,23 +253,45 @@ export class ExpenseExtractionService {
   }
 
   /**
-   * Extract text from a receipt document using the MCP server.
+   * Extract text from a receipt document using the document converter.
    *
    * Handles PDFs and images alike — markitdown describes photographed and
    * scanned receipts through its LLM, so a phone snapshot of a till slip goes
    * down the same path as a PDF invoice.
    *
    * @param fileBuffer - Receipt file buffer (PDF or image)
-   * @param filename - Original filename; its extension tells the MCP server
+   * @param filename - Original filename; its extension tells the converter
    *                   which converter to use, so pass the real one
-   * @returns Extracted text
+   * @param contentType - MIME type of the upload
+   * @returns Extracted text (never empty)
+   * @throws ReceiptAnalysisError
    */
-  async extractDocumentText(fileBuffer: Buffer, filename: string): Promise<string> {
-    if (!this.mcpClient) {
-      throw new Error('MCP client is not initialized');
+  async extractDocumentText(
+    fileBuffer: Buffer,
+    filename: string,
+    contentType?: string
+  ): Promise<string> {
+    if (!this.converter) {
+      throw new Error('ExpenseExtractionService.initialize() has not been called');
     }
 
-    return await this.mcpClient.extractDocumentText(fileBuffer, filename);
+    try {
+      return await this.converter.extractDocumentText(fileBuffer, filename, contentType);
+    } catch (error) {
+      if (error instanceof DocumentConversionError) {
+        switch (error.code) {
+          case 'NO_TEXT':
+            throw new ReceiptAnalysisError('NO_TEXT', 'converter', 'The document contains no readable text');
+          case 'UNREACHABLE':
+            throw new ReceiptAnalysisError('AI_UNREACHABLE', 'converter', 'The document converter is unreachable');
+          case 'TIMEOUT':
+            throw new ReceiptAnalysisError('AI_TIMEOUT', 'converter', 'The document converter timed out');
+          default:
+            throw new ReceiptAnalysisError('EXTRACTION_FAILED', 'converter', 'The document could not be converted');
+        }
+      }
+      throw error;
+    }
   }
 
   /**
@@ -244,43 +299,82 @@ export class ExpenseExtractionService {
    * 
    * @param text - Extracted text from PDF receipt
    * @returns Structured expense data
+   * @throws ReceiptAnalysisError for upstream failures
    */
   async extractExpenseData(text: string): Promise<ExtractedExpenseData> {
     if (!this.isEnabled()) {
       throw new Error('AI extraction is not enabled or initialized');
     }
 
+    logger.info(`Extracting expense data from ${text.length} characters of text`);
+
+    const prompt = this.buildExtractionPrompt(text);
+
+    let parsed: any;
     try {
-      logger.info(`Extracting expense data from ${text.length} characters of text`);
-
-      // Create structured prompt for expense extraction
-      const prompt = this.buildExtractionPrompt(text);
-
-      // Call OpenAI-compatible API
-      try {
-        const completion = await this.requestCompletion(prompt);
-
-        // Robustly extract JSON — strip <think> blocks, markdown fences, and any leading/trailing text
-        const jsonString = this.extractJsonFromResponse(completion);
-
-        const extractedData = this.normalizeExtractedData(JSON.parse(jsonString));
-
-        // Add confidence score and raw text
-        const result: ExtractedExpenseData = {
-          ...extractedData,
-          confidence: this.calculateConfidence(extractedData),
-          raw_text: text.substring(0, 500), // Store first 500 chars for reference
-        };
-
-        logger.info(`Successfully extracted expense data: ${JSON.stringify(result)}`);
-        return result;
-      } catch (apiError: any) {
-        logger.error('AI API error:', apiError.response?.data || apiError.message);
-        throw apiError;
-      }
+      const completion = await this.requestCompletion(prompt);
+      // Robustly extract JSON — strip <think> blocks, markdown fences, and any leading/trailing text
+      const jsonString = this.extractJsonFromResponse(completion);
+      parsed = JSON.parse(jsonString);
     } catch (error: any) {
-      logger.error('Failed to extract expense data:', error.message);
-      throw new Error(`AI extraction failed: ${error.message}`);
+      throw this.toReceiptAnalysisError(error);
+    }
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      logger.error('AI extraction returned JSON that is not an object');
+      throw new ReceiptAnalysisError('AI_INVALID_RESPONSE', 'llm', 'The AI answer was not a JSON object');
+    }
+
+    const extractedData = this.normalizeExtractedData(parsed);
+
+    // Add confidence score and raw text
+    const result: ExtractedExpenseData = {
+      ...extractedData,
+      confidence: this.calculateConfidence(extractedData),
+      raw_text: text.substring(0, 500), // Store first 500 chars for reference
+    };
+
+    // Field presence only — the values are the user's receipt contents.
+    logger.info(
+      `Extracted expense data: confidence=${result.confidence}, fields=[${Object.keys(result)
+        .filter((k) => k !== 'raw_text' && (result as any)[k] !== undefined)
+        .join(', ')}], line_items=${result.line_items?.length ?? 0}`
+    );
+    return result;
+  }
+
+  /**
+   * Map anything thrown while talking to the model to a ReceiptAnalysisError.
+   */
+  private toReceiptAnalysisError(error: any): Error {
+    if (error instanceof ReceiptAnalysisError) return error;
+
+    if (error instanceof SyntaxError) {
+      logger.error(`AI extraction answer is not valid JSON: ${error.message}`);
+      return new ReceiptAnalysisError('AI_INVALID_RESPONSE', 'llm', 'The AI answer was not valid JSON');
+    }
+
+    const failure = classifyUpstreamError(error);
+    logger.error(
+      `AI extraction request failed (${failure.kind}${failure.status ? `, HTTP ${failure.status}` : ''}${
+        failure.code ? `, ${failure.code}` : ''
+      }): ${error?.message}`
+    );
+    switch (failure.kind) {
+      case 'unreachable':
+        return new ReceiptAnalysisError('AI_UNREACHABLE', 'llm', 'The AI server is unreachable');
+      case 'timeout':
+        return new ReceiptAnalysisError('AI_TIMEOUT', 'llm', 'The AI server timed out');
+      case 'auth':
+        return new ReceiptAnalysisError('AI_AUTH', 'llm', 'The AI server rejected the API key');
+      case 'http':
+        return new ReceiptAnalysisError(
+          'AI_INVALID_RESPONSE',
+          'llm',
+          `The AI server answered HTTP ${failure.status}`
+        );
+      default:
+        return error instanceof Error ? error : new Error(String(error));
     }
   }
 
@@ -325,35 +419,53 @@ export class ExpenseExtractionService {
       logger.warn(
         `AI endpoint rejected response_format json_schema, retrying unconstrained: ${JSON.stringify(
           error.response?.data
-        )}`
+        )?.substring(0, 300)}`
       );
       response = await this.client!.post('/chat/completions', basePayload);
     }
 
     const choice = response.data?.choices?.[0];
     if (!choice) {
-      throw new Error(
-        `AI response contained no choices: ${JSON.stringify(response.data).substring(0, 200)}`
-      );
+      logger.error('AI response contained no choices');
+      throw new ReceiptAnalysisError('AI_INVALID_RESPONSE', 'llm', 'The AI answer contained no choices');
     }
 
     // Reasoning models split their output: hidden reasoning goes to
-    // reasoning_content, the answer to content. Only fall back to the reasoning
-    // when content is empty (model ran out of budget mid-thought).
-    const message = choice.message ?? {};
-    const completion: string = message.content || message.reasoning_content || '';
+    // reasoning_content, the answer to content. The reasoning is never the
+    // answer — an empty content means the model produced no answer.
+    const completion = this.messageText(choice.message?.content);
 
-    if (!completion.trim() && choice.finish_reason === 'length') {
-      throw new Error(
-        'AI model exhausted its token budget while reasoning and produced no answer. ' +
-          'Try a smaller receipt or a non-reasoning model.'
-      );
+    if (!completion.trim()) {
+      if (choice.finish_reason === 'length') {
+        logger.error('AI model exhausted its token budget before answering (finish_reason=length)');
+        throw new ReceiptAnalysisError(
+          'AI_INVALID_RESPONSE',
+          'llm',
+          'The AI model used up its token budget before answering'
+        );
+      }
+      logger.error(`AI model returned an empty answer (finish_reason=${choice.finish_reason})`);
+      throw new ReceiptAnalysisError('AI_INVALID_RESPONSE', 'llm', 'The AI model returned an empty answer');
     }
 
     logger.info(
       `AI response: ${completion.length} chars (finish_reason=${choice.finish_reason})`
     );
     return completion;
+  }
+
+  /**
+   * Message content is a string on every OpenAI-compatible server we know, but
+   * the spec also allows an array of content parts.
+   */
+  private messageText(content: unknown): string {
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) {
+      return content
+        .map((part: any) => (typeof part?.text === 'string' ? part.text : ''))
+        .join('');
+    }
+    return '';
   }
 
   /**
@@ -368,12 +480,7 @@ export class ExpenseExtractionService {
 
     data.amount = this.toNumber(raw.amount);
     data.tax_amount = this.toNumber(raw.tax_amount);
-    data.tax_rate = this.toNumber(raw.tax_rate);
-
-    // A percentage slipped through as 19 instead of 0.19
-    if (data.tax_rate !== undefined && data.tax_rate > 1) {
-      data.tax_rate = data.tax_rate / 100;
-    }
+    data.tax_rate = this.toTaxRate(raw.tax_rate);
 
     data.date = this.toIsoDate(raw.date);
 
@@ -423,8 +530,7 @@ export class ExpenseExtractionService {
 
         const quantity = this.toNumber(entry?.quantity);
         const unitAmount = this.toNumber(entry?.unit_amount);
-        let taxRate = this.toNumber(entry?.tax_rate);
-        if (taxRate !== undefined && taxRate > 1) taxRate = taxRate / 100;
+        const taxRate = this.toTaxRate(entry?.tax_rate);
 
         const category =
           typeof entry?.category === 'string' &&
@@ -448,62 +554,128 @@ export class ExpenseExtractionService {
   }
 
   /**
-   * Parse a number that may arrive as a German-formatted string ("1.234,56 €").
+   * Parse a number that may arrive as a formatted string.
+   *
+   * German invoices swap the separators: "1.234,56 €" is 1234.56, and a lone
+   * dot followed by exactly three digits ("1.234") is a thousands separator.
+   * English formatting ("1,234.56") is accepted as well.
    */
   private toNumber(value: any): number | undefined {
     if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
     if (typeof value !== 'string') return undefined;
 
-    let cleaned = value.replace(/[^\d.,-]/g, '').trim();
-    if (!cleaned) return undefined;
+    let cleaned = value.replace(/[^\d.,-]/g, '');
+    if (!cleaned || !/\d/.test(cleaned)) return undefined;
+
+    const negative = cleaned.startsWith('-');
+    cleaned = cleaned.replace(/-/g, '');
 
     const lastComma = cleaned.lastIndexOf(',');
     const lastDot = cleaned.lastIndexOf('.');
-    if (lastComma > lastDot) {
-      // German: dots group thousands, comma is the decimal separator
-      cleaned = cleaned.replace(/\./g, '').replace(',', '.');
-    } else {
-      cleaned = cleaned.replace(/,/g, '');
+
+    if (lastComma !== -1 && lastDot !== -1) {
+      // Both separators: whichever comes last is the decimal separator.
+      cleaned =
+        lastComma > lastDot
+          ? cleaned.replace(/\./g, '').replace(',', '.')
+          : cleaned.replace(/,/g, '');
+    } else if (lastComma !== -1) {
+      // Only commas: "1,234" / "1,234,567" group thousands, "51,99" is a decimal.
+      cleaned = /^[1-9]\d{0,2}(,\d{3})+$/.test(cleaned)
+        ? cleaned.replace(/,/g, '')
+        : cleaned.split(',').length === 2
+          ? cleaned.replace(',', '.')
+          : '';
+    } else if (lastDot !== -1) {
+      // Only dots: "1.234" / "1.234.567" group thousands, "12.50" is a decimal.
+      if (/^[1-9]\d{0,2}(\.\d{3})+$/.test(cleaned)) {
+        cleaned = cleaned.replace(/\./g, '');
+      } else if (cleaned.split('.').length > 2) {
+        cleaned = '';
+      }
     }
 
+    if (!/^\d*\.?\d+$|^\d+\.$/.test(cleaned)) return undefined;
     const parsed = parseFloat(cleaned);
-    return Number.isFinite(parsed) ? parsed : undefined;
+    if (!Number.isFinite(parsed)) return undefined;
+    return negative ? -parsed : parsed;
+  }
+
+  /**
+   * Normalise a VAT rate to a decimal fraction in [0, 1).
+   *
+   * The model is asked for 0.19 but sometimes answers 19 (or "19 %"); 0 is a
+   * valid rate (tax-exempt / reverse charge) and is kept.
+   */
+  private toTaxRate(value: any): number | undefined {
+    let rate = this.toNumber(value);
+    if (rate === undefined) return undefined;
+    // A percentage slipped through as 19 instead of 0.19
+    if (rate > 1) rate = rate / 100;
+    if (rate < 0 || rate >= 1) {
+      logger.warn(`AI returned an implausible tax rate, dropping it`);
+      return undefined;
+    }
+    return Math.round(rate * 10000) / 10000;
   }
 
   /**
    * Normalise a date to YYYY-MM-DD, accepting the DD.MM.YYYY and DD/MM/YYYY
-   * forms that German and European invoices use.
+   * forms that German and European invoices use. Impossible calendar dates
+   * (2026-02-30) are dropped rather than rolled over into the next month.
    */
   private toIsoDate(value: any): string | undefined {
     if (typeof value !== 'string') return undefined;
     const trimmed = value.trim();
     if (!trimmed) return undefined;
 
-    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+    let year: number | undefined;
+    let month: number | undefined;
+    let day: number | undefined;
 
+    const iso = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ].*)?$/);
     const euro = trimmed.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
-    if (euro) {
-      const [, day, month, year] = euro;
-      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    if (iso) {
+      [year, month, day] = [Number(iso[1]), Number(iso[2]), Number(iso[3])];
+    } else if (euro) {
+      [day, month, year] = [Number(euro[1]), Number(euro[2]), Number(euro[3])];
     }
 
-    logger.warn(`AI returned an unparseable date "${trimmed}", dropping it`);
-    return undefined;
+    if (year === undefined || month === undefined || day === undefined) {
+      logger.warn('AI returned an unparseable date, dropping it');
+      return undefined;
+    }
+
+    const candidate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    if (!this.isValidDate(candidate)) {
+      logger.warn('AI returned an impossible calendar date, dropping it');
+      return undefined;
+    }
+    return candidate;
   }
 
   /**
    * Robustly extract a JSON object from an AI response.
-   * Handles: <think>...</think> blocks, ```json fences, leading prose.
+   * Handles: <think>...</think> blocks (also unclosed ones and a dangling
+   * </think> whose opening tag was part of the chat template), ```json fences,
+   * leading prose.
    */
   private extractJsonFromResponse(raw: string): string {
     if (!raw || !raw.trim()) {
-      throw new Error('Empty response from AI model');
+      throw new ReceiptAnalysisError('AI_INVALID_RESPONSE', 'llm', 'The AI model returned an empty answer');
     }
 
     let text = raw;
 
-    // Strip <think>...</think> blocks (Qwen3 / chain-of-thought models)
-    text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    // Strip complete <think>...</think> blocks (Qwen3 / chain-of-thought models)
+    text = text.replace(/<think>[\s\S]*?<\/think>/gi, '');
+    // A closing tag without its opening tag: everything before it is reasoning
+    const lastClose = text.toLowerCase().lastIndexOf('</think>');
+    if (lastClose !== -1) {
+      text = text.slice(lastClose + '</think>'.length);
+    }
+    // An opening tag that was never closed: the rest is unfinished reasoning
+    text = text.replace(/<think>[\s\S]*$/i, '').trim();
 
     // Strip markdown code fences
     text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
@@ -516,14 +688,16 @@ export class ExpenseExtractionService {
                 : Math.min(openBrace, openBracket);
 
     if (start === -1) {
-      throw new Error(`No JSON object found in AI response: ${text.substring(0, 200)}`);
+      logger.error(`No JSON found in AI response (${text.length} chars after cleanup)`);
+      throw new ReceiptAnalysisError('AI_INVALID_RESPONSE', 'llm', 'The AI answer contained no JSON');
     }
 
     const closeChar = text[start] === '{' ? '}' : ']';
     const end = text.lastIndexOf(closeChar);
 
     if (end === -1 || end <= start) {
-      throw new Error(`Malformed JSON in AI response: ${text.substring(0, 200)}`);
+      logger.error(`Malformed JSON in AI response (${text.length} chars after cleanup)`);
+      throw new ReceiptAnalysisError('AI_INVALID_RESPONSE', 'llm', 'The AI answer contained malformed JSON');
     }
 
     return text.substring(start, end + 1);
@@ -623,16 +797,19 @@ Return the JSON object and nothing else — no explanation, no markdown fences.`
   }
 
   /**
-   * Validate date format (YYYY-MM-DD)
+   * Validate a YYYY-MM-DD date, including the calendar (no 2026-02-30).
    */
   private isValidDate(dateString: string): boolean {
-    const regex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!regex.test(dateString)) return false;
-    
-    const date = new Date(dateString);
-    return date instanceof Date && !isNaN(date.getTime());
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+    if (!match) return false;
+
+    const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+    if (year < 1900 || year > 2999 || month < 1 || month > 12 || day < 1) return false;
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day
+    );
   }
 }
-
-// Export singleton instance
-export const expenseExtractionService = new ExpenseExtractionService();

@@ -74,20 +74,16 @@ async function startServer() {
       logger.error('Failed to initialize recurring invoice scheduler:', err);
     }
 
-    // Initialize MCP client connections (DuckDuckGo, etc.)
-    try {
-      await mcpClient.initializeConnections();
-      logger.info('✅ MCP client initialized successfully');
-    } catch (err: any) {
-      logger.warn('⚠ MCP client initialization failed:', err);
-      logger.warn('AI web search features may not work correctly');
-    }
-
     // Start the server
     app.listen(port, () => {
       logger.info(`⚡️ [server]: Server is running at ${process.env.PUBLIC_URL || `http://localhost:${port}`}`);
       logger.info(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
     });
+
+    // Optional MCP gateway (AI web research in the AfA analysis). Only tried
+    // when MCP_GATEWAY_URL is set, and never delays the server start —
+    // initializeConnections() logs its own outcome and never throws.
+    void mcpClient.initializeConnections();
   } catch (err: any) {
     logger.error('Failed to start server:', { error: err.message });
     process.exit(1);

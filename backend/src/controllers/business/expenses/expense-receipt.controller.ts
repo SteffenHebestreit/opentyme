@@ -7,8 +7,24 @@
 import { Request, Response } from 'express';
 import { ExpenseService } from '../../../services/business/expense.service';
 import { expenseIdSchema } from '../../../schemas/business/expense.schema';
-import { ExpenseExtractionService } from '../../../services/ai/expense-extraction.service';
+import {
+  ExpenseExtractionService,
+  ReceiptAnalysisError,
+  ReceiptAnalysisErrorCode,
+} from '../../../services/ai/expense-extraction.service';
 import { logger } from '../../../utils/logger';
+
+/**
+ * HTTP status per receipt analysis error code (API contract §5).
+ */
+const RECEIPT_ERROR_STATUS: Record<ReceiptAnalysisErrorCode, number> = {
+  NO_TEXT: 422,
+  AI_UNREACHABLE: 503,
+  AI_TIMEOUT: 504,
+  AI_AUTH: 502,
+  AI_INVALID_RESPONSE: 502,
+  EXTRACTION_FAILED: 502,
+};
 
 export class ExpenseReceiptController {
   private expenseService: ExpenseService;
@@ -31,7 +47,7 @@ export class ExpenseReceiptController {
 
       // Check if file was uploaded
       if (!req.file) {
-        res.status(400).json({ error: 'Bad request', message: 'No file uploaded' });
+        res.status(400).json({ error: 'Bad request', message: 'No file uploaded', code: 'NO_FILE' });
         return;
       }
 
@@ -49,25 +65,26 @@ export class ExpenseReceiptController {
         res.status(400).json({
           error: 'Bad request',
           message: `Unsupported file type "${req.file.mimetype}". Upload a PDF or an image (JPEG, PNG, WebP).`,
+          code: 'UNSUPPORTED_TYPE',
         });
         return;
       }
 
-      logger.info(`Analyzing receipt: ${req.file.originalname} (${req.file.size} bytes)`);
+      logger.info(`Analyzing receipt (${req.file.mimetype}, ${req.file.size} bytes)`);
 
       try {
-        // Step 1: Initialize AI service with user settings (loads MCP client too).
-        // Per-request instance — the service holds per-user client/model state.
+        // Step 1: Load the user's settings. Per-request instance — the service
+        // holds per-user client/model state. The document converter is set up
+        // even with AI disabled, so the raw text can still be returned.
         const expenseExtractionService = new ExpenseExtractionService();
         await expenseExtractionService.initialize(userId);
 
-        // Step 2: Extract text from PDF using user's MCP server
+        // Step 2: Extract text from the document using the user's converter
         const extractedText = await expenseExtractionService.extractDocumentText(
           req.file.buffer,
-          req.file.originalname
+          req.file.originalname,
+          req.file.mimetype
         );
-
-        logger.info(`Extracted ${extractedText.length} characters from PDF`);
 
         // Step 3: Extract structured expense data using AI
         if (expenseExtractionService.isEnabled()) {
@@ -75,6 +92,7 @@ export class ExpenseReceiptController {
 
           res.status(200).json({
             success: true,
+            ai_enabled: true,
             data: extractedData,
             message: 'Receipt analyzed successfully',
           });
@@ -82,6 +100,7 @@ export class ExpenseReceiptController {
           // AI is disabled, return only raw text
           res.status(200).json({
             success: true,
+            ai_enabled: false,
             data: {
               raw_text: extractedText.substring(0, 1000), // First 1000 chars
               confidence: 0,
@@ -90,6 +109,23 @@ export class ExpenseReceiptController {
           });
         }
       } catch (extractionError: any) {
+        if (extractionError instanceof ReceiptAnalysisError) {
+          // Upstream details were logged where they happened; the client gets
+          // a stable code and a short message only.
+          const status = RECEIPT_ERROR_STATUS[extractionError.code] ?? 502;
+          logger.warn(
+            `Receipt analysis failed: ${extractionError.code} (${extractionError.service})`
+          );
+          res.status(status).json({
+            success: false,
+            error: extractionError.message,
+            message: extractionError.message,
+            code: extractionError.code,
+            service: extractionError.service,
+          });
+          return;
+        }
+
         // The logger JSON.stringifies its meta argument, and an Error serialises
         // to "{}" — pull the useful parts out explicitly.
         logger.error('Receipt analysis failed:', {
@@ -97,24 +133,16 @@ export class ExpenseReceiptController {
           code: extractionError?.code,
           stack: extractionError?.stack,
         });
-
-        // A missing/unreachable MCP server is an infrastructure problem, not a
-        // bad request — say so instead of returning an opaque 500.
-        const unreachable = /EAI_AGAIN|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|ECONNRESET/.test(
-          `${extractionError?.message ?? ''} ${extractionError?.code ?? ''}`
-        );
-
-        res.status(unreachable ? 503 : 500).json({
+        res.status(500).json({
           success: false,
-          error: unreachable ? 'Analysis service unavailable' : 'Receipt analysis failed',
-          message: unreachable
-            ? `Could not reach the PDF extraction or AI service. Check that the mcp-server container is running and that the AI endpoint in Settings is reachable. (${extractionError?.message})`
-            : extractionError.message,
+          error: 'Receipt analysis failed',
+          message: 'Receipt analysis failed',
+          code: 'INTERNAL',
         });
       }
     } catch (error: any) {
-      logger.error('Analyze receipt error:', error);
-      res.status(500).json({ error: 'Internal server error', message: error.message });
+      logger.error('Analyze receipt error:', { message: error?.message, stack: error?.stack });
+      res.status(500).json({ error: 'Internal server error', code: 'INTERNAL' });
     }
   };
 

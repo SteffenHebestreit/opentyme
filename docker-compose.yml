@@ -65,7 +65,8 @@ services:
       # Off-site mirror target — uncomment and point at a NAS/remote mount,
       # then set BACKUP_MIRROR_DIR=/mirror in .env:
       # - /mnt/nas/opentyme-backups:/mirror
-      - /var/run/docker.sock:/var/run/docker.sock  # Docker socket for MCP Gateway access
+      # No Docker socket: access to it is root on the host, and nothing in the
+      # backend needs it (the MCP gateway, if used, is reached via MCP_GATEWAY_URL).
     depends_on:
       - db
       - redis
@@ -443,6 +444,10 @@ services:
     container_name: opentyme-mcp-server
     restart: unless-stopped
     mem_limit: 512m  # observed ~195MiB
+    # The server reads its settings only from FTMD_-prefixed variables
+    # (pydantic env_prefix "FTMD_"). The unprefixed HOST/PORT/DEBUG/LOG_LEVEL/
+    # ENABLED_TOOLS/MAX_FILE_SIZE below are ignored by it — host and port come
+    # from the image's command line. Kept as documentation of the intent.
     environment:
       - HOST=0.0.0.0
       - PORT=8000
@@ -450,13 +455,17 @@ services:
       - LOG_LEVEL=INFO
       - ENABLED_TOOLS=file_converter
       - MAX_FILE_SIZE=10485760
+      # Effective settings (FTMD_ prefix). Without this the server defaults to
+      # debug=True, i.e. uvicorn auto-reload in production.
+      - FTMD_DEBUG=false
       # LLM Integration (optional - for enhanced OCR)
       - FTMD_MARKITDOWN_ENABLE_LLM=${MCP_ENABLE_LLM:-false}
       - FTMD_OPENAI_API_KEY=${MCP_OPENAI_API_KEY:-}
       - FTMD_OPENAI_BASE_URL=${MCP_OPENAI_BASE_URL:-}
       - FTMD_OPENAI_MODEL=${MCP_OPENAI_MODEL:-gpt-4o-mini}
-    ports:
-      - "${MCP_PORT:-8001}:8000"
+    # Internal only — no published port and no Traefik route. The server has no
+    # authentication and ships a url_fetcher tool (server-side request forgery),
+    # and the backend reaches it over the Docker network as mcp-server:8000.
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
       interval: 30s
@@ -466,19 +475,8 @@ services:
     networks:
       - project-network
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.mcp-server-local.rule=Host(`mcp.localhost`)"
-      - "traefik.http.routers.mcp-server-local.entrypoints=web"
-      - "traefik.http.routers.mcp-server-local.service=mcp-server"
-      - "traefik.http.routers.mcp-server-redirect.rule=Host(`${MCP_HOST:-mcp.localhost}`) && !Host(`mcp.localhost`)"
-      - "traefik.http.routers.mcp-server-redirect.entrypoints=web"
-      - "traefik.http.routers.mcp-server-redirect.service=mcp-server"
-      - "traefik.http.routers.mcp-server-redirect.middlewares=https-redirect@file"
-      - "traefik.http.routers.mcp-server-secure.rule=Host(`${MCP_HOST:-mcp.localhost}`) && !Host(`mcp.localhost`)"
-      - "traefik.http.routers.mcp-server-secure.entrypoints=websecure"
-      - "traefik.http.routers.mcp-server-secure.tls=true"
-      - "traefik.http.routers.mcp-server-secure.service=mcp-server"
-      - "traefik.http.services.mcp-server.loadbalancer.server.port=8000"
+      # Not exposed through Traefik (see the comment above the healthcheck).
+      - "traefik.enable=false"
 
   # SeaweedFS S3-Compatible Object Storage for File Uploads (Receipts, Documents)
   # Credentials are in config/seaweedfs/s3.json — update both that file and .env if you change them.

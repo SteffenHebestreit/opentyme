@@ -5,6 +5,9 @@
  * The gateway runs on the host machine and aggregates all MCP servers
  * 
  * This allows AI-powered web research for financial analysis and tax law lookups.
+ *
+ * Optional: the gateway is only contacted when MCP_GATEWAY_URL is set. Without
+ * it the AfA analysis runs without web research.
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -19,52 +22,73 @@ interface MCPTool {
   _originalName?: string;
 }
 
+/** How long the startup connection attempt may take before it is abandoned. */
+const CONNECT_TIMEOUT_MS = 10_000;
+
 /**
  * MCP Client Manager
- * Connects to Docker MCP Gateway running on host machine via HTTP
+ * Connects to Docker MCP Gateway via HTTP
  */
 export class MCPClientService {
   private gatewayClient: any = null;
   private isInitialized: boolean = false;
-  private gatewayUrl: string;
+  private readonly gatewayUrl: string | null;
 
-  constructor() {
-    // Gateway runs on host machine (Windows) at port 3100
-    this.gatewayUrl = process.env.MCP_GATEWAY_URL || 'http://host.docker.internal:3100';
+  constructor(gatewayUrl: string | undefined = process.env.MCP_GATEWAY_URL) {
+    this.gatewayUrl = gatewayUrl?.trim() || null;
+  }
+
+  /** Whether a gateway URL is configured at all. */
+  isConfigured(): boolean {
+    return this.gatewayUrl !== null;
   }
 
   /**
    * Connect to Docker MCP Gateway
-   * Uses Streamable HTTP transport to connect to gateway on host
+   * Uses Streamable HTTP transport to connect to the gateway
    */
   async connectToGateway(): Promise<void> {
     if (this.gatewayClient) {
       logger.info('Already connected to MCP Gateway');
       return;
     }
-
-    try {
-      const client = new Client(
-        {
-          name: 'tyme-backend',
-          version: '1.0.0',
-        },
-        {
-          capabilities: {},
-        }
-      );
-
-      // Connect using Streamable HTTP transport
-      const transport = new StreamableHTTPClientTransport(new URL(this.gatewayUrl));
-      
-      await client.connect(transport);
-      this.gatewayClient = client;
-
-      logger.info(`✓ Connected to MCP Gateway at ${this.gatewayUrl}`);
-    } catch (error: any) {
-      logger.error('Failed to connect to MCP Gateway:', error.message);
-      throw error;
+    if (!this.gatewayUrl) {
+      throw new Error('MCP_GATEWAY_URL is not set');
     }
+
+    const client = new Client(
+      {
+        name: 'tyme-backend',
+        version: '1.0.0',
+      },
+      {
+        capabilities: {},
+      }
+    );
+
+    // Connect using Streamable HTTP transport
+    const transport = new StreamableHTTPClientTransport(new URL(this.gatewayUrl));
+
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      await Promise.race([
+        client.connect(transport),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error(`no answer within ${CONNECT_TIMEOUT_MS / 1000} s`)),
+            CONNECT_TIMEOUT_MS
+          );
+        }),
+      ]);
+    } catch (error) {
+      await client.close().catch(() => undefined);
+      throw error;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+
+    this.gatewayClient = client;
+    logger.info(`Connected to MCP Gateway at ${this.gatewayUrl}`);
   }
 
   /**
@@ -163,38 +187,45 @@ export class MCPClientService {
   }
 
   /**
-   * Initialize connection to Docker MCP Gateway
-   * The gateway automatically discovers all MCP servers installed in Docker Desktop
+   * Initialize connection to Docker MCP Gateway.
+   * The gateway automatically discovers all MCP servers installed in Docker Desktop.
+   *
+   * Never throws. Skips (one info line) when MCP_GATEWAY_URL is not set.
+   *
+   * @returns true when connected, false when skipped or failed
    */
-  async initializeConnections(): Promise<void> {
+  async initializeConnections(): Promise<boolean> {
     if (this.isInitialized) {
-      logger.info('MCP Gateway already initialized');
-      return;
+      return true;
     }
 
-    logger.info('Initializing MCP Gateway connection...');
+    if (!this.gatewayUrl) {
+      logger.info('MCP gateway not configured (MCP_GATEWAY_URL unset) — AI web research disabled');
+      return false;
+    }
+
+    logger.info(`Connecting to MCP gateway at ${this.gatewayUrl}...`);
 
     try {
       await this.connectToGateway();
       
       // List available tools to verify connection
       const tools = await this.getTools();
-      logger.info(`✓ MCP Gateway initialized. Available tools: ${tools.length}`);
-      
-      // Log available tool names for debugging
       if (tools.length > 0) {
-        const toolNames = tools.map(t => t.name).slice(0, 5);
-        logger.debug(`Sample tools: ${toolNames.join(', ')}${tools.length > 5 ? '...' : ''}`);
+        logger.info(`MCP gateway connected. Web research tools: ${tools.map(t => t.name).join(', ')}`);
       } else {
-        logger.warn('⚠ No MCP tools available. Make sure MCP servers are installed in Docker Desktop.');
-        logger.warn('  Install servers via: Docker Desktop > MCP Toolkit > Catalog');
+        logger.warn('MCP gateway connected, but it offers no web search/fetch tools — AI web research disabled');
       }
 
       this.isInitialized = true;
+      return true;
     } catch (error: any) {
-      logger.error('❌ Failed to initialize MCP Gateway:', error.message);
-      logger.warn('  Make sure Docker Desktop is running and MCP Toolkit is enabled');
-      logger.warn('  You can verify with: docker mcp server list');
+      logger.warn(`MCP gateway unavailable (${error?.message}) — AI web research disabled`);
+      if (this.gatewayClient) {
+        await this.gatewayClient.close().catch(() => undefined);
+        this.gatewayClient = null;
+      }
+      return false;
     }
   }
 

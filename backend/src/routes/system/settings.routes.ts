@@ -4,7 +4,13 @@
  */
 
 import { Router } from 'express';
-import { getSettings, updateSettings, testSmtp } from '../../controllers/system/settings.controller';
+import {
+  getSettings,
+  updateSettings,
+  testSmtp,
+  testAiConnection,
+  testSttConnection,
+} from '../../controllers/system/settings.controller';
 import { authenticateKeycloak, extractKeycloakUser } from '../../middleware/auth/keycloak.middleware';
 
 const router = Router();
@@ -33,5 +39,21 @@ router.put('/', updateSettings);
  * @access  Protected
  */
 router.post('/test-smtp', testSmtp);
+
+/**
+ * @route   POST /api/settings/test-ai
+ * @desc    Check that the AI server is reachable and the API key is accepted
+ *          (GET {ai_api_url}/models); body fields override the stored settings
+ * @access  Protected
+ */
+router.post('/test-ai', testAiConnection);
+
+/**
+ * @route   POST /api/settings/test-stt
+ * @desc    Check that the speech-to-text server is reachable; body fields
+ *          override the stored settings
+ * @access  Protected
+ */
+router.post('/test-stt', testSttConnection);
 
 export default router;
