@@ -3,12 +3,15 @@ import { useTranslation } from 'react-i18next';
 import { Modal } from '../../ui/Modal';
 import { Input, CustomSelect, Textarea } from '../../forms';
 import { Button } from '../../common/Button';
+import { Alert } from '../../common/Alert';
 import { useCreatePayment } from '../../../hooks/api/usePayments';
 import { useClients } from '../../../hooks/api/useClients';
 import { useProjects } from '../../../hooks/api/useProjects';
 import { useInvoices } from '../../../hooks/api/useInvoices';
 import { InvoiceWithItems, PaymentType, Project, Client, Invoice } from '../../../api/types';
-import { Check } from 'lucide-react';
+import { Check, HandCoins } from 'lucide-react';
+import { cn } from '../../../lib/cn';
+import { InvoiceStatusBadge } from './InvoiceStatusBadge';
 
 interface RecordPaymentModalProps {
   isOpen: boolean;
@@ -16,6 +19,11 @@ interface RecordPaymentModalProps {
   invoice?: InvoiceWithItems; // Optional - if not provided, user must select client/project/invoices
   onPaymentRecorded: () => void;
 }
+
+const formId = 'record-payment-form';
+
+/** Two-column field row; Input's own bottom margin is dropped so rows line up. */
+const fieldRow = 'grid gap-4 sm:grid-cols-2 [&>div]:mb-0';
 
 // Format currency
 const formatCurrency = (amount: number, currency: string = 'EUR'): string => {
@@ -201,33 +209,54 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
       open={isOpen}
       onClose={onClose}
       title={invoice ? t('recordPayment.title') : t('recordPayment.titleStandalone', { defaultValue: 'Record Payment' })}
+      icon={<HandCoins className="h-4 w-4" />}
       size="md"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            disabled={createPaymentMutation.isPending}
+          >
+            {t('common:buttons.cancel')}
+          </Button>
+          <Button
+            type="submit"
+            form={formId}
+            variant="primary"
+            isLoading={createPaymentMutation.isPending}
+          >
+            {createPaymentMutation.isPending ? t('recordPayment.recording') : t('recordPayment.submit')}
+          </Button>
+        </>
+      }
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form id={formId} onSubmit={handleSubmit} className="space-y-5">
         {/* Invoice Info (only shown if invoice provided) */}
         {invoice && (
-          <div className="bg-gray-800 rounded-lg p-4 mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-gray-400">{t('recordPayment.info.invoice')}:</span>
-              <span className="text-white font-medium">{invoice.invoice_number}</span>
+          <dl className="space-y-2 rounded-xl border border-gray-200/70 bg-gray-50 p-4 text-sm tabular-nums dark:border-gray-800/70 dark:bg-white/[0.03]">
+            <div className="flex items-center justify-between gap-4">
+              <dt className="text-gray-500 dark:text-gray-400">{t('recordPayment.info.invoice')}</dt>
+              <dd className="font-medium text-gray-900 dark:text-white">{invoice.invoice_number}</dd>
             </div>
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-gray-400">{t('recordPayment.info.totalAmount')}:</span>
-              <span className="text-white font-bold">{formatCurrency(invoice.total_amount, invoice.currency)}</span>
+            <div className="flex items-center justify-between gap-4">
+              <dt className="text-gray-500 dark:text-gray-400">{t('recordPayment.info.totalAmount')}</dt>
+              <dd className="font-semibold text-gray-900 dark:text-white">{formatCurrency(invoice.total_amount, invoice.currency)}</dd>
             </div>
             {totalPaid > 0 && (
               <>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-gray-400">{t('recordPayment.info.alreadyPaid')}:</span>
-                  <span className="text-green-400 font-medium">{formatCurrency(totalPaid, invoice.currency)}</span>
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="text-gray-500 dark:text-gray-400">{t('recordPayment.info.alreadyPaid')}</dt>
+                  <dd className="font-medium text-emerald-600 dark:text-emerald-400">{formatCurrency(totalPaid, invoice.currency)}</dd>
                 </div>
-                <div className="flex justify-between items-center pt-2 border-t border-gray-700">
-                  <span className="text-gray-300 font-semibold">{t('recordPayment.info.remainingBalance')}:</span>
-                  <span className="text-orange-400 font-bold text-lg">{formatCurrency(remainingBalance, invoice.currency)}</span>
+                <div className="flex items-center justify-between gap-4 border-t border-gray-200 pt-2 dark:border-gray-800">
+                  <dt className="font-semibold text-gray-700 dark:text-gray-300">{t('recordPayment.info.remainingBalance')}</dt>
+                  <dd className="text-base font-semibold text-amber-600 dark:text-amber-400">{formatCurrency(remainingBalance, invoice.currency)}</dd>
                 </div>
               </>
             )}
-          </div>
+          </dl>
         )}
 
         {/* Client and Project Selection (only shown if no invoice provided) */}
@@ -250,58 +279,64 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
             {/* Invoice Selection - Multi-select */}
             {selectedClientId && availableInvoices.length > 0 && (
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+              <div className="animate-fade-in">
+                <p className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   {t('recordPayment.selectInvoices', { defaultValue: 'Select Invoice(s)' })}
-                </label>
-                <div className="max-h-48 overflow-y-auto border border-gray-700 rounded-lg divide-y divide-gray-700">
-                  {availableInvoices.map((inv: Invoice) => (
-                    <button
-                      key={inv.id}
-                      type="button"
-                      onClick={() => toggleInvoiceSelection(inv.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2 text-left transition-colors ${
-                        selectedInvoiceIds.includes(inv.id)
-                          ? 'bg-purple-900/30 border-l-2 border-purple-500'
-                          : 'hover:bg-gray-800'
-                      }`}
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-white">{inv.invoice_number}</span>
-                          <span className={`text-xs px-1.5 py-0.5 rounded ${
-                            inv.status === 'overdue' ? 'bg-red-900/50 text-red-300' :
-                            inv.status === 'partially_paid' ? 'bg-yellow-900/50 text-yellow-300' :
-                            'bg-blue-900/50 text-blue-300'
-                          }`}>
-                            {inv.status}
-                          </span>
-                        </div>
-                        <div className="text-sm text-gray-400">
+                </p>
+                <div className="max-h-56 divide-y divide-gray-100 overflow-y-auto rounded-xl border border-gray-200 dark:divide-gray-800/70 dark:border-gray-800">
+                  {availableInvoices.map((inv: Invoice) => {
+                    const selected = selectedInvoiceIds.includes(inv.id);
+                    return (
+                      <button
+                        key={inv.id}
+                        type="button"
+                        onClick={() => toggleInvoiceSelection(inv.id)}
+                        aria-pressed={selected}
+                        className={cn(
+                          'flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors focus:outline-none focus-visible:bg-gray-50 dark:focus-visible:bg-white/[0.04]',
+                          selected
+                            ? 'bg-purple-50/70 dark:bg-purple-500/10'
+                            : 'hover:bg-gray-50 dark:hover:bg-white/[0.02]'
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
+                            selected
+                              ? 'border-purple-600 bg-purple-600 text-white dark:border-purple-500 dark:bg-purple-500'
+                              : 'border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900'
+                          )}
+                          aria-hidden="true"
+                        >
+                          {selected && <Check className="h-3 w-3" strokeWidth={3} />}
+                        </span>
+                        <span className="flex min-w-0 flex-1 items-center gap-2">
+                          <span className="truncate text-sm font-medium text-gray-900 dark:text-white">{inv.invoice_number}</span>
+                          <InvoiceStatusBadge status={inv.status} size="sm" />
+                        </span>
+                        <span className="shrink-0 text-sm tabular-nums text-gray-700 dark:text-gray-300">
                           {formatCurrency(inv.total_amount, inv.currency)}
-                        </div>
-                      </div>
-                      {selectedInvoiceIds.includes(inv.id) && (
-                        <Check className="h-5 w-5 text-purple-400" />
-                      )}
-                    </button>
-                  ))}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
                 {selectedInvoiceIds.length > 0 && (
-                  <div className="mt-2 text-sm text-purple-300">
+                  <p className="mt-2 animate-fade-in text-sm text-purple-700 dark:text-purple-300">
                     {t('recordPayment.selectedTotal', { 
                       count: selectedInvoiceIds.length, 
                       defaultValue: `${selectedInvoiceIds.length} invoice(s) selected` 
-                    })} - {t('recordPayment.total', { defaultValue: 'Total' })}: {formatCurrency(selectedInvoicesTotal)}
-                  </div>
+                    })} · {t('recordPayment.total', { defaultValue: 'Total' })}:{' '}
+                    <span className="font-semibold tabular-nums">{formatCurrency(selectedInvoicesTotal)}</span>
+                  </p>
                 )}
               </div>
             )}
 
             {selectedClientId && availableInvoices.length === 0 && (
-              <div className="text-sm text-gray-400 italic">
+              <p className="animate-fade-in rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-500 dark:bg-white/[0.03] dark:text-gray-400">
                 {t('recordPayment.noUnpaidInvoices', { defaultValue: 'No unpaid invoices for this client' })}
-              </div>
+              </p>
             )}
 
             {selectedClientId && (
@@ -318,11 +353,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           </>
         )}
 
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg">
-            {error}
-          </div>
-        )}
+        {error && <Alert type="error" message={error} />}
 
         {/* Payment Type */}
         <div>
@@ -333,51 +364,56 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             options={paymentTypes.map(type => ({ value: type.value, label: type.label }))}
             required
           />
-          <p className="mt-1 text-sm text-gray-400">
+          <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
             {paymentTypes.find(t => t.value === paymentType)?.description}
           </p>
         </div>
 
-        {/* Payment Amount */}
-        <Input
-          label={paymentType === 'refund' ? t('recordPayment.refundAmount') : t('recordPayment.paymentAmount')}
-          type="number"
-          step="0.01"
-          min="0"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          required
-          placeholder="0.00"
-          max={invoice && paymentType === 'payment' ? remainingBalance : undefined}
-        />
+        <div className={fieldRow}>
+          {/* Payment Amount */}
+          <Input
+            label={paymentType === 'refund' ? t('recordPayment.refundAmount') : t('recordPayment.paymentAmount')}
+            type="number"
+            step="0.01"
+            min="0"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            required
+            placeholder="0.00"
+            max={invoice && paymentType === 'payment' ? remainingBalance : undefined}
+            className="tabular-nums"
+          />
 
-        {/* Payment Date */}
-        <Input
-          label={t('recordPayment.paymentDate')}
-          type="date"
-          value={paymentDate}
-          onChange={(e) => setPaymentDate(e.target.value)}
-          required
-          max={new Date().toISOString().split('T')[0]}
-        />
+          {/* Payment Date */}
+          <Input
+            label={t('recordPayment.paymentDate')}
+            type="date"
+            value={paymentDate}
+            onChange={(e) => setPaymentDate(e.target.value)}
+            required
+            max={new Date().toISOString().split('T')[0]}
+          />
+        </div>
 
-        {/* Payment Method */}
-        <CustomSelect
-          label={t('recordPayment.paymentMethod')}
-          value={paymentMethod}
-          onChange={(value) => setPaymentMethod(value)}
-          options={paymentMethods}
-          required
-        />
+        <div className={fieldRow}>
+          {/* Payment Method */}
+          <CustomSelect
+            label={t('recordPayment.paymentMethod')}
+            value={paymentMethod}
+            onChange={(value) => setPaymentMethod(value)}
+            options={paymentMethods}
+            required
+          />
 
-        {/* Transaction ID */}
-        <Input
-          label={t('recordPayment.transactionId')}
-          type="text"
-          value={transactionId}
-          onChange={(e) => setTransactionId(e.target.value)}
-          placeholder={t('recordPayment.transactionIdPlaceholder')}
-        />
+          {/* Transaction ID */}
+          <Input
+            label={t('recordPayment.transactionId')}
+            type="text"
+            value={transactionId}
+            onChange={(e) => setTransactionId(e.target.value)}
+            placeholder={t('recordPayment.transactionIdPlaceholder')}
+          />
+        </div>
 
         {/* Notes */}
         <Textarea
@@ -389,42 +425,26 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         />
 
         {/* Exclude from Tax */}
-        <div className="flex items-start space-x-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+        <label
+          htmlFor="record-payment-exclude-from-tax"
+          className="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-4 transition-colors hover:bg-gray-50 has-[:checked]:border-amber-300 has-[:checked]:bg-amber-50/70 dark:border-gray-800 dark:hover:bg-white/[0.02] dark:has-[:checked]:border-amber-500/30 dark:has-[:checked]:bg-amber-500/[0.06]"
+        >
           <input
             type="checkbox"
-            id="exclude_from_tax"
+            id="record-payment-exclude-from-tax"
             checked={excludeFromTax}
             onChange={(e) => setExcludeFromTax(e.target.checked)}
-            className="mt-1 h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900"
           />
-          <div className="flex-1">
-            <label htmlFor="exclude_from_tax" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
+          <span className="flex-1">
+            <span className="block text-sm font-medium text-gray-900 dark:text-white">
               {t('recordPayment.excludeFromTax.label')}
-            </label>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+            </span>
+            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
               {t('recordPayment.excludeFromTax.description')}
-            </p>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-3 justify-end pt-4">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={onClose}
-            disabled={createPaymentMutation.isPending}
-          >
-            {t('common:buttons.cancel')}
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={createPaymentMutation.isPending}
-          >
-            {createPaymentMutation.isPending ? t('recordPayment.recording') : t('recordPayment.submit')}
-          </Button>
-        </div>
+            </span>
+          </span>
+        </label>
       </form>
     </Modal>
   );

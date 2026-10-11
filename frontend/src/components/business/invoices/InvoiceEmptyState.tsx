@@ -1,14 +1,15 @@
 import { FC } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Receipt } from 'lucide-react';
+import { Plus, Receipt, SearchX } from 'lucide-react';
 import { Button } from '../../common/Button';
+import { EmptyState } from '../../common/EmptyState';
 
 /**
  * Empty state component for the invoices list.
  *
  * **Features:**
- * - Centered layout with dashed border
- * - Receipt icon in indigo circle
+ * - Centered layout with dashed border (shared EmptyState)
+ * - Receipt icon
  * - Descriptive message about creating invoices
  * - Call-to-action button
  * - Dark mode support
@@ -36,28 +37,47 @@ import { Button } from '../../common/Button';
  *
  * @interface InvoiceEmptyStateProps
  * @property {() => void} onCreate - Callback when create button is clicked
+ * @property {boolean} [filtered] - Invoices exist but none match the current filters
+ * @property {() => void} [onClearFilters] - Resets the list filters (shown when filtered)
  */
 interface InvoiceEmptyStateProps {
   onCreate: () => void;
+  filtered?: boolean;
+  onClearFilters?: () => void;
 }
 
-export const InvoiceEmptyState: FC<InvoiceEmptyStateProps> = ({ onCreate }) => {
+export const InvoiceEmptyState: FC<InvoiceEmptyStateProps> = ({ onCreate, filtered = false, onClearFilters }) => {
   const { t } = useTranslation('invoices');
+
+  if (filtered) {
+    return (
+      <EmptyState
+        bordered
+        icon={SearchX}
+        title={t('noInvoices')}
+        description={t('empty.filteredMessage')}
+        action={
+          onClearFilters ? (
+            <Button type="button" variant="secondary" onClick={onClearFilters}>
+              {t('filters.clear')}
+            </Button>
+          ) : undefined
+        }
+      />
+    );
+  }
   
   return (
-    <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center shadow-sm dark:border-gray-700 dark:bg-gray-900">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-50 text-indigo-500 dark:bg-indigo-500/10">
-        <Receipt className="h-8 w-8" />
-      </div>
-      <div className="space-y-2">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t('empty.title')}</h3>
-        <p className="max-w-md text-sm text-gray-500 dark:text-gray-400">
-          {t('empty.message')}
-        </p>
-      </div>
-      <Button type="button" onClick={onCreate}>
-        {t('create')}
-      </Button>
-    </div>
+    <EmptyState
+      bordered
+      icon={Receipt}
+      title={t('empty.title')}
+      description={t('empty.message')}
+      action={
+        <Button type="button" onClick={onCreate} leftIcon={<Plus className="h-4 w-4" />}>
+          {t('create')}
+        </Button>
+      }
+    />
   );
 };

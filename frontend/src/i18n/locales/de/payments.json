@@ -31,7 +31,14 @@
     "payment": "Zahlung",
     "paymentIncome": "Zahlungen (Eingang)",
     "refund": "Rückerstattung",
-    "refundOutgoing": "Rückerstattungen (Ausgang)"
+    "refundOutgoing": "Rückerstattungen (Ausgang)",
+    "expense": "Ausgabe",
+    "vat_refund": "USt-Erstattung",
+    "income_tax_refund": "Steuererstattung",
+    "vat_payment": "USt-Zahlung",
+    "income_tax_payment": "Einkommensteuer",
+    "trade_tax_payment": "Gewerbesteuer",
+    "surcharge_tax_payment": "Zuschlagsteuer"
   },
   "summary": {
     "totalTransactions": "Transaktionen gesamt",
@@ -63,6 +70,39 @@
     "deleteConfirm": "Möchten Sie diese Zahlung wirklich löschen?",
     "saving": "Wird gespeichert...",
     "saveChanges": "Änderungen speichern",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "updateFailed": "Zahlung konnte nicht aktualisiert werden"
+  },
+  "loading": "Zahlungen werden geladen...",
+  "loadError": "Fehler beim Laden der Zahlungen",
+  "unknownError": "Ein unbekannter Fehler ist aufgetreten",
+  "addExpense": {
+    "title": "Ausgabe hinzufügen",
+    "submit": "Ausgabe hinzufügen",
+    "fields": {
+      "description": "Beschreibung",
+      "descriptionPlaceholder": "z.B. Büromiete - Januar 2025",
+      "amount": "Betrag",
+      "date": "Datum",
+      "paymentMethod": "Zahlungsmethode",
+      "transactionId": "Transaktions-ID (optional)",
+      "transactionIdPlaceholder": "z.B. TXN-2025-01-123",
+      "notes": "Weitere Notizen (optional)",
+      "notesPlaceholder": "Weitere Details..."
+    },
+    "methods": {
+      "bankTransfer": "Banküberweisung",
+      "creditCard": "Kreditkarte",
+      "debitCard": "Debitkarte",
+      "cash": "Bargeld",
+      "check": "Scheck",
+      "paypal": "PayPal",
+      "other": "Sonstiges"
+    },
+    "errors": {
+      "invalidAmount": "Bitte geben Sie einen gültigen Betrag ein (positive Zahl)",
+      "descriptionRequired": "Bitte geben Sie eine Beschreibung ein",
+      "failed": "Ausgabe konnte nicht erfasst werden"
+    }
   }
 }

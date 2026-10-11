@@ -2,13 +2,16 @@
  * @fileoverview Invoice form modal component for creating and editing invoices.
  */
 
-import { FC, useEffect, useMemo, useState } from 'react';
+import { FC, ReactNode, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { ChevronRight, FilePen, FilePlus2, FileText } from 'lucide-react';
 import { Alert } from '../../common/Alert';
 import { Button } from '../../common/Button';
 import { Input, CustomSelect, Textarea } from '../../forms';
+import { fieldClasses } from '../../forms/fieldStyles';
 import { Modal } from '../../ui/Modal';
+import { cn } from '../../../lib/cn';
 import { Client, Invoice, InvoicePayload, InvoiceStatus, Project, InvoiceLineItemPayload, InvoiceItem } from '../../../api/types';
 import { useTaxRates, useDefaultTaxRate } from '../../../hooks/api/useTaxRates';
 import { useInvoiceTextTemplates } from '../../../hooks/api/useInvoiceTextTemplates';
@@ -72,6 +75,28 @@ const DEFAULT_VALUES: FormValues = {
 };
 
 const formId = 'invoice-form-modal';
+
+/** Two-column field row; Input's own bottom margin is dropped so rows line up. */
+const fieldRow = 'grid gap-4 sm:grid-cols-2 [&>div]:mb-0';
+
+/** A titled group of fields, separated from the previous one by a hairline. */
+const FormSection: FC<{ title?: string; children: ReactNode }> = ({ title, children }) => (
+  <section className="space-y-4 border-t border-gray-100 pt-5 dark:border-gray-800">
+    {title ? <h3 className="eyebrow">{title}</h3> : null}
+    {children}
+  </section>
+);
+
+/** Checkbox option rendered as a selectable card, tinted while checked. */
+const optionCardClass = (tone: 'purple' | 'amber') =>
+  cn(
+    'flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/[0.02]',
+    tone === 'purple'
+      ? 'has-[:checked]:border-purple-300 has-[:checked]:bg-purple-50/60 dark:has-[:checked]:border-purple-500/40 dark:has-[:checked]:bg-purple-500/[0.06]'
+      : 'has-[:checked]:border-amber-300 has-[:checked]:bg-amber-50/70 dark:has-[:checked]:border-amber-500/30 dark:has-[:checked]:bg-amber-500/[0.06]'
+  );
+const checkboxClass =
+  'mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900';
 
 function formatDateInput(value: string | null | undefined): string {
   if (!value) return '';
@@ -184,15 +209,15 @@ export const InvoiceFormModal: FC<InvoiceFormModalProps> = ({
 
   const handleFormSubmit = async (values: FormValues) => {
     if (!values.client_id) {
-      setError('client_id', { type: 'required', message: 'Select a client' });
+      setError('client_id', { type: 'required', message: t('form.errors.clientRequired') });
       return;
     }
     if (!values.issue_date) {
-      setError('issue_date', { type: 'required', message: 'Issue date is required' });
+      setError('issue_date', { type: 'required', message: t('form.errors.issueDateRequired') });
       return;
     }
     if (!values.due_date) {
-      setError('due_date', { type: 'required', message: 'Due date is required' });
+      setError('due_date', { type: 'required', message: t('form.errors.dueDateRequired') });
       return;
     }
 
@@ -200,15 +225,15 @@ export const InvoiceFormModal: FC<InvoiceFormModalProps> = ({
     const dueDate = new Date(values.due_date);
 
     if (Number.isNaN(issueDate.getTime())) {
-      setError('issue_date', { type: 'validate', message: 'Enter a valid issue date' });
+      setError('issue_date', { type: 'validate', message: t('form.errors.issueDateInvalid') });
       return;
     }
     if (Number.isNaN(dueDate.getTime())) {
-      setError('due_date', { type: 'validate', message: 'Enter a valid due date' });
+      setError('due_date', { type: 'validate', message: t('form.errors.dueDateInvalid') });
       return;
     }
     if (dueDate.getTime() < issueDate.getTime()) {
-      setError('due_date', { type: 'validate', message: 'Due date must be after the issue date' });
+      setError('due_date', { type: 'validate', message: t('form.errors.dueBeforeIssue') });
       return;
     }
 
@@ -254,18 +279,21 @@ export const InvoiceFormModal: FC<InvoiceFormModalProps> = ({
     }
   }, [lineItemsSubtotal, lineItems.length, setValue]);
 
+  const ModeIcon = mode === 'create' ? FilePlus2 : mode === 'correct' ? FilePen : FileText;
+
   return (
     <Modal
       open={open}
       onClose={onClose}
       title={mode === 'create' ? t('form.title.create') : mode === 'correct' ? t('correction') : t('form.title.edit')}
+      icon={<ModeIcon className="h-4 w-4" />}
       size="xl"
       footer={
         <>
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose}>
             {t('cancel')}
           </Button>
-          <Button type="submit" form={formId} disabled={isSubmitting || !hasClients}>
+          <Button type="submit" form={formId} disabled={!hasClients} isLoading={isSubmitting}>
             {isSubmitting ? t('saving') : mode === 'create' ? t('form.submit.create') : mode === 'correct' ? t('form.submit.correct') : t('form.submit.edit')}
           </Button>
         </>
@@ -277,258 +305,280 @@ export const InvoiceFormModal: FC<InvoiceFormModalProps> = ({
         
         {/* Correction Reason - only show in correction mode */}
         {isCorrection && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
-            <label className="block text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/20 dark:bg-amber-500/10">
+            <label htmlFor="invoice-correction-reason" className="mb-1.5 block text-sm font-medium text-amber-900 dark:text-amber-200">
               {t('correctionReason')}
             </label>
             <textarea
+              id="invoice-correction-reason"
               value={correctionReason || ''}
               onChange={(e) => onCorrectionReasonChange?.(e.target.value)}
               placeholder={t('correctionReasonPlaceholder')}
-              className="w-full rounded-md border border-amber-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-gray-800 dark:text-gray-100"
+              className={fieldClasses({ multiline: true })}
               rows={2}
             />
           </div>
         )}
 
-        <CustomSelect
-          label={t('form.client.label')}
-          value={watch('client_id')}
-          onChange={(value) => setValue('client_id', value)}
-          options={[
-            { value: '', label: t('form.client.placeholder') },
-            ...clients.map((client) => ({ value: client.id, label: client.name }))
-          ]}
-          disabled={!hasClients}
-          required
-          error={errors.client_id?.message}
-        />
+        {/* Details */}
+        <section className="space-y-4">
+          <h3 className="eyebrow">{t('form.sections.details')}</h3>
 
-        <CustomSelect
-          label={t('form.project.label')}
-          value={watch('project_id')}
-          onChange={(value) => setValue('project_id', value)}
-          options={[
-            { value: '', label: t('form.project.placeholder') },
-            ...filteredProjects.map((project) => ({ value: project.id, label: project.name }))
-          ]}
-        />
+          <div className={fieldRow}>
+            <CustomSelect
+              label={t('form.client.label')}
+              value={watch('client_id')}
+              onChange={(value) => setValue('client_id', value)}
+              options={[
+                { value: '', label: t('form.client.placeholder') },
+                ...clients.map((client) => ({ value: client.id, label: client.name }))
+              ]}
+              disabled={!hasClients}
+              required
+              error={errors.client_id?.message}
+            />
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            id="invoice-number"
-            label={t('form.invoiceNumber.label')}
-            placeholder={t('form.invoiceNumber.placeholder')}
-            {...register('invoice_number')}
-            error={errors.invoice_number?.message}
-          />
-          <CustomSelect
-            label={t('form.status.label')}
-            value={watch('status')}
-            onChange={(value) => setValue('status', value as InvoiceStatus)}
-            options={statusOptions}
-            required
-          />
-        </div>
+            <CustomSelect
+              label={t('form.project.label')}
+              value={watch('project_id')}
+              onChange={(value) => setValue('project_id', value)}
+              options={[
+                { value: '', label: t('form.project.placeholder') },
+                ...filteredProjects.map((project) => ({ value: project.id, label: project.name }))
+              ]}
+            />
+          </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            id="invoice-issue-date"
-            label={t('form.issueDate.label')}
-            type="date"
-            {...register('issue_date')}
-            error={errors.issue_date?.message}
-          />
-          <Input
-            id="invoice-due-date"
-            label={t('form.dueDate.label')}
-            type="date"
-            {...register('due_date')}
-            error={errors.due_date?.message}
-          />
-        </div>
+          <div className={fieldRow}>
+            <Input
+              id="invoice-number"
+              label={t('form.invoiceNumber.label')}
+              placeholder={t('form.invoiceNumber.placeholder')}
+              {...register('invoice_number')}
+              error={errors.invoice_number?.message}
+            />
+            <CustomSelect
+              label={t('form.status.label')}
+              value={watch('status')}
+              onChange={(value) => setValue('status', value as InvoiceStatus)}
+              options={statusOptions}
+              required
+            />
+          </div>
 
-        <Input
-          id="invoice-delivery-date"
-          label={t('form.deliveryDate.label')}
-          placeholder={t('form.deliveryDate.placeholder')}
-          {...register('delivery_date')}
-          error={errors.delivery_date?.message}
-          helperText={t('form.deliveryDate.helperText')}
-        />
+          <div className={cn(fieldRow, 'lg:grid-cols-3')}>
+            <Input
+              id="invoice-issue-date"
+              label={t('form.issueDate.label')}
+              type="date"
+              {...register('issue_date')}
+              error={errors.issue_date?.message}
+            />
+            <Input
+              id="invoice-due-date"
+              label={t('form.dueDate.label')}
+              type="date"
+              {...register('due_date')}
+              error={errors.due_date?.message}
+            />
+            <Input
+              id="invoice-delivery-date"
+              label={t('form.deliveryDate.label')}
+              placeholder={t('form.deliveryDate.placeholder')}
+              {...register('delivery_date')}
+              error={errors.delivery_date?.message}
+              helperText={t('form.deliveryDate.helperText')}
+            />
+          </div>
 
-        <CustomSelect
-          label={t('form.currency.label')}
-          value={watch('currency')}
-          onChange={(value) => setValue('currency', value)}
-          options={CURRENCIES.map((currency) => ({
-            value: currency.code,
-            label: `${currency.code} (${currency.symbol}) - ${currency.name}`
-          }))}
-        />
+          <div className={fieldRow}>
+            <CustomSelect
+              label={t('form.currency.label')}
+              value={watch('currency')}
+              onChange={(value) => setValue('currency', value)}
+              options={CURRENCIES.map((currency) => ({
+                value: currency.code,
+                label: `${currency.code} (${currency.symbol}) - ${currency.name}`
+              }))}
+            />
 
-        <CustomSelect
-          label={t('form.taxRate.label')}
-          value={watch('tax_rate_id')}
-          onChange={(value) => setValue('tax_rate_id', value)}
-          options={[
-            { value: '', label: t('form.taxRate.placeholder') },
-            ...(taxRates?.map((rate) => ({
-              value: rate.id,
-              label: `${rate.name} (${rate.rate}%)`
-            })) || [])
-          ]}
-        />
+            <CustomSelect
+              label={t('form.taxRate.label')}
+              value={watch('tax_rate_id')}
+              onChange={(value) => setValue('tax_rate_id', value)}
+              options={[
+                { value: '', label: t('form.taxRate.placeholder') },
+                ...(taxRates?.map((rate) => ({
+                  value: rate.id,
+                  label: `${rate.name} (${rate.rate}%)`
+                })) || [])
+              ]}
+            />
+          </div>
+        </section>
 
         {/* Line Items Section */}
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+        <FormSection>
           <InvoiceLineItemEditor
             lineItems={lineItems}
             onChange={setLineItems}
             disabled={isSubmitting}
           />
-        </div>
 
-        <Input
-          id="invoice-sub-total"
-          label={t('form.subTotal.label')}
-          type="number"
-          step="0.01"
-          min="0"
-          placeholder={t('form.subTotal.placeholder')}
-          {...register('sub_total')}
-          error={errors.sub_total?.message}
-          disabled={lineItems.length > 0}
-          className={lineItems.length > 0 ? 'bg-gray-100 dark:bg-gray-700' : ''}
-        />
+          <div className="sm:max-w-xs">
+            <Input
+              id="invoice-sub-total"
+              label={t('form.subTotal.label')}
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder={t('form.subTotal.placeholder')}
+              {...register('sub_total')}
+              error={errors.sub_total?.message}
+              disabled={lineItems.length > 0}
+              className="tabular-nums"
+            />
+          </div>
+        </FormSection>
 
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
-            {t('form.customization.title')}
-          </h3>
-        </div>
-
-        <div>
-          <Input
-            id="invoice-headline"
-            label={t('form.headline.label')}
-            placeholder={t('form.headline.placeholder')}
-            {...register('invoice_headline')}
-            error={errors.invoice_headline?.message}
-          />
-          <div className="mt-2">
-            <button
-              type="button"
-              onClick={() => setShowPlaceholderHint(!showPlaceholderHint)}
-              className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
-            >
-              {showPlaceholderHint ? '▼' : '▶'} {t('form.headline.showPlaceholders')}
-            </button>
-            {showPlaceholderHint && (
-              <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-md text-xs space-y-1">
-                {AVAILABLE_PLACEHOLDERS.map(({ key, label }) => (
-                  <div key={key} className="flex justify-between">
-                    <code className="text-indigo-600 dark:text-indigo-400">{key}</code>
-                    <span className="text-gray-600 dark:text-gray-400">{label}</span>
-                  </div>
-                ))}
+        {/* Customization */}
+        <FormSection title={t('form.customization.title')}>
+          <div>
+            <Input
+              id="invoice-headline"
+              label={t('form.headline.label')}
+              placeholder={t('form.headline.placeholder')}
+              {...register('invoice_headline')}
+              error={errors.invoice_headline?.message}
+            />
+            <div className="-mt-2">
+              <button
+                type="button"
+                onClick={() => setShowPlaceholderHint(!showPlaceholderHint)}
+                aria-expanded={showPlaceholderHint}
+                className="inline-flex items-center gap-1 rounded text-xs font-medium text-purple-600 transition-colors hover:text-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-purple-400 dark:hover:text-purple-300"
+              >
+                <ChevronRight
+                  className={cn('h-3.5 w-3.5 transition-transform duration-200', showPlaceholderHint && 'rotate-90')}
+                  aria-hidden="true"
+                />
+                {t('form.headline.showPlaceholders')}
+              </button>
+              <div className="collapsible" data-open={showPlaceholderHint}>
+                <div>
+                  <dl className="mt-2 space-y-1 rounded-lg border border-gray-200/70 bg-gray-50 p-3 text-xs dark:border-gray-800/70 dark:bg-white/[0.03]">
+                    {AVAILABLE_PLACEHOLDERS.map(({ key, label }) => (
+                      <div key={key} className="flex justify-between gap-4">
+                        <dt><code className="font-mono text-purple-700 dark:text-purple-300">{key}</code></dt>
+                        <dd className="text-right text-gray-600 dark:text-gray-400">{label}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              </div>
+            </div>
+            {invoiceHeadline && (
+              <div className="mt-3 animate-fade-in rounded-lg bg-sky-50 p-3 ring-1 ring-inset ring-sky-600/15 dark:bg-sky-500/10 dark:ring-sky-400/20">
+                <p className="mb-1 text-xs font-medium text-sky-700 dark:text-sky-300">
+                  {t('form.headline.preview')}
+                </p>
+                <p className="text-sm text-gray-900 dark:text-gray-100">
+                  {getPlaceholderPreview(invoiceHeadline)}
+                </p>
               </div>
             )}
           </div>
-          {invoiceHeadline && (
-            <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                {t('form.headline.preview')}:
-              </p>
-              <p className="text-sm text-gray-900 dark:text-gray-100">
-                {getPlaceholderPreview(invoiceHeadline)}
-              </p>
-            </div>
-          )}
-        </div>
 
-        <CustomSelect
-          label={t('form.headerTemplate.label')}
-          value={watch('header_template_id')}
-          onChange={(value) => setValue('header_template_id', value)}
-          options={[
-            { value: '', label: t('form.template.none') },
-            ...headerTemplates.map((template) => ({
-              value: template.id,
-              label: template.name
-            }))
-          ]}
-        />
+          <div className="grid gap-4 sm:grid-cols-3 sm:items-end">
+            <CustomSelect
+              label={t('form.headerTemplate.label')}
+              value={watch('header_template_id')}
+              onChange={(value) => setValue('header_template_id', value)}
+              options={[
+                { value: '', label: t('form.template.none') },
+                ...headerTemplates.map((template) => ({
+                  value: template.id,
+                  label: template.name
+                }))
+              ]}
+            />
 
-        <CustomSelect
-          label={t('form.footerTemplate.label')}
-          value={watch('footer_template_id')}
-          onChange={(value) => setValue('footer_template_id', value)}
-          options={[
-            { value: '', label: t('form.template.none') },
-            ...footerTemplates.map((template) => ({
-              value: template.id,
-              label: template.name
-            }))
-          ]}
-        />
+            <CustomSelect
+              label={t('form.footerTemplate.label')}
+              value={watch('footer_template_id')}
+              onChange={(value) => setValue('footer_template_id', value)}
+              options={[
+                { value: '', label: t('form.template.none') },
+                ...footerTemplates.map((template) => ({
+                  value: template.id,
+                  label: template.name
+                }))
+              ]}
+            />
 
-        <CustomSelect
-          label={t('form.termsTemplate.label')}
-          value={watch('terms_template_id')}
-          onChange={(value) => setValue('terms_template_id', value)}
-          options={[
-            { value: '', label: t('form.template.none') },
-            ...termsTemplates.map((template) => ({
-              value: template.id,
-              label: template.name
-            }))
-          ]}
-        />
-
-        <Textarea
-          label={t('form.notes.label')}
-          value={watch('notes')}
-          onChange={(e) => setValue('notes', e.target.value)}
-          rows={4}
-          placeholder={t('form.notes.placeholder')}
-        />
-
-        <div className="flex items-start space-x-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-          <input
-            type="checkbox"
-            id="enable_zugferd"
-            checked={watch('enable_zugferd')}
-            onChange={(e) => setValue('enable_zugferd', e.target.checked)}
-            className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-          />
-          <div className="flex-1">
-            <label htmlFor="enable_zugferd" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
-              {t('form.zugferd.label')}
-            </label>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-              {t('form.zugferd.description')}
-            </p>
+            <CustomSelect
+              label={t('form.termsTemplate.label')}
+              value={watch('terms_template_id')}
+              onChange={(value) => setValue('terms_template_id', value)}
+              options={[
+                { value: '', label: t('form.template.none') },
+                ...termsTemplates.map((template) => ({
+                  value: template.id,
+                  label: template.name
+                }))
+              ]}
+            />
           </div>
-        </div>
 
-        <div className="flex items-start space-x-3 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
-          <input
-            type="checkbox"
-            id="exclude_from_tax"
-            checked={watch('exclude_from_tax')}
-            onChange={(e) => setValue('exclude_from_tax', e.target.checked)}
-            className="mt-1 h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
+          <Textarea
+            label={t('form.notes.label')}
+            value={watch('notes')}
+            onChange={(e) => setValue('notes', e.target.value)}
+            rows={4}
+            placeholder={t('form.notes.placeholder')}
           />
-          <div className="flex-1">
-            <label htmlFor="exclude_from_tax" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
-              {t('form.excludeFromTax.label')}
+        </FormSection>
+
+        {/* Options */}
+        <FormSection title={t('form.sections.options')}>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label htmlFor="enable_zugferd" className={optionCardClass('purple')}>
+              <input
+                type="checkbox"
+                id="enable_zugferd"
+                checked={watch('enable_zugferd')}
+                onChange={(e) => setValue('enable_zugferd', e.target.checked)}
+                className={checkboxClass}
+              />
+              <span className="flex-1">
+                <span className="block text-sm font-medium text-gray-900 dark:text-white">
+                  {t('form.zugferd.label')}
+                </span>
+                <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                  {t('form.zugferd.description')}
+                </span>
+              </span>
             </label>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-              {t('form.excludeFromTax.description')}
-            </p>
+
+            <label htmlFor="exclude_from_tax" className={optionCardClass('amber')}>
+              <input
+                type="checkbox"
+                id="exclude_from_tax"
+                checked={watch('exclude_from_tax')}
+                onChange={(e) => setValue('exclude_from_tax', e.target.checked)}
+                className={checkboxClass}
+              />
+              <span className="flex-1">
+                <span className="block text-sm font-medium text-gray-900 dark:text-white">
+                  {t('form.excludeFromTax.label')}
+                </span>
+                <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                  {t('form.excludeFromTax.description')}
+                </span>
+              </span>
+            </label>
           </div>
-        </div>
+        </FormSection>
       </form>
     </Modal>
   );

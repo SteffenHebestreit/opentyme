@@ -8,8 +8,11 @@
  */
 
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Wallet } from 'lucide-react';
 import { Modal } from '../../ui/Modal';
 import { Button } from '../../common/Button';
+import { Alert } from '../../common/Alert';
 import { createPayment } from '../../../api/services/payment.service';
 import { Input, CustomSelect, Textarea } from '../../forms';
 
@@ -55,6 +58,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
   onClose,
   onExpenseAdded,
 }) => {
+  const { t } = useTranslation('payments');
   const [amount, setAmount] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [expenseDate, setExpenseDate] = useState<string>(
@@ -76,13 +80,13 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       
       // Validation
       if (isNaN(expenseAmount) || expenseAmount <= 0) {
-        setError('Please enter a valid amount (positive number)');
+        setError(t('addExpense.errors.invalidAmount'));
         setIsSubmitting(false);
         return;
       }
 
       if (!description.trim()) {
-        setError('Please enter a description');
+        setError(t('addExpense.errors.descriptionRequired'));
         setIsSubmitting(false);
         return;
       }
@@ -112,7 +116,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
       setNotes('');
     } catch (err: any) {
       console.error('Error recording expense:', err);
-      setError(err.response?.data?.message || err.response?.data?.details || 'Failed to record expense');
+      setError(err.response?.data?.message || err.response?.data?.details || t('addExpense.errors.failed'));
     } finally {
       setIsSubmitting(false);
     }
@@ -129,48 +133,45 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
     <Modal
       open={isOpen}
       onClose={handleClose}
-      title="Add Expense"
+      title={t('addExpense.title')}
+      icon={<Wallet className="h-4 w-4" />}
       size="md"
       footer={
-        <div className="flex justify-end gap-3">
+        <>
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             onClick={handleClose}
             disabled={isSubmitting}
           >
-            Cancel
+            {t('messages.cancel')}
           </Button>
           <Button
             type="submit"
             variant="primary"
             form="expense-form"
-            disabled={isSubmitting}
+            isLoading={isSubmitting}
           >
-            {isSubmitting ? 'Saving...' : 'Add Expense'}
+            {isSubmitting ? t('messages.saving') : t('addExpense.submit')}
           </Button>
-        </div>
+        </>
       }
     >
-      <form id="expense-form" onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className="rounded-md bg-red-50 dark:bg-red-900/20 p-3 border border-red-200 dark:border-red-800">
-            <p className="text-sm text-red-800 dark:text-red-300">{error}</p>
-          </div>
-        )}
+      <form id="expense-form" onSubmit={handleSubmit} className="space-y-5">
+        {error && <Alert type="error" message={error} />}
 
         <Input
-          label="Description"
+          label={t('addExpense.fields.description')}
           type="text"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="e.g., Office rent - January 2025"
+          placeholder={t('addExpense.fields.descriptionPlaceholder')}
           required
         />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4 [&>div]:mb-0">
           <Input
-            label="Amount"
+            label={t('addExpense.fields.amount')}
             type="number"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
@@ -178,10 +179,11 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
             min="0"
             step="0.01"
             required
+            className="tabular-nums"
           />
 
           <Input
-            label="Date"
+            label={t('addExpense.fields.date')}
             type="date"
             value={expenseDate}
             onChange={(e) => setExpenseDate(e.target.value)}
@@ -189,34 +191,36 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({
           />
         </div>
 
-        <CustomSelect
-          label="Payment Method"
-          value={paymentMethod}
-          onChange={(value) => setPaymentMethod(value)}
-          options={[
-            { value: 'bank_transfer', label: 'Bank Transfer' },
-            { value: 'credit_card', label: 'Credit Card' },
-            { value: 'debit_card', label: 'Debit Card' },
-            { value: 'cash', label: 'Cash' },
-            { value: 'check', label: 'Check' },
-            { value: 'paypal', label: 'PayPal' },
-            { value: 'other', label: 'Other' }
-          ]}
-        />
+        <div className="grid gap-4 sm:grid-cols-2 [&>div]:mb-0">
+          <CustomSelect
+            label={t('addExpense.fields.paymentMethod')}
+            value={paymentMethod}
+            onChange={(value) => setPaymentMethod(value)}
+            options={[
+              { value: 'bank_transfer', label: t('addExpense.methods.bankTransfer') },
+              { value: 'credit_card', label: t('addExpense.methods.creditCard') },
+              { value: 'debit_card', label: t('addExpense.methods.debitCard') },
+              { value: 'cash', label: t('addExpense.methods.cash') },
+              { value: 'check', label: t('addExpense.methods.check') },
+              { value: 'paypal', label: t('addExpense.methods.paypal') },
+              { value: 'other', label: t('addExpense.methods.other') }
+            ]}
+          />
 
-        <Input
-          label="Transaction ID (optional)"
-          type="text"
-          value={transactionId}
-          onChange={(e) => setTransactionId(e.target.value)}
-          placeholder="e.g., TXN-2025-01-123"
-        />
+          <Input
+            label={t('addExpense.fields.transactionId')}
+            type="text"
+            value={transactionId}
+            onChange={(e) => setTransactionId(e.target.value)}
+            placeholder={t('addExpense.fields.transactionIdPlaceholder')}
+          />
+        </div>
 
         <Textarea
-          label="Additional Notes (optional)"
+          label={t('addExpense.fields.notes')}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Any additional details..."
+          placeholder={t('addExpense.fields.notesPlaceholder')}
           rows={3}
         />
       </form>

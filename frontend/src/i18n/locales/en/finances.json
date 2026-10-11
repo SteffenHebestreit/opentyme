@@ -18,6 +18,7 @@
     "invoices": "Invoices",
     "payments": "Payments",
     "expenses": "Expenses",
-    "taxPrepayments": "Tax Prepayments"
+    "taxPrepayments": "Tax Prepayments",
+    "recurring": "Recurring"
   }
 }

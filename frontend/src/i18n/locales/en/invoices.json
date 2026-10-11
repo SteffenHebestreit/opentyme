@@ -16,7 +16,8 @@
   "noInvoices": "No invoices found",
   "empty": {
     "title": "No invoices yet",
-    "message": "Create your first invoice to bill clients for work completed. Generate invoices from tracked time or craft one manually."
+    "message": "Create your first invoice to bill clients for work completed. Generate invoices from tracked time or craft one manually.",
+    "filteredMessage": "No invoices match the current filters or date range."
   },
   "summary": {
     "total": "Total Invoices",
@@ -33,7 +34,8 @@
     "client": {
       "label": "Client",
       "all": "All clients"
-    }
+    },
+    "clear": "Clear filters"
   },
   "table": {
     "invoice": "Invoice",
@@ -65,8 +67,8 @@
     "error": "Failed to load invoice details.",
     "noInvoice": "No invoice selected.",
     "billing": {
-      "overbilled": "⚠️ Invoice Overbilled",
-      "underbilled": "⚠️ Invoice Underbilled",
+      "overbilled": "Invoice overbilled",
+      "underbilled": "Invoice underbilled",
       "invoiceTotal": "Invoice Total",
       "totalPaid": "Total Paid",
       "balance": "Balance"
@@ -103,9 +105,24 @@
       "method": "Method",
       "transactionId": "Transaction ID",
       "amount": "Amount",
-      "typePayment": "↓ Payment",
-      "typeRefund": "↑ Refund",
-      "typeExpense": "→ Expense"
+      "typePayment": "Payment",
+      "typeRefund": "Refund",
+      "typeExpense": "Expense"
+    },
+    "moreActions": "More actions",
+    "sendInvoice": "Send invoice",
+    "sendReminder": "Send reminder",
+    "downloadFailed": "Could not open the PDF. Please try again.",
+    "attachments": {
+      "invoicePdf": "Invoice PDF ({{number}})",
+      "timeReport": "Time Tracking Report",
+      "expenseReport": "Expense Report"
+    },
+    "statusDialog": {
+      "title": "Update invoice status?",
+      "message": "The email was sent successfully. Do you want to update the invoice status to <strong>Sent</strong>, or keep it as <strong>Draft</strong>?",
+      "keepDraft": "Keep as draft",
+      "markSent": "Mark as sent"
     }
   },
   "cancelModal": {
@@ -138,6 +155,31 @@
     "endDate": "End date",
     "errors": {
       "endDateAfterStart": "End date must be after the start date"
+    },
+    "description": "Create an invoice from billable time entries. All filters are optional.",
+    "sections": {
+      "source": "Time entries"
+    },
+    "customization": {
+      "title": "Invoice Customization"
+    },
+    "headline": {
+      "label": "Invoice Headline (Optional)",
+      "placeholder": "e.g. {project_name} - {period}",
+      "showPlaceholders": "Available placeholders",
+      "preview": "Preview"
+    },
+    "headerTemplate": {
+      "label": "Header Template (Optional)"
+    },
+    "footerTemplate": {
+      "label": "Footer Template (Optional)"
+    },
+    "termsTemplate": {
+      "label": "Payment Terms Template (Optional)"
+    },
+    "template": {
+      "none": "None"
     }
   },
   "recordPayment": {
@@ -184,8 +226,19 @@
     "errors": {
       "invalidAmount": "Please enter a valid amount (positive number)",
       "exceedsBalance": "Payment amount cannot exceed remaining balance ({{balance}})",
-      "failed": "Failed to record payment"
-    }
+      "failed": "Failed to record payment",
+      "clientRequired": "Please select a client"
+    },
+    "titleStandalone": "Record Payment",
+    "client": "Client",
+    "selectClient": "Select a client...",
+    "selectInvoices": "Select invoice(s)",
+    "selectedTotal_one": "{{count}} invoice selected",
+    "selectedTotal_other": "{{count}} invoices selected",
+    "total": "Total",
+    "noUnpaidInvoices": "No unpaid invoices for this client",
+    "project": "Project (optional)",
+    "noProject": "No specific project"
   },
   "form": {
     "title": {
@@ -258,6 +311,42 @@
     "excludeFromTax": {
       "label": "Exclude from Tax Reports",
       "description": "Mark this invoice as tax-exempt income that should be excluded from VAT declarations and tax reports (e.g., for non-taxable services or certain business transactions)."
+    },
+    "sections": {
+      "details": "Details",
+      "options": "Options"
+    },
+    "headline": {
+      "label": "Invoice Headline (Optional)",
+      "placeholder": "e.g. {project_name} - {period}",
+      "showPlaceholders": "Available placeholders",
+      "preview": "Preview"
+    },
+    "headerTemplate": {
+      "label": "Header Template (Optional)",
+      "placeholder": "None"
+    },
+    "footerTemplate": {
+      "label": "Footer Template (Optional)",
+      "placeholder": "None"
+    },
+    "termsTemplate": {
+      "label": "Payment Terms Template (Optional)",
+      "placeholder": "None"
+    },
+    "template": {
+      "none": "None"
+    },
+    "customization": {
+      "title": "Invoice Customization"
+    },
+    "errors": {
+      "clientRequired": "Select a client",
+      "issueDateRequired": "Issue date is required",
+      "dueDateRequired": "Due date is required",
+      "issueDateInvalid": "Enter a valid issue date",
+      "dueDateInvalid": "Enter a valid due date",
+      "dueBeforeIssue": "Due date must be after the issue date"
     }
   },
   "fields": {
@@ -310,7 +399,8 @@
       "rateType": "Type",
       "unitPrice": "Rate",
       "total": "Total"
-    }
+    },
+    "removeItem": "Remove item {{number}}"
   },
   "messages": {
     "createSuccess": "Invoice created successfully.",
@@ -319,6 +409,101 @@
     "deleteSuccess": "Invoice deleted successfully.",
     "generateSuccess": "Invoice generated from time entries.",
     "sendSuccess": "Invoice sent successfully",
-    "deleteConfirm": "Delete invoice {{number}}? This action cannot be undone."
+    "deleteConfirm": "Delete invoice {{number}}? This action cannot be undone.",
+    "cancelSuccess": "Invoice cancelled.",
+    "cancelFailed": "Could not cancel the invoice. Please try again."
+  },
+  "placeholders": {
+    "title": "Available Placeholders",
+    "loading": "Loading placeholders...",
+    "error": "Failed to load placeholders",
+    "description": "Use placeholders in your text to automatically fill in values. Copy and paste them into your text fields.",
+    "example": "Example",
+    "tip": "Tip",
+    "tipText": "Placeholders are processed when the invoice is created or updated. They will show the actual values in the final invoice."
+  },
+  "recurring": {
+    "title": "Recurring invoices",
+    "subtitle": "Automatically generate draft invoices for retainers. Drafts appear under Invoices for review.",
+    "newSchedule": "New schedule",
+    "empty": {
+      "title": "No recurring invoices yet",
+      "message": "Create one to bill retainers automatically."
+    },
+    "table": {
+      "title": "Title",
+      "client": "Client",
+      "frequency": "Frequency",
+      "nextInvoice": "Next invoice",
+      "amount": "Amount",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Active",
+      "paused": "Paused"
+    },
+    "frequency": {
+      "monthly": "Monthly",
+      "quarterly": "Quarterly",
+      "yearly": "Yearly"
+    },
+    "actions": {
+      "generateNow": "Generate due invoices now",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "messages": {
+      "created": "Schedule created.",
+      "updated": "Schedule updated.",
+      "deleted": "Schedule deleted.",
+      "saveFailed": "Failed to save schedule.",
+      "deleteFailed": "Failed to delete schedule.",
+      "generateFailed": "Failed to generate invoices.",
+      "generated_one": "Generated {{count}} draft invoice — see the Invoices tab.",
+      "generated_other": "Generated {{count}} draft invoices — see the Invoices tab.",
+      "nothingDue": "No invoices due yet.",
+      "deleteConfirmTitle": "Delete recurring schedule?",
+      "deleteConfirm": "Delete the recurring schedule \"{{title}}\"? Already-generated invoices are kept."
+    },
+    "form": {
+      "titleCreate": "New recurring invoice",
+      "titleEdit": "Edit recurring invoice",
+      "submitCreate": "Create schedule",
+      "submitEdit": "Save changes",
+      "fields": {
+        "title": "Title",
+        "titlePlaceholder": "e.g. Monthly retainer – Acme",
+        "client": "Client",
+        "selectClient": "Select a client…",
+        "project": "Project (optional)",
+        "noProject": "No project",
+        "frequency": "Frequency",
+        "startDate": "Start date",
+        "endDate": "End date (optional)",
+        "currency": "Currency",
+        "taxRate": "Tax rate (optional)",
+        "noTax": "No tax",
+        "paymentTerms": "Payment terms (days)",
+        "headline": "Invoice headline (optional)",
+        "headlinePlaceholder": "Shown as the invoice title",
+        "lineItems": "Line items",
+        "addItem": "Add item",
+        "description": "Description",
+        "quantity": "Qty",
+        "unitPrice": "Unit price",
+        "removeItem": "Remove line item",
+        "subtotal": "Subtotal per invoice",
+        "notes": "Notes (optional)",
+        "active": "Active (generate invoices automatically)"
+      },
+      "errors": {
+        "titleRequired": "A title is required.",
+        "clientRequired": "Please select a client.",
+        "startRequired": "A start date is required.",
+        "endAfterStart": "End date must be after the start date.",
+        "itemsRequired": "Add at least one line item with a description."
+      }
+    }
   }
 }

@@ -31,7 +31,14 @@
     "payment": "Payment",
     "paymentIncome": "Payments (Income)",
     "refund": "Refund",
-    "refundOutgoing": "Refunds (Outgoing)"
+    "refundOutgoing": "Refunds (Outgoing)",
+    "expense": "Expense",
+    "vat_refund": "VAT Refund",
+    "income_tax_refund": "Tax Refund",
+    "vat_payment": "VAT Payment",
+    "income_tax_payment": "Income Tax",
+    "trade_tax_payment": "Trade Tax",
+    "surcharge_tax_payment": "Surcharge Tax"
   },
   "summary": {
     "totalTransactions": "Total Transactions",
@@ -63,6 +70,39 @@
     "deleteConfirm": "Are you sure you want to delete this payment?",
     "saving": "Saving...",
     "saveChanges": "Save Changes",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "updateFailed": "Failed to update payment"
+  },
+  "loading": "Loading payments...",
+  "loadError": "Error loading payments",
+  "unknownError": "An unknown error occurred",
+  "addExpense": {
+    "title": "Add Expense",
+    "submit": "Add Expense",
+    "fields": {
+      "description": "Description",
+      "descriptionPlaceholder": "e.g. Office rent - January 2025",
+      "amount": "Amount",
+      "date": "Date",
+      "paymentMethod": "Payment Method",
+      "transactionId": "Transaction ID (optional)",
+      "transactionIdPlaceholder": "e.g. TXN-2025-01-123",
+      "notes": "Additional Notes (optional)",
+      "notesPlaceholder": "Any additional details..."
+    },
+    "methods": {
+      "bankTransfer": "Bank Transfer",
+      "creditCard": "Credit Card",
+      "debitCard": "Debit Card",
+      "cash": "Cash",
+      "check": "Check",
+      "paypal": "PayPal",
+      "other": "Other"
+    },
+    "errors": {
+      "invalidAmount": "Please enter a valid amount (positive number)",
+      "descriptionRequired": "Please enter a description",
+      "failed": "Failed to record expense"
+    }
   }
 }

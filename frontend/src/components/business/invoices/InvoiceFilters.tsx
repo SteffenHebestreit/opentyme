@@ -1,8 +1,10 @@
 import { ChangeEvent, FC } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search } from 'lucide-react';
-import { Input, CustomSelect } from '../../forms';
+import { CustomSelect } from '../../forms';
+import { fieldClasses } from '../../forms/fieldStyles';
 import { Client, InvoiceStatus } from '../../../api/types';
+import { cn } from '../../../lib/cn';
 
 /**
  * Union type for invoice status filter, including 'all' option.
@@ -19,7 +21,7 @@ export type InvoiceStatusFilter = 'all' | InvoiceStatus;
  * - Status filter dropdown (all, draft, sent, paid, overdue, cancelled)
  * - Client filter dropdown
  * - Search icon in search input
- * - Responsive layout (stacked mobile, grid desktop)
+ * - One-line toolbar (stacks on narrow screens)
  * - Dark mode support
  *
  * **Filter Options:**
@@ -116,40 +118,38 @@ export const InvoiceFilters: FC<InvoiceFiltersProps> = ({
   ];
 
   return (
-    <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-      <div className="flex w-full flex-1 items-center gap-3">
-        <div className="w-full xl:max-w-sm">
-          <Input
-            id="invoice-search"
-            type="search"
-            placeholder={t('filters.search')}
-            value={search}
-            onChange={handleSearchChange}
-            leftIcon={<Search className="h-4 w-4" />}
-            inputSize="md"
-            autoComplete="off"
-          />
-        </div>
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="relative w-full sm:max-w-sm sm:flex-1">
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+          aria-hidden="true"
+        />
+        <input
+          id="invoice-search"
+          type="search"
+          placeholder={t('filters.search')}
+          aria-label={t('filters.search')}
+          value={search}
+          onChange={handleSearchChange}
+          autoComplete="off"
+          className={cn(fieldClasses(), 'pl-9')}
+        />
       </div>
-      <div className="grid w-full gap-3 md:grid-cols-2 xl:w-auto xl:grid-cols-2">
-        <div>
-          <CustomSelect
-            label={t('filters.status.label')}
-            value={status}
-            onChange={(value) => onStatusChange(value as InvoiceStatusFilter)}
-            options={statusOptions}
-            size="md"
-          />
-        </div>
-        <div>
-          <CustomSelect
-            label={t('filters.client.label')}
-            value={clientId}
-            onChange={onClientChange}
-            options={clientOptions}
-            size="md"
-          />
-        </div>
+      <div className="grid w-full grid-cols-2 gap-3 sm:ml-auto sm:flex sm:w-auto">
+        <CustomSelect
+          value={status}
+          onChange={(value) => onStatusChange(value as InvoiceStatusFilter)}
+          options={statusOptions}
+          size="md"
+          className="sm:w-44"
+        />
+        <CustomSelect
+          value={clientId}
+          onChange={onClientChange}
+          options={clientOptions}
+          size="md"
+          className="sm:w-48"
+        />
       </div>
     </div>
   );

@@ -20,10 +20,13 @@
 import { FC, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { ChevronRight, Clock } from 'lucide-react';
 import { Alert } from '../../common/Alert';
 import { Button } from '../../common/Button';
 import { Input } from '../../forms/Input';
+import { Select } from '../../forms/Select';
 import { Modal } from '../../ui/Modal';
+import { cn } from '../../../lib/cn';
 import { Client, GenerateInvoiceFromTimeEntriesPayload, Project } from '../../../api/types';
 import { useInvoiceTextTemplates } from '../../../hooks/api/useInvoiceTextTemplates';
 import { AVAILABLE_PLACEHOLDERS, getPlaceholderPreview } from '../../../utils/placeholders';
@@ -267,13 +270,15 @@ export const GenerateInvoiceModal: FC<GenerateInvoiceModalProps> = ({
       open={open}
       onClose={onClose}
       title={t('generate.title')}
+      description={t('generate.description')}
+      icon={<Clock className="h-4 w-4" />}
       size="lg"
       footer={
         <>
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose}>
             {t('common:buttons.cancel')}
           </Button>
-          <Button type="submit" form={formId} disabled={isSubmitting}>
+          <Button type="submit" form={formId} isLoading={isSubmitting}>
             {isSubmitting ? t('generate.generating') : t('generate.submit')}
           </Button>
         </>
@@ -282,145 +287,130 @@ export const GenerateInvoiceModal: FC<GenerateInvoiceModalProps> = ({
       <form id={formId} className="space-y-5" onSubmit={handleSubmit(handleFormSubmit)}>
         {error ? <Alert type="error" message={error} /> : null}
 
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          {t('generate.client.label')}
-          <select
-            className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-            {...register('client_id')}
-          >
-            <option value="">{t('generate.client.all')}</option>
-            {clients.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* Time entries to include */}
+        <section className="space-y-4">
+          <h3 className="eyebrow">{t('generate.sections.source')}</h3>
+          <div className="grid gap-4 sm:grid-cols-2 [&>div]:mb-0">
+            <Select id="generate-client" label={t('generate.client.label')} {...register('client_id')}>
+              <option value="">{t('generate.client.all')}</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.name}
+                </option>
+              ))}
+            </Select>
 
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          {t('generate.project.label')}
-          <select
-            className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-            {...register('project_id')}
-          >
-            <option value="">{t('generate.project.all')}</option>
-            {filteredProjects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-        </label>
+            <Select id="generate-project" label={t('generate.project.label')} {...register('project_id')}>
+              <option value="">{t('generate.project.all')}</option>
+              {filteredProjects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </Select>
+          </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            id="generate-start-date"
-            label={t('generate.startDate')}
-            type="date"
-            {...register('start_date')}
-            error={errors.start_date?.message}
-          />
-          <Input
-            id="generate-end-date"
-            label={t('generate.endDate')}
-            type="date"
-            {...register('end_date')}
-            error={errors.end_date?.message}
-          />
-        </div>
+          <div className="grid gap-4 sm:grid-cols-2 [&>div]:mb-0">
+            <Input
+              id="generate-start-date"
+              label={t('generate.startDate')}
+              type="date"
+              {...register('start_date')}
+              error={errors.start_date?.message}
+            />
+            <Input
+              id="generate-end-date"
+              label={t('generate.endDate')}
+              type="date"
+              {...register('end_date')}
+              error={errors.end_date?.message}
+            />
+          </div>
+        </section>
 
-        {/* Divider */}
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+        {/* Invoice customization */}
+        <section className="space-y-4 border-t border-gray-100 pt-5 dark:border-gray-800">
+          <h3 className="eyebrow">
             {t('generate.customization.title', 'Invoice Customization')}
           </h3>
-        </div>
 
-        {/* Invoice Headline */}
-        <div>
-          <Input
-            id="generate-headline"
-            label={t('generate.headline.label', 'Invoice Headline (Optional)')}
-            placeholder={t('generate.headline.placeholder', 'e.g., {project_name} - {period}')}
-            {...register('invoice_headline')}
-            error={errors.invoice_headline?.message}
-          />
-          <div className="mt-2">
-            <button
-              type="button"
-              onClick={() => setShowPlaceholderHint(!showPlaceholderHint)}
-              className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300"
-            >
-              {showPlaceholderHint ? '▼' : '▶'} {t('generate.headline.showPlaceholders', 'Available placeholders')}
-            </button>
-            {showPlaceholderHint && (
-              <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-md text-xs space-y-1">
-                {AVAILABLE_PLACEHOLDERS.map(({ key, label }) => (
-                  <div key={key} className="flex justify-between">
-                    <code className="text-indigo-600 dark:text-indigo-400">{key}</code>
-                    <span className="text-gray-600 dark:text-gray-400">{label}</span>
-                  </div>
-                ))}
+          {/* Invoice Headline */}
+          <div>
+            <Input
+              id="generate-headline"
+              label={t('generate.headline.label', 'Invoice Headline (Optional)')}
+              placeholder={t('generate.headline.placeholder', 'e.g., {project_name} - {period}')}
+              {...register('invoice_headline')}
+              error={errors.invoice_headline?.message}
+            />
+            <div className="-mt-2">
+              <button
+                type="button"
+                onClick={() => setShowPlaceholderHint(!showPlaceholderHint)}
+                aria-expanded={showPlaceholderHint}
+                className="inline-flex items-center gap-1 rounded text-xs font-medium text-purple-600 transition-colors hover:text-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-purple-400 dark:hover:text-purple-300"
+              >
+                <ChevronRight
+                  className={cn('h-3.5 w-3.5 transition-transform duration-200', showPlaceholderHint && 'rotate-90')}
+                  aria-hidden="true"
+                />
+                {t('generate.headline.showPlaceholders', 'Available placeholders')}
+              </button>
+              <div className="collapsible" data-open={showPlaceholderHint}>
+                <div>
+                  <dl className="mt-2 space-y-1 rounded-lg border border-gray-200/70 bg-gray-50 p-3 text-xs dark:border-gray-800/70 dark:bg-white/[0.03]">
+                    {AVAILABLE_PLACEHOLDERS.map(({ key, label }) => (
+                      <div key={key} className="flex justify-between gap-4">
+                        <dt><code className="font-mono text-purple-700 dark:text-purple-300">{key}</code></dt>
+                        <dd className="text-right text-gray-600 dark:text-gray-400">{label}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              </div>
+            </div>
+            {invoiceHeadline && (
+              <div className="mt-3 animate-fade-in rounded-lg bg-sky-50 p-3 ring-1 ring-inset ring-sky-600/15 dark:bg-sky-500/10 dark:ring-sky-400/20">
+                <p className="mb-1 text-xs font-medium text-sky-700 dark:text-sky-300">
+                  {t('generate.headline.preview', 'Preview')}
+                </p>
+                <p className="text-sm text-gray-900 dark:text-gray-100">
+                  {getPlaceholderPreview(invoiceHeadline)}
+                </p>
               </div>
             )}
           </div>
-          {invoiceHeadline && (
-            <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-                {t('generate.headline.preview', 'Preview')}:
-              </p>
-              <p className="text-sm text-gray-900 dark:text-gray-100">
-                {getPlaceholderPreview(invoiceHeadline)}
-              </p>
-            </div>
-          )}
-        </div>
 
-        {/* Template Selections */}
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          {t('generate.headerTemplate.label', 'Header Template (Optional)')}
-          <select
-            className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-            {...register('header_template_id')}
-          >
-            <option value="">{t('generate.template.none', 'None')}</option>
-            {headerTemplates.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          {/* Template Selections */}
+          <div className="grid gap-4 sm:grid-cols-3 sm:items-end [&>div]:mb-0">
+            <Select id="generate-header-template" label={t('generate.headerTemplate.label', 'Header Template (Optional)')} {...register('header_template_id')}>
+              <option value="">{t('generate.template.none', 'None')}</option>
+              {headerTemplates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                </option>
+              ))}
+            </Select>
 
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          {t('generate.footerTemplate.label', 'Footer Template (Optional)')}
-          <select
-            className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-            {...register('footer_template_id')}
-          >
-            <option value="">{t('generate.template.none', 'None')}</option>
-            {footerTemplates.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.name}
-              </option>
-            ))}
-          </select>
-        </label>
+            <Select id="generate-footer-template" label={t('generate.footerTemplate.label', 'Footer Template (Optional)')} {...register('footer_template_id')}>
+              <option value="">{t('generate.template.none', 'None')}</option>
+              {footerTemplates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                </option>
+              ))}
+            </Select>
 
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          {t('generate.termsTemplate.label', 'Payment Terms Template (Optional)')}
-          <select
-            className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-            {...register('terms_template_id')}
-          >
-            <option value="">{t('generate.template.none', 'None')}</option>
-            {termsTemplates.map((template) => (
-              <option key={template.id} value={template.id}>
-                {template.name}
-              </option>
-            ))}
-          </select>
-        </label>
+            <Select id="generate-terms-template" label={t('generate.termsTemplate.label', 'Payment Terms Template (Optional)')} {...register('terms_template_id')}>
+              <option value="">{t('generate.template.none', 'None')}</option>
+              {termsTemplates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </section>
       </form>
     </Modal>
   );

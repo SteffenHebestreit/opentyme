@@ -13,18 +13,22 @@ import {
   useReplaceInvoiceLineItems,
   useUpdateInvoice,
 } from '../../../hooks/api/useInvoices';
+import { Clock, Plus } from 'lucide-react';
 import { Invoice, InvoiceLineItemPayload } from '../../../api/types';
 import { Button } from '../../common/Button';
 import { Alert } from '../../common/Alert';
-import { SkeletonCardList } from '../../common/Skeleton';
+import { SkeletonItem } from '../../common/Skeleton';
 import { extractErrorMessage } from '../../../utils/error';
 import { formatCurrency } from '../../../utils/currency';
+import { toast } from '../../../lib/toast';
+import { confirmDialog } from '../../../lib/confirm';
 import { InvoiceFilters, InvoiceStatusFilter } from './InvoiceFilters';
 import { InvoiceTable } from './InvoiceTable';
 import { InvoiceFormModal } from './InvoiceFormModal';
 import { InvoiceEmptyState } from './InvoiceEmptyState';
 import { InvoiceDetailModal } from './InvoiceDetailModal';
 import { GenerateInvoiceModal } from './GenerateInvoiceModal';
+import { SummaryStrip, SummaryStripItem } from './SummaryStrip';
 
 function normalizeDate(value: string, endOfDay = false): Date | null {
   if (!value) {
@@ -40,13 +44,53 @@ function normalizeDate(value: string, endOfDay = false): Date | null {
   return date;
 }
 
+/** Placeholder shaped like the invoice table while data loads. */
+function InvoiceTableSkeleton() {
+  return (
+    <div className="surface overflow-hidden" aria-busy="true">
+      <div className="flex gap-6 border-b border-gray-100 bg-gray-50/80 px-5 py-3 dark:border-gray-800 dark:bg-white/[0.02]">
+        <SkeletonItem className="h-3 w-20" />
+        <SkeletonItem className="h-3 w-24" />
+        <SkeletonItem className="hidden h-3 w-16 sm:block" />
+        <SkeletonItem className="ml-auto h-3 w-16" />
+      </div>
+      <div className="divide-y divide-gray-100 dark:divide-gray-800/70">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div key={index} className="flex items-center gap-6 px-5 py-4">
+            <div className="w-32 space-y-1.5">
+              <SkeletonItem className="h-4 w-24" />
+              <SkeletonItem className="h-3 w-32" />
+            </div>
+            <SkeletonItem className="h-4 w-28" />
+            <SkeletonItem className="hidden h-5 w-16 rounded-full sm:block" />
+            <SkeletonItem className="hidden h-4 w-20 md:block" />
+            <div className="ml-auto space-y-1.5">
+              <SkeletonItem className="ml-auto h-4 w-20" />
+              <SkeletonItem className="ml-auto h-3 w-14" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 interface InvoiceListProps {
   startDate?: string;
   endDate?: string;
   initialSearchTerm?: string;
+  /** Open the "create invoice" form (e.g. arriving via `?wizard=start`); confirmed via onCreateFormOpened */
+  openCreateForm?: boolean;
+  onCreateFormOpened?: () => void;
 }
 
-export default function InvoiceList({ startDate: propStartDate, endDate: propEndDate, initialSearchTerm = '' }: InvoiceListProps = {}) {
+export default function InvoiceList({
+  startDate: propStartDate,
+  endDate: propEndDate,
+  initialSearchTerm = '',
+  openCreateForm = false,
+  onCreateFormOpened,
+}: InvoiceListProps = {}) {
   const { t } = useTranslation('invoices');
   const { state } = useApp();
   const [searchTerm, setSearchTerm] = useState(initialSearchTerm);
@@ -60,9 +104,7 @@ export default function InvoiceList({ startDate: propStartDate, endDate: propEnd
   const [detailInvoiceId, setDetailInvoiceId] = useState<string | null>(null);
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const {
@@ -102,6 +144,18 @@ export default function InvoiceList({ startDate: propStartDate, endDate: propEnd
       setDebouncedSearch(initialSearchTerm);
     }
   }, [initialSearchTerm]);
+
+  // Same flow as the "Create invoice" button, requested by the parent page
+  useEffect(() => {
+    if (!openCreateForm) {
+      return;
+    }
+    setModalMode('create');
+    setEditingInvoice(null);
+    setFormError(null);
+    setIsModalOpen(true);
+    onCreateFormOpened?.();
+  }, [openCreateForm, onCreateFormOpened]);
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
@@ -204,8 +258,6 @@ export default function InvoiceList({ startDate: propStartDate, endDate: propEnd
     lineItems?: InvoiceLineItemPayload[],
   ) => {
     setFormError(null);
-    setActionError(null);
-    setSuccessMessage(null);
     try {
       if (modalMode === 'create') {
         const newInvoice = await createInvoice.mutateAsync(payload);
@@ -213,7 +265,7 @@ export default function InvoiceList({ startDate: propStartDate, endDate: propEnd
         if (lineItems && lineItems.length > 0 && newInvoice?.id) {
           await addLineItems.mutateAsync({ id: newInvoice.id, items: lineItems });
         }
-        setSuccessMessage(t('messages.createSuccess'));
+        toast.success(t('messages.createSuccess'));
       } else if (modalMode === 'correct' && editingInvoice) {
         // Handle correction mode - include all invoice fields that may have changed
         await correctInvoice.mutateAsync({
@@ -231,7 +283,7 @@ export default function InvoiceList({ startDate: propStartDate, endDate: propEnd
             unit_price: item.unit_price,
           })),
         });
-        setSuccessMessage(t('messages.correctionSuccess'));
+        toast.success(t('messages.correctionSuccess'));
         // Clear filters to ensure updated invoice is visible
         setStatusFilter('all');
         setClientFilter('');
@@ -242,7 +294,7 @@ export default function InvoiceList({ startDate: propStartDate, endDate: propEnd
         if (lineItems) {
           await replaceLineItems.mutateAsync({ id: editingInvoice.id, items: lineItems });
         }
-        setSuccessMessage(t('messages.updateSuccess'));
+        toast.success(t('messages.updateSuccess'));
         // Clear filters to ensure updated invoice is visible
         setStatusFilter('all');
         setClientFilter('');
@@ -255,20 +307,21 @@ export default function InvoiceList({ startDate: propStartDate, endDate: propEnd
   };
 
   const handleDelete = async (invoice: Invoice) => {
-    const confirmed = window.confirm(
-      t('messages.deleteConfirm', { number: invoice.invoice_number }),
-    );
+    const confirmed = await confirmDialog({
+      title: t('delete'),
+      message: t('messages.deleteConfirm', { number: invoice.invoice_number }),
+      tone: 'danger',
+      confirmLabel: t('delete'),
+    });
     if (!confirmed) {
       return;
     }
-    setActionError(null);
-    setSuccessMessage(null);
     setDeletingId(invoice.id);
     try {
       await deleteInvoice.mutateAsync(invoice.id);
-      setSuccessMessage(t('messages.deleteSuccess'));
+      toast.success(t('messages.deleteSuccess'));
     } catch (deleteErr) {
-      setActionError(extractErrorMessage(deleteErr));
+      toast.error(extractErrorMessage(deleteErr));
     } finally {
       setDeletingId(null);
     }
@@ -278,10 +331,9 @@ export default function InvoiceList({ startDate: propStartDate, endDate: propEnd
     payload: Parameters<typeof generateInvoice.mutateAsync>[0],
   ) => {
     setGenerateError(null);
-    setSuccessMessage(null);
     try {
       await generateInvoice.mutateAsync(payload);
-      setSuccessMessage(t('messages.generateSuccess'));
+      toast.success(t('messages.generateSuccess'));
       setIsGenerateOpen(false);
     } catch (generateErr) {
       setGenerateError(extractErrorMessage(generateErr));
@@ -302,30 +354,44 @@ export default function InvoiceList({ startDate: propStartDate, endDate: propEnd
   }, [filteredInvoices]);
 
 
+  const hasListFilters = statusFilter !== 'all' || clientFilter !== '' || searchTerm !== '';
+  const clearListFilters = () => {
+    setStatusFilter('all');
+    setClientFilter('');
+    setSearchTerm('');
+  };
+
+  const summaryItems: SummaryStripItem[] = [
+    { key: 'total', label: t('summary.total'), value: filteredInvoices.length },
+    { key: 'invoiced', label: t('summary.invoiced'), value: totalInvoiced, format: formatCurrency },
+    { key: 'paid', label: t('summary.paid'), value: paidInvoices, format: formatCurrency, tone: 'text-emerald-600 dark:text-emerald-400' },
+    { key: 'unpaid', label: t('summary.unpaid'), value: unpaidInvoices, format: formatCurrency, tone: 'text-amber-600 dark:text-amber-400' },
+  ];
+
   if (!state.isAuthenticated) {
     return (
-      <div className="p-6">
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{t('title')}</h1>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{t('noAuth')}</p>
-        </div>
+      <div className="surface p-6">
+        <h2 className="section-title">{t('title')}</h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('noAuth')}</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">{t('title')}</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="section-title">{t('title')}</h2>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {t('subtitle')}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
+            type="button"
             variant="secondary"
+            leftIcon={<Clock className="h-4 w-4" />}
             onClick={() => {
               setGenerateError(null);
               setIsGenerateOpen(true);
@@ -333,11 +399,14 @@ export default function InvoiceList({ startDate: propStartDate, endDate: propEnd
           >
             {t('generateButton')}
           </Button>
-          <Button type="button" onClick={openCreateModal}>
+          <Button type="button" onClick={openCreateModal} leftIcon={<Plus className="h-4 w-4" />}>
             {t('create')}
           </Button>
         </div>
       </div>
+
+      {/* Summary */}
+      <SummaryStrip items={summaryItems} />
 
       {/* Filters */}
       <InvoiceFilters
@@ -349,55 +418,6 @@ export default function InvoiceList({ startDate: propStartDate, endDate: propEnd
         onClientChange={setClientFilter}
         clients={clients}
       />
-
-      {/* Summary Cards */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="rounded-lg border border-blue-200 dark:border-blue-900/30 bg-blue-50 dark:bg-blue-900/20 p-4">
-            <div className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-1">
-              {t('summary.total')}
-            </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              {filteredInvoices.length}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-indigo-200 dark:border-indigo-900/30 bg-indigo-50 dark:bg-indigo-900/20 p-4">
-            <div className="text-sm font-medium text-indigo-600 dark:text-indigo-400 mb-1">
-              {t('summary.invoiced')}
-            </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              {formatCurrency(totalInvoiced)}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-green-200 dark:border-green-900/30 bg-green-50 dark:bg-green-900/20 p-4">
-            <div className="text-sm font-medium text-green-600 dark:text-green-400 mb-1">
-              {t('summary.paid')}
-            </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              {formatCurrency(paidInvoices)}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-orange-200 dark:border-orange-900/30 bg-orange-50 dark:bg-orange-900/20 p-4">
-            <div className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-1">
-              {t('summary.unpaid')}
-            </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              {formatCurrency(unpaidInvoices)}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {successMessage ? (
-        <Alert type="success" message={successMessage} onClose={() => setSuccessMessage(null)} />
-      ) : null}
-
-      {actionError ? (
-        <Alert type="error" message={actionError} onClose={() => setActionError(null)} />
-      ) : null}
 
       {isError ? (
         <Alert
@@ -424,9 +444,13 @@ export default function InvoiceList({ startDate: propStartDate, endDate: propEnd
       ) : null}
 
       {isLoading || isLoadingClients || isLoadingProjects ? (
-        <SkeletonCardList count={3} />
+        <InvoiceTableSkeleton />
       ) : sortedInvoices.length === 0 ? (
-        <InvoiceEmptyState onCreate={openCreateModal} />
+        <InvoiceEmptyState
+          onCreate={openCreateModal}
+          filtered={invoices.length > 0}
+          onClearFilters={hasListFilters ? clearListFilters : undefined}
+        />
       ) : (
         <InvoiceTable
           invoices={sortedInvoices}

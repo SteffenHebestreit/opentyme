@@ -20,17 +20,37 @@
  * @module components/business/invoices/InvoiceDetailModal
  */
 
-import { FC, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { FC, ReactNode, useMemo, useState } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
+import {
+  AlertTriangle,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Ban,
+  BellRing,
+  Ellipsis,
+  FileDown,
+  FileText,
+  HandCoins,
+  Send,
+  Wallet,
+} from 'lucide-react';
 import { Alert } from '../../common/Alert';
+import { Badge } from '../../common/Badge';
 import { Button } from '../../common/Button';
+import { Dropdown, DropdownItem } from '../../common/Dropdown';
+import { SkeletonItem } from '../../common/Skeleton';
 import { Modal } from '../../ui/Modal';
 import { Table, Column } from '../../common/Table';
 import { useCancelInvoice, useInvoice, useInvoiceBillingStatus, useUpdateInvoice, useInvoices } from '../../../hooks/api/useInvoices';
 import { downloadInvoicePDF } from '../../../api/services/invoice.service';
 import { formatDate } from '../../../utils/date';
+import { toast } from '../../../lib/toast';
+import { confirmDialog } from '../../../lib/confirm';
+import { cn } from '../../../lib/cn';
 import { RecordPaymentModal } from './RecordPaymentModal';
+import { InvoiceStatusBadge } from './InvoiceStatusBadge';
 import { SendEmailModal } from '../../communication/SendEmailModal';
 import { InvoiceItem, Payment } from '../../../api/types';
 
@@ -103,7 +123,7 @@ const formatCurrency = (value: number, currency: string | undefined) => {
  * 
  * Loading States:
  * - Shows skeleton loaders while fetching invoice data
- * - Animated pulse effect on placeholder elements
+ * - Shimmering placeholders shaped like the overview, items and totals
  * - Maintains layout during loading
  * 
  * Error Handling:
@@ -144,6 +164,18 @@ const formatCurrency = (value: number, currency: string | undefined) => {
  * @param {InvoiceDetailModalProps} props - Component props
  * @returns {JSX.Element} Invoice detail modal component
  */
+/** Opens the shared Dropdown's menu upwards — it sits in the modal's sticky footer. */
+const dropUpClass =
+  '[&_[role=menu]]:bottom-full [&_[role=menu]]:mb-1.5 [&_[role=menu]]:mt-0 [&_[role=menu]]:origin-bottom-right';
+
+/** Label + value in the invoice overview grid. */
+const MetaItem: FC<{ label: string; children: ReactNode; valueClassName?: string }> = ({ label, children, valueClassName }) => (
+  <div className="min-w-0">
+    <dt className="eyebrow">{label}</dt>
+    <dd className={cn('mt-1 truncate text-sm font-medium text-gray-900 dark:text-white', valueClassName)}>{children}</dd>
+  </div>
+);
+
 export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceId, onClose }) => {
   const { t } = useTranslation('invoices');
   const queryClient = useQueryClient();
@@ -152,7 +184,6 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
   const { data: billingValidation } = useInvoiceBillingStatus(enabled ? invoiceId ?? undefined : undefined);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [enableZugferd, setEnableZugferd] = useState(false);
   const [sendEmailType, setSendEmailType] = useState<'invoice' | 'reminder' | null>(null);
   const [showStatusDialog, setShowStatusDialog] = useState(false);
@@ -162,36 +193,6 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
   const { data: allInvoices = [] } = useInvoices();
 
   const currency = data?.currency ?? 'USD';
-
-  const handleCancelInvoice = () => {
-    if (!invoiceId) return;
-
-    cancelMutation.mutate(invoiceId, {
-      onSuccess: () => {
-        setShowCancelConfirm(false);
-        void refetch();
-      },
-      onError: (err: unknown) => {
-        console.error('Cancel invoice error:', err);
-        const errorMessage = err instanceof Error ? err.message : 'Failed to cancel invoice';
-        alert(errorMessage + '. Please try again.');
-      },
-    });
-  };
-
-  const handleDownloadPDF = async () => {
-    if (!invoiceId) return;
-
-    try {
-      setIsDownloadingPDF(true);
-      await downloadInvoicePDF(invoiceId, enableZugferd);
-    } catch (err) {
-      console.error('Download PDF error:', err);
-      alert('Failed to download PDF. Please try again.');
-    } finally {
-      setIsDownloadingPDF(false);
-    }
-  };
 
   const totals = useMemo(() => {
     if (!data) {
@@ -225,6 +226,66 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
     };
   }, [data]);
 
+  const handleCancelInvoice = async () => {
+    if (!invoiceId || !data) return;
+
+    const confirmed = await confirmDialog({
+      title: t('cancelModal.title'),
+      tone: 'danger',
+      confirmLabel: t('cancelModal.yes'),
+      cancelLabel: t('cancelModal.no'),
+      message: (
+        <div className="space-y-3">
+          <p>{t('cancelModal.confirmMessage', { invoiceNumber: data.invoice_number })}</p>
+          {totals && totals.totalPaid > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200">
+              <p className="font-medium text-amber-900 dark:text-amber-100">{t('cancelModal.warning.title')}</p>
+              <dl className="mt-2 space-y-0.5 tabular-nums">
+                <div className="flex justify-between gap-4">
+                  <dt>{t('cancelModal.warning.totalPaid')}</dt>
+                  <dd>{formatCurrency(totals.totalPaid, currency)}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt>{t('cancelModal.warning.totalAmount')}</dt>
+                  <dd>{formatCurrency(data.total_amount, currency)}</dd>
+                </div>
+              </dl>
+              <p className="mt-2">{t('cancelModal.warning.paymentsNotice')}</p>
+            </div>
+          )}
+          <p className="text-gray-500 dark:text-gray-400">{t('cancelModal.notice')}</p>
+        </div>
+      ),
+    });
+    if (!confirmed) return;
+
+    cancelMutation.mutate(invoiceId, {
+      onSuccess: () => {
+        toast.success(t('messages.cancelSuccess'));
+        void refetch();
+      },
+      onError: (err: unknown) => {
+        console.error('Cancel invoice error:', err);
+        const errorMessage = err instanceof Error ? err.message : t('messages.cancelFailed');
+        toast.error(t('messages.cancelFailed'), { description: errorMessage });
+      },
+    });
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!invoiceId) return;
+
+    try {
+      setIsDownloadingPDF(true);
+      await downloadInvoicePDF(invoiceId, enableZugferd);
+    } catch (err) {
+      console.error('Download PDF error:', err);
+      toast.error(t('detail.downloadFailed'));
+    } finally {
+      setIsDownloadingPDF(false);
+    }
+  };
+
   const handlePaymentRecorded = () => {
     // Refetch invoice to get updated status and payments
     refetch();
@@ -236,7 +297,7 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
       accessorKey: 'description',
       header: t('detail.table.description'),
       render: (item) => (
-        <span className="text-gray-800 dark:text-gray-200">{item.description}</span>
+        <span className="text-gray-900 dark:text-gray-100">{item.description}</span>
       ),
       sortable: true,
     },
@@ -246,7 +307,7 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
       header: t('detail.table.qty'),
       align: 'right',
       render: (item) => (
-        <span className="text-gray-700 dark:text-gray-300">{item.quantity}</span>
+        <span className="tabular-nums text-gray-700 dark:text-gray-300">{item.quantity}</span>
       ),
       sortable: true,
     },
@@ -256,7 +317,7 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
       header: t('detail.table.unitPrice'),
       align: 'right',
       render: (item) => (
-        <span className="text-gray-700 dark:text-gray-300">
+        <span className="whitespace-nowrap tabular-nums text-gray-700 dark:text-gray-300">
           {formatCurrency(item.unit_price, currency)}
         </span>
       ),
@@ -268,7 +329,7 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
       header: t('detail.table.total'),
       align: 'right',
       render: (item) => (
-        <span className="font-medium text-gray-900 dark:text-gray-100">
+        <span className="whitespace-nowrap font-medium tabular-nums text-gray-900 dark:text-white">
           {formatCurrency(item.total_price, currency)}
         </span>
       ),
@@ -282,7 +343,7 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
       accessorKey: 'payment_date',
       header: t('detail.payments.date'),
       render: (payment) => (
-        <span className="text-gray-800 dark:text-gray-200">
+        <span className="whitespace-nowrap tabular-nums text-gray-900 dark:text-gray-100">
           {formatDate(payment.payment_date)}
         </span>
       ),
@@ -297,19 +358,20 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
         const isRefund = payment.payment_type === 'refund';
         const isExpense = payment.payment_type === 'expense';
         return (
-          <span
-            className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-              isPayment
-                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                : isRefund
-                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                : isExpense
-                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                : 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
-            }`}
+          <Badge
+            variant={isPayment ? 'green' : isRefund ? 'red' : isExpense ? 'amber' : 'gray'}
+            icon={
+              isPayment ? (
+                <ArrowDownLeft className="h-3 w-3" aria-hidden="true" />
+              ) : isRefund ? (
+                <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+              ) : isExpense ? (
+                <Wallet className="h-3 w-3" aria-hidden="true" />
+              ) : undefined
+            }
           >
             {isPayment ? t('detail.payments.typePayment') : isRefund ? t('detail.payments.typeRefund') : isExpense ? t('detail.payments.typeExpense') : payment.payment_type}
-          </span>
+          </Badge>
         );
       },
       sortable: true,
@@ -328,7 +390,7 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
       accessorKey: 'transaction_id',
       header: t('detail.payments.transactionId'),
       render: (payment) => (
-        <span className="text-gray-700 dark:text-gray-300">{payment.transaction_id ?? '—'}</span>
+        <span className="font-mono text-xs text-gray-600 dark:text-gray-400">{payment.transaction_id ?? '—'}</span>
       ),
       sortable: true,
     },
@@ -342,15 +404,16 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
         const isRefund = payment.payment_type === 'refund';
         const isExpense = payment.payment_type === 'expense';
         return (
-          <span className={`font-medium ${
+          <span className={cn(
+            'whitespace-nowrap font-medium tabular-nums',
             isPayment
-              ? 'text-green-700 dark:text-green-400'
+              ? 'text-emerald-600 dark:text-emerald-400'
               : isRefund
-              ? 'text-red-700 dark:text-red-400'
+              ? 'text-red-600 dark:text-red-400'
               : isExpense
-              ? 'text-yellow-700 dark:text-yellow-400'
+              ? 'text-amber-600 dark:text-amber-400'
               : 'text-gray-900 dark:text-gray-100'
-          }`}>
+          )}>
             {isPayment ? '+' : '-'}{formatCurrency(payment.amount, currency)}
           </span>
         );
@@ -364,102 +427,129 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
   const canRecordPayment = data && data.status !== 'cancelled';
   const canCancelInvoice = data && data.status !== 'cancelled';
 
+  // Less frequent actions live in the "more" menu
+  const moreActions: DropdownItem[] = [];
+  if (data && (data.status === 'sent' || data.status === 'overdue')) {
+    moreActions.push({ label: t('detail.sendReminder'), icon: BellRing, onClick: () => setSendEmailType('reminder') });
+  }
+  if (canCancelInvoice) {
+    if (moreActions.length > 0) {
+      moreActions.push({ label: '', divider: true, onClick: () => undefined });
+    }
+    moreActions.push({
+      label: t('detail.cancelInvoice'),
+      icon: Ban,
+      danger: true,
+      disabled: cancelMutation.isPending,
+      onClick: () => void handleCancelInvoice(),
+    });
+  }
+
+  const isOverbilled = billingValidation?.status === 'overbilled';
+
   return (
     <>
     <Modal
       open={open}
       onClose={onClose}
-      title={t('detail.title')}
+      title={data?.invoice_number || t('detail.title')}
+      description={
+        data ? (
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+            <InvoiceStatusBadge status={data.status} size="sm" />
+            {data.client_name ? <span>{data.client_name}</span> : null}
+          </span>
+        ) : undefined
+      }
+      icon={<FileText className="h-4 w-4" />}
       size="xl"
       footer={
-        <div className="flex flex-col gap-3 w-full">
-          {/* ZUGFeRD Option */}
-          <div className="flex items-center gap-2 px-1">
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {/* ZUGFeRD option for the PDF */}
+          <label
+            htmlFor="zugferd-download"
+            className="flex cursor-pointer items-center gap-2 text-sm text-gray-600 dark:text-gray-300"
+          >
             <input
               type="checkbox"
               id="zugferd-download"
               checked={enableZugferd}
               onChange={(e) => setEnableZugferd(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800"
+              className="h-4 w-4 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900"
             />
-            <label 
-              htmlFor="zugferd-download" 
-              className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+            {t('detail.enableZugferd')}
+          </label>
+
+          {/* Actions — primary last */}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {moreActions.length > 0 && (
+              <Dropdown
+                align="right"
+                items={moreActions}
+                className={dropUpClass}
+                trigger={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="px-2.5"
+                    aria-label={t('detail.moreActions')}
+                    title={t('detail.moreActions')}
+                  >
+                    <Ellipsis className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                }
+              />
+            )}
+            <Button
+              type="button"
+              variant="secondary"
+              leftIcon={<FileDown className="h-4 w-4" />}
+              onClick={handleDownloadPDF}
+              disabled={!data}
+              isLoading={isDownloadingPDF}
             >
-              {t('detail.enableZugferd')}
-            </label>
-          </div>
-          
-          {/* Action Buttons */}
-          <div className="flex justify-between items-center w-full">
-            <div className="flex flex-wrap gap-2">
-              {canRecordPayment && (
-                <Button
-                  type="button"
-                  variant="primary"
-                  onClick={() => setIsPaymentModalOpen(true)}
-                >
-                  {t('detail.recordPayment')}
-                </Button>
-              )}
+              {isDownloadingPDF ? t('detail.downloading') : t('detail.downloadPDF')}
+            </Button>
+            {data && (
               <Button
                 type="button"
-                variant="outline"
-                onClick={handleDownloadPDF}
-                disabled={isDownloadingPDF || !data}
+                variant="secondary"
+                leftIcon={<Send className="h-4 w-4" />}
+                onClick={() => setSendEmailType('invoice')}
               >
-                {isDownloadingPDF ? t('detail.downloading') : t('detail.downloadPDF')}
+                {t('detail.sendInvoice')}
               </Button>
-              {data && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setSendEmailType('invoice')}
-                >
-                  Send Invoice
-                </Button>
-              )}
-              {data && (data.status === 'sent' || data.status === 'overdue') && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setSendEmailType('reminder')}
-                >
-                  Send Reminder
-                </Button>
-              )}
-            </div>
-            <div className="flex gap-2">
-              {canCancelInvoice && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowCancelConfirm(true)}
-                  className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                >
-                  {t('detail.cancelInvoice')}
-                </Button>
-              )}
+            )}
+            {canRecordPayment && (
               <Button
                 type="button"
-                variant="outline"
-                onClick={onClose}
+                variant="primary"
+                leftIcon={<HandCoins className="h-4 w-4" />}
+                onClick={() => setIsPaymentModalOpen(true)}
               >
-                {t('close')}
+                {t('detail.recordPayment')}
               </Button>
-            </div>
+            )}
           </div>
         </div>
       }
     >
       {isLoading ? (
-        <div className="space-y-4">
-          <div className="h-5 w-2/5 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
-          <div className="space-y-2">
-            <div className="h-4 w-full animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
-            <div className="h-4 w-5/6 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+        <div className="space-y-6" aria-busy="true">
+          <div className="grid grid-cols-2 gap-4 rounded-xl border border-gray-200/70 p-4 dark:border-gray-800/70 sm:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="space-y-2">
+                <SkeletonItem className="h-3 w-16" />
+                <SkeletonItem className="h-4 w-28" />
+              </div>
+            ))}
           </div>
-          <div className="h-64 animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800/60" />
+          <SkeletonItem className="h-48 w-full rounded-xl" />
+          <div className="ml-auto w-full max-w-sm space-y-2">
+            <SkeletonItem className="h-4 w-full" />
+            <SkeletonItem className="h-4 w-full" />
+            <SkeletonItem className="h-5 w-full" />
+          </div>
         </div>
       ) : isError ? (
         <Alert
@@ -474,141 +564,115 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
           {/* Billing Validation Warnings */}
           {billingValidation && billingValidation.status !== 'valid' && billingValidation.warnings.length > 0 && (
             <div
-              className={`rounded-lg p-4 ${
-                billingValidation.status === 'overbilled'
-                  ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-                  : 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800'
-              }`}
+              className={cn(
+                'flex animate-fade-in gap-3 rounded-xl border p-4 text-sm',
+                isOverbilled
+                  ? 'border-red-200 bg-red-50 text-red-800 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200'
+                  : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-200'
+              )}
+              role="alert"
             >
-              <div className="space-y-2">
-                <div
-                  className={`font-semibold text-lg ${
-                    billingValidation.status === 'overbilled'
-                      ? 'text-red-800 dark:text-red-200'
-                      : 'text-yellow-800 dark:text-yellow-200'
-                  }`}
+              <AlertTriangle
+                className={cn('mt-0.5 h-5 w-5 shrink-0', isOverbilled ? 'text-red-500 dark:text-red-400' : 'text-amber-500 dark:text-amber-400')}
+                aria-hidden="true"
+              />
+              <div className="min-w-0 flex-1">
+                <p className={cn('font-semibold', isOverbilled ? 'text-red-900 dark:text-red-100' : 'text-amber-900 dark:text-amber-100')}>
+                  {isOverbilled ? t('detail.billing.overbilled') : t('detail.billing.underbilled')}
+                </p>
+                <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-2 tabular-nums">
+                  <div>
+                    <dt className="text-xs opacity-80">{t('detail.billing.invoiceTotal')}</dt>
+                    <dd className="font-medium">{formatCurrency(billingValidation.invoice_total, billingValidation.currency)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs opacity-80">{t('detail.billing.totalPaid')}</dt>
+                    <dd className="font-medium">{formatCurrency(billingValidation.total_paid, billingValidation.currency)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs opacity-80">{t('detail.billing.balance')}</dt>
+                    <dd className="font-semibold">{formatCurrency(billingValidation.balance, billingValidation.currency)}</dd>
+                  </div>
+                </dl>
+                <ul
+                  className={cn(
+                    'mt-3 list-disc space-y-1 border-t pl-4 pt-3',
+                    isOverbilled ? 'border-red-200 dark:border-red-500/20' : 'border-amber-200 dark:border-amber-500/20'
+                  )}
                 >
-                  {billingValidation.status === 'overbilled' ? t('detail.billing.overbilled') : t('detail.billing.underbilled')}
-                </div>
-                <div
-                  className={`text-sm ${
-                    billingValidation.status === 'overbilled'
-                      ? 'text-red-700 dark:text-red-300'
-                      : 'text-yellow-700 dark:text-yellow-300'
-                  }`}
-                >
-                  <div className="mb-1">
-                    <strong>{t('detail.billing.invoiceTotal')}:</strong> {formatCurrency(billingValidation.invoice_total, billingValidation.currency)}
-                  </div>
-                  <div className="mb-1">
-                    <strong>{t('detail.billing.totalPaid')}:</strong> {formatCurrency(billingValidation.total_paid, billingValidation.currency)}
-                  </div>
-                  <div className="mb-2 font-bold">
-                    <strong>{t('detail.billing.balance')}:</strong> {formatCurrency(billingValidation.balance, billingValidation.currency)}
-                  </div>
-                  <div className="border-t border-current/30 pt-2">
-                    {billingValidation.warnings.map((warning, idx) => (
-                      <div key={idx} className="mb-1">• {warning}</div>
-                    ))}
-                  </div>
-                </div>
+                  {billingValidation.warnings.map((warning, idx) => (
+                    <li key={idx}>{warning}</li>
+                  ))}
+                </ul>
               </div>
             </div>
           )}
-          
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                {t('detail.sections.invoice')}
-              </h3>
-              <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">{data.invoice_number}</p>
-              <p className="text-sm text-gray-600 dark:text-gray-300">{t('detail.sections.status')}: {data.status}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                {t('detail.sections.dates')}
-              </h3>
-              <dl className="mt-2 space-y-1 text-sm text-gray-700 dark:text-gray-300">
-                <div className="flex items-center justify-between">
-                  <dt>{t('detail.sections.issued')}</dt>
-                  <dd>{formatDate(data.issue_date)}</dd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <dt>{t('detail.sections.due')}</dt>
-                  <dd>{formatDate(data.due_date)}</dd>
-                </div>
-              </dl>
-            </div>
-          </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                {t('detail.sections.client')}
-              </h3>
-              <p className="mt-1 text-gray-800 dark:text-gray-200">{data.client_name ?? '—'}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                {t('detail.sections.project')}
-              </h3>
-              <p className="mt-1 text-gray-800 dark:text-gray-200">{data.project_name ?? '—'}</p>
-            </div>
-          </div>
+          {/* Overview */}
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-xl border border-gray-200/70 bg-gray-50 p-4 dark:border-gray-800/70 dark:bg-white/[0.03] sm:grid-cols-4">
+            <MetaItem label={t('detail.sections.project')}>{data.project_name ?? '—'}</MetaItem>
+            <MetaItem label={t('detail.sections.issued')} valueClassName="tabular-nums">{formatDate(data.issue_date)}</MetaItem>
+            <MetaItem
+              label={t('detail.sections.due')}
+              valueClassName={cn('tabular-nums', data.status === 'overdue' && 'text-red-600 dark:text-red-400')}
+            >
+              {formatDate(data.due_date)}
+            </MetaItem>
+            <MetaItem label={t('detail.totals.total')} valueClassName="tabular-nums">
+              {formatCurrency(data.total_amount ?? 0, currency)}
+            </MetaItem>
+          </dl>
 
           {data.notes ? (
-            <div>
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                {t('detail.sections.notes')}
-              </h3>
+            <section>
+              <h3 className="eyebrow">{t('detail.sections.notes')}</h3>
               <p className="mt-2 whitespace-pre-line text-sm text-gray-700 dark:text-gray-300">{data.notes}</p>
-            </div>
+            </section>
           ) : null}
 
           {data.items && data.items.length > 0 ? (
-            <div>
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                {t('detail.sections.lineItems')}
-              </h3>
-              <div className="mt-3 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
-                <Table
-                  data={data.items}
-                  columns={itemColumns}
-                />
-              </div>
-            </div>
+            <section>
+              <h3 className="section-title mb-3">{t('detail.sections.lineItems')}</h3>
+              <Table
+                data={data.items}
+                columns={itemColumns}
+              />
+            </section>
           ) : null}
 
           {totals ? (
-            <div className="flex flex-col items-end gap-1">
-              <dl className="w-full max-w-xs space-y-1 text-sm text-gray-700 dark:text-gray-300">
-                <div className="flex items-center justify-between">
+            <div className="flex justify-end">
+              <dl className="w-full space-y-2 rounded-xl border border-gray-200/70 bg-gray-50 p-4 text-sm tabular-nums dark:border-gray-800/70 dark:bg-white/[0.03] sm:max-w-sm">
+                <div className="flex items-center justify-between gap-4 text-gray-600 dark:text-gray-400">
                   <dt>{t('detail.totals.subtotal')}</dt>
-                  <dd>{formatCurrency(totals.subTotal, currency)}</dd>
+                  <dd className="text-gray-900 dark:text-gray-100">{formatCurrency(totals.subTotal, currency)}</dd>
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4 text-gray-600 dark:text-gray-400">
                   <dt>{t('detail.totals.tax', { rate: (totals.taxRate * 100).toFixed(0) })}</dt>
-                  <dd>{formatCurrency(totals.taxAmount, currency)}</dd>
+                  <dd className="text-gray-900 dark:text-gray-100">{formatCurrency(totals.taxAmount, currency)}</dd>
                 </div>
-                <div className="flex items-center justify-between font-semibold text-gray-900 dark:text-white">
+                <div className="flex items-center justify-between gap-4 border-t border-gray-200 pt-2 text-base font-semibold text-gray-900 dark:border-gray-800 dark:text-white">
                   <dt>{t('detail.totals.total')}</dt>
                   <dd>{formatCurrency(totals.total, currency)}</dd>
                 </div>
                 {totals.totalPaid > 0 && (
                   <>
-                    <div className="flex items-center justify-between border-t border-gray-200 pt-1 dark:border-gray-700">
+                    <div className="flex items-center justify-between gap-4 text-gray-600 dark:text-gray-400">
                       <dt>{t('detail.totals.totalPaid')}</dt>
-                      <dd className="text-green-600 dark:text-green-400">
+                      <dd className="text-emerald-600 dark:text-emerald-400">
                         {formatCurrency(totals.totalPaid, currency)}
                       </dd>
                     </div>
-                    <div className="flex items-center justify-between font-bold text-lg">
-                      <dt className={totals.remainingBalance > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-green-600 dark:text-green-400'}>
-                        {totals.remainingBalance > 0 ? t('detail.totals.balanceDue') : t('detail.totals.paidInFull')}
-                      </dt>
-                      <dd className={totals.remainingBalance > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-green-600 dark:text-green-400'}>
-                        {formatCurrency(totals.remainingBalance, currency)}
-                      </dd>
+                    <div
+                      className={cn(
+                        '-mx-1 flex items-center justify-between gap-4 rounded-lg px-3 py-2 font-semibold',
+                        totals.remainingBalance > 0
+                          ? 'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300'
+                          : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                      )}
+                    >
+                      <dt>{totals.remainingBalance > 0 ? t('detail.totals.balanceDue') : t('detail.totals.paidInFull')}</dt>
+                      <dd>{formatCurrency(totals.remainingBalance, currency)}</dd>
                     </div>
                   </>
                 )}
@@ -617,17 +681,13 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
           ) : null}
 
           {data.payments && data.payments.length > 0 ? (
-            <div>
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                {t('detail.sections.payments')}
-              </h3>
-              <div className="mt-3 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
-                <Table
-                  data={data.payments}
-                  columns={paymentColumns}
-                />
-              </div>
-            </div>
+            <section>
+              <h3 className="section-title mb-3">{t('detail.sections.payments')}</h3>
+              <Table
+                data={data.payments}
+                columns={paymentColumns}
+              />
+            </section>
           ) : null}
         </div>
       ) : (
@@ -643,73 +703,6 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
         invoice={data}
         onPaymentRecorded={handlePaymentRecorded}
       />
-    )}
-
-    {/* Cancel Invoice Confirmation Modal */}
-    {showCancelConfirm && data && (
-      <Modal
-        open={showCancelConfirm}
-        onClose={() => setShowCancelConfirm(false)}
-        title={t('cancelModal.title')}
-        size="md"
-        footer={
-          <div className="flex justify-end gap-2 w-full">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setShowCancelConfirm(false)}
-              disabled={cancelMutation.isPending}
-            >
-              {t('cancelModal.no')}
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              onClick={handleCancelInvoice}
-              disabled={cancelMutation.isPending}
-              className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
-            >
-              {cancelMutation.isPending ? t('cancelModal.cancelling') : t('cancelModal.yes')}
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-4">
-          <p className="text-gray-700 dark:text-gray-300">
-            {t('cancelModal.confirmMessage', { invoiceNumber: data.invoice_number })}
-          </p>
-          
-          {totals && totals.totalPaid > 0 && (
-            <div className="rounded-md bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                    {t('cancelModal.warning.title')}
-                  </h3>
-                  <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
-                    <ul className="list-disc list-inside space-y-1">
-                      <li>{t('cancelModal.warning.totalPaid')}: {formatCurrency(totals.totalPaid, currency)}</li>
-                      <li>{t('cancelModal.warning.totalAmount')}: {formatCurrency(data.total_amount, currency)}</li>
-                    </ul>
-                    <p className="mt-2">
-                      {t('cancelModal.warning.paymentsNotice')}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            {t('cancelModal.notice')}
-          </p>
-        </div>
-      </Modal>
     )}
 
     {/* Send Email Modal */}
@@ -729,26 +722,26 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
       return (
         <SendEmailModal
           open
-          title={sendEmailType === 'invoice' ? 'Send Invoice' : 'Send Reminder'}
+          title={sendEmailType === 'invoice' ? t('detail.sendInvoice') : t('detail.sendReminder')}
           defaultTo={data.client_email ?? ''}
           defaultTemplateCategory={sendEmailType}
           attachmentOptions={[
             {
               type: 'invoice',
-              label: `Invoice PDF (${data.invoice_number ?? invoiceId})`,
+              label: t('detail.attachments.invoicePdf', { number: data.invoice_number ?? invoiceId }),
               invoiceId,
               defaultChecked: true,
             },
             // Other invoices for the same client — all unchecked by default
             ...otherClientInvoices.map((inv) => ({
               type: 'invoice' as const,
-              label: `Invoice PDF (${inv.invoice_number})`,
+              label: t('detail.attachments.invoicePdf', { number: inv.invoice_number }),
               invoiceId: inv.id,
               defaultChecked: false,
             })),
             {
               type: 'report' as const,
-              label: 'Time Tracking Report',
+              label: t('detail.attachments.timeReport'),
               reportType: 'time-tracking',
               dateFrom: monthStart,
               dateTo: monthEnd,
@@ -758,7 +751,7 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
             },
             {
               type: 'report' as const,
-              label: 'Expense Report',
+              label: t('detail.attachments.expenseReport'),
               reportType: 'expense',
               dateFrom: monthStart,
               dateTo: monthEnd,
@@ -785,7 +778,8 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
     {showStatusDialog && invoiceId && (
       <Modal
         open
-        title="Update Invoice Status?"
+        title={t('detail.statusDialog.title')}
+        icon={<Send className="h-4 w-4" />}
         onClose={() => {
           setShowStatusDialog(false);
           void queryClient.invalidateQueries({ queryKey: ['invoices'] });
@@ -793,21 +787,21 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
         }}
         size="sm"
         footer={
-          <div className="flex justify-end gap-2 w-full">
+          <>
             <Button
-              variant="outline"
-              size="sm"
+              type="button"
+              variant="secondary"
               onClick={() => {
                 setShowStatusDialog(false);
                 void queryClient.invalidateQueries({ queryKey: ['invoices'] });
                 void refetch();
               }}
             >
-              Keep as Draft
+              {t('detail.statusDialog.keepDraft')}
             </Button>
             <Button
+              type="button"
               variant="primary"
-              size="sm"
               isLoading={updateInvoice.isPending}
               onClick={async () => {
                 await updateInvoice.mutateAsync({ id: invoiceId, payload: { status: 'sent' } });
@@ -816,13 +810,17 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
                 void refetch();
               }}
             >
-              Mark as Sent
+              {t('detail.statusDialog.markSent')}
             </Button>
-          </div>
+          </>
         }
       >
         <p className="text-sm text-gray-600 dark:text-gray-300">
-          The email was sent successfully. Do you want to update the invoice status to <strong>Sent</strong>, or keep it as <strong>Draft</strong>?
+          <Trans
+            t={t}
+            i18nKey="detail.statusDialog.message"
+            components={{ strong: <strong className="font-semibold text-gray-900 dark:text-white" /> }}
+          />
         </p>
       </Modal>
     )}

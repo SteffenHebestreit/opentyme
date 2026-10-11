@@ -18,6 +18,7 @@
     "invoices": "Rechnungen",
     "payments": "Zahlungen",
     "expenses": "Ausgaben",
-    "taxPrepayments": "Steuervorauszahlungen"
+    "taxPrepayments": "Steuervorauszahlungen",
+    "recurring": "Wiederkehrend"
   }
 }

@@ -6,11 +6,17 @@ import { fetchPayments } from '@/api/services/payment.service';
 import { Payment } from '@/api/types';
 import { useApp } from '@/store/AppContext';
 import { CustomSelect } from '@/components/forms';
+import { fieldClasses } from '@/components/forms/fieldStyles';
 import { formatCurrency } from '@/utils/currency';
+import { formatDate as formatDisplayDate } from '@/utils/date';
+import { cn } from '@/lib/cn';
 import { PaymentDetailModal } from '@/components/business/payments/PaymentDetailModal';
 import { RecordPaymentModal } from '@/components/business/invoices/RecordPaymentModal';
-import { Plus, ArrowDownLeft, ArrowUpRight, Landmark, Wallet, DollarSign, TrendingUp, TrendingDown } from 'lucide-react';
-import { Table, Column, LoadingSpinner, PageHeader, StatCard, EmptyState, Alert } from '@/components/common';
+import { RowActionButton } from '@/components/business/invoices/RowActionButton';
+import { SummaryStrip } from '@/components/business/invoices/SummaryStrip';
+import { Plus, ArrowDownLeft, ArrowUpRight, Landmark, Wallet, CreditCard, Eye, Search } from 'lucide-react';
+import { Table, Column, EmptyState, Alert, Badge, Button, SkeletonItem } from '@/components/common';
+import type { BadgeVariant } from '@/components/common';
 
 /**
  * Payments page component displaying payment and refund records only.
@@ -20,11 +26,20 @@ import { Table, Column, LoadingSpinner, PageHeader, StatCard, EmptyState, Alert 
  * - Show payment details: invoice, client, amount, date, method
  * - Filter by date range and payment method
  * - Sort by date, amount, or client
- * - Responsive design with dark mode support
+ * - Rendered as the Payments tab of the finances page (no page chrome of its own)
  * 
  * @component
  * @returns {JSX.Element} Payments page with table and filters
  */
+
+// Format date
+const formatDate = (dateString: string) => formatDisplayDate(dateString);
+
+// Money in (payments and tax refunds) vs. money out (refunds)
+const isIncome = (payment: Payment) =>
+  payment.payment_type === 'payment' ||
+  (payment.payment_type as string) === 'vat_refund' ||
+  (payment.payment_type as string) === 'income_tax_refund';
 
 interface PaymentsPageProps {
   startDate?: string;
@@ -89,14 +104,6 @@ export default function PaymentsPage({ startDate: propStartDate, endDate: propEn
     return matchesSearch && matchesMethod && matchesType && matchesDateRange;
   });
 
-  // Format date
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
 
   // Get unique payment methods
   const paymentMethods = Array.from(
@@ -127,7 +134,7 @@ export default function PaymentsPage({ startDate: propStartDate, endDate: propEn
       accessorKey: 'payment_date',
       header: t('table.date'),
       render: (payment) => (
-        <span className="text-gray-900 dark:text-gray-100">
+        <span className="whitespace-nowrap tabular-nums text-gray-900 dark:text-gray-100">
           {formatDate(payment.payment_date)}
         </span>
       ),
@@ -137,66 +144,32 @@ export default function PaymentsPage({ startDate: propStartDate, endDate: propEn
       key: 'type',
       accessorKey: 'payment_type',
       header: t('table.type'),
-      render: (payment) => (
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-          payment.payment_type === 'payment'
-            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-            : payment.payment_type === 'refund'
-            ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-            : (payment.payment_type as string) === 'vat_refund'
-            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
-            : (payment.payment_type as string) === 'income_tax_refund'
-            ? 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400'
-            : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-        }`}>
-          {payment.payment_type === 'payment' ? (
-            <>
-              <ArrowDownLeft className="h-3 w-3" />
-              {t('type.payment', { defaultValue: 'Payment' })}
-            </>
-          ) : payment.payment_type === 'refund' ? (
-            <>
-              <ArrowUpRight className="h-3 w-3" />
-              {t('type.refund', { defaultValue: 'Refund' })}
-            </>
-          ) : (payment.payment_type as string) === 'vat_refund' ? (
-            <>
-              <Landmark className="h-3 w-3" />
-              {t('type.vat_refund', { defaultValue: 'VAT Refund' })}
-            </>
-          ) : (payment.payment_type as string) === 'income_tax_refund' ? (
-            <>
-              <Landmark className="h-3 w-3" />
-              {t('type.income_tax_refund', { defaultValue: 'Tax Refund' })}
-            </>
-          ) : (payment.payment_type as string) === 'vat_payment' ? (
-            <>
-              <Landmark className="h-3 w-3" />
-              {t('type.vat_payment', { defaultValue: 'VAT Payment' })}
-            </>
-          ) : (payment.payment_type as string) === 'income_tax_payment' ? (
-            <>
-              <Landmark className="h-3 w-3" />
-              {t('type.income_tax_payment', { defaultValue: 'Income Tax' })}
-            </>
-          ) : (payment.payment_type as string) === 'trade_tax_payment' ? (
-            <>
-              <Landmark className="h-3 w-3" />
-              {t('type.trade_tax_payment', { defaultValue: 'Trade Tax' })}
-            </>
-          ) : (payment.payment_type as string) === 'surcharge_tax_payment' ? (
-            <>
-              <Landmark className="h-3 w-3" />
-              {t('type.surcharge_tax_payment', { defaultValue: 'Surcharge Tax' })}
-            </>
-          ) : (
-            <>
-              <Wallet className="h-3 w-3" />
-              {t('type.expense', { defaultValue: 'Expense' })}
-            </>
-          )}
-        </span>
-      ),
+      render: (payment) => {
+        const type = payment.payment_type as string;
+        const variant: BadgeVariant =
+          type === 'payment' ? 'green'
+          : type === 'refund' ? 'red'
+          : type === 'vat_refund' ? 'emerald'
+          : type === 'income_tax_refund' ? 'teal'
+          : 'blue';
+        const icon =
+          type === 'payment' ? <ArrowDownLeft className="h-3 w-3" aria-hidden="true" />
+          : type === 'refund' ? <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+          : ['vat_refund', 'income_tax_refund', 'vat_payment', 'income_tax_payment', 'trade_tax_payment', 'surcharge_tax_payment'].includes(type)
+          ? <Landmark className="h-3 w-3" aria-hidden="true" />
+          : <Wallet className="h-3 w-3" aria-hidden="true" />;
+        const label =
+          type === 'payment' ? t('type.payment', { defaultValue: 'Payment' })
+          : type === 'refund' ? t('type.refund', { defaultValue: 'Refund' })
+          : type === 'vat_refund' ? t('type.vat_refund', { defaultValue: 'VAT Refund' })
+          : type === 'income_tax_refund' ? t('type.income_tax_refund', { defaultValue: 'Tax Refund' })
+          : type === 'vat_payment' ? t('type.vat_payment', { defaultValue: 'VAT Payment' })
+          : type === 'income_tax_payment' ? t('type.income_tax_payment', { defaultValue: 'Income Tax' })
+          : type === 'trade_tax_payment' ? t('type.trade_tax_payment', { defaultValue: 'Trade Tax' })
+          : type === 'surcharge_tax_payment' ? t('type.surcharge_tax_payment', { defaultValue: 'Surcharge Tax' })
+          : t('type.expense', { defaultValue: 'Expense' });
+        return <Badge variant={variant} icon={icon}>{label}</Badge>;
+      },
       sortable: true,
     },
     {
@@ -205,7 +178,7 @@ export default function PaymentsPage({ startDate: propStartDate, endDate: propEn
       header: t('table.client'),
       render: (payment) => (
         <span className="text-gray-900 dark:text-gray-100">
-          {payment.client_name || '-'}
+          {payment.client_name || '—'}
         </span>
       ),
       sortable: true,
@@ -214,12 +187,14 @@ export default function PaymentsPage({ startDate: propStartDate, endDate: propEn
       key: 'amount',
       accessorKey: 'amount',
       header: t('table.amount'),
+      align: 'right',
       render: (payment) => (
-        <span className={`font-semibold ${
-          payment.payment_type === 'payment' || (payment.payment_type as string) === 'vat_refund' || (payment.payment_type as string) === 'income_tax_refund'
-            ? 'text-green-600 dark:text-green-400'
+        <span className={cn(
+          'whitespace-nowrap font-semibold tabular-nums',
+          isIncome(payment)
+            ? 'text-emerald-600 dark:text-emerald-400'
             : 'text-red-600 dark:text-red-400'
-        }`}>
+        )}>
           {formatCurrency(payment.amount)}
         </span>
       ),
@@ -238,7 +213,7 @@ export default function PaymentsPage({ startDate: propStartDate, endDate: propEn
       header: t('table.method'),
       render: (payment) => (
         <span className="text-gray-600 dark:text-gray-400">
-          {payment.payment_method || 'N/A'}
+          {payment.payment_method || '—'}
         </span>
       ),
       sortable: true,
@@ -248,8 +223,8 @@ export default function PaymentsPage({ startDate: propStartDate, endDate: propEn
       accessorKey: 'transaction_id',
       header: t('table.transactionId'),
       render: (payment) => (
-        <span className="font-mono text-gray-600 dark:text-gray-400">
-          {payment.transaction_id || '-'}
+        <span className="font-mono text-xs text-gray-600 dark:text-gray-400">
+          {payment.transaction_id || '—'}
         </span>
       ),
       sortable: true,
@@ -259,33 +234,40 @@ export default function PaymentsPage({ startDate: propStartDate, endDate: propEn
       header: t('table.notes'),
       render: (payment) => (
         <div className="max-w-xs truncate text-gray-600 dark:text-gray-400">
-          {payment.notes || '-'}
+          {payment.notes || '—'}
         </div>
       ),
     },
     {
       key: 'actions',
-      header: t('table.actions'),
+      header: <span className="sr-only">{t('table.actions')}</span>,
       align: 'right',
       render: (payment) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setSelectedPayment(payment);
-          }}
-          className="text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium"
-        >
-          View
-        </button>
+        <RowActionButton label={t('view')} onClick={() => setSelectedPayment(payment)}>
+          <Eye className="h-4 w-4" aria-hidden="true" />
+        </RowActionButton>
       ),
     },
   ], [t]);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen pt-20 pb-8 px-4">
-        <div className="container mx-auto max-w-7xl">
-          <LoadingSpinner size="lg" fullScreen text={t('loading', { defaultValue: 'Loading payments...' })} />
+      <div className="space-y-5" aria-busy="true">
+        <span className="sr-only">{t('loading', { defaultValue: 'Loading payments...' })}</span>
+        <div className="space-y-2">
+          <SkeletonItem className="h-5 w-32" />
+          <SkeletonItem className="h-4 w-72" />
+        </div>
+        <SkeletonItem className="h-[5.5rem] w-full rounded-xl" />
+        <div className="surface divide-y divide-gray-100 overflow-hidden dark:divide-gray-800/70">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={index} className="flex items-center gap-6 px-5 py-4">
+              <SkeletonItem className="h-4 w-24" />
+              <SkeletonItem className="h-5 w-20 rounded-full" />
+              <SkeletonItem className="hidden h-4 w-32 sm:block" />
+              <SkeletonItem className="ml-auto h-4 w-20" />
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -293,151 +275,124 @@ export default function PaymentsPage({ startDate: propStartDate, endDate: propEn
 
   if (error) {
     return (
-      <div className="min-h-screen pt-20 pb-8 px-4">
-        <div className="container mx-auto max-w-7xl">
-          <Alert
-            type="error"
-            title="Error loading payments"
-            message={error instanceof Error ? error.message : 'An unknown error occurred'}
-          />
-        </div>
-      </div>
+      <Alert
+        type="error"
+        title={t('loadError', { defaultValue: 'Error loading payments' })}
+        message={error instanceof Error ? error.message : t('unknownError', { defaultValue: 'An unknown error occurred' })}
+      />
     );
   }
 
+  const incomeTotal = filteredPayments
+    .filter(p => p.payment_type === 'payment' || (p.payment_type as string) === 'vat_refund' || (p.payment_type as string) === 'income_tax_refund')
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+
+  const refundsTotal = filteredPayments
+    .reduce((sum, p) => {
+      if (p.payment_type === 'payment' || (p.payment_type as string) === 'vat_refund' || (p.payment_type as string) === 'income_tax_refund') {
+        return sum;
+      }
+      return sum + Number(p.amount);
+    }, 0);
+
+  const netTotal = filteredPayments.reduce((sum, p) => {
+    // Add payments and tax refunds, subtract refunds
+    if (p.payment_type === 'payment' || (p.payment_type as string) === 'vat_refund' || (p.payment_type as string) === 'income_tax_refund') {
+      return sum + Number(p.amount);
+    } else {
+      return sum - Number(p.amount);
+    }
+  }, 0);
+
+  const currencyFormat = (value: number) => formatCurrency(value);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
-      <PageHeader
-        title={t('title')}
-        subtitle={t('subtitle')}
-        actions={
-          <button
-            onClick={() => setIsAddPaymentModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            {t('addPayment', { defaultValue: 'Add Payment' })}
-          </button>
-        }
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="section-title">{t('title')}</h2>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('subtitle')}</p>
+        </div>
+        <Button
+          type="button"
+          onClick={() => setIsAddPaymentModalOpen(true)}
+          leftIcon={<Plus className="h-4 w-4" />}
+        >
+          {t('addPayment', { defaultValue: 'Add Payment' })}
+        </Button>
+      </div>
+
+      {/* Summary */}
+      <SummaryStrip
+        items={[
+          { key: 'transactions', label: t('summary.totalTransactions'), value: filteredPayments.length },
+          { key: 'income', label: t('summary.incomePayments'), value: incomeTotal, format: currencyFormat, tone: 'text-emerald-600 dark:text-emerald-400' },
+          { key: 'refunds', label: t('summary.refunds'), value: refundsTotal, format: currencyFormat, tone: 'text-red-600 dark:text-red-400' },
+          {
+            key: 'net',
+            label: t('summary.netAmount'),
+            value: netTotal,
+            format: currencyFormat,
+            tone: netTotal < 0 ? 'text-red-600 dark:text-red-400' : undefined,
+          },
+        ]}
       />
 
       {/* Filters */}
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div className="flex w-full flex-1 items-center gap-3">
-          <div className="relative w-full xl:max-w-sm">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <svg className="h-4 w-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            <input
-              type="search"
-              placeholder={t('searchPlaceholder')}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full bg-transparent border-0 border-b-2 border-gray-600 dark:border-gray-400 focus:outline-none focus:border-purple-500 dark:focus:border-purple-400 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200 ease-in-out accent-purple-500 py-2 pl-10 pr-3 text-sm"
-              autoComplete="off"
-            />
-          </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="relative w-full sm:max-w-sm sm:flex-1">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+            aria-hidden="true"
+          />
+          <input
+            type="search"
+            placeholder={t('searchPlaceholder')}
+            aria-label={t('searchPlaceholder')}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className={cn(fieldClasses(), 'pl-9')}
+            autoComplete="off"
+          />
         </div>
-        <div className="grid w-full gap-3 md:grid-cols-2 xl:w-auto xl:grid-cols-2">
-          <div>
-            <CustomSelect
-              label={t('filters.paymentType')}
-              value={paymentTypeFilter}
-              onChange={setPaymentTypeFilter}
-              options={paymentTypeOptions}
-              size="md"
-            />
-          </div>
-          <div>
-            <CustomSelect
-              label={t('filters.paymentMethod')}
-              value={paymentMethodFilter}
-              onChange={setPaymentMethodFilter}
-              options={paymentMethodOptions}
-              size="md"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            label={t('summary.totalTransactions')}
-            value={filteredPayments.length}
-            variant="blue"
-            icon={DollarSign}
+        <div className="grid w-full grid-cols-2 gap-3 sm:ml-auto sm:flex sm:w-auto">
+          <CustomSelect
+            value={paymentTypeFilter}
+            onChange={setPaymentTypeFilter}
+            options={paymentTypeOptions}
+            size="md"
+            className="sm:w-48"
           />
-
-          <StatCard
-            label={t('summary.incomePayments')}
-            value={formatCurrency(
-              filteredPayments
-                .filter(p => p.payment_type === 'payment' || (p.payment_type as string) === 'vat_refund' || (p.payment_type as string) === 'income_tax_refund')
-                .reduce((sum, p) => sum + Number(p.amount), 0)
-            )}
-            variant="green"
-            icon={TrendingUp}
-          />
-
-          <StatCard
-            label={t('summary.refunds')}
-            value={formatCurrency(
-              filteredPayments
-              .reduce((sum, p) => {
-                if (p.payment_type === 'payment' || (p.payment_type as string) === 'vat_refund' || (p.payment_type as string) === 'income_tax_refund') {
-                  return sum;
-                }
-                return sum + Number(p.amount);
-              }, 0)
-            )}
-            variant="red"
-            icon={TrendingDown}
-          />
-
-          <StatCard
-            label={t('summary.netAmount')}
-            value={formatCurrency(
-              filteredPayments.reduce((sum, p) => {
-                // Add payments and tax refunds, subtract refunds
-                if (p.payment_type === 'payment' || (p.payment_type as string) === 'vat_refund' || (p.payment_type as string) === 'income_tax_refund') {
-                  return sum + Number(p.amount);
-                } else {
-                  return sum - Number(p.amount);
-                }
-              }, 0)
-            )}
-            variant="indigo"
-            icon={Wallet}
+          <CustomSelect
+            value={paymentMethodFilter}
+            onChange={setPaymentMethodFilter}
+            options={paymentMethodOptions}
+            size="md"
+            className="sm:w-44"
           />
         </div>
       </div>
 
       {/* Payments Table */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <Table
-          data={filteredPayments}
-          columns={columns}
-          pageSize={10}
-          onRowClick={(payment) => setSelectedPayment(payment)}
-          emptyMessage={
-            <EmptyState
-              icon={DollarSign}
-              title={t('noPayments')}
-              description={
-                searchTerm || paymentMethodFilter !== 'all'
-                  ? t('tryAdjustingFilters')
-                  : t('noPaymentsMessage')
-              }
-            />
-          }
-          className="border-0 shadow-none"
-        />
-      </div>
+      <Table
+        data={filteredPayments}
+        columns={columns}
+        pageSize={10}
+        onRowClick={(payment) => setSelectedPayment(payment)}
+        emptyMessage={
+          <EmptyState
+            compact
+            icon={CreditCard}
+            title={t('noPayments')}
+            description={
+              searchTerm || paymentMethodFilter !== 'all'
+                ? t('tryAdjustingFilters')
+                : t('noPaymentsMessage')
+            }
+          />
+        }
+      />
 
       {/* Payment Detail Modal */}
       <PaymentDetailModal

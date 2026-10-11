@@ -1,16 +1,31 @@
 import { Modal } from '@/components/ui/Modal';
 import { Payment } from '@/api/types';
 import { formatCurrency } from '@/utils/currency';
+import { formatDate } from '@/utils/date';
 import { useTranslation } from 'react-i18next';
-import { useState, useEffect } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { useUpdatePayment } from '@/hooks/api/usePayments';
-import { ExternalLink } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, ExternalLink, Landmark, Wallet } from 'lucide-react';
+import { Badge, BadgeVariant } from '@/components/common/Badge';
+import { Button } from '@/components/common/Button';
+import { toast } from '@/lib/toast';
+import { cn } from '@/lib/cn';
 
 interface PaymentDetailModalProps {
   payment: Payment | null;
   isOpen: boolean;
   onClose: () => void;
   onNavigateToInvoice?: (invoiceId: string) => void;
+}
+
+/** Label + value in the payment details grid. */
+function DetailItem({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
+  return (
+    <div className={cn('min-w-0', className)}>
+      <dt className="eyebrow">{label}</dt>
+      <dd className="mt-1 text-sm text-gray-900 dark:text-white">{children}</dd>
+    </div>
+  );
 }
 
 export function PaymentDetailModal({ payment, isOpen, onClose, onNavigateToInvoice }: PaymentDetailModalProps) {
@@ -39,8 +54,10 @@ export function PaymentDetailModal({ payment, isOpen, onClose, onNavigateToInvoi
         },
       });
       setIsEditing(false);
+      toast.success(t('messages.updateSuccess'));
     } catch (error) {
       console.error('Failed to update payment:', error);
+      toast.error(t('messages.updateFailed'));
     }
   };
 
@@ -49,211 +66,186 @@ export function PaymentDetailModal({ payment, isOpen, onClose, onNavigateToInvoi
     setIsEditing(false);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
-
-  const getPaymentTypeLabel = (type: string) => {
+  const getPaymentTypeInfo = (type: string): { label: string; icon: ReactNode; variant: BadgeVariant; amountClass: string } => {
     switch (type) {
       case 'payment':
         return {
           label: t('type.paymentIncome'),
-          icon: '↓',
-          color: 'text-green-600 dark:text-green-400',
+          icon: <ArrowDownLeft className="h-3.5 w-3.5" aria-hidden="true" />,
+          variant: 'green',
+          amountClass: 'text-emerald-600 dark:text-emerald-400',
         };
       case 'refund':
         return {
           label: t('type.refundOutgoing'),
-          icon: '↑',
-          color: 'text-red-600 dark:text-red-400',
+          icon: <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />,
+          variant: 'red',
+          amountClass: 'text-red-600 dark:text-red-400',
         };
       case 'expense':
         return {
-          label: 'Expense',
-          icon: '💰',
-          color: 'text-blue-600 dark:text-blue-400',
+          label: t('type.expense', { defaultValue: 'Expense' }),
+          icon: <Wallet className="h-3.5 w-3.5" aria-hidden="true" />,
+          variant: 'blue',
+          amountClass: 'text-gray-900 dark:text-white',
+        };
+      case 'vat_refund':
+      case 'income_tax_refund':
+        return {
+          label: t(`type.${type}`, { defaultValue: type }),
+          icon: <Landmark className="h-3.5 w-3.5" aria-hidden="true" />,
+          variant: type === 'vat_refund' ? 'emerald' : 'teal',
+          amountClass: 'text-emerald-600 dark:text-emerald-400',
         };
       default:
         return {
           label: type,
-          icon: '',
-          color: 'text-gray-600 dark:text-gray-400',
+          icon: null,
+          variant: 'gray',
+          amountClass: 'text-gray-900 dark:text-white',
         };
     }
   };
 
-  const typeInfo = getPaymentTypeLabel(payment.payment_type);
+  const typeInfo = getPaymentTypeInfo(payment.payment_type);
+
+  const invoiceLinkClass =
+    'inline-flex items-center gap-1.5 rounded font-medium text-purple-600 transition-colors hover:text-purple-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-purple-400 dark:hover:text-purple-300';
 
   return (
-    <Modal open={isOpen} onClose={onClose} title={t('view')} size="md">
-      <div className="space-y-4">
-        {/* Payment Type */}
-        <div>
-          <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-            {t('fields.type')}
-          </label>
-          <p className={`mt-1 text-base font-semibold ${typeInfo.color}`}>
-            {typeInfo.icon} {typeInfo.label}
-          </p>
-        </div>
-
-        {/* Amount */}
-        <div>
-          <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-            {t('fields.amount')}
-          </label>
-          <p className={`mt-1 text-2xl font-bold ${typeInfo.color}`}>
-            {formatCurrency(payment.amount)}
-          </p>
-        </div>
-
-        {/* Payment Date */}
-        <div>
-          <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-            {t('fields.date')}
-          </label>
-          <p className="mt-1 text-base text-gray-900 dark:text-white">
-            {formatDate(payment.payment_date)}
-          </p>
-        </div>
-
-        {/* Payment Method */}
-        {payment.payment_method && (
-          <div>
-            <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              {t('fields.method')}
-            </label>
-            <p className="mt-1 text-base text-gray-900 dark:text-white capitalize">
-              {payment.payment_method.replace(/_/g, ' ')}
-            </p>
-          </div>
-        )}
-
-        {/* Transaction ID */}
-        {payment.transaction_id && (
-          <div>
-            <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              {t('fields.transactionId')}
-            </label>
-            <p className="mt-1 text-base font-mono text-gray-900 dark:text-white">
-              {payment.transaction_id}
-            </p>
-          </div>
-        )}
-
-        {/* Notes */}
-        {payment.notes && (
-          <div>
-            <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              Notes
-            </label>
-            <p className="mt-1 text-base text-gray-900 dark:text-white whitespace-pre-wrap">
-              {payment.notes}
-            </p>
-          </div>
-        )}
-
-        {/* Linked Invoices - supports both single invoice_id and multiple linked_invoices */}
-        {(payment.linked_invoices && payment.linked_invoices.length > 0) ? (
-          <div>
-            <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              {t('fields.linkedInvoices', { defaultValue: 'Linked Invoices' })}
-            </label>
-            <div className="mt-1 space-y-1">
-              {payment.linked_invoices.map((linkedInv) => (
-                onNavigateToInvoice ? (
-                  <button
-                    key={linkedInv.invoice_id}
-                    onClick={() => {
-                      onClose();
-                      onNavigateToInvoice(linkedInv.invoice_id);
-                    }}
-                    className="flex items-center gap-2 text-base text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline"
-                  >
-                    {linkedInv.invoice_number}
-                    <ExternalLink className="h-4 w-4" />
-                  </button>
-                ) : (
-                  <p key={linkedInv.invoice_id} className="text-base text-gray-900 dark:text-white">
-                    {linkedInv.invoice_number}
-                  </p>
-                )
-              ))}
-            </div>
-          </div>
-        ) : payment.invoice_id && (
-          <div>
-            <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              {t('fields.linkedInvoice')}
-            </label>
-            {onNavigateToInvoice ? (
-              <button
-                onClick={() => {
-                  onClose();
-                  onNavigateToInvoice(payment.invoice_id!);
-                }}
-                className="mt-1 flex items-center gap-2 text-base text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline"
-              >
-                {payment.invoice_number || payment.invoice_id}
-                <ExternalLink className="h-4 w-4" />
-              </button>
-            ) : (
-              <p className="mt-1 text-base text-gray-900 dark:text-white">
-                {payment.invoice_number || payment.invoice_id}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Divider */}
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-          {/* Exclude from Tax - Editable Field */}
-          <div className="rounded-lg border-2 border-amber-200 dark:border-amber-900/30 bg-amber-50 dark:bg-amber-900/10 p-4">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={excludeFromTax}
-                onChange={(e) => {
-                  setExcludeFromTax(e.target.checked);
-                  if (!isEditing) setIsEditing(true);
-                }}
-                className="mt-0.5 h-5 w-5 rounded border-amber-300 text-amber-600 focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 dark:border-amber-700 dark:bg-amber-900/20 dark:focus:ring-amber-600 dark:focus:ring-offset-gray-900"
-              />
-              <div className="flex-1">
-                <span className="text-sm font-medium text-amber-900 dark:text-amber-100">
-                  {tInvoices('recordPayment.excludeFromTax.label')}
-                </span>
-                <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                  {tInvoices('recordPayment.excludeFromTax.description')}
-                </p>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        {/* Action Buttons - Show when editing */}
-        {isEditing && (
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={handleSave}
-              disabled={updatePaymentMutation.isPending}
-              className="flex-1 rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-purple-500 dark:hover:bg-purple-600 dark:focus:ring-offset-gray-900"
-            >
-              {updatePaymentMutation.isPending ? t('messages.saving') : t('messages.saveChanges')}
-            </button>
-            <button
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      title={t('view')}
+      size="md"
+      footer={
+        isEditing ? (
+          <>
+            <Button
+              type="button"
+              variant="secondary"
               onClick={handleCancel}
               disabled={updatePaymentMutation.isPending}
-              className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 dark:focus:ring-offset-gray-900"
             >
               {t('messages.cancel')}
-            </button>
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSave}
+              isLoading={updatePaymentMutation.isPending}
+            >
+              {updatePaymentMutation.isPending ? t('messages.saving') : t('messages.saveChanges')}
+            </Button>
+          </>
+        ) : undefined
+      }
+    >
+      <div className="space-y-6">
+        {/* Amount, type and date */}
+        <div className="flex flex-col gap-3 rounded-xl border border-gray-200/70 bg-gray-50 p-4 dark:border-gray-800/70 dark:bg-white/[0.03] sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="eyebrow">{t('fields.amount')}</p>
+            <p className={cn('mt-1 text-2xl font-semibold tracking-tight tabular-nums', typeInfo.amountClass)}>
+              {formatCurrency(payment.amount)}
+            </p>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {formatDate(payment.payment_date, { year: 'numeric', month: 'long', day: 'numeric' })}
+            </p>
           </div>
-        )}
+          <Badge variant={typeInfo.variant} size="lg" icon={typeInfo.icon} className="self-start sm:self-center">
+            {typeInfo.label}
+          </Badge>
+        </div>
+
+        <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+          {/* Payment Method */}
+          {payment.payment_method && (
+            <DetailItem label={t('fields.method')}>
+              <span className="capitalize">{payment.payment_method.replace(/_/g, ' ')}</span>
+            </DetailItem>
+          )}
+
+          {/* Transaction ID */}
+          {payment.transaction_id && (
+            <DetailItem label={t('fields.transactionId')}>
+              <span className="break-all font-mono">{payment.transaction_id}</span>
+            </DetailItem>
+          )}
+
+          {/* Linked Invoices - supports both single invoice_id and multiple linked_invoices */}
+          {(payment.linked_invoices && payment.linked_invoices.length > 0) ? (
+            <DetailItem label={t('fields.linkedInvoices', { defaultValue: 'Linked Invoices' })}>
+              <div className="flex flex-wrap gap-x-4 gap-y-1">
+                {payment.linked_invoices.map((linkedInv) => (
+                  onNavigateToInvoice ? (
+                    <button
+                      key={linkedInv.invoice_id}
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onNavigateToInvoice(linkedInv.invoice_id);
+                      }}
+                      className={invoiceLinkClass}
+                    >
+                      {linkedInv.invoice_number}
+                      <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  ) : (
+                    <span key={linkedInv.invoice_id}>
+                      {linkedInv.invoice_number}
+                    </span>
+                  )
+                ))}
+              </div>
+            </DetailItem>
+          ) : payment.invoice_id && (
+            <DetailItem label={t('fields.linkedInvoice')}>
+              {onNavigateToInvoice ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onNavigateToInvoice(payment.invoice_id!);
+                  }}
+                  className={invoiceLinkClass}
+                >
+                  {payment.invoice_number || payment.invoice_id}
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              ) : (
+                <span>{payment.invoice_number || payment.invoice_id}</span>
+              )}
+            </DetailItem>
+          )}
+
+          {/* Notes */}
+          {payment.notes && (
+            <DetailItem label={t('fields.notes')} className="sm:col-span-2">
+              <span className="block whitespace-pre-wrap text-gray-700 dark:text-gray-300">{payment.notes}</span>
+            </DetailItem>
+          )}
+        </dl>
+
+        {/* Exclude from Tax - Editable Field */}
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-4 transition-colors hover:bg-gray-50 has-[:checked]:border-amber-300 has-[:checked]:bg-amber-50/70 dark:border-gray-800 dark:hover:bg-white/[0.02] dark:has-[:checked]:border-amber-500/30 dark:has-[:checked]:bg-amber-500/[0.06]">
+          <input
+            type="checkbox"
+            checked={excludeFromTax}
+            onChange={(e) => {
+              setExcludeFromTax(e.target.checked);
+              if (!isEditing) setIsEditing(true);
+            }}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900"
+          />
+          <span className="flex-1">
+            <span className="block text-sm font-medium text-gray-900 dark:text-white">
+              {tInvoices('recordPayment.excludeFromTax.label')}
+            </span>
+            <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+              {tInvoices('recordPayment.excludeFromTax.description')}
+            </span>
+          </span>
+        </label>
       </div>
     </Modal>
   );

@@ -25,6 +25,21 @@ import { fetchInvoices } from '@/api/services/invoice.service';
 import { fetchExpenseSummary } from '@/api/services/expense.service';
 import { Payment, Invoice } from '@/api/types';
 import { formatCurrency } from '@/utils/currency';
+import { PageHeader, StatCard, Tabs, TabPanel } from '@/components/common';
+import type { Tab } from '@/components/common';
+import { fieldClasses, fieldLabelClass } from '@/components/forms/fieldStyles';
+import { cn } from '@/lib/cn';
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  CreditCard,
+  FileText,
+  Landmark,
+  Receipt,
+  Repeat,
+  Scale,
+  Wallet,
+} from 'lucide-react';
 
 type FinanceTab = 'invoices' | 'recurring' | 'payments' | 'expenses' | 'tax-prepayments';
 
@@ -32,10 +47,9 @@ type FinanceTab = 'invoices' | 'recurring' | 'payments' | 'expenses' | 'tax-prep
  * Main finances page component with tabbed interface.
  * 
  * Features:
- * - Tab navigation between finance sections
- * - Date range filter with total calculations
- * - Clean, consistent layout
- * - Proper z-index management for modals
+ * - Tab navigation between finance sections (shared Tabs, sliding indicator)
+ * - Date range filter in the page header with key figures below it
+ * - Key figures count to their new value when the range or data changes
  * - Dark mode support
  * 
  * @component
@@ -49,24 +63,37 @@ export default function FinancesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<FinanceTab>('invoices');
   const [invoiceSearchTerm, setInvoiceSearchTerm] = useState<string>('');
+  // Set by `?wizard=start` (dashboard "Create invoice"): the invoices tab opens its create form once
+  const [createInvoiceRequested, setCreateInvoiceRequested] = useState(false);
   
-  // Handle URL params for tab switching and invoice search
+  // Handle URL params for tab switching, invoice search and the create-invoice entry point
   useEffect(() => {
     const tab = searchParams.get('tab') as FinanceTab | null;
     const search = searchParams.get('search');
+    const startWizard = searchParams.get('wizard') === 'start';
     
     if (tab && ['invoices', 'recurring', 'payments', 'expenses', 'tax-prepayments'].includes(tab)) {
       setActiveTab(tab);
     }
     
+    if (!search && !startWizard) {
+      return;
+    }
+
+    const newParams = new URLSearchParams(searchParams);
     if (search) {
       setInvoiceSearchTerm(search);
       // Clear the search param after capturing it
-      const newParams = new URLSearchParams(searchParams);
       newParams.delete('search');
       newParams.delete('tab');
-      setSearchParams(newParams, { replace: true });
     }
+    if (startWizard) {
+      setActiveTab('invoices');
+      setCreateInvoiceRequested(true);
+      // Remove it so a reload doesn't open the form again
+      newParams.delete('wizard');
+    }
+    setSearchParams(newParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
   // Handler for navigating from payments to invoices
@@ -185,169 +212,151 @@ export default function FinancesPage() {
     };
   }, [payments, invoices, expenseSummary, startDate, endDate]);
 
-  const tabs = [
-    { id: 'invoices' as FinanceTab, label: t('tabs.invoices'), icon: '📄' },
-    { id: 'recurring' as FinanceTab, label: t('tabs.recurring', { defaultValue: 'Recurring' }), icon: '🔁' },
-    { id: 'payments' as FinanceTab, label: t('tabs.payments'), icon: '💳' },
-    { id: 'expenses' as FinanceTab, label: t('tabs.expenses'), icon: '💰' },
-    { id: 'tax-prepayments' as FinanceTab, label: t('tabs.taxPrepayments'), icon: '📊' },
+  const tabs: Tab[] = [
+    { id: 'invoices', label: t('tabs.invoices'), icon: FileText },
+    { id: 'recurring', label: t('tabs.recurring', { defaultValue: 'Recurring' }), icon: Repeat },
+    { id: 'payments', label: t('tabs.payments'), icon: CreditCard },
+    { id: 'expenses', label: t('tabs.expenses'), icon: Receipt },
+    { id: 'tax-prepayments', label: t('tabs.taxPrepayments'), icon: Landmark },
   ];
 
+  const currencyFormat = (value: number) => formatCurrency(value);
+  const dateInputClass = cn(fieldClasses(), 'w-full sm:w-40');
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Page Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">
-          {t('title')}
-        </h1>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          {t('subtitle')}
-        </p>
-      </div>
-
-        {/* Date Range Filters - Inline without card */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {t('dateRange.startDate')}
-            </label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full bg-transparent border-0 border-b-2 border-gray-600 dark:border-gray-400 focus:outline-none focus:border-purple-500 dark:focus:border-purple-400 text-gray-900 dark:text-gray-100 transition-all duration-200 ease-in-out accent-purple-500 px-2 py-2"
-            />
+    <div className="space-y-6">
+      {/* Page Header with the date range */}
+      <PageHeader
+        title={t('title')}
+        subtitle={t('subtitle')}
+        icon={Wallet}
+        actions={
+          <div className="grid w-full grid-cols-2 gap-3 sm:flex sm:w-auto sm:items-end">
+            <div>
+              <label htmlFor="finances-start-date" className={fieldLabelClass()}>
+                {t('dateRange.startDate')}
+              </label>
+              <input
+                id="finances-start-date"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className={dateInputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="finances-end-date" className={fieldLabelClass()}>
+                {t('dateRange.endDate')}
+              </label>
+              <input
+                id="finances-end-date"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className={dateInputClass}
+              />
+            </div>
           </div>
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {t('dateRange.endDate')}
-            </label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full bg-transparent border-0 border-b-2 border-gray-600 dark:border-gray-400 focus:outline-none focus:border-purple-500 dark:focus:border-purple-400 text-gray-900 dark:text-gray-100 transition-all duration-200 ease-in-out accent-purple-500 px-2 py-2"
-            />
-          </div>
-        </div>
+        }
+      />
 
-        {/* Summary Cards */}
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="rounded-lg border border-green-200 dark:border-green-900/30 bg-green-50 dark:bg-green-900/20 p-4">
-              <div className="text-sm font-medium text-green-600 dark:text-green-400 mb-1">
-                {t('summary.totalIncome')}
-              </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatCurrency(totals.income)}
-              </div>
-              {totals.paidInvoicesNet > 0 && totals.paidInvoicesTax > 0 && (
-                <div className="mt-2 text-xs text-green-700 dark:text-green-300">
+      {/* Key figures for the selected range */}
+      <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label={t('summary.totalIncome')}
+          value={totals.income}
+          format={currencyFormat}
+          icon={ArrowDownLeft}
+          variant="green"
+          hint={
+            totals.paidInvoicesNet > 0 && totals.paidInvoicesTax > 0 ? (
+              <>
+                <span className="tabular-nums">
                   {formatCurrency(totals.paidInvoicesNet)} / {formatCurrency(totals.paidInvoicesTax)}
-                  <div className="text-green-600/70 dark:text-green-400/70">
-                    {t('summary.netTax')}
-                  </div>
-                </div>
-              )}
-            </div>
+                </span>{' '}
+                · {t('summary.netTax')}
+              </>
+            ) : undefined
+          }
+        />
 
-            <div className="rounded-lg border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-900/20 p-4">
-              <div className="text-sm font-medium text-red-600 dark:text-red-400 mb-1">
-                {t('summary.totalExpensesRefunds')}
-              </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatCurrency(totals.expenses + totals.refunds)}
-              </div>
-              {totals.expensesNet > 0 && totals.expensesTax > 0 && (
-                <div className="mt-2 text-xs text-red-700 dark:text-red-300">
+        <StatCard
+          label={t('summary.totalExpensesRefunds')}
+          value={totals.expenses + totals.refunds}
+          format={currencyFormat}
+          icon={ArrowUpRight}
+          variant="red"
+          hint={
+            totals.expensesNet > 0 && totals.expensesTax > 0 ? (
+              <>
+                <span className="tabular-nums">
                   {formatCurrency(totals.expensesNet)} / {formatCurrency(totals.expensesTax)}
-                  <div className="text-red-600/70 dark:text-red-400/70">
-                    {t('summary.netTax')}
-                  </div>
-                </div>
-              )}
-            </div>
+                </span>{' '}
+                · {t('summary.netTax')}
+              </>
+            ) : undefined
+          }
+        />
 
-            <div className="rounded-lg border border-blue-200 dark:border-blue-900/30 bg-blue-50 dark:bg-blue-900/20 p-4">
-              <div className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-1">
-                {t('summary.totalInvoiced')}
+        <StatCard
+          label={t('summary.totalInvoiced')}
+          value={totals.totalInvoiced}
+          format={currencyFormat}
+          icon={FileText}
+          variant="blue"
+          footer={
+            <dl className="space-y-1 text-xs tabular-nums">
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-gray-500 dark:text-gray-400">{t('summary.paid')}</dt>
+                <dd className="font-medium text-emerald-600 dark:text-emerald-400">{formatCurrency(totals.paidInvoices)}</dd>
               </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatCurrency(totals.totalInvoiced)}
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-gray-500 dark:text-gray-400">{t('summary.unpaid')}</dt>
+                <dd className="font-medium text-amber-600 dark:text-amber-400">{formatCurrency(totals.unpaidInvoices)}</dd>
               </div>
-              <div className="mt-2 text-xs text-blue-700 dark:text-blue-300 space-y-0.5">
-                <div className="flex justify-between">
-                  <span>{t('summary.paid')}:</span>
-                  <span className="font-medium">{formatCurrency(totals.paidInvoices)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>{t('summary.unpaid')}:</span>
-                  <span className="font-medium">{formatCurrency(totals.unpaidInvoices)}</span>
-                </div>
-              </div>
-            </div>
+            </dl>
+          }
+        />
 
-            <div className={`rounded-lg border p-4 ${
-              totals.netAmount >= 0
-                ? 'border-indigo-200 dark:border-indigo-900/30 bg-indigo-50 dark:bg-indigo-900/20'
-                : 'border-orange-200 dark:border-orange-900/30 bg-orange-50 dark:bg-orange-900/20'
-            }`}>
-              <div className={`text-sm font-medium mb-1 ${
-                totals.netAmount >= 0
-                  ? 'text-indigo-600 dark:text-indigo-400'
-                  : 'text-orange-600 dark:text-orange-400'
-              }`}>
-                {t('summary.netAmount')}
-              </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatCurrency(totals.netAmount)}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
-          <nav className="-mb-px flex space-x-8" aria-label="Finance tabs">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  flex items-center space-x-2 whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium transition-colors
-                  ${
-                    activeTab === tab.id
-                      ? 'border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
-                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300'
-                  }
-                `}
-                aria-current={activeTab === tab.id ? 'page' : undefined}
-              >
-                <span className="text-lg">{tab.icon}</span>
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        {/* Tab Content */}
-        <div className="relative">
-          {activeTab === 'invoices' && (
-            <InvoiceList startDate={startDate} endDate={endDate} initialSearchTerm={invoiceSearchTerm} />
-          )}
-          {activeTab === 'recurring' && (
-            <RecurringInvoicesPage />
-          )}
-          {activeTab === 'payments' && (
-            <PaymentsPage startDate={startDate} endDate={endDate} onNavigateToInvoice={handleNavigateToInvoice} />
-          )}
-          {activeTab === 'expenses' && (
-            <ExpensesPage startDate={startDate} endDate={endDate} />
-          )}
-          {activeTab === 'tax-prepayments' && (
-            <TaxPrepaymentsPage />
-          )}
-        </div>
+        <StatCard
+          label={t('summary.netAmount')}
+          value={totals.netAmount}
+          format={currencyFormat}
+          icon={Scale}
+          variant={totals.netAmount >= 0 ? 'indigo' : 'orange'}
+        />
       </div>
+
+      {/* Tabs */}
+      <div className="space-y-6">
+        <Tabs
+          tabs={tabs}
+          activeTab={activeTab}
+          onChange={(tabId) => setActiveTab(tabId as FinanceTab)}
+        />
+
+        <TabPanel tabId="invoices" activeTab={activeTab}>
+          <InvoiceList
+            startDate={startDate}
+            endDate={endDate}
+            initialSearchTerm={invoiceSearchTerm}
+            openCreateForm={createInvoiceRequested}
+            onCreateFormOpened={() => setCreateInvoiceRequested(false)}
+          />
+        </TabPanel>
+        <TabPanel tabId="recurring" activeTab={activeTab}>
+          <RecurringInvoicesPage />
+        </TabPanel>
+        <TabPanel tabId="payments" activeTab={activeTab}>
+          <PaymentsPage startDate={startDate} endDate={endDate} onNavigateToInvoice={handleNavigateToInvoice} />
+        </TabPanel>
+        <TabPanel tabId="expenses" activeTab={activeTab}>
+          <ExpensesPage startDate={startDate} endDate={endDate} />
+        </TabPanel>
+        <TabPanel tabId="tax-prepayments" activeTab={activeTab}>
+          <TaxPrepaymentsPage />
+        </TabPanel>
+      </div>
+    </div>
   );
 }

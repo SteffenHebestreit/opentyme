@@ -16,7 +16,8 @@
   "noInvoices": "Keine Rechnungen gefunden",
   "empty": {
     "title": "Noch keine Rechnungen",
-    "message": "Erstellen Sie Ihre erste Rechnung, um Kunden für erledigte Arbeit abzurechnen. Generieren Sie Rechnungen aus erfassten Zeiten oder erstellen Sie sie manuell."
+    "message": "Erstellen Sie Ihre erste Rechnung, um Kunden für erledigte Arbeit abzurechnen. Generieren Sie Rechnungen aus erfassten Zeiten oder erstellen Sie sie manuell.",
+    "filteredMessage": "Keine Rechnungen entsprechen den aktuellen Filtern oder dem Zeitraum."
   },
   "summary": {
     "total": "Rechnungen gesamt",
@@ -33,7 +34,8 @@
     "client": {
       "label": "Kunde",
       "all": "Alle Kunden"
-    }
+    },
+    "clear": "Filter zurücksetzen"
   },
   "table": {
     "invoice": "Rechnung",
@@ -65,8 +67,8 @@
     "error": "Fehler beim Laden der Rechnungsdetails.",
     "noInvoice": "Keine Rechnung ausgewählt.",
     "billing": {
-      "overbilled": "⚠️ Rechnung überfakturiert",
-      "underbilled": "⚠️ Rechnung unterfakturiert",
+      "overbilled": "Rechnung überfakturiert",
+      "underbilled": "Rechnung unterfakturiert",
       "invoiceTotal": "Rechnungssumme",
       "totalPaid": "Bereits gezahlt",
       "balance": "Saldo"
@@ -103,9 +105,24 @@
       "method": "Methode",
       "transactionId": "Transaktions-ID",
       "amount": "Betrag",
-      "typePayment": "↓ Zahlung",
-      "typeRefund": "↑ Rückerstattung",
-      "typeExpense": "→ Ausgabe"
+      "typePayment": "Zahlung",
+      "typeRefund": "Rückerstattung",
+      "typeExpense": "Ausgabe"
+    },
+    "moreActions": "Weitere Aktionen",
+    "sendInvoice": "Rechnung senden",
+    "sendReminder": "Zahlungserinnerung senden",
+    "downloadFailed": "Das PDF konnte nicht geöffnet werden. Bitte versuchen Sie es erneut.",
+    "attachments": {
+      "invoicePdf": "Rechnungs-PDF ({{number}})",
+      "timeReport": "Zeiterfassungsbericht",
+      "expenseReport": "Ausgabenbericht"
+    },
+    "statusDialog": {
+      "title": "Rechnungsstatus aktualisieren?",
+      "message": "Die E-Mail wurde erfolgreich versendet. Möchten Sie den Rechnungsstatus auf <strong>Gesendet</strong> setzen oder als <strong>Entwurf</strong> belassen?",
+      "keepDraft": "Als Entwurf belassen",
+      "markSent": "Als gesendet markieren"
     }
   },
   "cancelModal": {
@@ -159,6 +176,10 @@
     },
     "errors": {
       "endDateAfterStart": "Das Enddatum muss nach dem Startdatum liegen"
+    },
+    "description": "Erstellt eine Rechnung aus abrechenbaren Zeiteinträgen. Alle Filter sind optional.",
+    "sections": {
+      "source": "Zeiteinträge"
     }
   },
   "recordPayment": {
@@ -205,8 +226,19 @@
     "errors": {
       "invalidAmount": "Bitte geben Sie einen gültigen Betrag ein (positive Zahl)",
       "exceedsBalance": "Der Zahlungsbetrag darf den Restbetrag nicht überschreiten ({{balance}})",
-      "failed": "Zahlung konnte nicht erfasst werden"
-    }
+      "failed": "Zahlung konnte nicht erfasst werden",
+      "clientRequired": "Bitte wählen Sie einen Kunden aus"
+    },
+    "titleStandalone": "Zahlung erfassen",
+    "client": "Kunde",
+    "selectClient": "Kunde auswählen...",
+    "selectInvoices": "Rechnung(en) auswählen",
+    "selectedTotal_one": "{{count}} Rechnung ausgewählt",
+    "selectedTotal_other": "{{count}} Rechnungen ausgewählt",
+    "total": "Summe",
+    "noUnpaidInvoices": "Keine offenen Rechnungen für diesen Kunden",
+    "project": "Projekt (optional)",
+    "noProject": "Kein bestimmtes Projekt"
   },
   "form": {
     "title": {
@@ -303,6 +335,18 @@
     "excludeFromTax": {
       "label": "Von Steuerberichten ausschließen",
       "description": "Markieren Sie diese Rechnung als steuerfreies Einkommen, das von USt-Voranmeldungen und Steuerberichten ausgeschlossen werden soll (z.B. für nicht steuerpflichtige Leistungen oder bestimmte Geschäftsvorgänge)."
+    },
+    "sections": {
+      "details": "Details",
+      "options": "Optionen"
+    },
+    "errors": {
+      "clientRequired": "Bitte wählen Sie einen Kunden aus",
+      "issueDateRequired": "Rechnungsdatum ist erforderlich",
+      "dueDateRequired": "Fälligkeitsdatum ist erforderlich",
+      "issueDateInvalid": "Bitte geben Sie ein gültiges Rechnungsdatum ein",
+      "dueDateInvalid": "Bitte geben Sie ein gültiges Fälligkeitsdatum ein",
+      "dueBeforeIssue": "Das Fälligkeitsdatum muss nach dem Rechnungsdatum liegen"
     }
   },
   "fields": {
@@ -355,7 +399,8 @@
       "rateType": "Typ",
       "unitPrice": "Satz",
       "total": "Gesamt"
-    }
+    },
+    "removeItem": "Position {{number}} entfernen"
   },
   "messages": {
     "createSuccess": "Rechnung erfolgreich erstellt.",
@@ -364,6 +409,101 @@
     "deleteSuccess": "Rechnung erfolgreich gelöscht.",
     "generateSuccess": "Rechnung aus Zeiteinträgen generiert.",
     "sendSuccess": "Rechnung erfolgreich gesendet",
-    "deleteConfirm": "Rechnung {{number}} löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+    "deleteConfirm": "Rechnung {{number}} löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "cancelSuccess": "Rechnung storniert.",
+    "cancelFailed": "Die Rechnung konnte nicht storniert werden. Bitte versuchen Sie es erneut."
+  },
+  "placeholders": {
+    "title": "Verfügbare Platzhalter",
+    "loading": "Platzhalter werden geladen...",
+    "error": "Platzhalter konnten nicht geladen werden",
+    "description": "Verwenden Sie Platzhalter in Ihrem Text, um Werte automatisch einzufügen. Kopieren Sie sie in Ihre Textfelder.",
+    "example": "Beispiel",
+    "tip": "Tipp",
+    "tipText": "Platzhalter werden beim Erstellen oder Aktualisieren der Rechnung verarbeitet. In der fertigen Rechnung erscheinen die tatsächlichen Werte."
+  },
+  "recurring": {
+    "title": "Wiederkehrende Rechnungen",
+    "subtitle": "Erstellen Sie automatisch Rechnungsentwürfe für Pauschalen. Entwürfe erscheinen zur Prüfung unter Rechnungen.",
+    "newSchedule": "Neuer Zeitplan",
+    "empty": {
+      "title": "Noch keine wiederkehrenden Rechnungen",
+      "message": "Legen Sie einen Zeitplan an, um Pauschalen automatisch abzurechnen."
+    },
+    "table": {
+      "title": "Titel",
+      "client": "Kunde",
+      "frequency": "Intervall",
+      "nextInvoice": "Nächste Rechnung",
+      "amount": "Betrag",
+      "status": "Status",
+      "actions": "Aktionen"
+    },
+    "status": {
+      "active": "Aktiv",
+      "paused": "Pausiert"
+    },
+    "frequency": {
+      "monthly": "Monatlich",
+      "quarterly": "Vierteljährlich",
+      "yearly": "Jährlich"
+    },
+    "actions": {
+      "generateNow": "Fällige Rechnungen jetzt erstellen",
+      "edit": "Bearbeiten",
+      "delete": "Löschen"
+    },
+    "messages": {
+      "created": "Zeitplan erstellt.",
+      "updated": "Zeitplan aktualisiert.",
+      "deleted": "Zeitplan gelöscht.",
+      "saveFailed": "Zeitplan konnte nicht gespeichert werden.",
+      "deleteFailed": "Zeitplan konnte nicht gelöscht werden.",
+      "generateFailed": "Rechnungen konnten nicht erstellt werden.",
+      "generated_one": "{{count}} Rechnungsentwurf erstellt – siehe Reiter Rechnungen.",
+      "generated_other": "{{count}} Rechnungsentwürfe erstellt – siehe Reiter Rechnungen.",
+      "nothingDue": "Noch keine Rechnungen fällig.",
+      "deleteConfirmTitle": "Wiederkehrenden Zeitplan löschen?",
+      "deleteConfirm": "Den wiederkehrenden Zeitplan „{{title}}“ löschen? Bereits erstellte Rechnungen bleiben erhalten."
+    },
+    "form": {
+      "titleCreate": "Neue wiederkehrende Rechnung",
+      "titleEdit": "Wiederkehrende Rechnung bearbeiten",
+      "submitCreate": "Zeitplan erstellen",
+      "submitEdit": "Änderungen speichern",
+      "fields": {
+        "title": "Titel",
+        "titlePlaceholder": "z.B. Monatliche Pauschale – Acme",
+        "client": "Kunde",
+        "selectClient": "Kunde auswählen…",
+        "project": "Projekt (optional)",
+        "noProject": "Kein Projekt",
+        "frequency": "Intervall",
+        "startDate": "Startdatum",
+        "endDate": "Enddatum (optional)",
+        "currency": "Währung",
+        "taxRate": "Steuersatz (optional)",
+        "noTax": "Keine Steuer",
+        "paymentTerms": "Zahlungsziel (Tage)",
+        "headline": "Rechnungsüberschrift (optional)",
+        "headlinePlaceholder": "Wird als Rechnungstitel angezeigt",
+        "lineItems": "Positionen",
+        "addItem": "Position hinzufügen",
+        "description": "Beschreibung",
+        "quantity": "Menge",
+        "unitPrice": "Einzelpreis",
+        "removeItem": "Position entfernen",
+        "subtotal": "Zwischensumme pro Rechnung",
+        "notes": "Notizen (optional)",
+        "active": "Aktiv (Rechnungen automatisch erstellen)"
+      },
+      "errors": {
+        "titleRequired": "Ein Titel ist erforderlich.",
+        "clientRequired": "Bitte wählen Sie einen Kunden aus.",
+        "startRequired": "Ein Startdatum ist erforderlich.",
+        "endAfterStart": "Das Enddatum muss nach dem Startdatum liegen.",
+        "itemsRequired": "Fügen Sie mindestens eine Position mit Beschreibung hinzu."
+      }
+    }
   }
 }
