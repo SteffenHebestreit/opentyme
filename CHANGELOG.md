@@ -2,6 +2,58 @@
 
 ## Unreleased (since v1.5.0)
 
+### Security — every account only ever sees and changes its own data
+- **Fixed: several endpoints did not check who owns a record.** Invoices, projects, time
+  entries, payments, expenses and recurring invoices could be read, changed or deleted by id
+  from another account, and records could reference another account's clients, projects or
+  invoices — linking an own payment to a foreign invoice even set it to "paid". Every access
+  is now limited to the signed-in user (another account's record answers "not found"), and a
+  two-user test suite covers every entity.
+- System initialization endpoints are admin-only.
+- Payments are saved in a real database transaction (before, its steps could run on different
+  connections).
+- API keys and the SMTP password are no longer sent to the browser; they are write-only in the
+  settings ("stored" — replace / remove).
+- The document converter (MCP server) is no longer reachable from the network — it has no
+  login and can fetch arbitrary URLs — and the backend no longer has access to the Docker
+  socket. *Apply with `docker compose --profile mcp up -d mcp-server backend`.*
+
+### AI assistant — reliable with local models
+- **Answers stream live.** Responses were compressed and therefore held back until the run
+  ended; text, tool steps and keep-alive pings now arrive as they happen.
+- **Stop really stops** — the run ends on the server too. Approved changes already being
+  executed finish and are recorded; the rest are offered for approval again.
+- **Clear messages instead of raw errors**: model server not reachable, too slow, wrong API key,
+  model not available, conversation too long, session expired, previous request still running.
+- **"Test connection"** in the AI and speech-to-text settings — lists the server's models,
+  one click to use one. Only providers that actually work are offered.
+- Approval cards show what will really happen: "log time" names the resolved project, ambiguous
+  project names are asked back instead of guessed. Edits to a proposal survive closing the
+  editor; a newer proposal can no longer be declined by an outdated card.
+- Dates like "last week", "last Monday" or "KW 41" are resolved reliably (the assistant gets
+  the calendar of the current and previous week).
+- Long runs with slow local models are no longer cut off after two minutes; an expired session
+  token is renewed before the request.
+- The chat keeps a message that could not be sent (retry), keeps the input focused, scrolls
+  only while you are at the bottom, renders formatting (bold, lists, code) safely, and shows a
+  badge when changes wait for approval. The microphone is released when the panel closes.
+- Turning the assistant or voice input on or off applies without a reload.
+- Fixed: updating an invoice through the assistant always failed; binary downloads (PDFs, the
+  tax ZIP) are no longer offered to the model as tools.
+
+### Receipts and AfA
+- **Receipts larger than about 1 MB** (typical phone photos, scans) failed to upload to the
+  document converter — fixed.
+- **The AfA analysis never sent the API key**, and when the AI failed it silently returned a
+  rule-based result that was shown and stored as AI analysis. Results are now marked
+  "rule-based estimate" when the AI was not available and are not stored as AI analysis.
+- The rule-based fallback follows the 800 € (GWG) and 1000 € (pool) limits and the category's
+  useful life; 0 % deductibility and 0 % VAT are kept instead of turned into 100 % / 19 %.
+- German amounts ("1.234,56") and impossible dates on receipts are handled; with the AI
+  switched off the receipt text is copied to the notes.
+- Fixed: deleting a time entry that appears on an invoice failed (a database trigger wrote a
+  column that did not exist).
+
 ### Frontend — a modern, calmer interface that is always up to date
 - **Numbers update without reloading.** Saving anything — a time entry, a timer, a payment,
   an invoice, a rate change, an action approved in the AI assistant — refreshes everything
