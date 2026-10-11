@@ -1,4 +1,7 @@
+import { useId } from 'react';
+import { Calculator, Info } from 'lucide-react';
 import { CustomSelect } from '@/components/forms';
+import { fieldClasses, fieldLabelClass } from '@/components/forms/fieldStyles';
 import { useTranslation } from 'react-i18next';
 
 interface DepreciationSettingsProps {
@@ -15,6 +18,7 @@ export function DepreciationSettings({
   onChange,
 }: DepreciationSettingsProps) {
   const { t } = useTranslation('expenses');
+  const yearsId = useId();
 
   const depreciationTypeOptions = [
     { value: 'none', label: t('depreciation.types.none', 'Keine') },
@@ -29,58 +33,65 @@ export function DepreciationSettings({
     { value: 'degressive', label: t('depreciation.methods.degressive', 'Declining Balance') },
   ];
 
+  const info =
+    depreciationType === 'immediate'
+      ? t('depreciation.immediateInfo', 'This expense will be fully deducted in the current tax year.')
+      : depreciationType === 'partial' && depreciationYears
+      ? t('depreciation.partialInfo', `This expense will be depreciated over ${depreciationYears} years using ${depreciationMethod || 'linear'} method.`)
+      : null;
+
   return (
-    <div className="space-y-4 p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
-      <h3 className="text-sm font-medium text-amber-900 dark:text-amber-100">
-        {t('depreciation.title', 'Depreciation (AfA)')}
-      </h3>
-      
-      <div className="space-y-4">
-        <CustomSelect
-          label={t('depreciation.type', 'Depreciation Type')}
-          options={depreciationTypeOptions}
-          value={depreciationType || 'none'}
-          onChange={(value) => onChange('depreciation_type', value)}
-        />
-
-        {depreciationType === 'partial' && (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('depreciation.years', 'Depreciation Years')}
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="20"
-                value={depreciationYears || ''}
-                onChange={(e) => onChange('depreciation_years', parseInt(e.target.value) || null)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                placeholder={t('depreciation.yearsPlaceholder', 'Enter number of years')}
-              />
-            </div>
-
-            <CustomSelect
-              label={t('depreciation.method', 'Depreciation Method')}
-              options={depreciationMethodOptions}
-              value={depreciationMethod || 'linear'}
-              onChange={(value) => onChange('depreciation_method', value)}
-            />
-          </>
-        )}
-
-        {/* Asset category is now automatically determined from expense category - no manual selection needed */}
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Calculator className="h-4 w-4 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+          {t('depreciation.title', 'Depreciation (AfA)')}
+        </h3>
       </div>
 
-      {depreciationType === 'immediate' && (
-        <p className="text-xs text-amber-700 dark:text-amber-300">
-          {t('depreciation.immediateInfo', 'This expense will be fully deducted in the current tax year.')}
-        </p>
+      <CustomSelect
+        label={t('depreciation.type', 'Depreciation Type')}
+        options={depreciationTypeOptions}
+        value={depreciationType || 'none'}
+        onChange={(value) => onChange('depreciation_type', value)}
+      />
+
+      {depreciationType === 'partial' && (
+        <div className="grid animate-fade-in grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor={yearsId} className={fieldLabelClass()}>
+              {t('depreciation.years', 'Depreciation Years')}
+            </label>
+            <input
+              id={yearsId}
+              type="number"
+              min="1"
+              max="20"
+              value={depreciationYears || ''}
+              onChange={(e) => onChange('depreciation_years', parseInt(e.target.value) || null)}
+              className={`${fieldClasses()} tabular-nums`}
+              placeholder={t('depreciation.yearsPlaceholder', 'Enter number of years')}
+            />
+          </div>
+
+          <CustomSelect
+            label={t('depreciation.method', 'Depreciation Method')}
+            options={depreciationMethodOptions}
+            value={depreciationMethod || 'linear'}
+            onChange={(value) => onChange('depreciation_method', value)}
+          />
+        </div>
       )}
 
-      {depreciationType === 'partial' && depreciationYears && (
-        <p className="text-xs text-amber-700 dark:text-amber-300">
-          {t('depreciation.partialInfo', `This expense will be depreciated over ${depreciationYears} years using ${depreciationMethod || 'linear'} method.`)}
+      {/* Asset category is now automatically determined from expense category - no manual selection needed */}
+
+      {info && (
+        <p
+          key={depreciationType ?? 'none'}
+          className="flex animate-fade-in items-start gap-2 text-xs text-gray-500 dark:text-gray-400"
+        >
+          <Info className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span>{info}</span>
         </p>
       )}
     </div>

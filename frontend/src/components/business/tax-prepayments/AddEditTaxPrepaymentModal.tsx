@@ -1,16 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { 
-  useCreateTaxPrepayment, 
-  useUpdateTaxPrepayment, 
+import { CalendarRange, FileText, Landmark, Paperclip, Trash2, type LucideIcon } from 'lucide-react';
+import {
+  useCreateTaxPrepayment,
+  useUpdateTaxPrepayment,
   useTaxPrepayment,
   useUploadReceipt,
   useDeleteReceipt
 } from '@/hooks/api/useTaxPrepayments';
 import { TaxType, TaxPrepaymentStatus } from '@/api/types/tax-prepayment.types';
 import { Input, CustomSelect, Textarea } from '@/components/forms';
+import { FileDropZone } from '@/components/forms/FileDropZone';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/common/Button';
+import { toast } from '@/lib/toast';
+import { confirmDialog } from '@/lib/confirm';
 
 interface AddEditTaxPrepaymentModalProps {
   isOpen: boolean;
@@ -18,8 +22,41 @@ interface AddEditTaxPrepaymentModalProps {
   prepaymentId?: string;
 }
 
+/** Heading of one group of fields in the form. */
+function SectionHeading({ icon: Icon, title }: { icon: LucideIcon; title: string }) {
+  return (
+    <div className="mb-3 flex items-center gap-2">
+      <Icon className="h-4 w-4 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h3>
+    </div>
+  );
+}
+
+/**
+ * One group of fields. Form fields carry a bottom margin; `flush` cancels the
+ * last one so every section has the same spacing above and below.
+ */
+function FormSection({
+  icon,
+  title,
+  children,
+  flush = true,
+}: {
+  icon: LucideIcon;
+  title: string;
+  children: ReactNode;
+  flush?: boolean;
+}) {
+  return (
+    <section className="py-5 first:pt-0 last:pb-0">
+      <SectionHeading icon={icon} title={title} />
+      <div className={flush ? '-mb-4' : undefined}>{children}</div>
+    </section>
+  );
+}
+
 export function AddEditTaxPrepaymentModal({ isOpen, onClose, prepaymentId }: AddEditTaxPrepaymentModalProps) {
-  const { t } = useTranslation('tax-prepayments');
+  const { t, i18n } = useTranslation('tax-prepayments');
   const isEditMode = !!prepaymentId;
 
   // Form state
@@ -108,17 +145,26 @@ export function AddEditTaxPrepaymentModal({ isOpen, onClose, prepaymentId }: Add
         await uploadReceiptMutation.mutateAsync({ id: resultPrepaymentId, file: receiptFile });
       }
 
+      toast.success(isEditMode ? t('messages.updateSuccess') : t('messages.createSuccess'));
       onClose();
     } catch (error) {
       console.error('Failed to save tax prepayment:', error);
+      toast.error(t('messages.saveFailed'));
     }
   };
 
   const handleDeleteReceipt = async () => {
-    if (!prepaymentId || !confirm(t('messages.confirmDeleteReceipt'))) return;
+    if (!prepaymentId) return;
+    const confirmed = await confirmDialog({
+      title: t('messages.confirmDeleteReceipt'),
+      tone: 'danger',
+      confirmLabel: t('actions.deleteReceipt'),
+    });
+    if (!confirmed) return;
 
     try {
       await deleteReceiptMutation.mutateAsync(prepaymentId);
+      toast.success(t('messages.receiptDeleted'));
     } catch (error) {
       console.error('Failed to delete receipt:', error);
     }
@@ -161,161 +207,171 @@ export function AddEditTaxPrepaymentModal({ isOpen, onClose, prepaymentId }: Add
     { value: 'other', label: t('paymentMethods.other') },
   ];
 
+  const isSaving = createMutation.isPending || updateMutation.isPending;
+
   return (
     <Modal
       open={isOpen}
       onClose={onClose}
-      title={isEditMode ? t('actions.edit') : t('actions.add')}
-      size="xl"
+      title={isEditMode ? t('editTaxPrepayment') : t('actions.add')}
+      icon={<Landmark className="h-4 w-4" aria-hidden="true" />}
+      size="md"
       footer={
         <>
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose}>
             {t('actions.cancel')}
           </Button>
-          <Button type="submit" form={formId} disabled={createMutation.isPending || updateMutation.isPending}>
-            {createMutation.isPending || updateMutation.isPending ? t('actions.saving') : t('actions.save')}
+          <Button type="submit" form={formId} isLoading={isSaving}>
+            {isSaving ? t('actions.saving') : t('actions.save')}
           </Button>
         </>
       }
     >
-      <form id={formId} onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Tax Type */}
-          <CustomSelect
-            label={t('fields.taxType')}
-            value={taxType}
-            onChange={(value) => setTaxType(value as TaxType)}
-            options={taxTypeOptions}
-            required
-          />
+      <form id={formId} onSubmit={handleSubmit} className="divide-y divide-gray-100 dark:divide-gray-800">
+        {/* Payment */}
+        <FormSection icon={Landmark} title={t('sections.payment')}>
+          <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+            {/* Tax Type */}
+            <CustomSelect
+              className="mb-4"
+              label={t('fields.taxType')}
+              value={taxType}
+              onChange={(value) => setTaxType(value as TaxType)}
+              options={taxTypeOptions}
+              required
+            />
 
-          {/* Status */}
-          <CustomSelect
-            label={t('fields.status')}
-            value={status}
-            onChange={(value) => setStatus(value as TaxPrepaymentStatus)}
-            options={statusOptions}
-            required
-          />
+            {/* Status */}
+            <CustomSelect
+              className="mb-4"
+              label={t('fields.status')}
+              value={status}
+              onChange={(value) => setStatus(value as TaxPrepaymentStatus)}
+              options={statusOptions}
+              required
+            />
 
-          {/* Amount */}
+            {/* Amount */}
+            <Input
+              label={t('fields.amount')}
+              type="number"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+              placeholder="0.00"
+              className="tabular-nums"
+            />
+
+            {/* Payment Date */}
+            <Input
+              label={t('fields.paymentDate')}
+              type="date"
+              value={paymentDate}
+              onChange={(e) => setPaymentDate(e.target.value)}
+              required
+            />
+
+            {/* Payment Method */}
+            <CustomSelect
+              className="mb-4"
+              label={t('fields.paymentMethod')}
+              value={paymentMethod}
+              onChange={setPaymentMethod}
+              options={paymentMethodOptions}
+            />
+
+            {/* Reference Number */}
+            <Input
+              label={t('fields.referenceNumber')}
+              type="text"
+              value={referenceNumber}
+              onChange={(e) => setReferenceNumber(e.target.value)}
+              placeholder={t('fields.referenceNumberPlaceholder')}
+            />
+          </div>
+        </FormSection>
+
+        {/* Period */}
+        <FormSection icon={CalendarRange} title={t('sections.period')}>
+          <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+            {/* Tax Year */}
+            <CustomSelect
+              className="mb-4"
+              label={t('fields.taxYear')}
+              value={taxYear}
+              onChange={setTaxYear}
+              options={yearOptions}
+              required
+            />
+
+            {/* Quarter */}
+            <CustomSelect
+              className="mb-4"
+              label={t('fields.quarter')}
+              value={quarter}
+              onChange={setQuarter}
+              options={quarterOptions}
+            />
+          </div>
+        </FormSection>
+
+        {/* Details */}
+        <FormSection icon={FileText} title={t('sections.details')}>
+          {/* Description */}
           <Input
-            label={t('fields.amount')}
-            type="number"
-            step="0.01"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            required
-            placeholder="0.00"
-          />
-
-          {/* Payment Date */}
-          <Input
-            label={t('fields.paymentDate')}
-            type="date"
-            value={paymentDate}
-            onChange={(e) => setPaymentDate(e.target.value)}
-            required
-          />
-
-          {/* Tax Year */}
-          <CustomSelect
-            label={t('fields.taxYear')}
-            value={taxYear}
-            onChange={setTaxYear}
-            options={yearOptions}
-            required
-          />
-
-          {/* Quarter */}
-          <CustomSelect
-            label={t('fields.quarter')}
-            value={quarter}
-            onChange={setQuarter}
-            options={quarterOptions}
-          />
-
-          {/* Reference Number */}
-          <Input
-            label={t('fields.referenceNumber')}
+            label={t('fields.description')}
             type="text"
-            value={referenceNumber}
-            onChange={(e) => setReferenceNumber(e.target.value)}
-            placeholder={t('fields.referenceNumberPlaceholder')}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder={t('fields.descriptionPlaceholder')}
           />
 
-          {/* Payment Method */}
-          <CustomSelect
-            label={t('fields.paymentMethod')}
-            value={paymentMethod}
-            onChange={setPaymentMethod}
-            options={paymentMethodOptions}
+          {/* Notes */}
+          <Textarea
+            label={t('fields.notes')}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder={t('fields.notesPlaceholder')}
+            rows={3}
           />
-        </div>
-
-        {/* Description */}
-        <Input
-          label={t('fields.description')}
-          type="text"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder={t('fields.descriptionPlaceholder')}
-        />
-
-        {/* Notes */}
-        <Textarea
-          label={t('fields.notes')}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder={t('fields.notesPlaceholder')}
-          rows={3}
-        />
+        </FormSection>
 
         {/* Receipt Upload */}
-        <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            {t('fields.receipt')}
-          </label>
-          
-          {existingPrepayment?.receipt_filename && !receiptFile && (
-            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span className="text-sm text-gray-700 dark:text-gray-300">
+        <FormSection icon={Paperclip} title={t('fields.receipt')} flush={false}>
+          <div className="space-y-3">
+            {existingPrepayment?.receipt_filename && !receiptFile && (
+              <div className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 dark:border-gray-800">
+                <FileText className="h-5 w-5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate text-sm text-gray-700 dark:text-gray-300">
                   {existingPrepayment.receipt_filename}
                 </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDeleteReceipt}
+                  isLoading={deleteReceiptMutation.isPending}
+                  leftIcon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
+                  className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300"
+                >
+                  {t('actions.deleteReceipt')}
+                </Button>
               </div>
-              <button
-                type="button"
-                onClick={handleDeleteReceipt}
-                className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-sm"
-              >
-                {t('actions.deleteReceipt')}
-              </button>
-            </div>
-          )}
+            )}
 
-          <input
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png"
-            onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
-            className="block w-full text-sm text-gray-500 dark:text-gray-400
-              file:mr-4 file:py-2 file:px-4
-              file:rounded-lg file:border-0
-              file:text-sm file:font-semibold
-              file:bg-purple-50 file:text-purple-700
-              hover:file:bg-purple-100
-              dark:file:bg-purple-900/30 dark:file:text-purple-400
-              dark:hover:file:bg-purple-900/50"
-          />
-          {receiptFile && (
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {t('messages.fileSelected')}: {receiptFile.name}
-            </p>
-          )}
-        </div>
+            <FileDropZone
+              file={receiptFile}
+              onFile={setReceiptFile}
+              accept=".pdf,.jpg,.jpeg,.png"
+              prompt={existingPrepayment?.receipt_filename ? t('receipt.replacePrompt') : t('receipt.dropPrompt')}
+              hint={`${t('receipt.formats')} · ${t('messages.receiptMaxSize')}`}
+              changeLabel={t('receipt.change')}
+              removeLabel={t('receipt.remove')}
+              locale={i18n.language}
+            />
+          </div>
+        </FormSection>
       </form>
     </Modal>
   );

@@ -1,54 +1,95 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useExpenses, useExpenseSummary, useTriggerRecurringExpenses } from '@/hooks/api/useExpenses';
 import { useQuery } from '@tanstack/react-query';
+import type { Expense } from '@/api/types';
 import { getDepreciationSummary } from '@/api/services/depreciation.service';
 import { AddExpenseModal } from '@/components/business/expenses/AddExpenseModal';
 import { ExpenseDetailModal } from '@/components/business/expenses/ExpenseDetailModal';
 import { RecurringExpensesManager } from '@/components/business/expenses/RecurringExpensesManager';
+import { expenseCategoryLabel } from '@/components/business/expenses/expenseCategories';
 import { CustomSelect } from '@/components/forms';
+import { fieldClasses } from '@/components/forms/fieldStyles';
 import { formatCurrency } from '@/utils/currency';
 import { Table, Column } from '@/components/common/Table';
-import { 
-  Chart, 
-  ArcElement, 
-  Tooltip, 
-  Legend, 
+import { Alert } from '@/components/common/Alert';
+import { Badge } from '@/components/common/Badge';
+import { Button } from '@/components/common/Button';
+import { Card, CardBody, CardHeader } from '@/components/common/Card';
+import { EmptyState } from '@/components/common/EmptyState';
+import { SkeletonItem } from '@/components/common/Skeleton';
+import { StatCard } from '@/components/common/StatCard';
+import { Tabs, TabPanel } from '@/components/common/Tabs';
+import { useChartTheme } from '@/hooks/ui/useChartTheme';
+import {
+  chartColors,
+  getChartThemeColors,
+  getDoughnutChartOptions,
+  getLineChartOptions,
+  withAlpha,
+} from '@/utils/chartConfig';
+import { cn } from '@/lib/cn';
+import {
+  Calculator,
+  CalendarRange,
+  Check,
+  Hourglass,
+  Layers,
+  LineChart,
+  PieChart,
+  Plus,
+  Receipt,
+  RefreshCw,
+  Repeat,
+  Search,
+  Wallet,
+} from 'lucide-react';
+import {
+  Chart,
+  ArcElement,
+  Tooltip,
+  Legend,
   DoughnutController,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
-  LineController
+  LineController,
+  Filler,
 } from 'chart.js';
+import type { ChartOptions } from 'chart.js';
+import { Doughnut, Line } from 'react-chartjs-2';
 
 // Register Chart.js components
 Chart.register(
-  ArcElement, 
-  Tooltip, 
-  Legend, 
+  ArcElement,
+  Tooltip,
+  Legend,
   DoughnutController,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
-  LineController
+  LineController,
+  Filler
 );
 
 /**
  * Expenses page component for tracking and managing business expenses.
- * 
+ *
+ * Rendered as a tab inside the Finances page, so it has a section header
+ * rather than a page title and adds no outer padding.
+ *
  * Features:
  * - Display expenses with full details (category, project, status, receipts)
- * - Filter by category, status, billable, date range
- * - Search by description
- * - Show expense summary statistics
- * - Add/edit/delete expenses
- * - Upload and manage receipts
- * - Responsive design with dark mode support
- * 
+ * - Filter by category and search by description
+ * - Expense summary, category breakdown and trend over time
+ * - Depreciation (AfA) summary for the current year
+ * - Add/edit/delete expenses and manage receipts
+ * - Recurring expense templates
+ *
  * @component
- * @returns {JSX.Element} Expenses page with table, filters, and summary
+ * @returns {JSX.Element} Expenses section with table, filters, and summary
  */
 
 interface ExpensesPageProps {
@@ -56,17 +97,53 @@ interface ExpensesPageProps {
   endDate?: string;
 }
 
+type ExpensesTab = 'expense-list' | 'expense-recurring';
+
+// Colour per category: distinct colours for the big categories, muted grays for minor ones
+const categoryColors: Record<string, string> = {
+  // Major expense categories
+  vehicle_car: '#3b82f6',
+  vehicle: '#3b82f6',
+  insurance: '#10b981',
+  professional_services: '#06b6d4',
+  computer: '#8b5cf6',
+  software: '#a855f7',
+
+  // Medium categories
+  travel: '#f59e0b',
+  meals: '#ec4899',
+  marketing: '#84cc16',
+  hardware: '#f97316',
+  training: '#14b8a6',
+
+  // Minor categories
+  storage: '#9ca3af',
+  telecommunications: '#9ca3af',
+  peripherals: '#9ca3af',
+  office_supplies: '#ef4444',
+  utilities: '#9ca3af',
+  other: '#6b7280',
+};
+
 export default function ExpensesPage({ startDate: propStartDate, endDate: propEndDate }: ExpensesPageProps = {}) {
-  const { t } = useTranslation('expenses');
-  const [activeTab, setActiveTab] = useState<'expenses' | 'recurring'>('expenses');
+  const { t, i18n } = useTranslation('expenses');
+  const locale = i18n.language;
+  const theme = useChartTheme();
+  const [activeTab, setActiveTab] = useState<ExpensesTab>('expense-list');
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [showExpenseModal, setShowExpenseModal] = useState(false);
+  // The detail modal stays mounted while it closes so it can animate out;
+  // the session counter gives every opening fresh modal state.
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(null);
-  const chartRef = useRef<HTMLCanvasElement>(null);
-  const chartInstanceRef = useRef<Chart | null>(null);
-  const trendChartRef = useRef<HTMLCanvasElement>(null);
-  const trendChartInstanceRef = useRef<Chart | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailSession, setDetailSession] = useState(0);
+
+  const openExpense = (expenseId: string) => {
+    setSelectedExpenseId(expenseId);
+    setDetailSession((session) => session + 1);
+    setDetailOpen(true);
+  };
 
   // Build filters for API
   const filters = {
@@ -80,7 +157,7 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
   const { data: expenses = [], isLoading, error, refetch } = useExpenses(filters);
   const { data: summary } = useExpenseSummary(filters);
   const triggerRecurring = useTriggerRecurringExpenses();
-  
+
   // Fetch depreciation summary for current year
   const currentYear = new Date().getFullYear();
   const { data: depreciationSummary } = useQuery({
@@ -89,13 +166,15 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
   });
 
   // Format date
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+  const formatDate = useCallback(
+    (dateString: string) =>
+      new Date(dateString).toLocaleDateString(locale, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      }),
+    [locale]
+  );
 
   // Category options
   const categoryOptions = [
@@ -112,140 +191,90 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
     { value: 'other', label: t('categories.other') },
   ];
 
-  // Status options
   // Get category label
-  const getCategoryLabel = (category: string) => {
-    const option = categoryOptions.find(opt => opt.value === category);
-    return option?.label || category;
-  };
+  const getCategoryLabel = useCallback((category: string) => expenseCategoryLabel(t, category), [t]);
 
-  // Calculate category breakdown
-  const categoryBreakdown = expenses.reduce((acc, expense) => {
-    const category = expense.category || 'other';
-    if (!acc[category]) {
-      acc[category] = { total: 0, count: 0 };
-    }
-    acc[category].total += Number(expense.amount) || 0;
-    acc[category].count += 1;
-    return acc;
-  }, {} as Record<string, { total: number; count: number }>);
+  // Calculate category breakdown, largest first
+  const sortedCategories = useMemo(() => {
+    const breakdown = expenses.reduce((acc, expense) => {
+      const category = expense.category || 'other';
+      if (!acc[category]) {
+        acc[category] = { total: 0, count: 0 };
+      }
+      acc[category].total += Number(expense.amount) || 0;
+      acc[category].count += 1;
+      return acc;
+    }, {} as Record<string, { total: number; count: number }>);
+    return Object.entries(breakdown).sort(([, a], [, b]) => b.total - a.total);
+  }, [expenses]);
 
   // Calculate total from category breakdown
-  const categoryTotal = (Object.values(categoryBreakdown) as Array<{ total: number; count: number }>).reduce(
-    (sum, data) => sum + data.total, 
-    0
-  );
-  
-  // Color palette: vibrant colors for major categories, muted grays for minor ones
-  const categoryColors: Record<string, string> = {
-    // Major expense categories - vibrant distinct colors
-    vehicle_car: '#3b82f6',        // Blue
-    vehicle: '#3b82f6',            // Blue (alias)
-    insurance: '#10b981',          // Green
-    professional_services: '#06b6d4', // Cyan
-    computer: '#8b5cf6',           // Purple
-    software: '#a855f7',           // Light Purple
-    
-    // Medium categories - distinct but less vibrant
-    travel: '#f59e0b',             // Orange
-    meals: '#ec4899',              // Pink
-    marketing: '#84cc16',          // Lime
-    hardware: '#f97316',           // Dark Orange
-    training: '#14b8a6',           // Teal
-    
-    // Minor categories - muted grays
-    storage: '#9ca3af',            // Gray
-    telecommunications: '#9ca3af', // Gray
-    peripherals: '#9ca3af',        // Gray
-    office_supplies: '#ef4444',    // Red (stands out for office)
-    utilities: '#9ca3af',          // Gray
-    other: '#6b7280',              // Dark Gray
-  };
+  const categoryTotal = sortedCategories.reduce((sum, [, data]) => sum + data.total, 0);
 
   // Calculate average per month
   const monthlyAverage = (() => {
     if (!summary || summary.total_amount === 0) return 0;
-    
+
     // Group expenses by month to count unique months
     const months = new Set<string>();
-    expenses.forEach((expense: any) => {
+    expenses.forEach((expense) => {
       const date = new Date(expense.expense_date);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       months.add(monthKey);
     });
-    
+
     const monthCount = months.size || 1;
     return summary.total_amount / monthCount;
   })();
 
-  // Create Chart.js donut chart
-  useEffect(() => {
-    if (!chartRef.current || Object.keys(categoryBreakdown).length === 0 || !categoryTotal) {
-      return;
-    }
-
-    // Destroy existing chart
-    if (chartInstanceRef.current) {
-      chartInstanceRef.current.destroy();
-    }
-
-    const ctx = chartRef.current.getContext('2d');
-    if (!ctx) {
-      return;
-    }
-
-    const sortedCategories = Object.entries(categoryBreakdown).sort(([, a], [, b]) => b.total - a.total);
-    
-    chartInstanceRef.current = new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels: sortedCategories.map(([category]) => getCategoryLabel(category)),
-        datasets: [{
+  // Doughnut: expenses by category
+  const doughnutData = useMemo(
+    () => ({
+      labels: sortedCategories.map(([category]) => getCategoryLabel(category)),
+      datasets: [
+        {
           data: sortedCategories.map(([, data]) => data.total),
           backgroundColor: sortedCategories.map(([category]) => categoryColors[category] || categoryColors.other),
-          borderWidth: 0,
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        plugins: {
-          legend: {
-            display: false,
-          },
-          tooltip: {
-            callbacks: {
-              label: (context) => {
-                const value = context.parsed;
-                const percentage = ((value / categoryTotal) * 100).toFixed(1);
-                return `${formatCurrency(value)} (${percentage}%)`;
-              }
-            }
-          }
         },
-        cutout: '60%',
-      }
-    });
+      ],
+    }),
+    [sortedCategories, getCategoryLabel]
+  );
 
-    return () => {
-      if (chartInstanceRef.current) {
-        chartInstanceRef.current.destroy();
-      }
+  const doughnutOptions = useMemo<ChartOptions<'doughnut'>>(() => {
+    const base = getDoughnutChartOptions(theme);
+    const colors = getChartThemeColors(theme);
+    return {
+      ...base,
+      responsive: true,
+      maintainAspectRatio: true,
+      cutout: '68%',
+      interaction: { mode: 'nearest', intersect: true },
+      plugins: {
+        ...base.plugins,
+        legend: { display: false },
+        tooltip: {
+          ...base.plugins?.tooltip,
+          mode: 'nearest',
+          intersect: true,
+          callbacks: {
+            label: (context) => {
+              const value = context.parsed;
+              const percentage = categoryTotal ? ((value / categoryTotal) * 100).toFixed(1) : '0.0';
+              return `${formatCurrency(value)} (${percentage}%)`;
+            },
+          },
+        },
+      },
+      elements: { arc: { borderWidth: 2, borderColor: colors.surface, hoverOffset: 4 } },
     };
-  }, [categoryBreakdown, categoryTotal, getCategoryLabel]);
+  }, [theme, categoryTotal]);
 
-  // Create expense trend line chart (monthly totals over the year)
-  useEffect(() => {
-    if (!trendChartRef.current || expenses.length === 0) return;
-
-    // Destroy existing chart
-    if (trendChartInstanceRef.current) {
-      trendChartInstanceRef.current.destroy();
-    }
-
+  // Expense trend: monthly totals over the selected range
+  const trend = useMemo(() => {
     // Group expenses by month
     const monthlyData: Record<string, number> = {};
-    expenses.forEach((expense: any) => {
+    expenses.forEach((expense) => {
       // Parse date string as local date to avoid timezone issues
       // expense_date format is "YYYY-MM-DD" or "YYYY-MM-DDTHH:mm:ss..."
       const dateStr = expense.expense_date.split('T')[0]; // Get just the date part
@@ -258,11 +287,11 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
     const allMonths: string[] = [];
     let startMonth: Date;
     let endMonth: Date;
-    
+
     // Get today's date in local timezone
     const today = new Date();
-    const currentYear = today.getFullYear();
-    
+    const thisYear = today.getFullYear();
+
     if (propStartDate && propEndDate) {
       // Use the provided date range (inclusive)
       // Parse as local date by extracting year/month/day
@@ -272,16 +301,16 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
       endMonth = new Date(endYear, endMonthNum - 1, endDay);
     } else {
       // Default: January 1st of current year to today (max Dec 31st)
-      startMonth = new Date(currentYear, 0, 1); // January 1st
+      startMonth = new Date(thisYear, 0, 1); // January 1st
       // End at current date, but no later than December 31st of current year
-      const dec31 = new Date(currentYear, 11, 31);
+      const dec31 = new Date(thisYear, 11, 31);
       endMonth = today <= dec31 ? today : dec31;
     }
-    
+
     // Generate all months between start and end
     const current = new Date(startMonth.getFullYear(), startMonth.getMonth(), 1);
     const end = new Date(endMonth.getFullYear(), endMonth.getMonth(), 1);
-    
+
     while (current <= end) {
       const monthKey = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`;
       allMonths.push(monthKey);
@@ -289,69 +318,75 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
     }
 
     // Use all months for labels and data (fill with 0 if no expenses)
-    const labels = allMonths.map(month => {
+    const labels = allMonths.map((month) => {
       const [year, monthNum] = month.split('-');
       const date = new Date(Number(year), Number(monthNum) - 1);
-      return date.toLocaleDateString('de-DE', { month: 'short', year: '2-digit' });
+      return date.toLocaleDateString(locale, { month: 'short', year: '2-digit' });
     });
-    const data = allMonths.map(month => monthlyData[month] || 0);
+    const data = allMonths.map((month) => monthlyData[month] || 0);
+    return { labels, data };
+  }, [expenses, propStartDate, propEndDate, locale]);
 
-    // Create chart
-    trendChartInstanceRef.current = new Chart(trendChartRef.current, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [{
-          label: 'Ausgaben',
-          data,
-          borderColor: '#8b5cf6',
-          backgroundColor: '#8b5cf620',
+  const lineData = useMemo(
+    () => ({
+      labels: trend.labels,
+      datasets: [
+        {
+          label: t('charts.expenses'),
+          data: trend.data,
+          borderColor: chartColors.primary,
+          backgroundColor: withAlpha(chartColors.primary, theme === 'dark' ? 0.18 : 0.12),
+          pointBackgroundColor: chartColors.primary,
+          pointRadius: 2.5,
           fill: true,
           tension: 0.4,
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            display: false,
-          },
-          tooltip: {
-            callbacks: {
-              label: (context: any) => {
-                return `${formatCurrency(context.parsed.y)}`;
-              }
-            }
-          }
         },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: {
-              callback: (value: any) => formatCurrency(value as number)
-            }
-          }
-        }
-      }
-    });
+      ],
+    }),
+    [trend, t, theme]
+  );
 
-    return () => {
-      if (trendChartInstanceRef.current) {
-        trendChartInstanceRef.current.destroy();
-      }
+  const lineOptions = useMemo<ChartOptions<'line'>>(() => {
+    const base = getLineChartOptions(undefined, theme);
+    const baseY = (base.scales?.y ?? {}) as Record<string, unknown> & { ticks?: Record<string, unknown> };
+    return {
+      ...base,
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        ...base.plugins,
+        legend: { display: false },
+        tooltip: {
+          ...base.plugins?.tooltip,
+          displayColors: false,
+          callbacks: {
+            label: (context) => formatCurrency(context.parsed.y ?? 0),
+          },
+        },
+      },
+      scales: {
+        ...base.scales,
+        y: {
+          ...baseY,
+          beginAtZero: true,
+          ticks: {
+            ...baseY.ticks,
+            callback: (value) => formatCurrency(Number(value)),
+          },
+        },
+      },
     };
-  }, [expenses, propStartDate, propEndDate]);
+  }, [theme]);
 
-  // getStatusBadgeColor removed - status column hidden for solo freelancer
+  const formatCount = useCallback((value: number) => Math.round(value).toLocaleString(locale), [locale]);
 
-  const columns: Column<any>[] = useMemo(() => [
+  const columns: Column<Expense>[] = useMemo(() => [
     {
       key: 'date',
       accessorKey: 'expense_date',
       header: t('table.date'),
       render: (expense) => (
-        <span className="text-gray-900 dark:text-gray-100">
+        <span className="whitespace-nowrap tabular-nums text-gray-700 dark:text-gray-300">
           {formatDate(expense.expense_date)}
         </span>
       ),
@@ -363,24 +398,26 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
       header: t('table.description'),
       render: (expense) => (
         <div className="max-w-xs">
-          <div className="font-medium text-gray-900 dark:text-gray-100">{expense.description}</div>
-          <div className="flex gap-2 mt-1">
-            {expense.is_billable && (
-              <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                {t('fields.billable')}
-              </span>
-            )}
-            {expense.is_recurring && (
-              <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">
-                🔄 {t('recurring.recurring', 'Recurring')}
-              </span>
-            )}
-            {expense.parent_expense_id && (
-              <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                {t('recurring.autoGenerated', 'Auto-generated')}
-              </span>
-            )}
-          </div>
+          <div className="truncate font-medium text-gray-900 dark:text-white">{expense.description}</div>
+          {(expense.is_billable || expense.is_recurring || expense.parent_expense_id) && (
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {expense.is_billable && (
+                <Badge variant="green" size="sm">
+                  {t('fields.billable')}
+                </Badge>
+              )}
+              {expense.is_recurring && (
+                <Badge variant="purple" size="sm" icon={<Repeat className="h-3 w-3" aria-hidden="true" />}>
+                  {t('recurring.recurring', 'Recurring')}
+                </Badge>
+              )}
+              {expense.parent_expense_id && (
+                <Badge variant="blue" size="sm">
+                  {t('recurring.autoGenerated', 'Auto-generated')}
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
       ),
       sortable: true,
@@ -400,8 +437,9 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
       key: 'amount',
       accessorKey: 'amount',
       header: t('table.amount'),
+      align: 'right',
       render: (expense) => (
-        <span className="font-semibold text-red-600 dark:text-red-400">
+        <span className="whitespace-nowrap font-semibold tabular-nums text-gray-900 dark:text-white">
           {formatCurrency(expense.amount, expense.currency)}
         </span>
       ),
@@ -410,378 +448,320 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
     },
     {
       key: 'depreciation',
-      header: t('table.depreciation', 'Depreciation'),
+      header: t('table.depreciation'),
       render: (expense) => (
         expense.depreciation_type === 'immediate' ? (
-          <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
-            Immediate
-          </span>
+          <Badge variant="green" size="sm">
+            {t('depreciation.immediateShort')}
+          </Badge>
         ) : expense.depreciation_type === 'partial' ? (
-          <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-            {expense.depreciation_years}y
-          </span>
+          <Badge variant="amber" size="sm">
+            {t('depreciation.yearsShort', { count: expense.depreciation_years ?? 0 })}
+          </Badge>
         ) : (
-          <span className="text-gray-400">-</span>
+          <span className="text-gray-400 dark:text-gray-500">—</span>
         )
       ),
     },
     {
       key: 'taxDeductible',
-      header: t('table.taxDeductible', 'Tax Deductible'),
+      header: t('table.taxDeductible'),
       render: (expense) => (
         expense.tax_deductible_percentage !== null && expense.tax_deductible_percentage !== undefined ? (
-          <div className="flex items-center gap-2">
-            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+          <Badge
+            size="sm"
+            variant={
               expense.tax_deductible_percentage === 100
-                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                ? 'green'
                 : expense.tax_deductible_percentage === 0
-                ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-            }`}>
-              {expense.tax_deductible_percentage}%
-            </span>
-          </div>
+                ? 'red'
+                : 'blue'
+            }
+          >
+            <span className="tabular-nums">{expense.tax_deductible_percentage}%</span>
+          </Badge>
         ) : (
-          <span className="text-gray-400">-</span>
+          <span className="text-gray-400 dark:text-gray-500">—</span>
         )
       ),
     },
     {
       key: 'receipt',
       header: t('table.receipt'),
+      align: 'center',
       render: (expense) => (
         expense.receipt_url ? (
-          <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-          </svg>
+          <span
+            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 ring-1 ring-inset ring-emerald-600/15 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-400/20"
+            title={t('receipt.hasReceipt')}
+          >
+            <Check className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="sr-only">{t('receipt.hasReceipt')}</span>
+          </span>
         ) : (
-          <span className="text-gray-400">-</span>
+          <span className="text-gray-400 dark:text-gray-500">—</span>
         )
       ),
     },
     {
       key: 'actions',
-      header: '',
+      header: <span className="sr-only">{t('table.actions')}</span>,
       align: 'right',
       render: (expense) => (
-        <button
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
           onClick={(e) => {
             e.stopPropagation();
-            setSelectedExpenseId(expense.id);
+            openExpense(expense.id);
           }}
-          className="text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-medium"
+          className="text-purple-700 hover:text-purple-800 dark:text-purple-300 dark:hover:text-purple-200"
         >
-          {t('view')}
-        </button>
+          {t('table.view')}
+        </Button>
       ),
     },
-  ], [t, getCategoryLabel]);
+  ], [t, getCategoryLabel, formatDate]);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-900/20 dark:text-red-300">
-        <p className="font-semibold">{t('errorLoading')}</p>
-        <p className="text-sm mt-1">
-          {error instanceof Error ? error.message : 'An unknown error occurred'}
-        </p>
-      </div>
-    );
-  }
+  const hasFilters = Boolean(searchTerm) || categoryFilter !== 'all';
+  const showDepreciation =
+    depreciationSummary && depreciationSummary.summary.total_assets_under_depreciation > 0;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">
-            {t('title')}
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {t('subtitle')}
-          </p>
+      {/* Section header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="section-title">{t('title')}</h2>
+          <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{t('subtitle')}</p>
         </div>
-        
-        <div className="flex items-center gap-2">
-          {activeTab === 'expenses' && (
-            <>
-              <button
-                onClick={() => triggerRecurring.mutate()}
-                disabled={triggerRecurring.isPending}
-                className="flex items-center gap-2 rounded-lg bg-gray-600 px-4 py-2 font-medium text-white transition-colors hover:bg-gray-700 disabled:opacity-50"
-                title={t('syncRecurringTooltip', 'Generate any missed recurring expenses')}
-              >
-                <svg className={`w-5 h-5 ${triggerRecurring.isPending ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                {triggerRecurring.isPending ? t('syncing', 'Syncing...') : t('syncRecurring', 'Sync Recurring')}
-              </button>
-              <button
-                onClick={() => setShowExpenseModal(true)}
-                className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 font-medium text-white transition-colors hover:bg-purple-700"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                {t('addExpense')}
-              </button>
-            </>
-          )}
-        </div>
+
+        {activeTab === 'expense-list' && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => triggerRecurring.mutate()}
+              disabled={triggerRecurring.isPending}
+              title={t('syncRecurringTooltip')}
+              leftIcon={
+                <RefreshCw
+                  className={cn('h-4 w-4', triggerRecurring.isPending && 'animate-spin')}
+                  aria-hidden="true"
+                />
+              }
+            >
+              {triggerRecurring.isPending ? t('syncing') : t('syncRecurring')}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => setShowExpenseModal(true)}
+              leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
+            >
+              {t('addExpense')}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 dark:border-gray-700">
-        <nav className="flex gap-4" aria-label="Tabs">
-          <button
-            onClick={() => setActiveTab('expenses')}
-            className={`py-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'expenses'
-                ? 'border-purple-500 text-purple-600 dark:text-purple-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-            }`}
-          >
-            📋 {t('tabs.allExpenses', 'All Expenses')}
-          </button>
-          <button
-            onClick={() => setActiveTab('recurring')}
-            className={`py-3 px-1 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'recurring'
-                ? 'border-purple-500 text-purple-600 dark:text-purple-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-            }`}
-          >
-            🔄 {t('tabs.recurring', 'Recurring Templates')}
-          </button>
-        </nav>
-      </div>
+      <Tabs
+        variant="pills"
+        activeTab={activeTab}
+        onChange={(id) => setActiveTab(id as ExpensesTab)}
+        tabs={[
+          { id: 'expense-list', label: t('tabs.allExpenses'), icon: Receipt },
+          { id: 'expense-recurring', label: t('tabs.recurring'), icon: Repeat },
+        ]}
+      />
 
-      {/* Tab Content */}
-      {activeTab === 'recurring' ? (
+      {/* Recurring templates */}
+      <TabPanel tabId="expense-recurring" activeTab={activeTab}>
         <RecurringExpensesManager />
-      ) : (
-        <>
-          {/* Filters */}
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div className="flex w-full flex-1 items-center gap-3">
-              <div className="relative w-full xl:max-w-sm">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                  <svg className="h-4 w-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-                <input
-                  type="search"
-                  placeholder={t('searchPlaceholder')}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="block w-full bg-transparent border-0 border-b-2 border-gray-600 dark:border-gray-400 focus:outline-none focus:border-purple-500 dark:focus:border-purple-400 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200 ease-in-out accent-purple-500 py-2 pl-10 pr-3 text-sm"
-                  autoComplete="off"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <CustomSelect
-                label={t('fields.category')}
-            value={categoryFilter}
-            onChange={setCategoryFilter}
-            options={categoryOptions}
-            size="md"
-          />
+      </TabPanel>
+
+      {/* All expenses */}
+      <TabPanel tabId="expense-list" activeTab={activeTab} className="space-y-6">
+        {/* Filters */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative w-full sm:max-w-sm">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+              aria-hidden="true"
+            />
+            <input
+              type="search"
+              placeholder={t('searchPlaceholder')}
+              aria-label={t('searchPlaceholder')}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={cn(fieldClasses(), 'pl-9')}
+              autoComplete="off"
+            />
+          </div>
+          <div className="w-full sm:w-60">
+            <CustomSelect
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+              options={categoryOptions}
+              size="md"
+            />
+          </div>
           {/* Status filter hidden - not needed for solo freelancer (all expenses auto-approved) */}
         </div>
-      </div>
 
-      {/* Summary Cards */}
-      {summary && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Total Expenses Card */}
-            <div className="lg:col-span-1 space-y-4">
-              <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-900/30 dark:bg-orange-900/20">
-                <div className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-1">
-                  {t('summary.totalExpenses')}
+        {isLoading ? (
+          <ExpensesSkeleton />
+        ) : error ? (
+          <Alert
+            type="error"
+            title={t('errorLoading')}
+            message={error instanceof Error ? error.message : t('unknownError')}
+          />
+        ) : (
+          <>
+            {/* Summary */}
+            {summary && (
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1">
+                  <StatCard
+                    label={t('summary.totalExpenses')}
+                    value={Number(summary.total_amount) || 0}
+                    format={(value) => formatCurrency(value)}
+                    icon={Wallet}
+                    variant="orange"
+                    hint={`${summary.total_expenses} ${t('summary.transactions')}`}
+                  />
+                  <StatCard
+                    label={t('summary.monthlyAverage')}
+                    value={monthlyAverage}
+                    format={(value) => formatCurrency(value)}
+                    icon={CalendarRange}
+                    variant="blue"
+                    hint={t('summary.monthlyAverageHint')}
+                  />
                 </div>
-                <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {formatCurrency(summary.total_amount)}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {summary.total_expenses} {t('summary.transactions')}
-                </div>
-              </div>
 
-              {/* Average per Month Card */}
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/30 dark:bg-blue-900/20">
-                <div className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-1">
-                  Durchschnitt je Monat
-                </div>
-                <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {formatCurrency(monthlyAverage)}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Ø Betrag
-                </div>
-              </div>
-            </div>
-
-            {/* Category Breakdown Donut Chart */}
-            <div className="lg:col-span-2">
-              <div className="rounded-lg border border-purple-200 bg-purple-50 p-4 dark:border-purple-900/30 dark:bg-purple-900/20 h-full">
-                <div className="text-sm font-medium text-purple-600 dark:text-purple-400 mb-3">
-                  Ausgaben nach Kategorie
-                </div>
-                {Object.keys(categoryBreakdown).length > 0 ? (
-                  <div className="flex items-center gap-6">
-                    {/* Chart.js Donut Chart */}
-                    <div className="flex-shrink-0" style={{ width: '200px', height: '200px' }}>
-                      <canvas ref={chartRef}></canvas>
-                    </div>
-                    
-                    {/* Legend */}
-                    <div className="flex-1 space-y-2">
-                      {Object.entries(categoryBreakdown)
-                        .sort(([, a], [, b]) => b.total - a.total)
-                        .map(([category, data]) => {
-                          const percentage = (data.total / categoryTotal) * 100;
-                          return (
-                            <div key={category} className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-sm flex-shrink-0"
-                                style={{ backgroundColor: categoryColors[category] || categoryColors.other }}
-                              />
-                              <div className="flex-1 flex justify-between items-center gap-4 text-xs">
-                                <span className="text-gray-700 dark:text-gray-300 truncate">
+                {/* Category breakdown */}
+                <Card className="lg:col-span-2">
+                  <CardHeader title={t('charts.byCategory')} />
+                  <CardBody className="py-5">
+                    {sortedCategories.length > 0 && categoryTotal ? (
+                      <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center">
+                        <div className="h-44 w-44 shrink-0">
+                          <Doughnut data={doughnutData} options={doughnutOptions} />
+                        </div>
+                        <ul className="w-full min-w-0 flex-1 space-y-2">
+                          {sortedCategories.map(([category, data]) => {
+                            const percentage = (data.total / categoryTotal) * 100;
+                            return (
+                              <li key={category} className="flex items-center gap-3 text-sm">
+                                <span
+                                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                  style={{ backgroundColor: categoryColors[category] || categoryColors.other }}
+                                  aria-hidden="true"
+                                />
+                                <span className="min-w-0 flex-1 truncate text-gray-700 dark:text-gray-300">
                                   {getCategoryLabel(category)}
                                 </span>
-                                <span className="font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                                  {formatCurrency(data.total)} ({percentage.toFixed(1)}%)
+                                <span className="whitespace-nowrap font-medium tabular-nums text-gray-900 dark:text-white">
+                                  {formatCurrency(data.total)}
                                 </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  </div>
+                                <span className="w-12 whitespace-nowrap text-right text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                                  {percentage.toFixed(1)}%
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ) : (
+                      <EmptyState compact icon={PieChart} title={t('charts.noCategoryData')} />
+                    )}
+                  </CardBody>
+                </Card>
+              </div>
+            )}
+
+            {/* Expense trend */}
+            <Card>
+              <CardHeader title={t('charts.overTime')} />
+              <CardBody className="py-5">
+                {expenses.length === 0 ? (
+                  <EmptyState compact icon={LineChart} title={t('charts.noData')} />
                 ) : (
-                  <div className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                    Keine Kategoriedaten verfügbar
+                  <div className="relative h-[280px]">
+                    <Line data={lineData} options={lineOptions} />
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+              </CardBody>
+            </Card>
 
-      {/* Expense Trend Line Chart */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          Ausgaben über Zeit
-        </h3>
-        <div className="relative" style={{ height: '300px' }}>
-          {expenses.length === 0 ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <p className="text-gray-500 dark:text-gray-400">Keine Daten verfügbar</p>
-            </div>
-          ) : (
-            <canvas ref={trendChartRef} style={{ maxHeight: '300px' }}></canvas>
-          )}
-        </div>
-      </div>
+            {/* Depreciation (AfA) summary */}
+            {showDepreciation && depreciationSummary && (
+              <section className="space-y-3">
+                <h3 className="section-title">
+                  {t('depreciationSummary.title', { year: currentYear })}
+                </h3>
+                <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <StatCard
+                    label={t('depreciationSummary.assets')}
+                    value={Number(depreciationSummary.summary.total_assets_under_depreciation) || 0}
+                    format={formatCount}
+                    icon={Layers}
+                    variant="purple"
+                    hint={t('depreciationSummary.assetsHint')}
+                  />
+                  <StatCard
+                    label={t('depreciationSummary.deductible', { year: currentYear })}
+                    value={Number(depreciationSummary.summary.depreciation_amount || 0)}
+                    format={(value) => formatCurrency(value)}
+                    icon={Calculator}
+                    variant="green"
+                    hint={t('depreciationSummary.deductibleHint')}
+                  />
+                  <StatCard
+                    label={t('depreciationSummary.remaining')}
+                    value={Number(depreciationSummary.summary.deferred_amount || 0)}
+                    format={(value) => formatCurrency(value)}
+                    icon={Hourglass}
+                    variant="yellow"
+                    hint={t('depreciationSummary.remainingHint')}
+                  />
+                </div>
+              </section>
+            )}
 
-      {/* Depreciation Summary Cards */}
-      {depreciationSummary && depreciationSummary.summary.total_assets_under_depreciation > 0 && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <div className="mb-4 flex items-center gap-2">
-            <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-            </svg>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Abschreibungen (AfA) {currentYear}
-            </h3>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="rounded-lg border border-purple-200 bg-purple-50 p-4 dark:border-purple-900/30 dark:bg-purple-900/20">
-              <div className="text-sm font-medium text-purple-600 dark:text-purple-400 mb-1">
-                Anzahl Vermögenswerte
-              </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {depreciationSummary.summary.total_assets_under_depreciation}
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Wird über mehrere Jahre abgeschrieben
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/30 dark:bg-emerald-900/20">
-              <div className="text-sm font-medium text-emerald-600 dark:text-emerald-400 mb-1">
-                Steuerlich Absetzbar ({currentYear})
-              </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatCurrency(depreciationSummary.summary.depreciation_amount || 0)}
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Abschreibung dieses Jahr
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/30 dark:bg-amber-900/20">
-              <div className="text-sm font-medium text-amber-600 dark:text-amber-400 mb-1">
-                Verbleibender Wert
-              </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                {formatCurrency(depreciationSummary.summary.deferred_amount || 0)}
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Wird in Zukunft abgeschrieben
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Expenses Table */}
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <Table
-          data={expenses}
-          columns={columns}
-          pageSize={10}
-          onRowClick={(expense) => setSelectedExpenseId(expense.id)}
-          emptyMessage={
-            <div className="p-6 text-center">
-              <svg
-                className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            {/* Expenses table */}
+            <Table
+              data={expenses}
+              columns={columns}
+              pageSize={10}
+              onRowClick={(expense) => openExpense(expense.id)}
+              emptyMessage={
+                <EmptyState
+                  icon={Receipt}
+                  title={t('noExpenses')}
+                  description={hasFilters ? t('tryAdjustingFilters') : t('noExpensesMessage')}
+                  action={
+                    hasFilters ? undefined : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => setShowExpenseModal(true)}
+                        leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
+                      >
+                        {t('addExpense')}
+                      </Button>
+                    )
+                  }
                 />
-              </svg>
-              <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">
-                {t('noExpenses')}
-              </h3>
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                {searchTerm || categoryFilter !== 'all'
-                  ? t('tryAdjustingFilters')
-                  : t('noExpensesMessage')}
-              </p>
-            </div>
-          }
-          className="border-0 shadow-none"
-        />
-      </div>
+              }
+            />
+          </>
+        )}
+      </TabPanel>
 
       {/* Add Expense Modal */}
       <AddExpenseModal
@@ -793,14 +773,53 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
       {/* Expense Detail Modal */}
       {selectedExpenseId && (
         <ExpenseDetailModal
+          key={detailSession}
           expenseId={selectedExpenseId}
-          isOpen={!!selectedExpenseId}
-          onClose={() => setSelectedExpenseId(null)}
+          isOpen={detailOpen}
+          onClose={() => setDetailOpen(false)}
           onExpenseUpdated={() => refetch()}
         />
       )}
-        </>
-      )}
+    </div>
+  );
+}
+
+/** Placeholder shaped like the summary, chart and table while expenses load. */
+function ExpensesSkeleton() {
+  return (
+    <div className="space-y-6" aria-busy="true">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1">
+          {[0, 1].map((i) => (
+            <div key={i} className="surface p-5">
+              <SkeletonItem className="h-4 w-28" />
+              <SkeletonItem className="mt-3 h-7 w-36" />
+              <SkeletonItem className="mt-2 h-3 w-20" />
+            </div>
+          ))}
+        </div>
+        <div className="surface flex items-center gap-6 p-6 lg:col-span-2">
+          <SkeletonItem className="h-40 w-40 shrink-0 rounded-full" />
+          <div className="flex-1 space-y-3">
+            {[0, 1, 2, 3].map((i) => (
+              <SkeletonItem key={i} className="h-4 w-full" />
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="surface p-6">
+        <SkeletonItem className="h-5 w-40" />
+        <SkeletonItem className="mt-5 h-56 w-full" />
+      </div>
+      <div className="surface divide-y divide-gray-100 dark:divide-gray-800">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div key={i} className="flex items-center gap-4 px-5 py-4">
+            <SkeletonItem className="h-4 w-24" />
+            <SkeletonItem className="h-4 flex-1" />
+            <SkeletonItem className="h-4 w-20" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

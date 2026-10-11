@@ -1,19 +1,26 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTaxPrepayments, useTaxPrepaymentSummary, useDeleteTaxPrepayment } from '@/hooks/api/useTaxPrepayments';
 import { TaxType, TaxPrepaymentStatus, TaxPrepaymentFilters, TaxPrepayment } from '@/api/types/tax-prepayment.types';
 import { AddEditTaxPrepaymentModal } from '@/components/business/tax-prepayments/AddEditTaxPrepaymentModal';
 import { TaxPrepaymentDetailModal } from '@/components/business/tax-prepayments/TaxPrepaymentDetailModal';
 import { CustomSelect } from '@/components/forms';
+import { fieldClasses } from '@/components/forms/fieldStyles';
 import { formatCurrency } from '@/utils/currency';
-import { Table, Column, LoadingSpinner, PageHeader, StatCard, EmptyState, Badge } from '@/components/common';
+import { Table, Column, StatCard, EmptyState, Badge, Button, SkeletonItem } from '@/components/common';
 import { Alert } from '@/components/common/Alert';
 import { BadgeVariant } from '@/components/common/Badge';
-import { Plus, Wallet, TrendingUp, FileText } from 'lucide-react';
+import { toast } from '@/lib/toast';
+import { confirmDialog } from '@/lib/confirm';
+import { cn } from '@/lib/cn';
+import { CalendarDays, FileText, Landmark, Paperclip, Pencil, Plus, Receipt, Search, Trash2, Wallet } from 'lucide-react';
 
 /**
  * Tax Prepayments page component for tracking VAT and income tax prepayments.
- * 
+ *
+ * Rendered as a tab inside the Finances page, so it has a section header
+ * rather than a page title and adds no outer padding.
+ *
  * Features:
  * - Display tax prepayments with full details (type, amount, dates, receipts)
  * - Filter by tax type, year, quarter, status
@@ -22,17 +29,21 @@ import { Plus, Wallet, TrendingUp, FileText } from 'lucide-react';
  * - Add/edit/delete tax prepayments
  * - Upload and manage receipts
  * - Responsive design with dark mode support
- * 
+ *
  * @component
- * @returns {JSX.Element} Tax prepayments page with table, filters, and summary
+ * @returns {JSX.Element} Tax prepayments section with table, filters, and summary
  */
 
 interface TaxPrepaymentsPageProps {
   taxYear?: number;
 }
 
+const iconButtonClass =
+  'rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-400 dark:hover:bg-white/5';
+
 export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepaymentsPageProps = {}) {
-  const { t } = useTranslation('tax-prepayments');
+  const { t, i18n } = useTranslation('tax-prepayments');
+  const locale = i18n.language;
   const [searchTerm, setSearchTerm] = useState('');
   const [taxTypeFilter, setTaxTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -42,7 +53,7 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedPrepaymentId, setSelectedPrepaymentId] = useState<string | null>(null);
 
-  const deleteMutation = useDeleteTaxPrepayment();
+  const { mutateAsync: deletePrepayment } = useDeleteTaxPrepayment();
 
   // Build filters for API
   const filters: TaxPrepaymentFilters = {
@@ -58,13 +69,15 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
   const { data: summary } = useTaxPrepaymentSummary(yearFilter !== 'all' ? parseInt(yearFilter) : undefined);
 
   // Format date
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+  const formatDate = useCallback(
+    (dateString: string) =>
+      new Date(dateString).toLocaleDateString(locale, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      }),
+    [locale]
+  );
 
   // Get current year and generate year options
   const currentYear = new Date().getFullYear();
@@ -113,15 +126,22 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
   };
 
   // Handle delete
-  const handleDelete = async (id: string) => {
-    if (confirm(t('messages.confirmDelete'))) {
+  const handleDelete = useCallback(async (id: string) => {
+    const confirmed = await confirmDialog({
+      title: t('messages.confirmDelete'),
+      tone: 'danger',
+      confirmLabel: t('actions.delete'),
+    });
+    if (confirmed) {
       try {
-        await deleteMutation.mutateAsync(id);
+        await deletePrepayment(id);
+        toast.success(t('messages.deleteSuccess'));
       } catch (err) {
         console.error('Error deleting tax prepayment:', err);
+        toast.error(t('messages.deleteFailed'));
       }
     }
-  };
+  }, [t, deletePrepayment]);
 
   // Handle edit
   const handleEdit = (id: string) => {
@@ -140,7 +160,7 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
       accessorKey: 'tax_type',
       header: t('table.taxType'),
       render: (prepayment) => (
-        <div className="text-sm font-medium text-gray-900 dark:text-white">
+        <div className="font-medium text-gray-900 dark:text-white">
           {prepayment.tax_type === 'vat' ? t('taxTypes.vat') : t('taxTypes.incomeTax')}
         </div>
       ),
@@ -150,14 +170,18 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
       key: 'amount',
       accessorKey: 'amount',
       header: t('table.amount'),
+      align: 'right',
       render: (prepayment) => (
-        <div className={`text-sm font-semibold ${
-          prepayment.status === 'refund' 
-            ? 'text-green-600 dark:text-green-400' 
-            : 'text-red-600 dark:text-red-400'
-        }`}>
+        <span
+          className={cn(
+            'whitespace-nowrap font-semibold tabular-nums',
+            prepayment.status === 'refund'
+              ? 'text-emerald-600 dark:text-emerald-400'
+              : 'text-gray-900 dark:text-white'
+          )}
+        >
           {formatCurrency(prepayment.amount)}
-        </div>
+        </span>
       ),
       sortable: true,
       sortValue: (prepayment) => {
@@ -170,9 +194,9 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
       accessorKey: 'payment_date',
       header: t('table.paymentDate'),
       render: (prepayment) => (
-        <div className="text-sm text-gray-900 dark:text-white">
+        <span className="whitespace-nowrap tabular-nums text-gray-700 dark:text-gray-300">
           {formatDate(prepayment.payment_date)}
-        </div>
+        </span>
       ),
       sortable: true,
     },
@@ -181,11 +205,11 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
       accessorKey: 'period_start',
       header: t('table.period'),
       render: (prepayment) => (
-        <div className="text-sm text-gray-500 dark:text-gray-400">
-          {prepayment.period_start && prepayment.period_end 
-            ? `${formatDate(prepayment.period_start)} - ${formatDate(prepayment.period_end)}`
-            : '-'}
-        </div>
+        <span className="whitespace-nowrap tabular-nums text-gray-500 dark:text-gray-400">
+          {prepayment.period_start && prepayment.period_end
+            ? `${formatDate(prepayment.period_start)} – ${formatDate(prepayment.period_end)}`
+            : '—'}
+        </span>
       ),
       sortable: true,
     },
@@ -194,9 +218,9 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
       accessorKey: 'quarter',
       header: t('table.quarter'),
       render: (prepayment) => (
-        <div className="text-sm text-gray-900 dark:text-white">
-          {prepayment.quarter ? t(`quarters.q${prepayment.quarter}`) : '-'}
-        </div>
+        <span className="whitespace-nowrap text-gray-700 dark:text-gray-300">
+          {prepayment.quarter ? t(`quarters.q${prepayment.quarter}`) : '—'}
+        </span>
       ),
       sortable: true,
     },
@@ -205,7 +229,7 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
       accessorKey: 'status',
       header: t('table.status'),
       render: (prepayment) => (
-        <Badge variant={getStatusBadgeVariant(prepayment.status)}>
+        <Badge variant={getStatusBadgeVariant(prepayment.status)} dot>
           {t(`status.${prepayment.status}`)}
         </Badge>
       ),
@@ -216,14 +240,12 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
       header: t('table.receipt'),
       render: (prepayment) => (
         prepayment.receipt_filename ? (
-          <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <span className="text-xs">{t('table.hasReceipt')}</span>
-          </div>
+          <span className="inline-flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+            <Paperclip className="h-3.5 w-3.5" aria-hidden="true" />
+            {t('table.hasReceipt')}
+          </span>
         ) : (
-          <span className="text-xs text-gray-400 dark:text-gray-600">
+          <span className="text-xs text-gray-400 dark:text-gray-500">
             {t('table.noReceipt')}
           </span>
         )
@@ -231,107 +253,98 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
     },
     {
       key: 'actions',
-      header: t('table.actions'),
+      header: <span className="sr-only">{t('table.actions')}</span>,
       align: 'right',
       render: (prepayment) => (
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end gap-1">
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               handleEdit(prepayment.id);
             }}
-            className="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300"
+            className={cn(iconButtonClass, 'hover:text-purple-600 dark:hover:text-purple-300')}
+            title={t('actions.edit')}
+            aria-label={t('actions.edit')}
           >
-            {t('actions.edit')}
+            <Pencil className="h-4 w-4" aria-hidden="true" />
           </button>
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               handleDelete(prepayment.id);
             }}
-            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+            className={cn(iconButtonClass, 'hover:text-red-600 dark:hover:text-red-400')}
+            title={t('actions.delete')}
+            aria-label={t('actions.delete')}
           >
-            {t('actions.delete')}
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       ),
     },
-  ], [t]);
+  ], [t, formatDate, handleDelete]);
 
-  if (isLoading) {
-    return <LoadingSpinner size="lg" fullScreen text={t('messages.loading', { defaultValue: 'Loading tax prepayments...' })} />;
-  }
-
-  if (error) {
-    return (
-      <Alert
-        type="error"
-        title={t('messages.errorLoading')}
-        message={error instanceof Error ? error.message : 'An unknown error occurred'}
-      />
-    );
-  }
+  const hasFilters =
+    Boolean(searchTerm) || taxTypeFilter !== 'all' || yearFilter !== 'all' || quarterFilter !== 'all' || statusFilter !== 'all';
+  const byYear = summary ? Object.entries(summary.total_by_year) : [];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <PageHeader
-        title={t('title')}
-        subtitle={t('subtitle')}
-        actions={
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 font-medium text-white transition-colors hover:bg-purple-700"
-          >
-            <Plus className="w-5 h-5" />
-            {t('actions.add')}
-          </button>
-        }
-      />
+      {/* Section header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <h2 className="section-title">{t('title')}</h2>
+          <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{t('subtitle')}</p>
+        </div>
+        <Button
+          type="button"
+          onClick={() => setShowAddModal(true)}
+          leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
+          className="self-start sm:self-auto"
+        >
+          {t('actions.add')}
+        </Button>
+      </div>
 
       {/* Filters */}
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div className="flex w-full flex-1 items-center gap-3">
-          <div className="relative w-full xl:max-w-sm">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <svg className="h-4 w-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-            <input
-              type="search"
-              placeholder={t('filters.searchPlaceholder')}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="block w-full bg-transparent border-0 border-b-2 border-gray-600 dark:border-gray-400 focus:outline-none focus:border-purple-500 dark:focus:border-purple-400 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200 ease-in-out accent-purple-500 py-2 pl-10 pr-3 text-sm"
-              autoComplete="off"
-            />
-          </div>
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+        <div className="relative w-full xl:max-w-xs">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+            aria-hidden="true"
+          />
+          <input
+            type="search"
+            placeholder={t('filters.searchPlaceholder')}
+            aria-label={t('filters.searchPlaceholder')}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className={cn(fieldClasses(), 'pl-9')}
+            autoComplete="off"
+          />
         </div>
-        <div className="flex gap-3">
+        <div className="grid w-full grid-cols-2 gap-3 lg:grid-cols-4 xl:flex-1">
           <CustomSelect
-            label={t('fields.taxType')}
             value={taxTypeFilter}
             onChange={setTaxTypeFilter}
             options={taxTypeOptions}
             size="md"
           />
           <CustomSelect
-            label={t('fields.taxYear')}
             value={yearFilter}
             onChange={setYearFilter}
             options={yearOptions}
             size="md"
           />
           <CustomSelect
-            label={t('fields.quarter')}
             value={quarterFilter}
             onChange={setQuarterFilter}
             options={quarterOptions}
             size="md"
           />
           <CustomSelect
-            label={t('fields.status')}
             value={statusFilter}
             onChange={setStatusFilter}
             options={statusOptions}
@@ -340,74 +353,115 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
         </div>
       </div>
 
-      {/* Summary Cards */}
-      {summary && (
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <StatCard
-              label={t('summary.totalPrepayments')}
-              value={formatCurrency(summary.total_vat + summary.total_income_tax)}
-              variant="purple"
-              icon={Wallet}
-              footer={
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {summary.count} {t('summary.transactions')}
-                </span>
-              }
-            />
-
-            <StatCard
-              label={t('summary.vatAmount')}
-              value={formatCurrency(summary.total_vat)}
-              variant="blue"
-              icon={TrendingUp}
-            />
-
-            <StatCard
-              label={t('summary.incomeTaxAmount')}
-              value={formatCurrency(summary.total_income_tax)}
-              variant="green"
-              icon={FileText}
-            />
-
-            <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-900/30 dark:bg-orange-900/20">
-              <div className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-1">
-                {t('summary.byYear')}
+      {isLoading ? (
+        <div className="space-y-6" aria-busy="true">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="surface p-5">
+                <SkeletonItem className="h-4 w-28" />
+                <SkeletonItem className="mt-3 h-7 w-32" />
               </div>
-              <div className="text-sm text-gray-900 dark:text-white space-y-1">
-                {Object.entries(summary.total_by_year).map(([year, amounts]) => (
-                  <div key={year} className="flex justify-between">
-                    <span>{year}:</span>
-                    <span className="font-semibold">{formatCurrency(amounts.vat + amounts.income_tax)}</span>
-                  </div>
-                ))}
+            ))}
+          </div>
+          <div className="surface divide-y divide-gray-100 dark:divide-gray-800">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex items-center gap-4 px-5 py-4">
+                <SkeletonItem className="h-4 w-40" />
+                <SkeletonItem className="h-4 flex-1" />
+                <SkeletonItem className="h-5 w-16 rounded-full" />
               </div>
-            </div>
+            ))}
           </div>
         </div>
-      )}
-
-      {/* Tax Prepayments Table */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <Table
-          data={prepayments}
-          columns={columns}
-          pageSize={10}
-          onRowClick={(prepayment) => handleViewDetails(prepayment.id)}
-          emptyMessage={
-            <EmptyState
-              icon={FileText}
-              title={t('messages.noPrepayments')}
-              description={
-                searchTerm || taxTypeFilter !== 'all' || yearFilter !== 'all' || quarterFilter !== 'all' || statusFilter !== 'all'
-                  ? t('messages.tryAdjustingFilters')
-                  : t('messages.noPrepaymentsMessage')
-              }
-            />
-          }
-          className="border-0 shadow-none"
+      ) : error ? (
+        <Alert
+          type="error"
+          title={t('messages.errorLoading')}
+          message={error instanceof Error ? error.message : t('messages.unknownError')}
         />
-      </div>
+      ) : (
+        <>
+          {/* Summary */}
+          {summary && (
+            <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <StatCard
+                label={t('summary.totalPrepayments')}
+                value={Number(summary.total_vat) + Number(summary.total_income_tax)}
+                format={(value) => formatCurrency(value)}
+                variant="purple"
+                icon={Wallet}
+                hint={`${summary.count} ${t('summary.transactions')}`}
+              />
+
+              <StatCard
+                label={t('summary.vatAmount')}
+                value={Number(summary.total_vat) || 0}
+                format={(value) => formatCurrency(value)}
+                variant="blue"
+                icon={Receipt}
+              />
+
+              <StatCard
+                label={t('summary.incomeTaxAmount')}
+                value={Number(summary.total_income_tax) || 0}
+                format={(value) => formatCurrency(value)}
+                variant="green"
+                icon={Landmark}
+              />
+
+              <div className="surface p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{t('summary.byYear')}</p>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-600 ring-1 ring-inset ring-orange-600/10 dark:bg-orange-500/10 dark:text-orange-400 dark:ring-orange-400/20">
+                    <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                </div>
+                {byYear.length > 0 ? (
+                  <dl className="mt-2 max-h-28 space-y-1.5 overflow-y-auto text-sm">
+                    {byYear.map(([year, amounts]) => (
+                      <div key={year} className="flex items-baseline justify-between gap-4">
+                        <dt className="tabular-nums text-gray-500 dark:text-gray-400">{year}</dt>
+                        <dd className="font-semibold tabular-nums text-gray-900 dark:text-white">
+                          {formatCurrency(amounts.vat + amounts.income_tax)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : (
+                  <p className="mt-2 text-2xl font-semibold text-gray-300 dark:text-gray-700">—</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Tax Prepayments Table */}
+          <Table
+            data={prepayments}
+            columns={columns}
+            pageSize={10}
+            onRowClick={(prepayment) => handleViewDetails(prepayment.id)}
+            emptyMessage={
+              <EmptyState
+                icon={FileText}
+                title={t('messages.noPrepayments')}
+                description={hasFilters ? t('messages.tryAdjustingFilters') : t('messages.noPrepaymentsMessage')}
+                action={
+                  hasFilters ? undefined : (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => setShowAddModal(true)}
+                      leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
+                    >
+                      {t('actions.add')}
+                    </Button>
+                  )
+                }
+              />
+            }
+          />
+        </>
+      )}
 
       {/* Modals */}
       {showAddModal && (

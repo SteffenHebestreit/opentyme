@@ -1,10 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTaxPrepayment, useDeleteTaxPrepayment, useDeleteReceipt } from '@/hooks/api/useTaxPrepayments';
 import { formatCurrency } from '@/utils/currency';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/common/Button';
-import { Download, Trash2, Edit2, FileText, Eye, X } from 'lucide-react';
+import { Badge, type BadgeVariant } from '@/components/common/Badge';
+import { SkeletonItem } from '@/components/common/Skeleton';
+import { toast } from '@/lib/toast';
+import { confirmDialog } from '@/lib/confirm';
+import { cn } from '@/lib/cn';
+import {
+  CalendarRange,
+  Download,
+  Eye,
+  FileText,
+  Info,
+  Landmark,
+  Paperclip,
+  Pencil,
+  StickyNote,
+  Trash2,
+  type LucideIcon,
+} from 'lucide-react';
 import api from '@/api/services/client';
 
 interface TaxPrepaymentDetailModalProps {
@@ -14,13 +31,43 @@ interface TaxPrepaymentDetailModalProps {
   onEdit?: () => void;
 }
 
+/** Heading of one group of details. */
+function SectionHeading({ icon: Icon, title }: { icon: LucideIcon; title: string }) {
+  return (
+    <div className="mb-3 flex items-center gap-2">
+      <Icon className="h-4 w-4 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h3>
+    </div>
+  );
+}
+
+/** One label/value pair in a details grid. */
+function Detail({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
+  return (
+    <div className={className}>
+      <dt className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</dt>
+      <dd className="mt-1 text-sm text-gray-900 dark:text-white">{children}</dd>
+    </div>
+  );
+}
+
+const statusVariants: Record<string, BadgeVariant> = {
+  paid: 'green',
+  planned: 'yellow',
+  cancelled: 'red',
+  refund: 'blue',
+};
+
+const iconButtonClass =
+  'rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white';
+
 export function TaxPrepaymentDetailModal({
   prepaymentId,
   isOpen,
   onClose,
   onEdit,
 }: TaxPrepaymentDetailModalProps) {
-  const { t } = useTranslation('tax-prepayments');
+  const { t, i18n } = useTranslation('tax-prepayments');
   const { data: prepayment, isLoading } = useTaxPrepayment(prepaymentId);
   const deleteMutation = useDeleteTaxPrepayment();
   const deleteReceiptMutation = useDeleteReceipt();
@@ -35,7 +82,7 @@ export function TaxPrepaymentDetailModal({
           const response = await api.get(`/tax-prepayments/${prepayment.id}/receipt/download`, {
             responseType: 'blob',
           });
-          
+
           const blob = response.data as Blob;
           const url = URL.createObjectURL(blob);
           setReceiptPreviewUrl(url);
@@ -43,10 +90,10 @@ export function TaxPrepaymentDetailModal({
           console.error('Failed to load receipt preview:', error);
         }
       };
-      
+
       fetchReceiptBlob();
     }
-    
+
     // Cleanup blob URL when modal closes
     return () => {
       if (receiptPreviewUrl) {
@@ -57,13 +104,20 @@ export function TaxPrepaymentDetailModal({
   }, [showReceiptPreview, prepayment?.id, prepayment?.receipt_filename]);
 
   const handleDelete = async () => {
-    if (!confirm(t('messages.confirmDelete'))) return;
+    const confirmed = await confirmDialog({
+      title: t('messages.confirmDelete'),
+      tone: 'danger',
+      confirmLabel: t('actions.delete'),
+    });
+    if (!confirmed) return;
 
     try {
       await deleteMutation.mutateAsync(prepaymentId);
+      toast.success(t('messages.deleteSuccess'));
       onClose();
     } catch (error) {
       console.error('Failed to delete tax prepayment:', error);
+      toast.error(t('messages.deleteFailed'));
     }
   };
 
@@ -86,41 +140,47 @@ export function TaxPrepaymentDetailModal({
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Failed to download receipt:', error);
+      toast.error(t('messages.downloadFailed'));
     }
   };
 
   const handleDeleteReceipt = async () => {
-    if (!confirm(t('messages.confirmDeleteReceipt'))) return;
+    const confirmed = await confirmDialog({
+      title: t('messages.confirmDeleteReceipt'),
+      tone: 'danger',
+      confirmLabel: t('actions.deleteReceipt'),
+    });
+    if (!confirmed) return;
 
     try {
       await deleteReceiptMutation.mutateAsync(prepaymentId);
+      toast.success(t('messages.receiptDeleted'));
     } catch (error) {
       console.error('Failed to delete receipt:', error);
     }
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return new Date(dateString).toLocaleDateString(i18n.language, {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
   };
 
-  const getStatusBadgeColor = (status: string) => {
-    const colors = {
-      paid: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-      planned: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-      cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-    };
-    return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
-  };
-
   if (isLoading) {
     return (
-      <Modal open={isOpen} onClose={onClose} title={t('details.title')} size="lg">
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+      <Modal open={isOpen} onClose={onClose} title={t('details.title')} icon={<Landmark className="h-4 w-4" aria-hidden="true" />} size="md">
+        <div className="space-y-6" aria-busy="true">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 space-y-2">
+              <SkeletonItem className="h-6 w-1/2" />
+              <SkeletonItem className="h-5 w-20 rounded-full" />
+            </div>
+            <SkeletonItem className="h-8 w-28" />
+          </div>
+          <SkeletonItem className="h-24 w-full rounded-xl" />
+          <SkeletonItem className="h-16 w-full rounded-xl" />
         </div>
       </Modal>
     );
@@ -130,233 +190,189 @@ export function TaxPrepaymentDetailModal({
     return null;
   }
 
+  const hasAdditionalInfo = Boolean(prepayment.description || prepayment.reference_number || prepayment.payment_method);
+
   return (
     <Modal
       open={isOpen}
       onClose={onClose}
       title={t('details.title')}
-      size="lg"
+      icon={<Landmark className="h-4 w-4" aria-hidden="true" />}
+      size="md"
       footer={
-        <div className="flex justify-between w-full">
-          <Button type="button" variant="outline" onClick={handleDelete} className="text-red-600 hover:text-red-700">
-            <Trash2 className="w-4 h-4 mr-2" />
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleDelete}
+            isLoading={deleteMutation.isPending}
+            leftIcon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
+            className="text-red-600 hover:bg-red-50 hover:text-red-700 sm:mr-auto dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300"
+          >
             {t('actions.delete')}
           </Button>
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              {t('actions.close')}
+          <Button type="button" variant="secondary" onClick={onClose}>
+            {t('actions.close')}
+          </Button>
+          {onEdit && (
+            <Button type="button" onClick={onEdit} leftIcon={<Pencil className="h-4 w-4" aria-hidden="true" />}>
+              {t('actions.edit')}
             </Button>
-            {onEdit && (
-              <Button type="button" onClick={onEdit}>
-                <Edit2 className="w-4 h-4 mr-2" />
-                {t('actions.edit')}
-              </Button>
-            )}
-          </div>
-        </div>
+          )}
+        </>
       }
     >
-      <div className="space-y-6">
+      <div className="animate-fade-in space-y-6">
         {/* Main Info */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              {t('fields.taxType')}
-            </label>
-            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
               {prepayment.tax_type === 'vat' ? t('taxTypes.vat') : t('taxTypes.incomeTax')}
             </p>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              {t('fields.status')}
-            </label>
-            <div className="mt-1">
-              <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${getStatusBadgeColor(prepayment.status)}`}>
+            <div className="mt-2">
+              <Badge variant={statusVariants[prepayment.status] || 'gray'} dot>
                 {t(`status.${prepayment.status}`)}
-              </span>
+              </Badge>
             </div>
           </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              {t('fields.amount')}
-            </label>
-            <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+          <div className="shrink-0 sm:text-right">
+            <p
+              className={cn(
+                'text-2xl font-semibold tracking-tight tabular-nums',
+                prepayment.status === 'refund'
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : 'text-gray-900 dark:text-white'
+              )}
+            >
               {formatCurrency(prepayment.amount)}
             </p>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              {t('fields.paymentDate')}
-            </label>
-            <p className="mt-1 text-base text-gray-900 dark:text-white">
-              {formatDate(prepayment.payment_date)}
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {t('fields.paymentDate')}: <span className="tabular-nums">{formatDate(prepayment.payment_date)}</span>
             </p>
           </div>
         </div>
 
         {/* Period Info */}
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-          <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-            {t('details.periodInfo')}
-          </h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                {t('fields.periodStart')}
-              </label>
-              <p className="mt-1 text-base text-gray-900 dark:text-white">
-                {prepayment.period_start ? formatDate(prepayment.period_start) : '—'}
-              </p>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                {t('fields.periodEnd')}
-              </label>
-              <p className="mt-1 text-base text-gray-900 dark:text-white">
-                {prepayment.period_end ? formatDate(prepayment.period_end) : '—'}
-              </p>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                {t('fields.taxYear')}
-              </label>
-              <p className="mt-1 text-base text-gray-900 dark:text-white">
-                {prepayment.tax_year}
-              </p>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                {t('fields.quarter')}
-              </label>
-              <p className="mt-1 text-base text-gray-900 dark:text-white">
-                {prepayment.quarter ? t(`quarters.q${prepayment.quarter}`) : '-'}
-              </p>
-            </div>
-          </div>
-        </div>
+        <section>
+          <SectionHeading icon={CalendarRange} title={t('details.periodInfo')} />
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-4 rounded-xl bg-gray-50 p-4 ring-1 ring-inset ring-gray-200 sm:grid-cols-4 dark:bg-white/[0.03] dark:ring-gray-800">
+            <Detail label={t('fields.periodStart')}>
+              <span className="tabular-nums">{prepayment.period_start ? formatDate(prepayment.period_start) : '—'}</span>
+            </Detail>
+            <Detail label={t('fields.periodEnd')}>
+              <span className="tabular-nums">{prepayment.period_end ? formatDate(prepayment.period_end) : '—'}</span>
+            </Detail>
+            <Detail label={t('fields.taxYear')}>
+              <span className="tabular-nums">{prepayment.tax_year}</span>
+            </Detail>
+            <Detail label={t('fields.quarter')}>
+              {prepayment.quarter ? t(`quarters.q${prepayment.quarter}`) : '—'}
+            </Detail>
+          </dl>
+        </section>
 
         {/* Additional Details */}
-        {(prepayment.description || prepayment.reference_number || prepayment.payment_method) && (
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-            <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-              {t('details.additionalInfo')}
-            </h3>
-            <div className="space-y-3">
+        {hasAdditionalInfo && (
+          <section>
+            <SectionHeading icon={Info} title={t('details.additionalInfo')} />
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
               {prepayment.description && (
-                <div>
-                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    {t('fields.description')}
-                  </label>
-                  <p className="mt-1 text-base text-gray-900 dark:text-white">
-                    {prepayment.description}
-                  </p>
-                </div>
+                <Detail label={t('fields.description')} className="sm:col-span-2">
+                  {prepayment.description}
+                </Detail>
               )}
 
               {prepayment.reference_number && (
-                <div>
-                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    {t('fields.referenceNumber')}
-                  </label>
-                  <p className="mt-1 text-base text-gray-900 dark:text-white">
-                    {prepayment.reference_number}
-                  </p>
-                </div>
+                <Detail label={t('fields.referenceNumber')}>
+                  {prepayment.reference_number}
+                </Detail>
               )}
 
               {prepayment.payment_method && (
-                <div>
-                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    {t('fields.paymentMethod')}
-                  </label>
-                  <p className="mt-1 text-base text-gray-900 dark:text-white">
-                    {t(`paymentMethods.${prepayment.payment_method}`)}
-                  </p>
-                </div>
+                <Detail label={t('fields.paymentMethod')}>
+                  {t(`paymentMethods.${prepayment.payment_method}`)}
+                </Detail>
               )}
-            </div>
-          </div>
+            </dl>
+          </section>
         )}
 
         {/* Notes */}
         {prepayment.notes && (
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-            <label className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              {t('fields.notes')}
-            </label>
-            <p className="mt-1 text-base text-gray-900 dark:text-white whitespace-pre-wrap">
+          <section>
+            <SectionHeading icon={StickyNote} title={t('fields.notes')} />
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
               {prepayment.notes}
             </p>
-          </div>
+          </section>
         )}
 
         {/* Receipt Section */}
         {prepayment.receipt_filename && (
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-            <label className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 block">
-              {t('fields.receipt')}
-            </label>
-            <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-gray-500" />
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  {prepayment.receipt_filename}
-                </span>
-              </div>
-              <div className="flex gap-2">
+          <section>
+            <SectionHeading icon={Paperclip} title={t('fields.receipt')} />
+            <div className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 dark:border-gray-800">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-purple-600 ring-1 ring-inset ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+                <FileText className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-white">
+                {prepayment.receipt_filename}
+              </span>
+              <div className="flex shrink-0 items-center gap-0.5">
                 <button
+                  type="button"
                   onClick={() => setShowReceiptPreview(true)}
-                  className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300"
+                  className={iconButtonClass}
                   title={t('actions.viewReceipt')}
+                  aria-label={t('actions.viewReceipt')}
                 >
-                  <Eye className="w-4 h-4" />
+                  <Eye className="h-4 w-4" aria-hidden="true" />
                 </button>
                 <button
+                  type="button"
                   onClick={handleDownloadReceipt}
-                  className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                  className={iconButtonClass}
                   title={t('actions.downloadReceipt')}
+                  aria-label={t('actions.downloadReceipt')}
                 >
-                  <Download className="w-4 h-4" />
+                  <Download className="h-4 w-4" aria-hidden="true" />
                 </button>
                 <button
+                  type="button"
                   onClick={handleDeleteReceipt}
-                  className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                  disabled={deleteReceiptMutation.isPending}
+                  className={cn(iconButtonClass, 'hover:text-red-600 dark:hover:text-red-400')}
                   title={t('actions.deleteReceipt')}
+                  aria-label={t('actions.deleteReceipt')}
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
             </div>
-          </div>
+          </section>
         )}
       </div>
 
       {/* Receipt Preview Modal */}
-      {showReceiptPreview && receiptPreviewUrl && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60]" onClick={() => setShowReceiptPreview(false)}>
-          <div className="relative max-w-4xl max-h-[90vh] w-full mx-4">
-            <button
-              onClick={() => setShowReceiptPreview(false)}
-              className="absolute top-4 right-4 text-white bg-black/50 rounded-full p-2 hover:bg-black/70"
-            >
-              <X className="w-6 h-6" />
-            </button>
+      <Modal
+        open={showReceiptPreview}
+        onClose={() => setShowReceiptPreview(false)}
+        title={prepayment.receipt_filename || t('actions.viewReceipt')}
+        icon={<Eye className="h-4 w-4" aria-hidden="true" />}
+        size="xl"
+      >
+        <div className="flex min-h-[16rem] items-center justify-center rounded-lg bg-gray-100 p-4 dark:bg-gray-950/60">
+          {receiptPreviewUrl ? (
             <img
               src={receiptPreviewUrl}
-              alt="Receipt preview"
-              className="max-w-full max-h-[90vh] object-contain"
-              onClick={(e) => e.stopPropagation()}
+              alt={t('details.receiptPreviewAlt')}
+              className="max-h-[70vh] max-w-full animate-fade-in rounded object-contain"
             />
-          </div>
+          ) : (
+            <SkeletonItem className="h-64 w-full max-w-md" />
+          )}
         </div>
-      )}
+      </Modal>
     </Modal>
   );
 }

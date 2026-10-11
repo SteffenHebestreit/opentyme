@@ -75,7 +75,8 @@
   "details": {
     "title": "Steuervorauszahlung Details",
     "periodInfo": "Zeitrauminformationen",
-    "additionalInfo": "Zusätzliche Informationen"
+    "additionalInfo": "Zusätzliche Informationen",
+    "receiptPreviewAlt": "Beleg"
   },
   
   "summary": {
@@ -115,7 +116,25 @@
     "errorLoading": "Fehler beim Laden der Steuervorauszahlungen",
     "noPrepayments": "Keine Steuervorauszahlungen gefunden",
     "noPrepaymentsMessage": "Beginnen Sie mit dem Hinzufügen Ihrer ersten Steuervorauszahlung",
-    "tryAdjustingFilters": "Versuchen Sie, Ihre Filter anzupassen"
+    "tryAdjustingFilters": "Versuchen Sie, Ihre Filter anzupassen",
+    "saveFailed": "Die Steuervorauszahlung konnte nicht gespeichert werden. Bitte erneut versuchen.",
+    "deleteFailed": "Die Steuervorauszahlung konnte nicht gelöscht werden",
+    "downloadFailed": "Der Beleg konnte nicht heruntergeladen werden. Bitte erneut versuchen.",
+    "unknownError": "Ein unbekannter Fehler ist aufgetreten"
+  },
+  
+  "sections": {
+    "payment": "Zahlung",
+    "period": "Zeitraum",
+    "details": "Details"
+  },
+
+  "receipt": {
+    "dropPrompt": "Beleg hierher ziehen oder Datei auswählen",
+    "replacePrompt": "Neuen Beleg hierher ziehen, um ihn zu ersetzen",
+    "formats": "PDF, JPG oder PNG",
+    "change": "Ändern",
+    "remove": "Beleg entfernen"
   },
   
   "actions": {

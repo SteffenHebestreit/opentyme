@@ -75,7 +75,8 @@
   "details": {
     "title": "Tax Prepayment Details",
     "periodInfo": "Period Information",
-    "additionalInfo": "Additional Information"
+    "additionalInfo": "Additional Information",
+    "receiptPreviewAlt": "Receipt"
   },
   
   "summary": {
@@ -115,7 +116,25 @@
     "errorLoading": "Error loading tax prepayments",
     "noPrepayments": "No tax prepayments found",
     "noPrepaymentsMessage": "Get started by adding your first tax prepayment",
-    "tryAdjustingFilters": "Try adjusting your filters"
+    "tryAdjustingFilters": "Try adjusting your filters",
+    "saveFailed": "Could not save the tax prepayment. Please try again.",
+    "deleteFailed": "Could not delete the tax prepayment",
+    "downloadFailed": "Could not download the receipt. Please try again.",
+    "unknownError": "An unknown error occurred"
+  },
+  
+  "sections": {
+    "payment": "Payment",
+    "period": "Period",
+    "details": "Details"
+  },
+
+  "receipt": {
+    "dropPrompt": "Drop the receipt here or click to choose a file",
+    "replacePrompt": "Drop a new receipt here to replace it",
+    "formats": "PDF, JPG or PNG",
+    "change": "Change",
+    "remove": "Remove receipt"
   },
   
   "actions": {

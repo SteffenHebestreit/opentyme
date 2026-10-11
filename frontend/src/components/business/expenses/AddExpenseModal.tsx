@@ -1,18 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Eye,
+  FileText,
+  Info,
+  ListChecks,
+  Calculator,
+  Paperclip,
+  Receipt,
+  SlidersHorizontal,
+  Sparkles,
+  type LucideIcon,
+} from 'lucide-react';
 import { useCreateExpense } from '@/hooks/api/useExpenses';
 import { useProjects } from '@/hooks/api/useProjects';
 import { ExpenseCategory } from '@/api/types';
 import { Input, CustomSelect, Textarea } from '@/components/forms';
+import { FileDropZone } from '@/components/forms/FileDropZone';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/common/Button';
+import { Alert, type AlertType } from '@/components/common/Alert';
 import { useUploadReceipt } from '@/hooks/api/useExpenses';
 import { analyzeReceipt } from '@/api/services/expense.service';
 import type { AnalyzedLineItem } from '@/api/services/expense.service';
 import { DepreciationSettings } from '@/components/business/expenses/DepreciationSettings';
+import { expenseCategoryLabel, getExpenseCategoryOptions } from '@/components/business/expenses/expenseCategories';
 import { useAnalyzeDepreciationDraft } from '@/hooks/api/useDepreciation';
 import { Slot } from '@/plugins/slots';
 import { usePlugins } from '@/api/hooks/usePlugins';
+import { formatCurrency } from '@/utils/currency';
+import { cn } from '@/lib/cn';
 import { extractErrorMessage } from '../../../utils/error';
 
 interface AddExpenseModalProps {
@@ -21,8 +40,39 @@ interface AddExpenseModalProps {
   onExpenseAdded: () => void;
 }
 
+/** A status line shown after an AI step (receipt analysis, AfA analysis, split booking). */
+interface Notice {
+  tone: AlertType;
+  text: string;
+}
+
+const checkboxClass =
+  'h-4 w-4 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900';
+
+/** Heading of one group of fields in the form. */
+function SectionHeading({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children?: ReactNode }) {
+  return (
+    <div className="mb-3 flex items-center gap-2">
+      <Icon className="h-4 w-4 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+/** Thin indeterminate bar shown while an AI request runs. */
+function WorkingBar() {
+  return (
+    <div className="relative h-0.5 overflow-hidden bg-purple-100 dark:bg-purple-500/10" aria-hidden="true">
+      <div className="absolute inset-y-0 left-0 w-full origin-left animate-progress-indeterminate bg-purple-500 dark:bg-purple-400" />
+    </div>
+  );
+}
+
+const sectionClass = 'py-5 first:pt-0 last:pb-0';
+
 export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseModalProps) {
-  const { t } = useTranslation('expenses');
+  const { t, i18n } = useTranslation('expenses');
   const { data: pluginsData } = usePlugins();
   const aiAddonEnabled = pluginsData?.plugins?.find((p) => p.name === 'ai-expense-analysis')?.userEnabled ?? false;
   const [description, setDescription] = useState('');
@@ -37,19 +87,19 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
   const [currency, setCurrency] = useState('EUR');
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisMessage, setAnalysisMessage] = useState<string | null>(null);
+  const [analysisMessage, setAnalysisMessage] = useState<Notice | null>(null);
   // Set once the receipt analysis succeeds, so the modal can offer the AfA
   // analysis right away instead of making the user save and reopen the expense.
   const [offerDepreciationAnalysis, setOfferDepreciationAnalysis] = useState(false);
-  const [depreciationMessage, setDepreciationMessage] = useState<string | null>(null);
+  const [depreciationMessage, setDepreciationMessage] = useState<Notice | null>(null);
   // Positions of a bundled invoice. Non-empty only when the receipt covers
   // several distinct articles, which have to be booked separately: the GWG
   // limit and the AfA useful life both apply per article, not per invoice.
   const [lineItems, setLineItems] = useState<AnalyzedLineItem[]>([]);
   const [selectedLineItems, setSelectedLineItems] = useState<boolean[]>([]);
-  const [splitProgress, setSplitProgress] = useState<string | null>(null);
+  const [splitProgress, setSplitProgress] = useState<Notice | null>(null);
   const [isSplitting, setIsSplitting] = useState(false);
-  
+
   // Recurring expense fields
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceFrequency, setRecurrenceFrequency] = useState('monthly');
@@ -73,6 +123,8 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
   const uploadReceipt = useUploadReceipt();
   const analyzeDepreciationDraft = useAnalyzeDepreciationDraft();
   const { data: projects = [] } = useProjects();
+
+  const categoryOptions = getExpenseCategoryOptions(t);
 
   useEffect(() => {
     if (!isOpen) {
@@ -169,14 +221,15 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
 
   const handleAnalyzeReceipt = async () => {
     if (!receiptFile) {
-      setAnalysisMessage('Please select a PDF file first');
+      setAnalysisMessage({ tone: 'warning', text: t('ai.selectFileFirst') });
       return;
     }
 
     if (!isAnalysable(receiptFile)) {
-      setAnalysisMessage(
-        t('ai.unsupportedType', 'Only PDFs and images (JPEG, PNG, WebP) can be analyzed')
-      );
+      setAnalysisMessage({
+        tone: 'warning',
+        text: t('ai.unsupportedType', 'Only PDFs and images (JPEG, PNG, WebP) can be analyzed'),
+      });
       return;
     }
 
@@ -218,9 +271,7 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
         if (extracted.tax_rate) setTaxRate((extracted.tax_rate * 100).toString());
 
         const confidence = result.data.confidence || 0;
-        setAnalysisMessage(
-          `✓ Analysis complete! Confidence: ${confidence}%. Please review and adjust the extracted data.`
-        );
+        setAnalysisMessage({ tone: 'success', text: t('ai.analysisComplete', { confidence }) });
         // A bundled invoice has to be booked per article, so offer the split
         // instead of the single-expense AfA shortcut.
         const items = extracted.line_items ?? [];
@@ -233,11 +284,11 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
         setDepreciationMessage(null);
         setOfferDepreciationAnalysis(items.length === 0 && Boolean(label && extracted.amount));
       } else {
-        setAnalysisMessage(result.message || 'Analysis failed. Please fill in the form manually.');
+        setAnalysisMessage({ tone: 'warning', text: result.message || t('ai.analysisFailedManual') });
       }
     } catch (error) {
       console.error('Failed to analyze receipt:', error);
-      setAnalysisMessage(`✗ Analysis failed: ${extractErrorMessage(error)}`);
+      setAnalysisMessage({ tone: 'error', text: `${t('ai.analysisFailed')}: ${extractErrorMessage(error)}` });
     } finally {
       setIsAnalyzing(false);
     }
@@ -253,9 +304,10 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
   const handleAnalyzeDepreciation = async () => {
     const parsedAmount = parseFloat(amount);
     if (!description.trim() || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      setDepreciationMessage(
-        t('ai.depreciationNeedsData', 'Please fill in a description and amount first.')
-      );
+      setDepreciationMessage({
+        tone: 'warning',
+        text: t('ai.depreciationNeedsData', 'Please fill in a description and amount first.'),
+      });
       return;
     }
 
@@ -275,9 +327,10 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
 
       const analysis = result.analysis;
       if (!analysis) {
-        setDepreciationMessage(
-          result.reason || t('ai.depreciationNoResult', 'No depreciation recommendation returned.')
-        );
+        setDepreciationMessage({
+          tone: 'warning',
+          text: result.reason || t('ai.depreciationNoResult', 'No depreciation recommendation returned.'),
+        });
         return;
       }
 
@@ -295,16 +348,16 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
       }
 
       setOfferDepreciationAnalysis(false);
-      setDepreciationMessage(
-        `✓ ${t('ai.depreciationDone', 'Depreciation analysis complete')} (${analysis.confidence}%): ${analysis.reasoning}`
-      );
+      setDepreciationMessage({
+        tone: 'success',
+        text: `${t('ai.depreciationDone', 'Depreciation analysis complete')} (${analysis.confidence}%): ${analysis.reasoning}`,
+      });
     } catch (error) {
       console.error('Failed to analyze depreciation:', error);
-      setDepreciationMessage(
-        `✗ ${t('ai.depreciationFailed', 'Depreciation analysis failed')}: ${
-          extractErrorMessage(error)
-        }`
-      );
+      setDepreciationMessage({
+        tone: 'error',
+        text: `${t('ai.depreciationFailed', 'Depreciation analysis failed')}: ${extractErrorMessage(error)}`,
+      });
     }
   };
 
@@ -351,12 +404,13 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
     let created = 0;
     try {
       for (const item of chosen) {
-        setSplitProgress(
-          t('ai.splitProgress', 'Creating expense {{current}} of {{total}}...', {
+        setSplitProgress({
+          tone: 'info',
+          text: t('ai.splitProgress', 'Creating expense {{current}} of {{total}}...', {
             current: created + 1,
             total: chosen.length,
-          })
-        );
+          }),
+        });
 
         const itemTaxRate = item.tax_rate ?? (parseFloat(taxRate) / 100 || 0);
         const itemNet = item.amount / (1 + itemTaxRate);
@@ -397,12 +451,13 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
       onClose();
     } catch (error) {
       console.error('Failed to create split expenses:', error);
-      setSplitProgress(
-        `✗ ${t('ai.splitFailed', 'Created {{created}} of {{total}} expenses, then failed', {
+      setSplitProgress({
+        tone: 'error',
+        text: `${t('ai.splitFailed', 'Created {{created}} of {{total}} expenses, then failed', {
           created,
           total: chosen.length,
-        })}: ${extractErrorMessage(error)}`
-      );
+        })}: ${extractErrorMessage(error)}`,
+      });
       if (created > 0) onExpenseAdded();
     } finally {
       setIsSplitting(false);
@@ -410,43 +465,6 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
   };
 
   const formId = 'add-expense-form';
-
-  const categoryOptions = [
-    // IT & Digital Equipment
-    { value: 'computer', label: t('categories.computer', 'Computer/Laptop/Tablet') },
-    { value: 'software', label: t('categories.software', 'Software & Licenses') },
-    { value: 'peripherals', label: t('categories.peripherals', 'Peripherals') },
-    { value: 'storage', label: t('categories.storage', 'Storage Devices') },
-    { value: 'display', label: t('categories.display', 'Monitor/Display') },
-    { value: 'printer', label: t('categories.printer', 'Printer/Scanner') },
-    
-    // Office
-    { value: 'office_furniture', label: t('categories.office_furniture', 'Office Furniture') },
-    { value: 'office_equipment', label: t('categories.office_equipment', 'Office Equipment') },
-    { value: 'office_supplies', label: t('categories.office_supplies', 'Office Supplies') },
-    
-    // Vehicles
-    { value: 'vehicle_car', label: t('categories.vehicle_car', 'Car/Vehicle') },
-    { value: 'vehicle_motorcycle', label: t('categories.vehicle_motorcycle', 'Motorcycle/E-bike') },
-    
-    // Tools
-    { value: 'camera', label: t('categories.camera', 'Camera Equipment') },
-    { value: 'tools', label: t('categories.tools', 'Tools/Equipment') },
-    { value: 'machinery', label: t('categories.machinery', 'Machinery') },
-    
-    // Services & Operating Expenses
-    { value: 'insurance', label: t('categories.insurance', 'Insurance') },
-    { value: 'professional_services', label: t('categories.professional_services', 'Professional Services') },
-    { value: 'marketing', label: t('categories.marketing', 'Marketing') },
-    { value: 'utilities', label: t('categories.utilities', 'Utilities') },
-    { value: 'travel', label: t('categories.travel', 'Travel') },
-    { value: 'meals', label: t('categories.meals', 'Meals') },
-    { value: 'training', label: t('categories.training', 'Training') },
-    { value: 'rent', label: t('categories.rent', 'Rent') },
-    { value: 'telecommunications', label: t('categories.telecommunications', 'Phone/Internet') },
-    
-    { value: 'other', label: t('categories.other', 'Other') },
-  ];
 
   const projectOptions = [
     { value: '', label: t('noProject') },
@@ -468,438 +486,471 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
     { value: '19', label: t('tax.standardRate') + ' (19%)' },
   ];
 
-  const getCurrencySymbol = () => {
-    switch (currency) {
-      case 'USD': return '$';
-      case 'GBP': return '£';
-      case 'EUR':
-      default: return '€';
-    }
-  };
+  const optionTileClass =
+    'flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm font-medium text-gray-700 transition-colors ' +
+    'hover:bg-gray-50 has-[:checked]:border-purple-300 has-[:checked]:bg-purple-50/60 has-[:checked]:text-gray-900 ' +
+    'dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.02] dark:has-[:checked]:border-purple-500/40 dark:has-[:checked]:bg-purple-500/[0.08] dark:has-[:checked]:text-white';
 
   return (
     <Modal
       open={isOpen}
       onClose={onClose}
       title={t('add')}
+      description={t('addDescription')}
+      icon={<Receipt className="h-4 w-4" aria-hidden="true" />}
       size="lg"
       footer={
         <>
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose}>
             {t('cancel')}
           </Button>
-          <Button type="submit" form={formId} disabled={createExpense.isPending}>
+          <Button type="submit" form={formId} isLoading={createExpense.isPending}>
             {createExpense.isPending ? t('adding') : t('addExpense')}
           </Button>
         </>
       }
     >
-      <form id={formId} onSubmit={handleSubmit} className="space-y-4">
-                {/* Description */}
-                <Input
-                  label={t('fields.description')}
-                  type="text"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder={t('fields.descriptionPlaceholder')}
-                  required
-                />
+      <form id={formId} onSubmit={handleSubmit} className="divide-y divide-gray-100 dark:divide-gray-800">
+        {/* Receipt & AI analysis */}
+        <section className={sectionClass}>
+          <SectionHeading icon={Paperclip} title={t('fields.receipt')} />
 
-                {/* Amount and Currency */}
-                <div className="grid grid-cols-2 gap-4">
-                  <Input
-                    label={t('fields.amount')}
-                    type="number"
-                    step="0.01"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    required
-                  />
-                  <CustomSelect
-                    label={t('fields.currency')}
-                    value={currency}
-                    onChange={setCurrency}
-                    options={currencyOptions}
-                  />
-                </div>
+          <FileDropZone
+            file={receiptFile}
+            onFile={setReceiptFile}
+            accept="image/*,application/pdf"
+            prompt={t('receipt.dropPrompt')}
+            hint={t('receiptMaxSize')}
+            changeLabel={t('receipt.change')}
+            removeLabel={t('receipt.remove')}
+            locale={i18n.language}
+          />
 
-                {/* Tax Rate */}
-                <CustomSelect
-                  label={t('tax.taxRate')}
-                  value={taxRate}
-                  onChange={setTaxRate}
-                  options={taxRateOptions}
-                />
+          {receiptFile && (
+            <div className="mt-2 flex justify-end">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                leftIcon={<Eye className="h-4 w-4" aria-hidden="true" />}
+                onClick={() => {
+                  const url = URL.createObjectURL(receiptFile);
+                  window.open(url, '_blank');
+                }}
+              >
+                {t('receipt.preview')}
+              </Button>
+            </div>
+          )}
 
-                {/* Tax Breakdown Display */}
-                {totalAmount > 0 && (
-                  <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-4 border border-gray-200 dark:border-gray-700">
-                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                      {t('tax.breakdown')}
-                    </h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">{t('tax.netAmount')}</span>
-                        <span className="font-medium text-gray-900 dark:text-gray-100">
-                          {netAmount.toFixed(2)} {getCurrencySymbol()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">
-                          {t('tax.taxAmount')} ({taxRatePercent}%)
-                        </span>
-                        <span className="font-medium text-gray-900 dark:text-gray-100">
-                          {taxAmount.toFixed(2)} {getCurrencySymbol()}
-                        </span>
-                      </div>
-                      <div className="border-t border-gray-300 dark:border-gray-600 pt-2 mt-2"></div>
-                      <div className="flex justify-between">
-                        <span className="font-semibold text-gray-700 dark:text-gray-300">{t('tax.total')}</span>
-                        <span className="font-semibold text-gray-900 dark:text-gray-100">
-                          {totalAmount.toFixed(2)} {getCurrencySymbol()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Category and Date */}
-                <div className="grid grid-cols-2 gap-4">
-                  <CustomSelect
-                    label={t('fields.category')}
-                    value={category}
-                    onChange={setCategory}
-                    options={categoryOptions}
-                  />
-                  <Input
-                    label={t('fields.date')}
-                    type="date"
-                    value={expenseDate}
-                    onChange={(e) => setExpenseDate(e.target.value)}
-                    required
-                  />
-                </div>
-
-                {/* Project */}
-                <CustomSelect
-                  label={t('fields.project')}
-                  value={projectId}
-                  onChange={setProjectId}
-                  options={projectOptions}
-                />
-
-                {/* Checkboxes */}
-                <div className="flex gap-6">
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={isBillable}
-                      onChange={(e) => setIsBillable(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-700"
-                    />
-                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                      {t('billableToClient')}
-                    </span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={isReimbursable}
-                      onChange={(e) => setIsReimbursable(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-700"
-                    />
-                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                      {t('fields.isReimbursable')}
-                    </span>
-                  </label>
-                </div>
-
-                {/* Recurring Expense Section */}
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                  <label className="flex items-center mb-4">
-                    <input
-                      type="checkbox"
-                      checked={isRecurring}
-                      onChange={(e) => setIsRecurring(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-700"
-                    />
-                    <span className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {t('recurring.isRecurring', 'Recurring Expense')}
-                    </span>
-                  </label>
-
-                  {isRecurring && (
-                    <div className="space-y-4 pl-6 border-l-2 border-purple-200 dark:border-purple-800">
-                      {/* Frequency */}
-                      <CustomSelect
-                        label={t('recurring.frequency', 'Frequency')}
-                        value={recurrenceFrequency}
-                        onChange={setRecurrenceFrequency}
-                        options={[
-                          { value: 'monthly', label: t('recurring.monthly', 'Monthly') },
-                          { value: 'quarterly', label: t('recurring.quarterly', 'Quarterly') },
-                          { value: 'yearly', label: t('recurring.yearly', 'Yearly') },
-                        ]}
-                      />
-
-                      {/* Start and End Dates */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <Input
-                          label={t('recurring.startDate', 'Start Date')}
-                          type="date"
-                          value={recurrenceStartDate}
-                          onChange={(e) => setRecurrenceStartDate(e.target.value)}
-                          required
-                        />
-                        <Input
-                          label={t('recurring.endDate', 'End Date (Optional)')}
-                          type="date"
-                          value={recurrenceEndDate}
-                          onChange={(e) => setRecurrenceEndDate(e.target.value)}
-                          min={recurrenceStartDate}
-                        />
-                      </div>
-
-                      {/* Info Box */}
-                      <div className="rounded-lg bg-purple-50 dark:bg-purple-900/20 p-3 border border-purple-200 dark:border-purple-800">
-                        <p className="text-xs text-purple-800 dark:text-purple-300">
-                          💡 {t('recurring.info', 'This expense will be automatically generated based on the selected frequency. The system runs daily at 2 AM to create new expense entries.')}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Depreciation Settings */}
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-                  <DepreciationSettings
-                    depreciationType={depreciationType}
-                    depreciationYears={depreciationYears}
-                    depreciationMethod={depreciationMethod}
-                    onChange={(field, value) => {
-                      if (field === 'depreciation_type') {
-                        setDepreciationType(value);
-                      } else if (field === 'depreciation_years') {
-                        setDepreciationYears(value);
-                      } else if (field === 'depreciation_method') {
-                        setDepreciationMethod(value);
-                      }
-                    }}
-                  />
-                </div>
-
-                {/* Notes */}
-                <Textarea
-                  label={t('fields.notes')}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder={t('notesPlaceholder')}
-                  rows={3}
-                />
-
-                {/* Receipt Upload */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    {t('fields.receipt')}
-                  </label>
-                  <div className="space-y-2">
-                    <input
-                      type="file"
-                      accept="image/*,application/pdf"
-                      onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
-                      className="block w-full text-sm text-gray-900 dark:text-gray-100 
-                                file:mr-4 file:py-2 file:px-4
-                                file:rounded-md file:border-0
-                                file:text-sm file:font-medium
-                                file:bg-purple-50 file:text-purple-700
-                                hover:file:bg-purple-100
-                                dark:file:bg-purple-900/30 dark:file:text-purple-400
-                                dark:hover:file:bg-purple-900/50
-                                cursor-pointer"
-                    />
-                    {receiptFile && isAnalysable(receiptFile) && aiAddonEnabled && (
-                      <button
-                        type="button"
-                        onClick={handleAnalyzeReceipt}
-                        disabled={isAnalyzing}
-                        className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 
-                                   rounded-lg hover:from-purple-700 hover:to-indigo-700 
-                                   disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed
-                                   transition-all duration-200 shadow-sm hover:shadow-md
-                                   flex items-center gap-2"
-                      >
-                        {isAnalyzing ? (
-                          <>
-                            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Analyzing...
-                          </>
-                        ) : (
-                          <>
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
-                            🤖 {t('ai.analyzeReceipt', 'Analyze Receipt with AI')}
-                          </>
-                        )}
-                      </button>
-                    )}
-                    {analysisMessage && (
-                      <p className={`text-sm ${analysisMessage.startsWith('✓') ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
-                        {analysisMessage}
-                      </p>
-                    )}
-                    {lineItems.length > 0 && (
-                      <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-3 space-y-3">
-                        <div>
-                          <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                            {t('ai.splitTitle', 'This invoice contains {{count}} positions', {
-                              count: lineItems.length,
-                            })}
-                          </p>
-                          <p className="text-xs text-blue-800 dark:text-blue-200 mt-1">
-                            {t(
-                              'ai.splitHint',
-                              'The 800 EUR GWG limit and the depreciation period apply per article, not per invoice. Book them separately to get the tax treatment right.'
-                            )}
-                          </p>
-                        </div>
-
-                        <div className="space-y-1">
-                          {lineItems.map((item, index) => (
-                            <label
-                              key={`${item.description}-${index}`}
-                              className="flex items-start gap-2 text-sm text-gray-800 dark:text-gray-100 cursor-pointer"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selectedLineItems[index] ?? false}
-                                onChange={() => toggleLineItem(index)}
-                                disabled={isSplitting}
-                                className="mt-1 rounded border-gray-300 dark:border-gray-600 text-purple-600 focus:ring-purple-500"
-                              />
-                              <span className="flex-1">
-                                {item.quantity && item.quantity > 1 ? `${item.quantity}x ` : ''}
-                                {item.description}
-                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  {' '}— {item.amount.toFixed(2)} {currency}
-                                  {item.category ? ` · ${item.category}` : ''}
-                                </span>
-                              </span>
-                            </label>
-                          ))}
-                        </div>
-
-                        <p className="text-xs text-gray-600 dark:text-gray-300">
-                          {t('ai.splitSelected', 'Selected')}: {selectedLineItemTotal.toFixed(2)} {currency}
-                          {' · '}
-                          {lineItemsReconcile
-                            ? t('ai.splitReconciles', 'positions match the invoice total')
-                            : t(
-                                'ai.splitMismatch',
-                                'positions do NOT add up to the invoice total — check them'
-                              )}
-                        </p>
-
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            variant="primary"
-                            onClick={handleCreateSplitExpenses}
-                            disabled={isSplitting || selectedLineItemCount === 0}
-                          >
-                            {isSplitting
-                              ? t('ai.splitRunning', 'Creating...')
-                              : t('ai.splitCreate', 'Create {{count}} expenses', {
-                                  count: selectedLineItemCount,
-                                })}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => {
-                              setLineItems([]);
-                              setSelectedLineItems([]);
-                              setOfferDepreciationAnalysis(Boolean(description && amount));
-                            }}
-                            disabled={isSplitting}
-                          >
-                            {t('ai.splitCombined', 'Keep as one expense')}
-                          </Button>
-                        </div>
-
-                        {splitProgress && (
-                          <p className={`text-sm ${splitProgress.startsWith('✗') ? 'text-red-600 dark:text-red-400' : 'text-blue-800 dark:text-blue-200'}`}>
-                            {splitProgress}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    {offerDepreciationAnalysis && aiAddonEnabled && (
-                      <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3 space-y-2">
-                        <p className="text-sm text-amber-900 dark:text-amber-100">
-                          {t(
-                            'ai.depreciationPrompt',
-                            'Analyze depreciation (AfA) for this expense now as well?'
-                          )}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            variant="primary"
-                            onClick={handleAnalyzeDepreciation}
-                            disabled={analyzeDepreciationDraft.isPending}
-                          >
-                            {analyzeDepreciationDraft.isPending
-                              ? t('ai.depreciationRunning', 'Analyzing depreciation...')
-                              : t('ai.depreciationYes', 'Yes, analyze now')}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setOfferDepreciationAnalysis(false)}
-                            disabled={analyzeDepreciationDraft.isPending}
-                          >
-                            {t('ai.depreciationNo', 'Skip')}
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    {depreciationMessage && (
-                      <p className={`text-sm ${depreciationMessage.startsWith('✓') ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
-                        {depreciationMessage}
-                      </p>
-                    )}
-                    {receiptFile && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {t('receiptSelected')}:{' '}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const url = URL.createObjectURL(receiptFile);
-                            window.open(url, '_blank');
-                          }}
-                          className="text-purple-600 dark:text-purple-400 hover:underline cursor-pointer font-medium"
-                        >
-                          {receiptFile.name}
-                        </button>
-                        {' '}({(receiptFile.size / 1024).toFixed(2)} KB)
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {t('receiptMaxSize')}
+          {receiptFile && isAnalysable(receiptFile) && aiAddonEnabled && (
+            <div className="mt-3 animate-fade-in overflow-hidden rounded-xl border border-purple-200/70 bg-purple-50/50 dark:border-purple-500/20 dark:bg-purple-500/[0.06]">
+              <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-purple-600 ring-1 ring-inset ring-purple-600/15 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+                    <Sparkles className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">{t('ai.panelTitle')}</p>
+                    <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-400">
+                      {isAnalyzing ? t('ai.analyzingHint') : t('ai.panelHint')}
                     </p>
                   </div>
                 </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleAnalyzeReceipt}
+                  isLoading={isAnalyzing}
+                  leftIcon={<Sparkles className="h-4 w-4" aria-hidden="true" />}
+                  className="shrink-0 self-start sm:self-auto"
+                >
+                  {isAnalyzing ? t('ai.analyzing') : t('ai.analyzeReceipt', 'Analyze Receipt with AI')}
+                </Button>
+              </div>
+              {isAnalyzing && <WorkingBar />}
+            </div>
+          )}
+
+          {analysisMessage && (
+            <Alert className="mt-3" type={analysisMessage.tone} message={analysisMessage.text} />
+          )}
+
+          {/* Positions of a bundled invoice */}
+          {lineItems.length > 0 && (
+            <div className="mt-3 animate-fade-up overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+              <div className="flex items-start gap-3 border-b border-gray-100 bg-blue-50/60 px-4 py-3 dark:border-gray-800 dark:bg-blue-500/[0.06]">
+                <ListChecks className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {t('ai.splitTitle', 'This invoice contains {{count}} positions', {
+                      count: lineItems.length,
+                    })}
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">
+                    {t(
+                      'ai.splitHint',
+                      'The 800 EUR GWG limit and the depreciation period apply per article, not per invoice. Book them separately to get the tax treatment right.'
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <ul className="max-h-64 divide-y divide-gray-100 overflow-y-auto dark:divide-gray-800/70">
+                {lineItems.map((item, index) => (
+                  <li key={`${item.description}-${index}`}>
+                    <label className="flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                      <input
+                        type="checkbox"
+                        checked={selectedLineItems[index] ?? false}
+                        onChange={() => toggleLineItem(index)}
+                        disabled={isSplitting}
+                        className={checkboxClass}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm text-gray-900 dark:text-white">
+                          {item.quantity && item.quantity > 1 ? `${item.quantity}x ` : ''}
+                          {item.description}
+                        </span>
+                        {item.category && (
+                          <span className="block text-xs text-gray-500 dark:text-gray-400">
+                            {expenseCategoryLabel(t, item.category)}
+                          </span>
+                        )}
+                      </span>
+                      <span className="whitespace-nowrap text-right text-sm font-medium tabular-nums text-gray-900 dark:text-white">
+                        {formatCurrency(item.amount, currency)}
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="flex flex-col gap-3 border-t border-gray-100 bg-gray-50/70 px-4 py-3 dark:border-gray-800 dark:bg-white/[0.02]">
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs">
+                  <span className="text-gray-600 dark:text-gray-400">
+                    {t('ai.splitSelected', 'Selected')}:{' '}
+                    <span className="font-semibold tabular-nums text-gray-900 dark:text-white">
+                      {formatCurrency(selectedLineItemTotal, currency)}
+                    </span>
+                  </span>
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-1.5 font-medium',
+                      lineItemsReconcile
+                        ? 'text-emerald-700 dark:text-emerald-400'
+                        : 'text-amber-700 dark:text-amber-400'
+                    )}
+                  >
+                    {lineItemsReconcile ? (
+                      <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    ) : (
+                      <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                    {lineItemsReconcile
+                      ? t('ai.splitReconciles', 'positions match the invoice total')
+                      : t(
+                          'ai.splitMismatch',
+                          'positions do NOT add up to the invoice total — check them'
+                        )}
+                  </span>
+                </div>
+
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      setLineItems([]);
+                      setSelectedLineItems([]);
+                      setOfferDepreciationAnalysis(Boolean(description && amount));
+                    }}
+                    disabled={isSplitting}
+                  >
+                    {t('ai.splitCombined', 'Keep as one expense')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    onClick={handleCreateSplitExpenses}
+                    disabled={selectedLineItemCount === 0}
+                    isLoading={isSplitting}
+                  >
+                    {isSplitting
+                      ? t('ai.splitRunning', 'Creating...')
+                      : t('ai.splitCreate', 'Create {{count}} expenses', {
+                          count: selectedLineItemCount,
+                        })}
+                  </Button>
+                </div>
+
+                {splitProgress && <Alert type={splitProgress.tone} message={splitProgress.text} />}
+              </div>
+            </div>
+          )}
+
+          {/* Offer the AfA analysis right after a successful receipt analysis */}
+          {offerDepreciationAnalysis && aiAddonEnabled && (
+            <div className="mt-3 animate-fade-up overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+              <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-start gap-3">
+                  <Calculator className="mt-0.5 h-4 w-4 shrink-0 text-purple-600 dark:text-purple-300" aria-hidden="true" />
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    {analyzeDepreciationDraft.isPending
+                      ? t('ai.depreciationRunningHint')
+                      : t('ai.depreciationPrompt', 'Analyze depreciation (AfA) for this expense now as well?')}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-col-reverse gap-2 sm:flex-row">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setOfferDepreciationAnalysis(false)}
+                    disabled={analyzeDepreciationDraft.isPending}
+                  >
+                    {t('ai.depreciationNo', 'Skip')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    onClick={handleAnalyzeDepreciation}
+                    isLoading={analyzeDepreciationDraft.isPending}
+                  >
+                    {analyzeDepreciationDraft.isPending
+                      ? t('ai.depreciationRunning', 'Analyzing depreciation...')
+                      : t('ai.depreciationYes', 'Yes, analyze now')}
+                  </Button>
+                </div>
+              </div>
+              {analyzeDepreciationDraft.isPending && <WorkingBar />}
+            </div>
+          )}
+
+          {depreciationMessage && (
+            <Alert className="mt-3" type={depreciationMessage.tone} message={depreciationMessage.text} />
+          )}
+        </section>
+
+        {/* Expense details */}
+        <section className={sectionClass}>
+          <SectionHeading icon={FileText} title={t('sections.details')} />
+
+          {/* Fields keep their bottom margin; cancel the last one so sections stay even */}
+          <div className="-mb-4">
+            {/* Description */}
+            <Input
+              label={t('fields.description')}
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={t('fields.descriptionPlaceholder')}
+              required
+            />
+
+            {/* Amount, Currency and Tax Rate */}
+            <div className="grid grid-cols-2 gap-x-4 sm:grid-cols-[minmax(0,1fr)_9rem_minmax(0,1fr)]">
+              <Input
+                label={t('fields.amount')}
+                type="number"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                className="tabular-nums"
+                required
+              />
+              <CustomSelect
+                className="mb-4"
+                label={t('fields.currency')}
+                value={currency}
+                onChange={setCurrency}
+                options={currencyOptions}
+              />
+              <CustomSelect
+                className="col-span-2 mb-4 sm:col-span-1"
+                label={t('tax.taxRate')}
+                value={taxRate}
+                onChange={setTaxRate}
+                options={taxRateOptions}
+              />
+            </div>
+
+            {/* Tax Breakdown Display */}
+            <div className="collapsible" data-open={totalAmount > 0} aria-hidden={totalAmount <= 0}>
+              <div>
+                <div className="mb-4 rounded-lg bg-gray-50 px-4 py-3 ring-1 ring-inset ring-gray-200 dark:bg-white/[0.03] dark:ring-gray-800">
+                  <p className="eyebrow mb-2">{t('tax.breakdown')}</p>
+                  <dl className="space-y-1.5 text-sm">
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-gray-600 dark:text-gray-400">{t('tax.netAmount')}</dt>
+                      <dd className="font-medium tabular-nums text-gray-900 dark:text-white">
+                        {formatCurrency(netAmount, currency)}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-gray-600 dark:text-gray-400">
+                        {t('tax.taxAmount')} ({taxRatePercent}%)
+                      </dt>
+                      <dd className="font-medium tabular-nums text-gray-900 dark:text-white">
+                        {formatCurrency(taxAmount, currency)}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between gap-4 border-t border-gray-200 pt-1.5 dark:border-gray-800">
+                      <dt className="font-semibold text-gray-700 dark:text-gray-300">{t('tax.total')}</dt>
+                      <dd className="font-semibold tabular-nums text-gray-900 dark:text-white">
+                        {formatCurrency(totalAmount, currency)}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+              </div>
+            </div>
+
+            {/* Category and Date */}
+            <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+              <CustomSelect
+                className="mb-4"
+                label={t('fields.category')}
+                value={category}
+                onChange={setCategory}
+                options={categoryOptions}
+              />
+              <Input
+                label={t('fields.date')}
+                type="date"
+                value={expenseDate}
+                onChange={(e) => setExpenseDate(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* Project */}
+            <CustomSelect
+              className="mb-4"
+              label={t('fields.project')}
+              value={projectId}
+              onChange={setProjectId}
+              options={projectOptions}
+            />
+
+            {/* Notes */}
+            <Textarea
+              label={t('fields.notes')}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder={t('notesPlaceholder')}
+              rows={3}
+            />
+          </div>
+        </section>
+
+        {/* Options */}
+        <section className={sectionClass}>
+          <SectionHeading icon={SlidersHorizontal} title={t('sections.options')} />
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <label className={optionTileClass}>
+              <input
+                type="checkbox"
+                checked={isBillable}
+                onChange={(e) => setIsBillable(e.target.checked)}
+                className={checkboxClass}
+              />
+              {t('billableToClient')}
+            </label>
+            <label className={optionTileClass}>
+              <input
+                type="checkbox"
+                checked={isReimbursable}
+                onChange={(e) => setIsReimbursable(e.target.checked)}
+                className={checkboxClass}
+              />
+              {t('fields.isReimbursable')}
+            </label>
+            <label className={optionTileClass}>
+              <input
+                type="checkbox"
+                checked={isRecurring}
+                onChange={(e) => setIsRecurring(e.target.checked)}
+                className={checkboxClass}
+              />
+              {t('recurring.isRecurring', 'Recurring Expense')}
+            </label>
+          </div>
+
+          {/* Recurring Expense Settings */}
+          {isRecurring && (
+            <div className="mt-3 animate-fade-in rounded-lg border border-gray-200 bg-gray-50/70 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
+              {/* Frequency */}
+              <CustomSelect
+                className="mb-4"
+                label={t('recurring.frequency', 'Frequency')}
+                value={recurrenceFrequency}
+                onChange={setRecurrenceFrequency}
+                options={[
+                  { value: 'monthly', label: t('recurring.monthly', 'Monthly') },
+                  { value: 'quarterly', label: t('recurring.quarterly', 'Quarterly') },
+                  { value: 'yearly', label: t('recurring.yearly', 'Yearly') },
+                ]}
+              />
+
+              {/* Start and End Dates */}
+              <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+                <Input
+                  label={t('recurring.startDate', 'Start Date')}
+                  type="date"
+                  value={recurrenceStartDate}
+                  onChange={(e) => setRecurrenceStartDate(e.target.value)}
+                  required
+                />
+                <Input
+                  label={t('recurring.endDate', 'End Date (Optional)')}
+                  type="date"
+                  value={recurrenceEndDate}
+                  onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                  min={recurrenceStartDate}
+                />
+              </div>
+
+              {/* Info */}
+              <p className="flex items-start gap-2 text-xs text-gray-500 dark:text-gray-400">
+                <Info className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span>
+                  {t('recurring.info', 'This expense will be automatically generated based on the selected frequency. The system runs daily at 2 AM to create new expense entries.')}
+                </span>
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* Depreciation Settings */}
+        <section className={sectionClass}>
+          <DepreciationSettings
+            depreciationType={depreciationType}
+            depreciationYears={depreciationYears}
+            depreciationMethod={depreciationMethod}
+            onChange={(field, value) => {
+              if (field === 'depreciation_type') {
+                setDepreciationType(value);
+              } else if (field === 'depreciation_years') {
+                setDepreciationYears(value);
+              } else if (field === 'depreciation_method') {
+                setDepreciationMethod(value);
+              }
+            }}
+          />
+        </section>
 
         {/* Addon injection point: expense form actions
             Addons can render buttons or sections here (e.g., AI receipt scan).
             Context provides form field setters so addons can pre-fill the form. */}
         <Slot
           name="expense-form-actions"
+          className="py-5 last:pb-0"
           context={{
             setDescription,
             setAmount,
