@@ -36,5 +36,14 @@
   "unknown": {
     "title": "Unbekannter Fehler",
     "message": "Ein unerwarteter Fehler ist aufgetreten."
+  },
+  "routeError": {
+    "errorCode": "Fehler {{status}}",
+    "generic": "Ein unerwarteter Fehler hat diese Seite unterbrochen. Neu laden hilft meistens – falls es wieder passiert, sagen Sie uns bitte, was Sie gerade getan haben.",
+    "fallbackMessage": "Ein unerwarteter Fehler ist aufgetreten",
+    "responseFallback": "Ein Fehler ist aufgetreten",
+    "reload": "Seite neu laden",
+    "details": "Fehlerdetails",
+    "stack": "Stacktrace"
   }
 }

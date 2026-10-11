@@ -36,5 +36,14 @@
   "unknown": {
     "title": "Unknown Error",
     "message": "An unexpected error occurred."
+  },
+  "routeError": {
+    "errorCode": "Error {{status}}",
+    "generic": "An unexpected error interrupted this page. Reloading usually helps; if it keeps happening, please let us know what you were doing.",
+    "fallbackMessage": "An unexpected error occurred",
+    "responseFallback": "An error occurred",
+    "reload": "Reload page",
+    "details": "Error details",
+    "stack": "Stack trace"
   }
 }

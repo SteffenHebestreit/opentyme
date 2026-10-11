@@ -4,9 +4,13 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Eye, EyeOff, Mail, Paperclip, Send } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../common/Button';
 import { Alert } from '../common/Alert';
+import { SkeletonItem } from '../common/Skeleton';
+import { fieldClasses, fieldLabelClass } from '../forms/fieldStyles';
 import { useEmailTemplates } from '../../api/hooks/useEmailTemplates';
 import { useSendEmail } from '../../api/hooks/useEmailSend';
 import type { AttachmentOption, AttachmentSpec } from '../../api/services/email-send.service';
@@ -37,9 +41,10 @@ export function SendEmailModal({
   defaultTemplateCategory,
   variables,
   attachmentOptions = [],
-  title = 'Send Email',
+  title,
   onSent,
 }: SendEmailModalProps) {
+  const { t } = useTranslation('email-templates');
   const { data: templates = [], isLoading: loadingTemplates } = useEmailTemplates();
   const sendMutation = useSendEmail();
 
@@ -98,7 +103,7 @@ export function SendEmailModal({
       });
       setPreviewHtml(res.data.html ?? '');
     } catch {
-      setPreviewHtml('<p style="color:red">Preview unavailable.</p>');
+      setPreviewHtml(`<p style="padding:20px;color:#e00;font-family:sans-serif;">${t('send.previewUnavailable')}</p>`);
     } finally {
       setLoadingPreview(false);
     }
@@ -117,8 +122,8 @@ export function SendEmailModal({
 
   const handleSend = async () => {
     setErrorMsg(null);
-    if (!to.trim()) { setErrorMsg('Please enter a recipient email address.'); return; }
-    if (!selectedTemplateId) { setErrorMsg('Please select a template.'); return; }
+    if (!to.trim()) { setErrorMsg(t('send.errors.recipientRequired')); return; }
+    if (!selectedTemplateId) { setErrorMsg(t('send.errors.templateRequired')); return; }
 
     // Build the attachments array from checked options
     const attachments: AttachmentSpec[] = attachmentOptions
@@ -132,11 +137,11 @@ export function SendEmailModal({
         variables,
         attachments: attachments.length > 0 ? attachments : undefined,
       });
-      setSuccessMsg('Email sent successfully.');
+      setSuccessMsg(t('send.success'));
       onSent?.();
       setTimeout(() => { setSuccessMsg(null); onClose(); }, 1500);
     } catch (err: any) {
-      setErrorMsg(err?.response?.data?.message ?? err?.message ?? 'Failed to send email.');
+      setErrorMsg(err?.response?.data?.message ?? err?.message ?? t('send.errors.sendFailed'));
     }
   };
 
@@ -145,89 +150,97 @@ export function SendEmailModal({
   return (
     <Modal
       open={open}
-      title={title}
+      title={title ?? t('sendModal.title')}
+      description={t('sendModal.description')}
+      icon={<Mail className="h-5 w-5" aria-hidden="true" />}
       onClose={onClose}
       size="md"
       footer={
-        <div className="flex justify-end gap-2 w-full">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={sendMutation.isPending}>
-            Cancel
+        <>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={sendMutation.isPending}>
+            {t('sendModal.cancel')}
           </Button>
           <Button
+            type="button"
             variant="primary"
-            size="sm"
             onClick={handleSend}
             isLoading={sendMutation.isPending}
             disabled={noTemplates}
+            leftIcon={<Send className="h-4 w-4" aria-hidden="true" />}
           >
-            Send Email
+            {t('send.submit')}
           </Button>
-        </div>
+        </>
       }
     >
-      <div className="space-y-4">
+      <div className="space-y-5">
         {/* Recipient */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">To</label>
+          <label htmlFor="send-email-to" className={fieldLabelClass()}>{t('send.to')}</label>
           <input
+            id="send-email-to"
             type="email"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            placeholder="recipient@example.com"
-            className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-purple-500"
+            placeholder={t('send.toPlaceholder')}
+            className={fieldClasses()}
           />
         </div>
 
         {/* Template selector */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Template</label>
+          <div className="flex items-center justify-between gap-3">
+            <label htmlFor="send-email-template" className={fieldLabelClass()}>{t('send.template')}</label>
+            {/* Preview toggle */}
+            {selectedTemplateId && !noTemplates && (
+              <button
+                type="button"
+                onClick={handlePreviewToggle}
+                aria-expanded={showPreview}
+                className="mb-1.5 inline-flex items-center gap-1.5 rounded text-xs font-medium text-purple-600 transition-colors hover:text-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-purple-400 dark:hover:text-purple-300"
+              >
+                {showPreview ? <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}
+                {showPreview ? t('send.hidePreview') : t('send.showPreview')}
+              </button>
+            )}
+          </div>
           {loadingTemplates ? (
-            <div className="text-sm text-gray-400">Loading templates…</div>
+            <SkeletonItem className="h-10 w-full rounded-lg" />
           ) : noTemplates ? (
             <Alert
               type="warning"
               message={
                 defaultTemplateCategory
-                  ? `No "${defaultTemplateCategory}" templates found. Create one in Config → Email Templates.`
-                  : 'No email templates found. Create one in Config → Email Templates.'
+                  ? t('sendModal.noTemplatesCategory', { category: defaultTemplateCategory })
+                  : t('sendModal.noTemplates')
               }
             />
           ) : (
             <select
+              id="send-email-template"
               value={selectedTemplateId}
               onChange={(e) => handleTemplateChange(e.target.value)}
-              className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-purple-500"
+              className={fieldClasses()}
             >
               {filtered.map((tpl) => (
                 <option key={tpl.id} value={tpl.id}>
-                  {tpl.name}{tpl.is_default ? ' (default)' : ''}
+                  {tpl.name}{tpl.is_default ? ` ${t('sendModal.defaultSuffix')}` : ''}
                 </option>
               ))}
             </select>
           )}
         </div>
 
-        {/* Preview toggle */}
-        {selectedTemplateId && !noTemplates && (
-          <button
-            type="button"
-            onClick={handlePreviewToggle}
-            className="text-xs text-purple-600 dark:text-purple-400 hover:underline"
-          >
-            {showPreview ? 'Hide preview' : 'Show preview'}
-          </button>
-        )}
-
         {/* Preview iframe */}
         {showPreview && (
-          <div className="rounded border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="animate-fade-in overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800">
             {loadingPreview ? (
-              <div className="h-40 flex items-center justify-center text-sm text-gray-400">Loading preview…</div>
+              <div className="flex h-40 items-center justify-center text-sm text-gray-500">{t('send.loadingPreview')}</div>
             ) : (
               <iframe
                 srcDoc={previewHtml}
-                title="Email preview"
-                className="w-full h-64 bg-white"
+                title={t('send.previewTitle')}
+                className="h-64 w-full bg-white"
                 sandbox="allow-same-origin"
               />
             )}
@@ -236,29 +249,31 @@ export function SendEmailModal({
 
         {/* Attachments */}
         {attachmentOptions.length > 0 && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Attachments
-            </label>
-            <div className="space-y-2">
+          <fieldset>
+            <legend className={fieldLabelClass()}>{t('send.attachments')}</legend>
+            <div className="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 dark:divide-gray-800 dark:border-gray-800">
               {attachmentOptions.map((opt, i) => (
-                <label key={i} className="flex items-center gap-2.5 cursor-pointer">
+                <label
+                  key={i}
+                  className="flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+                >
                   <input
                     type="checkbox"
                     checked={checkedAttachments.has(i)}
                     onChange={() => toggleAttachment(i)}
-                    className="rounded border-gray-300 dark:border-gray-600 text-purple-600 focus:ring-purple-500"
+                    className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900"
                   />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">{opt.label}</span>
+                  <Paperclip className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                  <span className="min-w-0 flex-1 truncate text-sm text-gray-700 dark:text-gray-300">{opt.label}</span>
                   {opt.type === 'report' && opt.dateFrom && opt.dateTo && (
-                    <span className="text-xs text-gray-400 dark:text-gray-500">
-                      ({opt.dateFrom} – {opt.dateTo})
+                    <span className="shrink-0 text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                      {opt.dateFrom} – {opt.dateTo}
                     </span>
                   )}
                 </label>
               ))}
             </div>
-          </div>
+          </fieldset>
         )}
 
         {/* Status / error */}

@@ -195,7 +195,9 @@
     "editArgs": "Edit arguments before approving",
     "invalidJson": "Not a valid JSON object",
     "ready": "Ready to help",
-    "toolDone": "Completed"
+    "toolDone": "Completed",
+    "inputPlaceholder": "Ask something…",
+    "inputHint": "Enter to send · Shift+Enter for a new line"
   },
   "shell": {
     "mainNavigation": "Main navigation",
@@ -231,5 +233,8 @@
     "title": "Page not found",
     "description": "The page you are looking for does not exist.",
     "back": "Return to Dashboard"
+  },
+  "footer": {
+    "rights": "All rights reserved."
   }
 }

@@ -75,7 +75,7 @@ describe('EmailTemplatesPage', () => {
   });
 
   describe('loading state', () => {
-    it('shows a spinner while loading', () => {
+    it('shows a loading skeleton while loading', () => {
       (useEmailTemplates as jest.Mock).mockReturnValue({
         data: undefined,
         isLoading: true,
@@ -83,9 +83,9 @@ describe('EmailTemplatesPage', () => {
       });
 
       const { container } = renderPage();
-      // Spinner is an animate-spin div
-      const spinner = container.querySelector('.animate-spin');
-      expect(spinner).toBeInTheDocument();
+      // Loading state is a shimmering skeleton of the table
+      const skeleton = container.querySelector('.skeleton');
+      expect(skeleton).toBeInTheDocument();
     });
   });
 

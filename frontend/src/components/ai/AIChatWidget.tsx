@@ -5,11 +5,13 @@
 
 import React, { useState, useEffect, Component } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MessageCircle, X } from 'lucide-react';
+import { Sparkles, X } from 'lucide-react';
 import { useAIChat } from '../../api/hooks/useAIChat';
 import AIChatPanel from './AIChatPanel';
 import { getSettings } from '../../api/services/settings.service';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePresence } from '../../hooks/ui/usePresence';
+import { cn } from '../../lib/cn';
 
 // ── Error boundary to isolate widget crashes ─────────────────────────────────
 
@@ -42,44 +44,78 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
   const { t } = useTranslation('common');
   const [open, setOpen] = useState(false);
   const chat = useAIChat();
+  const { mounted, closing } = usePresence(open, 160);
 
   return (
     <>
-      {/* Floating panel */}
-      {open && (
-        <div
-          className="fixed bottom-20 right-6 z-50 w-96 h-[600px] rounded-2xl shadow-2xl overflow-hidden border border-purple-500/20 dark:border-purple-400/20 flex flex-col backdrop-blur-sm"
-          style={{ maxHeight: 'calc(100vh - 100px)' }}
-        >
-          <AIChatPanel
-            messages={chat.messages}
-            isStreaming={chat.isStreaming}
-            error={chat.error}
-            onSend={chat.sendMessage}
-            onStop={chat.stopStreaming}
-            onClear={chat.clearConversation}
-            sttEnabled={sttEnabled}
-            pendingApproval={chat.pendingApproval}
-            onApprove={chat.approve}
+      {mounted && (
+        <>
+          {/* Backdrop behind the bottom sheet on small screens */}
+          <div
+            className={cn(
+              'fixed inset-0 z-40 bg-gray-950/40 backdrop-blur-[2px] sm:hidden dark:bg-black/60',
+              closing ? 'animate-fade-out' : 'animate-fade-in'
+            )}
+            onClick={() => setOpen(false)}
+            aria-hidden="true"
           />
-        </div>
+
+          {/* Floating panel — bottom sheet on mobile, card above the button from sm up */}
+          <div
+            role="dialog"
+            aria-label={t('ai.title')}
+            className={cn(
+              'fixed z-40 flex flex-col overflow-hidden border border-gray-200 bg-white shadow-overlay dark:border-gray-800 dark:bg-gray-900',
+              'inset-x-0 bottom-0 h-[85dvh] origin-bottom rounded-t-2xl pb-[env(safe-area-inset-bottom)]',
+              'sm:inset-x-auto sm:bottom-[5.5rem] sm:right-6 sm:h-[min(640px,calc(100dvh-8rem))] sm:w-[400px] sm:origin-bottom-right sm:rounded-xl sm:pb-0',
+              closing ? 'animate-scale-out' : 'animate-scale-in'
+            )}
+          >
+            <AIChatPanel
+              messages={chat.messages}
+              isStreaming={chat.isStreaming}
+              error={chat.error}
+              onSend={chat.sendMessage}
+              onStop={chat.stopStreaming}
+              onClear={chat.clearConversation}
+              sttEnabled={sttEnabled}
+              pendingApproval={chat.pendingApproval}
+              onApprove={chat.approve}
+              onClose={() => setOpen(false)}
+            />
+          </div>
+        </>
       )}
 
-      {/* FAB button */}
+      {/* FAB button (hidden on mobile while the sheet is open — the sheet has its own close button) */}
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
-        className="fixed bottom-6 right-6 z-[9999] w-14 h-14 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg shadow-purple-500/30 flex items-center justify-center transition-all duration-200 active:scale-95"
+        className={cn(
+          'fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-purple-600 text-white shadow-lifted',
+          'transition-[background-color,transform] duration-200 hover:bg-purple-500 active:scale-95',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950',
+          open && 'max-sm:hidden'
+        )}
         aria-label={open ? t('ai.close') : t('ai.open')}
+        aria-expanded={open}
       >
-        {open ? (
-          <X size={22} />
-        ) : (
-          <>
-            <MessageCircle size={22} />
-            {chat.isStreaming && (
-              <span className="absolute top-1 right-1 w-3 h-3 rounded-full bg-pink-400 animate-pulse border-2 border-white" />
-            )}
-          </>
+        <Sparkles
+          className={cn(
+            'absolute h-[22px] w-[22px] transition-[transform,opacity] duration-200 ease-out-expo',
+            open ? 'rotate-90 scale-50 opacity-0' : 'rotate-0 scale-100 opacity-100'
+          )}
+          aria-hidden="true"
+        />
+        <X
+          className={cn(
+            'absolute h-[22px] w-[22px] transition-[transform,opacity] duration-200 ease-out-expo',
+            open ? 'rotate-0 scale-100 opacity-100' : '-rotate-90 scale-50 opacity-0'
+          )}
+          aria-hidden="true"
+        />
+        {!open && chat.isStreaming && (
+          <span className="absolute right-0.5 top-0.5 h-3 w-3 animate-soft-pulse rounded-full border-2 border-white bg-emerald-400 dark:border-gray-950" />
         )}
       </button>
     </>

@@ -1,19 +1,26 @@
 /**
  * @fileoverview Error Boundary component for React Router.
- * 
+ *
  * Catches errors in route components and displays a user-friendly error page.
- * 
+ *
  * @module components/common/ErrorBoundary
  */
 
 import React from 'react';
 import { useRouteError, isRouteErrorResponse, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { AlertTriangle, ArrowLeft, ChevronRight, LayoutDashboard, RotateCw, SearchX, ServerCrash, ShieldX } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { BrandLogo } from '../layout/BrandLogo';
+import { Button } from './Button';
+import { buttonClasses } from './buttonStyles';
+import { cn } from '../../lib/cn';
 
 /**
  * Error Boundary Component
- * 
+ *
  * Displays error information and provides navigation options.
+ * Rendered by the router instead of the whole layout, so it frames itself.
  */
 const ErrorBoundary: React.FC = () => {
   const error = useRouteError();
@@ -25,13 +32,13 @@ const ErrorBoundary: React.FC = () => {
   if (isRouteErrorResponse(error)) {
     // Error from a loader or action
     errorStatus = error.status;
-    errorMessage = error.statusText || error.data?.message || 'An error occurred';
+    errorMessage = error.statusText || error.data?.message || t('routeError.responseFallback');
   } else if (error instanceof Error) {
     // JavaScript error
     errorMessage = error.message;
   } else {
     // Unknown error
-    errorMessage = 'An unexpected error occurred';
+    errorMessage = t('routeError.fallbackMessage');
   }
 
   // Determine error type
@@ -39,74 +46,117 @@ const ErrorBoundary: React.FC = () => {
   const is403 = errorStatus === 403;
   const is500 = errorStatus === 500;
 
+  const title = is404 ? t('notFound') : is403 ? t('forbidden') : is500 ? t('serverError') : t('somethingWentWrong');
+  const description = is404
+    ? t('notFoundPage.message')
+    : is403
+      ? t('forbiddenPage.message')
+      : is500
+        ? t('serverErrorPage.message')
+        : t('routeError.generic');
+  const Icon: LucideIcon = is404 ? SearchX : is403 ? ShieldX : is500 ? ServerCrash : AlertTriangle;
+  const isClientIssue = is404 || is403;
+  const showStack = process.env.NODE_ENV === 'development' && error instanceof Error && !!error.stack;
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-      <div className="max-w-md w-full text-center">
-        {/* Error Icon */}
-        <div className="mb-6">
-          <svg
-            className="mx-auto h-24 w-24 text-red-500"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-            />
-          </svg>
-        </div>
-
-        {/* Error Status */}
-        {errorStatus && (
-          <h1 className="text-6xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-            {errorStatus}
-          </h1>
-        )}
-
-        {/* Error Title */}
-        <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
-          {is404 && t('notFound')}
-          {is403 && t('forbidden')}
-          {is500 && t('serverError')}
-          {!is404 && !is403 && !is500 && t('somethingWentWrong')}
-        </h2>
-
-        {/* Error Message */}
-        <p className="text-gray-600 dark:text-gray-400 mb-8">
-          {errorMessage}
-        </p>
-
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link
-            to="/dashboard"
-            className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors"
-          >
-            {t('goToDashboard')}
-          </Link>
-          <button
-            onClick={() => window.history.back()}
-            className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 dark:border-gray-600 text-base font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors"
-          >
-            {t('goBack')}
-          </button>
-        </div>
-
-        {/* Development Error Details */}
-        {process.env.NODE_ENV === 'development' && error instanceof Error && (
-          <details className="mt-8 text-left">
-            <summary className="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Error Details (Development Only)
-            </summary>
-            <pre className="text-xs text-left bg-gray-100 dark:bg-gray-800 p-4 rounded-md overflow-auto max-h-64 text-red-600 dark:text-red-400">
-              {error.stack}
-            </pre>
-          </details>
-        )}
+    <div className="flex min-h-screen flex-col bg-gray-50 px-4 dark:bg-gray-950">
+      <div className="mx-auto flex h-16 w-full max-w-6xl items-center">
+        <Link
+          to="/dashboard"
+          className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+          aria-label="OpenTYME"
+        >
+          <BrandLogo />
+        </Link>
       </div>
+
+      <main className="flex flex-1 items-center justify-center pb-16 pt-4">
+        <div className="w-full max-w-md animate-fade-up">
+          <div className="surface p-6 text-center sm:p-8">
+            {/* Error Icon */}
+            <span
+              className={cn(
+                'mx-auto flex h-12 w-12 items-center justify-center rounded-xl ring-1 ring-inset',
+                isClientIssue
+                  ? 'bg-purple-50 text-purple-600 ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20'
+                  : 'bg-red-50 text-red-600 ring-red-600/15 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-400/20'
+              )}
+            >
+              <Icon className="h-6 w-6" aria-hidden="true" />
+            </span>
+
+            {/* Error Status */}
+            {errorStatus && (
+              <p className="mt-5 text-sm font-semibold tabular-nums text-purple-600 dark:text-purple-400">
+                {t('routeError.errorCode', { status: errorStatus })}
+              </p>
+            )}
+
+            {/* Error Title */}
+            <h1
+              className={cn(
+                'text-xl font-semibold tracking-tight text-gray-900 dark:text-white',
+                errorStatus ? 'mt-1' : 'mt-5'
+              )}
+            >
+              {title}
+            </h1>
+
+            {/* Friendly explanation */}
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{description}</p>
+
+            {/* Action Buttons */}
+            <div className="mt-7 flex flex-col-reverse gap-2 sm:flex-row sm:justify-center">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => window.history.back()}
+                leftIcon={<ArrowLeft className="h-4 w-4" aria-hidden="true" />}
+              >
+                {t('goBack')}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => window.location.reload()}
+                leftIcon={<RotateCw className="h-4 w-4" aria-hidden="true" />}
+              >
+                {t('routeError.reload')}
+              </Button>
+              <Link
+                to="/dashboard"
+                className={buttonClasses()}
+              >
+                <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
+                {t('goToDashboard')}
+              </Link>
+            </div>
+          </div>
+
+          {/* Error details — collapsed, for debugging */}
+          <details className="group mt-4 rounded-xl border border-gray-200 bg-white/60 text-left dark:border-gray-800 dark:bg-gray-900/50">
+            <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-medium text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-white [&::-webkit-details-marker]:hidden">
+              <ChevronRight className="h-4 w-4 transition-transform duration-200 group-open:rotate-90" aria-hidden="true" />
+              {t('routeError.details')}
+            </summary>
+            <div className="space-y-3 border-t border-gray-100 px-4 py-3 dark:border-gray-800">
+              <p className="break-words font-mono text-xs text-gray-700 dark:text-gray-300">
+                {errorStatus ? `${errorStatus} · ` : ''}
+                {errorMessage}
+              </p>
+              {/* Development Error Details */}
+              {showStack && (
+                <div>
+                  <p className="eyebrow mb-1.5">{t('routeError.stack')}</p>
+                  <pre className="max-h-64 overflow-auto rounded-lg bg-gray-50 p-3 text-xs text-red-600 dark:bg-gray-950 dark:text-red-400">
+                    {(error as Error).stack}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </details>
+        </div>
+      </main>
     </div>
   );
 };

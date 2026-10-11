@@ -195,7 +195,9 @@
     "editArgs": "Argumente vor der Genehmigung bearbeiten",
     "invalidJson": "Kein gültiges JSON-Objekt",
     "ready": "Bereit zu helfen",
-    "toolDone": "Abgeschlossen"
+    "toolDone": "Abgeschlossen",
+    "inputPlaceholder": "Frage eingeben…",
+    "inputHint": "Enter zum Senden · Shift+Enter für neue Zeile"
   },
   "shell": {
     "mainNavigation": "Hauptnavigation",
@@ -231,5 +233,8 @@
     "title": "Seite nicht gefunden",
     "description": "Die gesuchte Seite gibt es nicht.",
     "back": "Zurück zum Dashboard"
+  },
+  "footer": {
+    "rights": "Alle Rechte vorbehalten."
   }
 }

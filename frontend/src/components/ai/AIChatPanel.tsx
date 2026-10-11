@@ -5,12 +5,28 @@
 
 import { useEffect, useRef, useState, KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Send, Square, Trash2, ChevronRight, ChevronDown, Wrench, Mic, MicOff, Check, ShieldAlert, X, Pencil } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowUp,
+  Check,
+  ChevronRight,
+  Mic,
+  MicOff,
+  Pencil,
+  ShieldAlert,
+  Sparkles,
+  Square,
+  Trash2,
+  Wrench,
+  X,
+} from 'lucide-react';
 import type { UIMessage, PendingApproval } from '../../api/hooks/useAIChat';
 import type { ApprovalAction, ApprovalDecision } from '../../api/services/ai-chat.service';
 import { startRecording } from '../../api/services/ai-transcription.service';
 import type { RecordingHandle } from '../../api/services/ai-transcription.service';
 import { Slot } from '../../plugins/slots/Slot';
+import { Button } from '../common/Button';
+import { cn } from '../../lib/cn';
 
 interface Props {
   messages: UIMessage[];
@@ -22,10 +38,18 @@ interface Props {
   sttEnabled?: boolean;
   pendingApproval?: PendingApproval | null;
   onApprove?: (decisions: ApprovalDecision[]) => void;
+  /** Shows a close button in the header (the widget passes it) */
+  onClose?: () => void;
 }
 
 // Guardrail: max input length
 const MAX_INPUT_LENGTH = 4000;
+
+const iconButtonClass =
+  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 disabled:pointer-events-none disabled:opacity-40';
+
+const codeBlockClass =
+  'max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-md border border-gray-100 bg-gray-50 p-2 font-mono text-[11px] leading-relaxed text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300';
 
 // ── Tool call step ───────────────────────────────────────────────────────────
 
@@ -50,43 +74,51 @@ function ToolCallStep({ msg, result }: { msg: UIMessage; result?: UIMessage }) {
   }
 
   return (
-    <div className="my-1 rounded-lg border border-purple-500/20 dark:border-purple-400/20 bg-white/60 dark:bg-gray-800/60 text-xs backdrop-blur-sm">
+    <div className="animate-fade-in rounded-lg border border-gray-200 bg-white text-xs dark:border-gray-800 dark:bg-gray-900">
       <button
-        className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-gray-600 dark:text-gray-400 hover:bg-purple-50/50 dark:hover:bg-purple-900/20 transition-colors rounded-lg"
+        type="button"
+        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-gray-600 transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-400 dark:hover:bg-white/[0.03]"
         onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
       >
-        <Wrench size={12} className="shrink-0 text-purple-500" />
-        <span className="font-mono font-medium truncate">{msg.toolName ?? 'tool'}()</span>
-        {open ? (
-          <ChevronDown size={12} className="ml-auto shrink-0 text-purple-400" />
-        ) : (
-          <ChevronRight size={12} className="ml-auto shrink-0 text-purple-400" />
+        <Wrench className="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+        <span className="truncate font-mono font-medium">{msg.toolName ?? 'tool'}()</span>
+        {result && (
+          <span className="flex shrink-0 items-center text-emerald-600 dark:text-emerald-400">
+            <Check className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="sr-only">{t('ai.toolDone')}</span>
+          </span>
         )}
+        <ChevronRight
+          className={cn(
+            'ml-auto h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform duration-200',
+            open && 'rotate-90'
+          )}
+          aria-hidden="true"
+        />
       </button>
-      {open && (
-        <div className="px-3 pb-3 space-y-2">
-          {argsDisplay && (
-            <div>
-              <div className="text-purple-400 dark:text-purple-300 font-semibold mb-0.5 text-[10px] uppercase tracking-wider">
-                {t('ai.toolArguments')}
+      <div className="collapsible" data-open={open}>
+        <div>
+          <div className="space-y-2 px-2.5 pb-2.5 pt-1">
+            {argsDisplay && (
+              <div>
+                <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  {t('ai.toolArguments')}
+                </div>
+                <pre className={codeBlockClass}>{argsDisplay}</pre>
               </div>
-              <pre className="overflow-x-auto rounded-md bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-2 text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-all">
-                {argsDisplay}
-              </pre>
-            </div>
-          )}
-          {resultDisplay && (
-            <div>
-              <div className="text-purple-400 dark:text-purple-300 font-semibold mb-0.5 text-[10px] uppercase tracking-wider">
-                {t('ai.toolResult')}
+            )}
+            {resultDisplay && (
+              <div>
+                <div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  {t('ai.toolResult')}
+                </div>
+                <pre className={codeBlockClass}>{resultDisplay}</pre>
               </div>
-              <pre className="overflow-x-auto rounded-md bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-2 text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-all max-h-48">
-                {resultDisplay}
-              </pre>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -168,15 +200,17 @@ function ApprovalCard({
   };
 
   return (
-    <div className="mt-2 rounded-xl border border-amber-400/40 dark:border-amber-500/30 bg-amber-50/80 dark:bg-amber-900/20 p-3 text-xs">
-      <div className="flex items-center gap-1.5 mb-2 font-semibold text-amber-700 dark:text-amber-300">
-        <ShieldAlert size={14} className="shrink-0" />
-        {t('ai.approvalTitle', 'Approve these changes?')}
-        <span className="ml-auto font-normal text-amber-600/80 dark:text-amber-400/80">
+    <div className="mt-3 animate-fade-up rounded-xl border border-amber-200 bg-amber-50/70 text-xs dark:border-amber-500/25 dark:bg-amber-500/[0.06]">
+      <div className="flex items-center gap-2 px-3 pb-2 pt-3">
+        <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+        <span className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+          {t('ai.approvalTitle', 'Approve these changes?')}
+        </span>
+        <span className="ml-auto rounded-full bg-amber-100 px-2 py-0.5 font-medium tabular-nums text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
           {approval.actions.length}
         </span>
       </div>
-      <div className="space-y-1.5 mb-2.5">
+      <div className="space-y-1.5 px-3">
         {approval.actions.map((a) => {
           const isRejected = rejected.has(a.toolCallId);
           const isEditing = editing.has(a.toolCallId) && !isRejected;
@@ -185,43 +219,68 @@ function ApprovalCard({
           return (
             <div
               key={a.toolCallId}
-              className={`rounded-lg border px-2.5 py-1.5 transition-colors ${
+              className={cn(
+                'rounded-lg border bg-white px-2.5 py-2 transition-[opacity,border-color] duration-200 dark:bg-gray-900',
                 isRejected
-                  ? 'border-gray-200 dark:border-gray-700 bg-gray-100/60 dark:bg-gray-800/40 opacity-50'
-                  : 'border-emerald-300/50 dark:border-emerald-600/40 bg-white/70 dark:bg-gray-800/60'
-              }`}
+                  ? 'border-gray-200 opacity-60 dark:border-gray-800'
+                  : 'border-emerald-200 dark:border-emerald-500/25'
+              )}
             >
               <div className="flex w-full items-start gap-2">
                 <button
+                  type="button"
                   onClick={() => toggle(a.toolCallId)}
                   title={isRejected ? t('ai.willSkip', 'Will be skipped') : t('ai.willRun', 'Will run')}
-                  className={`flex flex-1 items-start gap-2 text-left min-w-0 ${isRejected ? 'line-through' : ''}`}
+                  aria-pressed={!isRejected}
+                  className="flex min-w-0 flex-1 items-start gap-2 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
                 >
-                  <span className="shrink-0 mt-0.5">
+                  <span
+                    className={cn(
+                      'mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full transition-colors',
+                      isRejected
+                        ? 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500'
+                        : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400'
+                    )}
+                  >
                     {isRejected ? (
-                      <X size={12} className="text-gray-400" />
+                      <X className="h-3 w-3" aria-hidden="true" />
                     ) : (
-                      <Check size={12} className="text-emerald-500" />
+                      <Check className="h-3 w-3" aria-hidden="true" />
                     )}
                   </span>
                   <span className="min-w-0">
-                    <span className="font-mono font-medium text-gray-700 dark:text-gray-200">{a.toolName}</span>
+                    <span
+                      className={cn(
+                        'font-mono font-medium text-gray-800 dark:text-gray-100',
+                        isRejected && 'line-through'
+                      )}
+                    >
+                      {a.toolName}
+                    </span>
+                    <span className="sr-only">
+                      {' — '}
+                      {isRejected ? t('ai.willSkip', 'Will be skipped') : t('ai.willRun', 'Will run')}
+                    </span>
                     {argsText && !isEditing && (
-                      <span className="block text-[11px] text-gray-500 dark:text-gray-400 break-words">{argsText}</span>
+                      <span className="mt-0.5 block break-words text-[11px] text-gray-500 dark:text-gray-400">{argsText}</span>
                     )}
                   </span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => toggleEdit(a)}
                   disabled={isRejected}
                   title={t('ai.editArgs', 'Edit arguments before approving')}
-                  className={`shrink-0 p-1 rounded transition-colors disabled:opacity-30 ${
+                  aria-label={t('ai.editArgs', 'Edit arguments before approving')}
+                  aria-pressed={isEditing}
+                  className={cn(
+                    'shrink-0 rounded-md p-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 disabled:opacity-30',
                     isEditing
-                      ? 'text-amber-600 dark:text-amber-400 bg-amber-100/60 dark:bg-amber-900/30'
-                      : 'text-gray-400 hover:text-amber-600 dark:hover:text-amber-400'
-                  }`}
+                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+                      : 'text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-200'
+                  )}
                 >
-                  <Pencil size={12} />
+                  <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               </div>
               {isEditing && (
@@ -230,34 +289,49 @@ function ApprovalCard({
                   onChange={(e) => setEdits((prev) => ({ ...prev, [a.toolCallId]: e.target.value }))}
                   rows={4}
                   spellCheck={false}
-                  className={`mt-1.5 w-full rounded-md border bg-gray-50 dark:bg-gray-900 p-1.5 font-mono text-[10px] text-gray-700 dark:text-gray-300 focus:outline-none ${
-                    editInvalid ? 'border-red-400 dark:border-red-500' : 'border-gray-200 dark:border-gray-700'
-                  }`}
+                  aria-label={t('ai.editArgs', 'Edit arguments before approving')}
+                  aria-invalid={editInvalid || undefined}
+                  className={cn(
+                    'mt-2 block w-full animate-fade-in rounded-md border bg-gray-50 px-2 py-1.5 font-mono text-[11px] leading-relaxed text-gray-800 transition-[border-color,box-shadow] focus:outline-none focus:ring-4 dark:bg-gray-950 dark:text-gray-200',
+                    editInvalid
+                      ? 'border-red-400 focus:ring-red-500/15 dark:border-red-500/60'
+                      : 'border-gray-200 focus:border-purple-500 focus:ring-purple-500/15 dark:border-gray-700 dark:focus:border-purple-400'
+                  )}
                 />
               )}
               {isEditing && editInvalid && (
-                <div className="mt-0.5 text-[10px] text-red-500">{t('ai.invalidJson', 'Not a valid JSON object')}</div>
+                <div className="mt-1 text-[11px] font-medium text-red-600 dark:text-red-400">
+                  {t('ai.invalidJson', 'Not a valid JSON object')}
+                </div>
               )}
             </div>
           );
         })}
       </div>
-      <div className="flex items-center gap-2">
-        <button
+      <div className="flex items-center gap-2 px-3 pt-3">
+        <Button
+          type="button"
+          size="sm"
+          variant="success"
+          className="flex-1"
           onClick={() => submit(rejected.size === 0 && editing.size === 0 ? 'all' : 'selected')}
           disabled={hasInvalidEdit}
-          className="flex-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          leftIcon={<Check className="h-4 w-4" aria-hidden="true" />}
         >
           {rejected.size === 0 ? t('ai.approveAll', 'Approve all') : t('ai.approveSelected', 'Approve selected')}
-        </button>
-        <button
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="flex-1"
           onClick={() => submit('none')}
-          className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 py-1.5 font-medium transition-colors"
+          leftIcon={<X className="h-4 w-4" aria-hidden="true" />}
         >
           {t('ai.rejectAll', 'Reject all')}
-        </button>
+        </Button>
       </div>
-      <div className="mt-1.5 text-[10px] text-gray-400 dark:text-gray-500">
+      <div className="px-3 pb-3 pt-2 text-[11px] text-amber-800/70 dark:text-amber-200/60">
         {t('ai.approvalHint', 'Tap an item to toggle whether it runs.')}
       </div>
     </div>
@@ -277,21 +351,26 @@ function MessageBubble({ msg, toolResult }: { msg: UIMessage; toolResult?: UIMes
   const isUser = msg.role === 'user';
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-2`}>
+    <div className={cn('flex animate-fade-up', isUser ? 'justify-end' : 'justify-start')}>
       <div
-        className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+        className={cn(
+          'max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed',
           isUser
-            ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-br-sm shadow-md shadow-purple-500/20'
-            : 'bg-white/80 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-100 rounded-bl-sm shadow-sm backdrop-blur-sm'
-        }`}
+            ? 'rounded-br-md bg-purple-600 text-white'
+            : 'rounded-bl-md bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
+        )}
         style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
       >
         {msg.content}
         {msg.role === 'assistant' && msg.content === '' && (
-          <span className="inline-flex gap-0.5 opacity-60">
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+          <span className="inline-flex items-center gap-1 py-1.5" aria-hidden="true">
+            {[0, 200, 400].map((delay) => (
+              <span
+                key={delay}
+                className="h-1.5 w-1.5 animate-soft-pulse rounded-full bg-gray-400 dark:bg-gray-500"
+                style={{ animationDelay: `${delay}ms` }}
+              />
+            ))}
           </span>
         )}
       </div>
@@ -301,7 +380,7 @@ function MessageBubble({ msg, toolResult }: { msg: UIMessage; toolResult?: UIMes
 
 // ── Main panel ───────────────────────────────────────────────────────────────
 
-export default function AIChatPanel({ messages, isStreaming, error, onSend, onStop, onClear, sttEnabled = false, pendingApproval, onApprove }: Props) {
+export default function AIChatPanel({ messages, isStreaming, error, onSend, onStop, onClear, sttEnabled = false, pendingApproval, onApprove, onClose }: Props) {
   const { t } = useTranslation('common');
   const [input, setInput] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -365,69 +444,94 @@ export default function AIChatPanel({ messages, isStreaming, error, onSend, onSt
   const inputLength = input.length;
   const overLimit = inputLength > MAX_INPUT_LENGTH;
 
+  const status = isStreaming ? 'thinking' : isRecording ? 'listening' : 'ready';
+
   return (
-    <div className="flex flex-col h-full bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-sm">
+    <div className="flex h-full flex-col bg-white dark:bg-gray-900">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-900/10 to-indigo-900/10 dark:from-purple-900/40 dark:to-indigo-900/40 border-b border-purple-500/20 dark:border-purple-500/30 shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-sm shadow-purple-500/30">
-            <span className="text-white text-xs font-bold">AI</span>
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">{t('ai.title')}</div>
-            {isStreaming && (
-              <div className="text-xs text-purple-500 dark:text-purple-400 animate-pulse">{t('ai.thinking')}</div>
-            )}
-            {isRecording && !isStreaming && (
-              <div className="text-xs text-pink-500 dark:text-pink-400 animate-pulse">{t('ai.listening')}</div>
-            )}
-          </div>
+      <div className="flex shrink-0 items-center gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-purple-600 ring-1 ring-inset ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+          <Sparkles className="h-[18px] w-[18px]" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-sm font-semibold text-gray-900 dark:text-white">{t('ai.title')}</h2>
+          <p className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400" aria-live="polite">
+            <span
+              className={cn(
+                'h-1.5 w-1.5 shrink-0 rounded-full',
+                status === 'thinking' && 'animate-soft-pulse bg-purple-500 dark:bg-purple-400',
+                status === 'listening' && 'animate-soft-pulse bg-red-500',
+                status === 'ready' && 'bg-emerald-500'
+              )}
+              aria-hidden="true"
+            />
+            {status === 'thinking' ? t('ai.thinking') : status === 'listening' ? t('ai.listening') : t('ai.ready')}
+          </p>
         </div>
         <button
+          type="button"
           onClick={onClear}
           title={t('ai.newConversation')}
-          className="p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+          aria-label={t('ai.newConversation')}
+          className={cn(
+            iconButtonClass,
+            'text-gray-400 hover:bg-red-50 hover:text-red-600 dark:text-gray-500 dark:hover:bg-red-500/10 dark:hover:text-red-400'
+          )}
         >
-          <Trash2 size={15} />
+          <Trash2 className="h-4 w-4" aria-hidden="true" />
         </button>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            title={t('ai.close')}
+            aria-label={t('ai.close')}
+            className={cn(
+              iconButtonClass,
+              'text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-200'
+            )}
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       {/* Messages */}
-      <div
-        ref={scrollRef}
-        className={`flex-1 overflow-y-auto px-4 ${
-          messages.length === 0
-            ? 'flex flex-col items-center justify-center'
-            : 'py-4 space-y-0.5'
-        }`}
-      >
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center text-center gap-3 py-6">
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-500/20 to-indigo-500/20 dark:from-purple-500/30 dark:to-indigo-500/30 flex items-center justify-center border border-purple-500/20">
-              <span className="text-2xl">✨</span>
-            </div>
-            <div className="font-semibold text-gray-700 dark:text-gray-200">{t('ai.welcomeTitle')}</div>
-            <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 max-w-[220px]">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
+        {messages.length === 0 ? (
+          <div className="flex h-full animate-fade-up flex-col items-center justify-center px-4 text-center">
+            <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50 text-purple-600 ring-1 ring-inset ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+              <Sparkles className="h-6 w-6" aria-hidden="true" />
+            </span>
+            <p className="mt-4 text-sm font-semibold text-gray-900 dark:text-white">{t('ai.welcomeTitle')}</p>
+            <p className="mt-1 max-w-[260px] text-xs leading-relaxed text-gray-500 dark:text-gray-400">
               {t('ai.welcomeBody')}
-              <br />
-              {t('ai.welcomeBodyMic')}
-            </div>
+              {sttEnabled && (
+                <>
+                  <br />
+                  {t('ai.welcomeBodyMic')}
+                </>
+              )}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {messages.map((msg) => {
+              if (msg.role === 'tool_result') return null;
+              return (
+                <MessageBubble
+                  key={msg.id}
+                  msg={msg}
+                  toolResult={
+                    msg.role === 'tool_call' && msg.toolCallId
+                      ? toolResultMap.get(msg.toolCallId)
+                      : undefined
+                  }
+                />
+              );
+            })}
           </div>
         )}
-        {messages.map((msg) => {
-          if (msg.role === 'tool_result') return null;
-          return (
-            <MessageBubble
-              key={msg.id}
-              msg={msg}
-              toolResult={
-                msg.role === 'tool_call' && msg.toolCallId
-                  ? toolResultMap.get(msg.toolCallId)
-                  : undefined
-              }
-            />
-          );
-        })}
 
         {/* Write-approval prompt (human-in-the-loop) — inside the scroll area so it scrolls with the chat */}
         {pendingApproval && pendingApproval.actions.length > 0 && !isStreaming && onApprove && (
@@ -437,74 +541,94 @@ export default function AIChatPanel({ messages, isStreaming, error, onSend, onSt
 
       {/* Error banners */}
       {(error || speechError) && (
-        <div className="mx-4 mb-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/50 rounded-lg text-xs text-red-600 dark:text-red-400">
-          {error ?? speechError}
+        <div
+          role="alert"
+          className="mx-4 mb-2 flex animate-fade-in items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-300"
+        >
+          <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span className="min-w-0 break-words">{error ?? speechError}</span>
         </div>
       )}
 
       {/* Input area */}
-      <div className="shrink-0 border-t border-gray-200 dark:border-gray-700/50 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm px-3 py-3">
+      <div className="shrink-0 border-t border-gray-100 px-3 pb-2 pt-2.5 dark:border-gray-800">
         {/* Addon quick-action buttons (slot) */}
-        <Slot name="ai-chat-actions" context={{ onSend, isStreaming }} className="flex flex-wrap gap-1.5 mb-2" />
-        <div className="flex items-center gap-2">
+        <Slot name="ai-chat-actions" context={{ onSend, isStreaming }} className="mb-2 flex flex-wrap gap-1.5" />
+        <div
+          className={cn(
+            'flex items-end gap-1.5 rounded-xl border bg-white p-1.5 shadow-sm transition-[border-color,box-shadow] duration-150 focus-within:ring-4 dark:bg-gray-950/40',
+            overLimit
+              ? 'border-red-400 focus-within:ring-red-500/15 dark:border-red-500/60'
+              : 'border-gray-300 focus-within:border-purple-500 focus-within:ring-purple-500/15 dark:border-gray-700 dark:focus-within:border-purple-400 dark:focus-within:ring-purple-400/15'
+          )}
+        >
           {/* Mic button — only shown when speech-to-text is configured */}
-          {sttEnabled && <button
-            onClick={toggleRecording}
-            disabled={isStreaming}
-            title={isRecording ? t('ai.stopRecording') : t('ai.startRecording')}
-            className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors disabled:opacity-40 ${
-              isRecording
-                ? 'bg-pink-500 hover:bg-pink-600 text-white animate-pulse shadow-sm shadow-pink-500/30'
-                : 'bg-gray-100 dark:bg-gray-700 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400'
-            }`}
-          >
-            {isRecording ? <MicOff size={16} /> : <Mic size={16} />}
-          </button>}
+          {sttEnabled && (
+            <button
+              type="button"
+              onClick={toggleRecording}
+              disabled={isStreaming}
+              title={isRecording ? t('ai.stopRecording') : t('ai.startRecording')}
+              aria-label={isRecording ? t('ai.stopRecording') : t('ai.startRecording')}
+              aria-pressed={isRecording}
+              className={cn(
+                iconButtonClass,
+                isRecording
+                  ? 'bg-red-500 text-white hover:bg-red-600'
+                  : 'text-gray-500 hover:bg-gray-100 hover:text-purple-600 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-purple-400'
+              )}
+            >
+              {isRecording ? <MicOff className="h-4 w-4" aria-hidden="true" /> : <Mic className="h-4 w-4" aria-hidden="true" />}
+            </button>
+          )}
 
           {/* Text input */}
-          <div className="flex-1 relative">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value.slice(0, MAX_INPUT_LENGTH))}
-              onKeyDown={handleKeyDown}
-              placeholder={t('ai.placeholder')}
-              disabled={isStreaming || isRecording}
-              rows={1}
-              maxLength={MAX_INPUT_LENGTH}
-              className={`w-full resize-none rounded-xl border px-3 py-2.5 text-sm text-gray-800 dark:text-gray-100 bg-white dark:bg-gray-700 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 dark:focus:ring-purple-400/50 disabled:opacity-50 transition-colors ${
-                overLimit
-                  ? 'border-red-400 dark:border-red-500'
-                  : 'border-gray-200 dark:border-gray-600'
-              }`}
-              style={{ minHeight: 42, maxHeight: 120 }}
-            />
-            {inputLength > MAX_INPUT_LENGTH * 0.8 && (
-              <div
-                className={`absolute -bottom-4 right-1 text-[10px] ${overLimit ? 'text-red-500' : 'text-gray-400 dark:text-gray-500'}`}
-              >
-                {inputLength}/{MAX_INPUT_LENGTH}
-              </div>
-            )}
-          </div>
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value.slice(0, MAX_INPUT_LENGTH))}
+            onKeyDown={handleKeyDown}
+            placeholder={t('ai.inputPlaceholder')}
+            aria-label={t('ai.placeholder')}
+            disabled={isStreaming || isRecording}
+            rows={1}
+            maxLength={MAX_INPUT_LENGTH}
+            className="min-w-0 flex-1 resize-none border-0 bg-transparent px-2 py-1.5 text-sm leading-5 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0 disabled:opacity-50 dark:text-gray-100 dark:placeholder:text-gray-500"
+            style={{ minHeight: 32, maxHeight: 120 }}
+          />
 
           {/* Send / Stop button */}
           {isStreaming ? (
             <button
+              type="button"
               onClick={onStop}
-              className="shrink-0 w-9 h-9 rounded-xl bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-colors shadow-sm"
+              className={cn(
+                iconButtonClass,
+                'bg-gray-900 text-white hover:bg-gray-700 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white'
+              )}
               title={t('ai.stop')}
+              aria-label={t('ai.stop')}
             >
-              <Square size={15} />
+              <Square className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
             </button>
           ) : (
             <button
+              type="button"
               onClick={handleSend}
               disabled={!input.trim() || isStreaming || overLimit}
-              className="shrink-0 w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shadow-purple-500/30"
+              className={cn(iconButtonClass, 'bg-purple-600 text-white hover:bg-purple-500')}
               title={t('ai.send')}
+              aria-label={t('ai.send')}
             >
-              <Send size={15} />
+              <ArrowUp className="h-4 w-4" aria-hidden="true" />
             </button>
+          )}
+        </div>
+        <div className="mt-1.5 flex items-center justify-between gap-3 px-1 text-[11px] text-gray-400 dark:text-gray-500">
+          <span className="hidden truncate sm:block">{t('ai.inputHint')}</span>
+          {inputLength > MAX_INPUT_LENGTH * 0.8 && (
+            <span className={cn('ml-auto tabular-nums', overLimit && 'text-red-600 dark:text-red-400')}>
+              {inputLength}/{MAX_INPUT_LENGTH}
+            </span>
           )}
         </div>
       </div>

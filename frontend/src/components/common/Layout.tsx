@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from './Header';
 import { Toaster } from './Toaster';
@@ -31,6 +32,7 @@ const PUBLIC_PATHS = new Set(['/', '/login', '/register', '/forgot-password', '/
  * @returns {JSX.Element} Page frame around the routed content
  */
 export default function Layout({ children, overlay }: LayoutProps) {
+  const { t } = useTranslation('common');
   const { isAuthenticated } = useAuth();
   const { pathname } = useLocation();
   const isPublic = !isAuthenticated || PUBLIC_PATHS.has(pathname);
@@ -55,7 +57,7 @@ export default function Layout({ children, overlay }: LayoutProps) {
           <footer className="border-t border-gray-200/70 py-6 dark:border-gray-800/70">
             <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 text-sm text-gray-500 sm:flex-row sm:px-6 dark:text-gray-400">
               <p className="font-medium text-gray-700 dark:text-gray-300">Track Your Money &amp; Effort</p>
-              <p>&copy; {new Date().getFullYear()} OpenTYME. All rights reserved.</p>
+              <p>&copy; {new Date().getFullYear()} OpenTYME. {t('footer.rights', 'All rights reserved.')}</p>
             </div>
           </footer>
         </div>

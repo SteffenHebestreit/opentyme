@@ -9,10 +9,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { ArrowLeft, Braces, Code2, Eye, Mail, Save, Upload } from 'lucide-react';
 import { Slot } from '@/plugins/slots';
 import { useSlotProvider } from '@/plugins/slots/SlotProvider';
 import { useEmailTemplate, useCreateEmailTemplate, useUpdateEmailTemplate } from '@/api/hooks/useEmailTemplates';
 import { previewRawMjml } from '@/api/services/email-template.service';
+import { PageHeader } from '@/components/common/PageHeader';
+import { Button } from '@/components/common/Button';
+import { Tabs } from '@/components/common/Tabs';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { fieldClasses, fieldLabelClass } from '@/components/forms/fieldStyles';
+import { usePresence } from '@/hooks/ui/usePresence';
+import { toast } from '@/lib/toast';
+import { cn } from '@/lib/cn';
 
 const CATEGORIES = ['custom', 'invoice', 'reminder', 'welcome', 'notification'];
 
@@ -46,6 +55,7 @@ export default function EmailTemplateBuilder() {
   const { id } = useParams<{ id?: string }>();
   const isNew = !id;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const placeholderMenuRef = useRef<HTMLDivElement>(null);
 
   const [name, setName] = useState('');
   const [subject, setSubject] = useState('');
@@ -59,8 +69,10 @@ export default function EmailTemplateBuilder() {
   const [activeTab, setActiveTab] = useState<'code' | 'preview'>('code');
   const [previewHtml, setPreviewHtml] = useState('');
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  // Set after a save attempt with missing fields, to highlight them
+  const [showValidation, setShowValidation] = useState(false);
   const [showPh, setShowPh] = useState(false);
+  const placeholderMenu = usePresence(showPh, 140);
 
   const { data: existing } = useEmailTemplate(id ?? '');
   const createTemplate = useCreateEmailTemplate();
@@ -78,25 +90,40 @@ export default function EmailTemplateBuilder() {
     }
   }, [existing]);
 
+  // Close the placeholder menu on outside click / Escape
+  useEffect(() => {
+    if (!showPh) return;
+    const onPointer = (event: MouseEvent) => {
+      if (placeholderMenuRef.current && !placeholderMenuRef.current.contains(event.target as Node)) setShowPh(false);
+    };
+    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setShowPh(false);
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [showPh]);
+
   const handleSave = async () => {
     if (!name || !subject) {
-      setSaveMsg({ type: 'error', text: t('builder.validationError') });
+      setShowValidation(true);
+      toast.error(t('builder.validationError'));
       return;
     }
     setSaving(true);
-    setSaveMsg(null);
     try {
       const payload = { name, subject, category, language, is_default: isDefault, mjml_content: mjmlContent };
       if (isNew) {
         const created = await createTemplate.mutateAsync(payload);
-        setSaveMsg({ type: 'success', text: t('builder.saveSuccess') });
+        toast.success(t('builder.saveSuccess'));
         navigate(`/email-templates/${created.id}`, { replace: true });
       } else {
         await updateTemplate.mutateAsync(payload);
-        setSaveMsg({ type: 'success', text: t('builder.saveSuccess') });
+        toast.success(t('builder.saveSuccess'));
       }
     } catch {
-      setSaveMsg({ type: 'error', text: t('builder.saveError') });
+      toast.error(t('builder.saveError'));
     } finally {
       setSaving(false);
     }
@@ -114,7 +141,7 @@ export default function EmailTemplateBuilder() {
       });
       setPreviewHtml(result.html);
     } catch {
-      setPreviewHtml('<p style="padding:20px;color:#e00;">Failed to render preview.</p>');
+      setPreviewHtml(`<p style="padding:20px;color:#e00;font-family:sans-serif;">${t('builder.previewError')}</p>`);
     }
   };
 
@@ -149,137 +176,237 @@ export default function EmailTemplateBuilder() {
   };
 
   const PLACEHOLDER_GROUPS = [
-    { label: 'Company', vars: ['company.name', 'company.email', 'company.phone', 'company.address', 'company.logo_url'] },
-    { label: 'Invoice', vars: ['invoice.number', 'invoice.date', 'invoice.due_date', 'invoice.total', 'invoice.currency'] },
-    { label: 'Client', vars: ['client.name', 'client.email', 'client.address'] },
+    { label: t('builder.groups.company'), vars: ['company.name', 'company.email', 'company.phone', 'company.address', 'company.logo_url'] },
+    { label: t('builder.groups.invoice'), vars: ['invoice.number', 'invoice.date', 'invoice.due_date', 'invoice.total', 'invoice.currency'] },
+    { label: t('builder.groups.client'), vars: ['client.name', 'client.email', 'client.address'] },
   ];
 
+  const nameMissing = showValidation && !name;
+  const subjectMissing = showValidation && !subject;
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
-        <button onClick={() => navigate('/config/email-templates')} className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400">
-          {'←'} {t('builder.back')}
-        </button>
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-          {isNew ? t('builder.newTitle') : t('builder.editTitle')}
-        </h1>
-      </div>
+    <div>
+      <button
+        type="button"
+        onClick={() => navigate('/config/email-templates')}
+        className="mb-4 inline-flex items-center gap-1.5 rounded-lg text-sm font-medium text-gray-500 transition-colors hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-400 dark:hover:text-white"
+      >
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        {t('builder.back')}
+      </button>
 
-      {/* Meta fields */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
-        <div>
-          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('builder.name')}</label>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('builder.namePlaceholder')} className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('builder.subject')}</label>
-          <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={t('builder.subjectPlaceholder')} className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm text-gray-900 dark:text-gray-100" />
-        </div>
-        <div className="flex gap-3 items-end flex-wrap">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('builder.category')}</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-gray-100">
-              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+      <PageHeader
+        title={isNew ? t('builder.newTitle') : t('builder.editTitle')}
+        subtitle={t('builder.subtitle')}
+        icon={Mail}
+        actions={
+          <Button
+            type="button"
+            onClick={handleSave}
+            isLoading={saving}
+            leftIcon={<Save className="h-4 w-4" aria-hidden="true" />}
+          >
+            {saving ? t('builder.saving') : t('builder.save')}
+          </Button>
+        }
+      />
+
+      <div className="space-y-6">
+        {/* Meta fields */}
+        <section className="surface p-5 sm:p-6" aria-labelledby="tpl-settings-heading">
+          <h2 id="tpl-settings-heading" className="section-title mb-4">
+            {t('builder.settings')}
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
+            <div className="lg:col-span-5">
+              <label htmlFor="tpl-name" className={fieldLabelClass(nameMissing)}>
+                {t('builder.name')}
+              </label>
+              <input
+                id="tpl-name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={t('builder.namePlaceholder')}
+                aria-invalid={nameMissing || undefined}
+                className={fieldClasses({ error: nameMissing })}
+              />
+            </div>
+            <div className="lg:col-span-7">
+              <label htmlFor="tpl-subject" className={fieldLabelClass(subjectMissing)}>
+                {t('builder.subject')}
+              </label>
+              <input
+                id="tpl-subject"
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder={t('builder.subjectPlaceholder')}
+                aria-invalid={subjectMissing || undefined}
+                className={fieldClasses({ error: subjectMissing })}
+              />
+            </div>
+            <div className="lg:col-span-3">
+              <label htmlFor="tpl-category" className={fieldLabelClass()}>
+                {t('builder.category')}
+              </label>
+              <select
+                id="tpl-category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className={fieldClasses()}
+              >
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {t(`categories.${c}`, c)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="lg:col-span-2">
+              <label htmlFor="tpl-language" className={fieldLabelClass()}>
+                {t('builder.language')}
+              </label>
+              <select
+                id="tpl-language"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className={fieldClasses()}
+              >
+                <option value="de">DE</option>
+                <option value="en">EN</option>
+              </select>
+            </div>
+            <div className="flex items-end sm:col-span-2 lg:col-span-7">
+              <label className="flex h-10 cursor-pointer items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={isDefault}
+                  onChange={(e) => setIsDefault(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900"
+                />
+                {t('builder.default')}
+              </label>
+            </div>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('builder.language')}</label>
-            <select value={language} onChange={(e) => setLanguage(e.target.value)} className="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-gray-100">
-              <option value="de">DE</option>
-              <option value="en">EN</option>
-            </select>
-          </div>
-          <label className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer pb-1.5">
-            <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} className="rounded border-gray-300" />
-            {t('builder.default')}
-          </label>
-        </div>
-      </div>
+        </section>
 
-      {/* Toolbar */}
-      <div className="mb-2 flex items-center gap-2 flex-wrap">
-        <div className="flex rounded border border-gray-300 dark:border-gray-600 overflow-hidden">
-          <button onClick={() => setActiveTab('code')} className={`px-3 py-1.5 text-sm ${activeTab === 'code' ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}>
-            {t('builder.tabCode')}
-          </button>
-          <button onClick={handlePreview} className={`px-3 py-1.5 text-sm ${activeTab === 'preview' ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'}`}>
-            {t('builder.tabPreview')}
-          </button>
-        </div>
+        {/* Editor */}
+        <section className="surface" aria-label={t('builder.content')}>
+          {/* Toolbar */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+            <Tabs
+              variant="pills"
+              tabs={[
+                { id: 'code', label: t('builder.tabCode'), icon: Code2 },
+                { id: 'preview', label: t('builder.tabPreview'), icon: Eye },
+              ]}
+              activeTab={activeTab}
+              onChange={(tab) => (tab === 'preview' ? void handlePreview() : setActiveTab('code'))}
+            />
 
-        {/* Placeholder picker */}
-        <div className="relative">
-          <button onClick={() => setShowPh((v) => !v)} className="rounded border border-purple-300 dark:border-purple-700 px-3 py-1.5 text-sm font-medium text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20">
-            {'{{\u2026}}'} {t('builder.insertPlaceholder')}
-          </button>
-          {showPh && (
-            <div className="absolute left-0 top-full mt-1 z-50 w-56 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-xl">
-              <div className="p-2 max-h-60 overflow-y-auto">
-                {PLACEHOLDER_GROUPS.map((g) => (
-                  <div key={g.label} className="mb-2">
-                    <div className="px-2 py-0.5 text-xs font-semibold text-gray-400 uppercase">{g.label}</div>
-                    {g.vars.map((v) => (
-                      <button key={v} onClick={() => { insertPlaceholder(v); setShowPh(false); }} className="block w-full text-left px-2 py-1 text-xs font-mono text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
-                        {`{{${v}}}`}
-                      </button>
+            <div className="flex-1" />
+
+            {/* Placeholder picker */}
+            <div className="relative" ref={placeholderMenuRef}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPh((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={showPh}
+                leftIcon={<Braces className="h-4 w-4" aria-hidden="true" />}
+              >
+                {t('builder.insertPlaceholder')}
+              </Button>
+              {placeholderMenu.mounted && (
+                <div
+                  role="menu"
+                  className={cn(
+                    'absolute right-0 top-full z-50 mt-2 w-64 origin-top-right rounded-xl border border-gray-200 bg-white p-1.5 shadow-overlay sm:left-0 sm:right-auto sm:origin-top-left',
+                    'dark:border-gray-800 dark:bg-gray-900',
+                    placeholderMenu.closing ? 'animate-scale-out' : 'animate-scale-in'
+                  )}
+                >
+                  <div className="max-h-72 overflow-y-auto">
+                    {PLACEHOLDER_GROUPS.map((g) => (
+                      <div key={g.label} className="py-1">
+                        <div className="eyebrow px-2 pb-1 pt-1 text-[11px]">{g.label}</div>
+                        {g.vars.map((v) => (
+                          <button
+                            key={v}
+                            type="button"
+                            role="menuitem"
+                            onClick={() => { insertPlaceholder(v); setShowPh(false); }}
+                            className="block w-full rounded-md px-2 py-1.5 text-left font-mono text-xs text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
+                          >
+                            {`{{${v}}}`}
+                          </button>
+                        ))}
+                      </div>
                     ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        <button onClick={() => fileInputRef.current?.click()} className="rounded border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
-          {t('builder.uploadFile')}
-        </button>
-        <input ref={fileInputRef} type="file" accept=".html,.mjml,.txt" onChange={handleFileUpload} className="hidden" />
-
-        <div className="flex-1" />
-
-        <button onClick={handleSave} disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
-          {saving ? t('builder.saving') : t('builder.save')}
-        </button>
-      </div>
-
-      {saveMsg && (
-        <p className={`mb-2 text-xs ${saveMsg.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>{saveMsg.text}</p>
-      )}
-
-      {/* Code editor — addon replaces textarea with visual builder via slot */}
-      {activeTab === 'code' && (
-        builderAddonActive ? (
-          isContentReady ? (
-            <Slot
-              name="email-template-builder"
-              context={{ templateId: id, mjmlContent, setMjmlContent, onSave: handleSave }}
-            />
-          ) : (
-            <div
-              className="rounded-lg border border-gray-300 dark:border-gray-700 flex items-center justify-center text-gray-400 text-sm"
-              style={{ height: 600 }}
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              leftIcon={<Upload className="h-4 w-4" aria-hidden="true" />}
             >
-              Loading template…
-            </div>
-          )
-        ) : (
-          <textarea
-            id="mjml-editor"
-            value={mjmlContent}
-            onChange={(e) => setMjmlContent(e.target.value)}
-            spellCheck={false}
-            className="w-full h-[600px] rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-4 py-3 font-mono text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
-          />
-        )
-      )}
+              {t('builder.uploadFile')}
+            </Button>
+            <input ref={fileInputRef} type="file" accept=".html,.mjml,.txt" onChange={handleFileUpload} className="hidden" />
+          </div>
 
-      {/* Preview iframe */}
-      {activeTab === 'preview' && (
-        <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden" style={{ height: 600 }}>
-          <iframe srcDoc={previewHtml || '<p style="padding:20px;color:#666;">Loading preview...</p>'} className="h-full w-full border-0 bg-white" title="Email preview" sandbox="allow-same-origin" />
-        </div>
-      )}
+          <div id={`${activeTab}-panel`} role="tabpanel" aria-labelledby={`${activeTab}-tab`} className="p-3 sm:p-4">
+            {/* Code editor — addon replaces textarea with visual builder via slot */}
+            {activeTab === 'code' && (
+              builderAddonActive ? (
+                isContentReady ? (
+                  <Slot
+                    name="email-template-builder"
+                    context={{ templateId: id, mjmlContent, setMjmlContent, onSave: handleSave }}
+                  />
+                ) : (
+                  <div
+                    className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-gray-200 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400"
+                    style={{ height: 600 }}
+                  >
+                    <LoadingSpinner />
+                    {t('builder.loadingTemplate')}
+                  </div>
+                )
+              ) : (
+                <textarea
+                  id="mjml-editor"
+                  value={mjmlContent}
+                  onChange={(e) => setMjmlContent(e.target.value)}
+                  spellCheck={false}
+                  aria-label={t('builder.tabCode')}
+                  className="block h-[600px] w-full resize-y rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 font-mono text-[13px] leading-relaxed text-gray-900 transition-[border-color,box-shadow] focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/15 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 dark:focus:border-purple-400 dark:focus:ring-purple-400/15"
+                />
+              )
+            )}
+
+            {/* Preview iframe */}
+            {activeTab === 'preview' && (
+              <div className="animate-fade-in overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-800" style={{ height: 600 }}>
+                <iframe
+                  srcDoc={previewHtml || `<p style="padding:20px;color:#666;font-family:sans-serif;">${t('builder.loadingPreview')}</p>`}
+                  className="h-full w-full border-0 bg-white"
+                  title={t('builder.previewTitle')}
+                  sandbox="allow-same-origin"
+                />
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

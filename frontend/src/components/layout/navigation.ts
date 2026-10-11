@@ -6,6 +6,7 @@ import {
   Settings,
   ShieldCheck,
   Timer,
+  UserRound,
   Users,
   Wallet,
   type LucideIcon,
@@ -37,9 +38,19 @@ export const secondaryNav: NavItem[] = [
   { to: '/system-admin', labelKey: 'navigation.systemAdmin', fallback: 'System Admin', icon: ShieldCheck, adminOnly: true },
 ];
 
+/** Pages reached from inside a section (template editor → settings). */
+const sectionAliases: Record<string, string> = {
+  '/email-templates': '/config',
+};
+
+const profileItem: NavItem = { to: '/profile', labelKey: 'navigation.profile', fallback: 'Profile', icon: UserRound };
+
 /** Section a path belongs to — used for the page title in the top bar. */
 export function findNavItem(pathname: string): NavItem | undefined {
-  return [...primaryNav, ...secondaryNav].find(
-    (item) => pathname === item.to || pathname.startsWith(`${item.to}/`)
+  const matches = (base: string) => pathname === base || pathname.startsWith(`${base}/`);
+  const alias = Object.keys(sectionAliases).find(matches);
+  const target = alias ? sectionAliases[alias] : pathname;
+  return [...primaryNav, ...secondaryNav, profileItem].find(
+    (item) => target === item.to || target.startsWith(`${item.to}/`)
   );
 }
