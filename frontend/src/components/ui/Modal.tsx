@@ -1,6 +1,7 @@
 import { FC, ReactNode, useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/cn';
 import { usePresence } from '../../hooks/ui/usePresence';
 
@@ -73,6 +74,7 @@ export const Modal: FC<ModalProps> = ({
   className,
   bodyClassName,
 }) => {
+  const { t } = useTranslation('common');
   const { mounted, closing } = usePresence(open, 150);
   const id = useId();
   const titleId = `${id}-title`;
@@ -100,7 +102,8 @@ export const Modal: FC<ModalProps> = ({
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (openStack[openStack.length - 1] !== id) return;
-      if (event.key === 'Escape' && closeOnEsc) {
+      // A menu or select inside the dialog that handled Escape itself calls preventDefault
+      if (event.key === 'Escape' && closeOnEsc && !event.defaultPrevented) {
         event.stopPropagation();
         onCloseRef.current();
         return;
@@ -164,7 +167,7 @@ export const Modal: FC<ModalProps> = ({
         ref={panelRef}
         tabIndex={-1}
         className={cn(
-          'relative z-10 flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-overlay outline-none',
+          'relative z-10 flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-overlay outline-none focus-visible:ring-0 focus-visible:ring-offset-0',
           'sm:max-h-[min(90dvh,960px)] sm:rounded-2xl',
           'dark:border-gray-800 dark:bg-gray-900',
           closing ? 'animate-scale-out' : 'animate-scale-in',
@@ -199,7 +202,7 @@ export const Modal: FC<ModalProps> = ({
               <button
                 type="button"
                 className="-mr-2 -mt-1 rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:hover:bg-white/5 dark:hover:text-gray-200"
-                aria-label="Close modal"
+                aria-label={t('buttons.close', 'Close')}
                 onClick={() => onCloseRef.current()}
               >
                 <X className="h-5 w-5" />

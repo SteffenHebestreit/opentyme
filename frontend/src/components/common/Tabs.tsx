@@ -47,6 +47,15 @@ export const Tabs: React.FC<TabsProps> = ({
       setIndicator(active ? { left: active.offsetLeft, width: active.offsetWidth } : null);
     };
     update();
+    // On narrow screens keep the active tab in view — horizontally only, never scroll the page
+    const active = list.querySelector<HTMLElement>('[aria-selected="true"]');
+    const scroller = list.parentElement;
+    if (active && scroller && scroller.scrollWidth > scroller.clientWidth) {
+      const start = active.offsetLeft - 16;
+      const end = active.offsetLeft + active.offsetWidth + 16;
+      if (start < scroller.scrollLeft) scroller.scrollLeft = start;
+      else if (end > scroller.scrollLeft + scroller.clientWidth) scroller.scrollLeft = end - scroller.clientWidth;
+    }
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
     observer?.observe(list);
     return () => observer?.disconnect();

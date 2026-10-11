@@ -267,7 +267,8 @@ export const Table = <T extends { id?: string | number }>({
                 <th
                   key={column.key}
                   className={clsx(
-                    'group px-4 py-2.5 first:pl-5 last:pr-5',
+                    // relative: keeps sr-only header labels inside the scroll container
+                    'group relative px-4 py-2.5 first:pl-5 last:pr-5',
                     column.align === 'right' && 'text-right',
                     column.align === 'center' && 'text-center',
                     column.sortable && 'cursor-pointer select-none transition-colors hover:text-gray-900 dark:hover:text-gray-200',

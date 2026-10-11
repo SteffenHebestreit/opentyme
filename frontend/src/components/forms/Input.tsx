@@ -25,6 +25,8 @@ interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'>
   label?: string;
   error?: string;
   helperText?: string;
+  /** Classes of the wrapper; replaces the default bottom margin (e.g. `mb-0` in grid rows) */
+  wrapperClassName?: string;
   leftIcon?: ReactNode;
   rightIcon?: ReactNode;
   inputSize?: InputSize;
@@ -96,6 +98,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
   label,
   error,
   helperText,
+  wrapperClassName,
   leftIcon,
   rightIcon,
   disabled,
@@ -107,7 +110,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
   const inputId = props.id || generatedId;
 
   return (
-    <div className={fieldWrapperClass}>
+    <div className={wrapperClassName ?? fieldWrapperClass}>
       {label && (
         <label 
           htmlFor={inputId}

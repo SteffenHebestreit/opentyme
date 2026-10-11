@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useId } from 'react';
 import clsx from 'clsx';
 import { Check, ChevronDown } from 'lucide-react';
 import { fieldClasses, fieldErrorClass, fieldLabelClass } from './fieldStyles';
@@ -17,6 +17,10 @@ interface CustomSelectProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
   error?: string;
+  /** id of the trigger button (the label points at it) */
+  id?: string;
+  /** Accessible name when there is no visible label */
+  'aria-label'?: string;
 }
 
 /**
@@ -51,7 +55,12 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
   size = 'md',
   className = '',
   error,
+  id,
+  'aria-label': ariaLabel,
 }) => {
+  const generatedId = useId();
+  const buttonId = id ?? generatedId;
+  const listboxId = `${buttonId}-listbox`;
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -138,7 +147,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
   return (
     <div className={clsx('w-full', className)}>
       {label && (
-        <label className={fieldLabelClass(!!error)} onClick={() => !disabled && setIsOpen(true)}>
+        <label htmlFor={buttonId} className={fieldLabelClass(!!error)}>
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}
         </label>
@@ -150,6 +159,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
       >
         {/* Select button */}
         <button
+          id={buttonId}
           type="button"
           onClick={() => !disabled && setIsOpen(!isOpen)}
           onKeyDown={handleKeyDown}
@@ -166,6 +176,8 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
           )}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
+          aria-controls={isOpen ? listboxId : undefined}
+          aria-label={ariaLabel}
         >
           <span className="truncate">{displayText}</span>
           <ChevronDown
@@ -182,6 +194,8 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
           <ul
             ref={dropdownRef}
             role="listbox"
+            id={listboxId}
+            aria-label={label ?? ariaLabel}
             className={clsx(
               'absolute z-50 mt-1.5 w-full min-w-[12rem] origin-top animate-scale-in',
               'bg-white dark:bg-gray-900',

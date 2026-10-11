@@ -23,6 +23,8 @@ interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'siz
   label?: string;
   error?: string;
   helperText?: string;
+  /** Classes of the wrapper; replaces the default bottom margin (e.g. `mb-0` in grid rows) */
+  wrapperClassName?: string;
   selectSize?: SelectSize;
 }
 
@@ -67,6 +69,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
   label,
   error,
   helperText,
+  wrapperClassName,
   disabled,
   className,
   selectSize = 'md',
@@ -77,7 +80,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
   const selectId = props.id || generatedId;
 
   return (
-    <div className={fieldWrapperClass}>
+    <div className={wrapperClassName ?? fieldWrapperClass}>
       {label && (
         <label 
           htmlFor={selectId}

@@ -105,7 +105,7 @@ export function AppShell({ children, overlay }: { children: ReactNode; overlay?:
 
       <div className={cn('flex min-h-screen flex-col transition-[padding] duration-300 ease-out-expo', collapsed ? 'lg:pl-[68px]' : 'lg:pl-60')}>
         <Topbar onOpenMenu={() => setDrawerOpen(true)} onOpenPalette={openPalette} />
-        <main id="main-content" className="flex-1 focus:outline-none" tabIndex={-1}>
+        <main id="main-content" className="flex-1 focus:outline-none focus-visible:ring-0 focus-visible:ring-offset-0" tabIndex={-1}>
           <div key={sectionKey} className="mx-auto w-full max-w-[1600px] animate-page-in px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
             {children}
           </div>

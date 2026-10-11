@@ -22,6 +22,8 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   error?: string;
   helperText?: string;
+  /** Classes of the wrapper; replaces the default bottom margin (e.g. `mb-0` in grid rows) */
+  wrapperClassName?: string;
   textareaSize?: TextareaSize;
 }
 
@@ -66,6 +68,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(({
   label,
   error,
   helperText,
+  wrapperClassName,
   disabled,
   className,
   textareaSize = 'md',
@@ -76,7 +79,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(({
   const textareaId = props.id || generatedId;
 
   return (
-    <div className={fieldWrapperClass}>
+    <div className={wrapperClassName ?? fieldWrapperClass}>
       {label && (
         <label 
           htmlFor={textareaId}

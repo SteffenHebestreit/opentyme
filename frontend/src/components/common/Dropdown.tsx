@@ -36,6 +36,8 @@ interface DropdownProps {
   label?: string;
   icon?: LucideIcon;
   align?: DropdownAlign;
+  /** Open below (default) or above the trigger — e.g. in a dialog footer */
+  placement?: 'bottom' | 'top';
   className?: string;
 }
 
@@ -93,6 +95,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
   label = 'Options',
   icon: Icon,
   align = 'left',
+  placement = 'bottom',
   className = '',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -117,18 +120,21 @@ export const Dropdown: React.FC<DropdownProps> = ({
 
   // Close on Escape
   useEffect(() => {
+    // Capture phase + preventDefault: Escape closes only this menu, not a dialog around it
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
         setIsOpen(false);
       }
     };
 
     if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
+      document.addEventListener('keydown', handleEscape, true);
     }
 
     return () => {
-      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener('keydown', handleEscape, true);
     };
   }, [isOpen]);
 
@@ -162,8 +168,12 @@ export const Dropdown: React.FC<DropdownProps> = ({
       {isOpen && (
         <div
           role="menu"
-          className={`absolute z-50 mt-1.5 min-w-[12rem] animate-scale-in rounded-xl border border-gray-200 bg-white p-1 shadow-lifted dark:border-gray-800 dark:bg-gray-900 ${
-            align === 'right' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'
+          className={`absolute z-50 min-w-[12rem] animate-scale-in rounded-xl border border-gray-200 bg-white p-1 shadow-lifted dark:border-gray-800 dark:bg-gray-900 ${
+            placement === 'top' ? 'bottom-full mb-1.5' : 'mt-1.5'
+          } ${
+            align === 'right'
+              ? placement === 'top' ? 'right-0 origin-bottom-right' : 'right-0 origin-top-right'
+              : placement === 'top' ? 'left-0 origin-bottom-left' : 'left-0 origin-top-left'
           }`}
         >
           {items.map((item, index) => {

@@ -1,4 +1,4 @@
-import { forwardRef, useState } from 'react';
+import { forwardRef, useId, useRef, useState } from 'react';
 import type { InputHTMLAttributes } from 'react';
 
 /**
@@ -252,21 +252,33 @@ export const Switch = forwardRef<HTMLInputElement, SwitchProps>(({
   className = '',
   disabled,
   checked,
+  defaultChecked,
+  onChange,
+  id,
   ...props
 }, ref) => {
-  const [isChecked, setIsChecked] = useState(checked || false);
-  const switchId = props.id || `switch-${Math.random().toString(36).substr(2, 9)}`;
+  // Controlled when `checked` is given, otherwise it keeps its own state
+  const isControlled = checked !== undefined;
+  const [internalChecked, setInternalChecked] = useState(Boolean(defaultChecked));
+  const isChecked = isControlled ? Boolean(checked) : internalChecked;
+  const generatedId = useId();
+  const switchId = id || generatedId;
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const setRefs = (node: HTMLInputElement | null) => {
+    inputRef.current = node;
+    if (typeof ref === 'function') ref(node);
+    else if (ref) ref.current = node;
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setIsChecked(e.target.checked);
-    if (props.onChange) {
-      props.onChange(e);
-    }
+    if (!isControlled) setInternalChecked(e.target.checked);
+    onChange?.(e);
   };
 
   return (
     <div className="mb-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div className="flex-1">
           <label
             htmlFor={switchId}
@@ -282,31 +294,34 @@ export const Switch = forwardRef<HTMLInputElement, SwitchProps>(({
             </p>
           )}
         </div>
+        {/* The hidden checkbox carries the value and fires onChange; the button is the visible control */}
+        <input
+          ref={setRefs}
+          id={switchId}
+          type="checkbox"
+          className="sr-only"
+          tabIndex={-1}
+          checked={isChecked}
+          onChange={handleChange}
+          disabled={disabled}
+          {...props}
+        />
         <button
           type="button"
           role="switch"
           aria-checked={isChecked}
-          onClick={() => !disabled && setIsChecked(!isChecked)}
+          aria-label={label}
+          onClick={() => !disabled && inputRef.current?.click()}
           disabled={disabled}
-          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent 
-            transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2
+          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent
+            transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2
             ${isChecked ? 'bg-purple-600' : 'bg-gray-200 dark:bg-gray-700'}
             ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
             ${className}`}
         >
-          <input
-            ref={ref}
-            id={switchId}
-            type="checkbox"
-            className="sr-only"
-            checked={isChecked}
-            onChange={handleChange}
-            disabled={disabled}
-            {...props}
-          />
           <span
             aria-hidden="true"
-            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 
+            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0
               transition duration-200 ease-in-out
               ${isChecked ? 'translate-x-5' : 'translate-x-0'}`}
           />
