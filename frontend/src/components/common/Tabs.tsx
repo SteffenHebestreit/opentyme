@@ -77,7 +77,7 @@ export const Tabs: React.FC<TabsProps> = ({
         onKeyDown={onKeyDown}
         className={cn(
           'relative flex',
-          pills ? 'inline-flex gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-900' : 'gap-6'
+          pills ? 'inline-flex gap-1 rounded-lg bg-gray-100 p-1 dark:bg-white/[0.05]' : 'gap-6'
         )}
       >
         {indicator && (
@@ -86,7 +86,7 @@ export const Tabs: React.FC<TabsProps> = ({
             className={cn(
               'absolute transition-[left,width] duration-300 ease-out-expo',
               pills
-                ? 'inset-y-1 rounded-md bg-white shadow-soft dark:bg-gray-800'
+                ? 'inset-y-1 rounded-md bg-white shadow-soft dark:bg-white/10'
                 : 'bottom-0 h-0.5 rounded-full bg-purple-600 dark:bg-purple-400'
             )}
             style={{ left: indicator.left, width: indicator.width }}

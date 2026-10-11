@@ -1,258 +1,238 @@
 import { FC } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TrendingUp, TrendingDown, DollarSign, Receipt, Percent } from 'lucide-react';
-import clsx from 'clsx';
+import {
+  AlertTriangle,
+  Landmark,
+  LucideIcon,
+  Receipt,
+  RefreshCw,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+} from 'lucide-react';
 import { useYearlyFinancialSummary } from '../../hooks/api';
 import { formatCurrency } from '../../utils/currency';
+import { cn } from '../../lib/cn';
+import { AnimatedNumber } from '../common/AnimatedNumber';
+import { Button } from '../common/Button';
+import { DashboardSection } from './DashboardSection';
+import { FinancialSummarySkeleton } from './DashboardSkeleton';
+
+/** Icon accent of a key figure (same tints as StatCard). */
+type Accent = 'green' | 'orange' | 'red';
+
+const accentClasses: Record<Accent, string> = {
+  green: 'bg-emerald-50 text-emerald-600 ring-emerald-600/10 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-400/20',
+  orange: 'bg-orange-50 text-orange-600 ring-orange-600/10 dark:bg-orange-500/10 dark:text-orange-400 dark:ring-orange-400/20',
+  red: 'bg-red-50 text-red-600 ring-red-600/10 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-400/20',
+};
+
+/** Sign of a figure: colours profit/loss and refund/liability. */
+type Tone = 'positive' | 'negative' | 'neutral';
+
+const toneText: Record<Tone, string> = {
+  positive: 'text-emerald-600 dark:text-emerald-400',
+  negative: 'text-red-600 dark:text-red-400',
+  neutral: 'text-gray-900 dark:text-white',
+};
+
+const formatMoney = (value: number) => formatCurrency(value);
+
+/**
+ * Primary key figure: larger than the operational StatCards below it, with a
+ * value that counts up on load and highlights when it changes after a save.
+ */
+const KpiCard: FC<{
+  label: string;
+  value: number;
+  icon: LucideIcon;
+  variant: Accent;
+  tone?: Tone;
+  hint?: string;
+}> = ({ label, value, icon: Icon, variant, tone = 'neutral', hint }) => (
+  <div className="surface p-5 sm:p-6">
+    <div className="flex items-start justify-between gap-3">
+      <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</p>
+      <span
+        className={cn(
+          'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset',
+          accentClasses[variant]
+        )}
+      >
+        <Icon className="h-5 w-5" aria-hidden="true" />
+      </span>
+    </div>
+    <p
+      className={cn(
+        'mt-2 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl xl:text-[1.75rem] 2xl:text-3xl',
+        toneText[tone]
+      )}
+    >
+      <AnimatedNumber value={value} format={formatMoney} />
+    </p>
+    {hint && <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{hint}</p>}
+  </div>
+);
+
+/** A label/value pair of the compact tax card. */
+const TaxFigure: FC<{ label: string; value: number; tone?: Tone; accent?: boolean }> = ({
+  label,
+  value,
+  tone = 'neutral',
+  accent = false,
+}) => (
+  <div className="min-w-0">
+    <dt
+      className={cn(
+        'text-xs font-medium uppercase tracking-wider',
+        accent ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'
+      )}
+    >
+      {label}
+    </dt>
+    <dd className={cn('mt-1 text-base font-semibold tabular-nums', toneText[tone])}>
+      <AnimatedNumber value={value} format={formatMoney} />
+    </dd>
+  </div>
+);
+
+const signTone = (value: number): Tone => (value > 0 ? 'positive' : value < 0 ? 'negative' : 'neutral');
 
 /**
  * Yearly Financial Summary component for dashboard.
- * 
- * Displays prominent cards with the current year's financial overview:
+ *
+ * The dashboard's primary key figures for the current year:
  * - Total Revenue (gross)
  * - Total Expenses (gross)
- * - Tax Payable (net VAT liability)
+ * - Tax Payable (remaining VAT liability after prepayments)
  * - Net Profit (net revenue - net expenses)
- * 
+ *
+ * followed by a compact, secondary card with the tax-relevant figures
+ * (net amounts, VAT, input tax and — when present — tax prepayments).
+ *
  * Features:
- * - Large, prominent cards with color-coded indicators
- * - Automatic year selection (current year)
- * - Loading skeleton during data fetch
- * - Error state with retry
- * - Color-coded profit/loss indicator (green for profit, red for loss)
- * - Dark mode support
- * 
+ * - Values count up on load and highlight when they change (e.g. after a save)
+ * - Profit/loss and refund/liability colour coding
+ * - Skeleton while loading, inline error with retry
+ * - Light and dark mode
+ *
  * @component
  * @example
  * <YearlyFinancialSummary />
- * 
- * @returns {JSX.Element} Yearly financial summary cards
+ *
+ * @returns {JSX.Element} Yearly financial summary section
  */
 export const YearlyFinancialSummary: FC = () => {
   const { t } = useTranslation('dashboard');
   const currentYear = new Date().getFullYear();
   const { data, isLoading, isError, refetch } = useYearlyFinancialSummary(currentYear);
 
+  const title = t('yearlyFinancialSummary.title', { year: currentYear });
+  const period = t('yearlyFinancialSummary.period', { start: `01.01.${currentYear}`, end: `31.12.${currentYear}` });
+
   if (isLoading) {
     return (
-      <div className="space-y-3">
-        <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-          {t('yearlyFinancialSummary.title', { year: currentYear })}
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="animate-pulse rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900"
-            >
-              <div className="h-4 w-24 rounded bg-gray-200 dark:bg-gray-700"></div>
-              <div className="mt-3 h-8 w-32 rounded bg-gray-200 dark:bg-gray-700"></div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <DashboardSection title={title} aside={period}>
+        <FinancialSummarySkeleton />
+      </DashboardSection>
     );
   }
 
   if (isError || !data) {
     return (
-      <div className="space-y-3">
-        <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-          {t('yearlyFinancialSummary.title', { year: currentYear })}
-        </h2>
-        <div className="rounded-xl border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950">
-          <p className="text-sm text-red-600 dark:text-red-400">
+      <DashboardSection title={title} aside={period}>
+        <div
+          role="alert"
+          className="flex animate-fade-in flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-5 py-4 dark:border-red-500/20 dark:bg-red-500/10"
+        >
+          <p className="flex items-center gap-2 text-sm font-medium text-red-700 dark:text-red-300">
+            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
             {t('yearlyFinancialSummary.error')}
           </p>
-          <button
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            leftIcon={<RefreshCw className="h-4 w-4" />}
             onClick={() => void refetch()}
-            className="mt-2 text-sm font-medium text-red-700 hover:text-red-800 dark:text-red-300 dark:hover:text-red-200"
           >
             {t('yearlyFinancialSummary.retry')}
-          </button>
+          </Button>
         </div>
-      </div>
+      </DashboardSection>
     );
   }
 
   const isProfit = data.net_profit >= 0;
   const isTaxRefund = data.remaining_tax_payable < 0; // Negative means we get money back
-
-  const cards: Array<{
-    label: string;
-    value: number;
-    icon: FC<{ className?: string }>;
-    accent: string;
-    description?: string;
-  }> = [
-    {
-      label: t('yearlyFinancialSummary.totalRevenue'),
-      value: data.gross_revenue_all,
-      icon: DollarSign,
-      accent: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300',
-      description: t('yearlyFinancialSummary.totalRevenueDesc'),
-    },
-    {
-      label: t('yearlyFinancialSummary.totalExpenses'),
-      value: data.gross_expenses_all,
-      icon: Receipt,
-      accent: 'bg-orange-500/10 text-orange-600 dark:text-orange-300',
-      description: t('yearlyFinancialSummary.totalExpensesDesc'),
-    },
-    {
-      label: t('yearlyFinancialSummary.taxPayable'),
-      value: data.remaining_tax_payable,
-      icon: Percent,
-      accent: isTaxRefund
-        ? 'bg-green-500/10 text-green-600 dark:text-green-300'
-        : 'bg-red-500/10 text-red-600 dark:text-red-300',
-      description: t('yearlyFinancialSummary.remainingTaxPayableDesc'),
-    },
-    {
-      label: t('yearlyFinancialSummary.netProfit'),
-      value: data.net_profit,
-      icon: isProfit ? TrendingUp : TrendingDown,
-      accent: isProfit
-        ? 'bg-green-500/10 text-green-600 dark:text-green-300'
-        : 'bg-red-500/10 text-red-600 dark:text-red-300',
-      description: t('yearlyFinancialSummary.netProfitDesc'),
-    },
-  ];
+  const taxRelevantProfit = data.net_revenue - data.net_expenses;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-          {t('yearlyFinancialSummary.title', { year: currentYear })}
-        </h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          {t('yearlyFinancialSummary.period', { start: `01.01.${currentYear}`, end: `31.12.${currentYear}` })}
-        </p>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map(({ label, value, icon: Icon, accent, description }) => (
-          <div
-            key={label}
-            className="group rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition hover:shadow-lg dark:border-gray-800 dark:bg-gray-900"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</p>
-                <p
-                  className={clsx(
-                    'mt-2 text-3xl font-bold',
-                    label === t('yearlyFinancialSummary.netProfit')
-                      ? isProfit
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-red-600 dark:text-red-400'
-                      : label === t('yearlyFinancialSummary.taxPayable')
-                        ? isTaxRefund
-                          ? 'text-green-600 dark:text-green-400'
-                          : 'text-red-600 dark:text-red-400'
-                        : 'text-gray-900 dark:text-white'
-                  )}
-                >
-                  {formatCurrency(value)}
-                </p>
-                {description && (
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{description}</p>
-                )}
-              </div>
-              <span className={clsx('flex h-14 w-14 items-center justify-center rounded-full text-xl', accent)}>
-                <Icon className="h-7 w-7" />
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Additional breakdown summary */}
-      <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-5 dark:border-gray-800 dark:from-gray-900 dark:to-gray-900">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-4">
-          {t('yearlyFinancialSummary.taxBreakdownTitle')}
-        </h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              {t('yearlyFinancialSummary.netRevenue')}
-            </p>
-            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-              {formatCurrency(data.net_revenue)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              {t('yearlyFinancialSummary.netExpenses')}
-            </p>
-            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-              {formatCurrency(data.net_expenses)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              {t('yearlyFinancialSummary.taxRelevantProfit')}
-            </p>
-            <p className={clsx(
-              'mt-1 text-lg font-semibold',
-              data.net_revenue - data.net_expenses >= 0
-                ? 'text-green-600 dark:text-green-400'
-                : 'text-red-600 dark:text-red-400'
-            )}>
-              {formatCurrency(data.net_revenue - data.net_expenses)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              {t('yearlyFinancialSummary.revenueTax')}
-            </p>
-            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-              {formatCurrency(data.revenue_tax)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              {t('yearlyFinancialSummary.expenseTax')}
-            </p>
-            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-              {formatCurrency(data.expense_tax)}
-            </p>
-          </div>
+    <DashboardSection title={title} aside={period}>
+      <div className="space-y-4">
+        {/* Primary key figures */}
+        <div className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <KpiCard
+            label={t('yearlyFinancialSummary.totalRevenue')}
+            value={data.gross_revenue_all}
+            icon={Wallet}
+            variant="green"
+            hint={t('yearlyFinancialSummary.totalRevenueDesc')}
+          />
+          <KpiCard
+            label={t('yearlyFinancialSummary.totalExpenses')}
+            value={data.gross_expenses_all}
+            icon={Receipt}
+            variant="orange"
+            hint={t('yearlyFinancialSummary.totalExpensesDesc')}
+          />
+          <KpiCard
+            label={t('yearlyFinancialSummary.taxPayable')}
+            value={data.remaining_tax_payable}
+            icon={Landmark}
+            variant={isTaxRefund ? 'green' : 'red'}
+            tone={isTaxRefund ? 'positive' : data.remaining_tax_payable > 0 ? 'negative' : 'neutral'}
+            hint={t('yearlyFinancialSummary.remainingTaxPayableDesc')}
+          />
+          <KpiCard
+            label={t('yearlyFinancialSummary.netProfit')}
+            value={data.net_profit}
+            icon={isProfit ? TrendingUp : TrendingDown}
+            variant={isProfit ? 'green' : 'red'}
+            tone={signTone(data.net_profit)}
+            hint={t('yearlyFinancialSummary.netProfitDesc')}
+          />
         </div>
 
-        {/* Tax prepayments section - only show if there are any prepayments */}
-        {data.total_prepayments > 0 && (
-          <>
-            <div className="my-4 border-t border-gray-200 dark:border-gray-700" />
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-purple-600 dark:text-purple-400">
-                  {t('yearlyFinancialSummary.vatPrepayments')}
-                </p>
-                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                  {formatCurrency(data.vat_prepayments)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-purple-600 dark:text-purple-400">
-                  {t('yearlyFinancialSummary.incomeTaxPrepayments')}
-                </p>
-                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                  {formatCurrency(data.income_tax_prepayments)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-purple-600 dark:text-purple-400">
-                  {t('yearlyFinancialSummary.totalPrepayments')}
-                </p>
-                <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                  {formatCurrency(data.total_prepayments)}
-                </p>
-              </div>
-            </div>
-          </>
-        )}
+        {/* Secondary: tax-relevant figures */}
+        <div className="surface p-5">
+          <h3 className="eyebrow">{t('yearlyFinancialSummary.taxBreakdownTitle')}</h3>
+          <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-5">
+            <TaxFigure label={t('yearlyFinancialSummary.netRevenue')} value={data.net_revenue} />
+            <TaxFigure label={t('yearlyFinancialSummary.netExpenses')} value={data.net_expenses} />
+            <TaxFigure
+              label={t('yearlyFinancialSummary.taxRelevantProfit')}
+              value={taxRelevantProfit}
+              tone={signTone(taxRelevantProfit)}
+            />
+            <TaxFigure label={t('yearlyFinancialSummary.revenueTax')} value={data.revenue_tax} />
+            <TaxFigure label={t('yearlyFinancialSummary.expenseTax')} value={data.expense_tax} />
+          </dl>
+
+          {/* Tax prepayments — only shown if there are any */}
+          {data.total_prepayments > 0 && (
+            <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-gray-100 pt-4 sm:grid-cols-3 dark:border-gray-800">
+              <TaxFigure label={t('yearlyFinancialSummary.vatPrepayments')} value={data.vat_prepayments} accent />
+              <TaxFigure
+                label={t('yearlyFinancialSummary.incomeTaxPrepayments')}
+                value={data.income_tax_prepayments}
+                accent
+              />
+              <TaxFigure label={t('yearlyFinancialSummary.totalPrepayments')} value={data.total_prepayments} accent />
+            </dl>
+          )}
+        </div>
       </div>
-    </div>
+    </DashboardSection>
   );
 };

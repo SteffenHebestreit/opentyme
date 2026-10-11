@@ -1,7 +1,11 @@
 import { Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
+import { LayoutDashboard } from 'lucide-react';
 import { useApp } from '../../store/AppContext';
 import { useDashboard } from '../../hooks/api';
+import { PageHeader } from '../common/PageHeader';
+import { EmptyState } from '../common/EmptyState';
+import { DashboardSection } from './DashboardSection';
 import { MetricsGrid } from './MetricsGrid';
 import { YearlyFinancialSummary } from './YearlyFinancialSummary';
 import { RecentTimeEntries } from './RecentTimeEntries';
@@ -18,22 +22,24 @@ import { Slot } from '../../plugins/slots';
 
 /**
  * Main Dashboard component displaying application overview and key metrics.
- * 
- * Features:
- * - Personalized greeting with user name
- * - Metrics grid showing KPIs (projects, clients, hours, invoices, revenue)
- * - Weekly hours trend chart
- * - Recent time entries list
- * - Recent invoices list  
- * - Quick action buttons
- * - Loading skeleton during data fetch
- * - Error state with retry functionality
- * - Unauthenticated state with welcome message
- * - Dark mode support
- * 
+ *
+ * Layout, top to bottom:
+ * - Page header with personalized greeting and quick actions (log time, new invoice, …)
+ * - Financial overview of the year: primary key figures + compact tax card
+ * - "At a glance" metrics (projects, clients, hours, unpaid invoices, revenue)
+ * - Analytics charts (time trend, top clients) and project time budgets
+ * - Recent activity: time entries and invoices side by side
+ * - Depreciation (AfA): schedule chart and asset register
+ * - Addon-contributed widgets
+ *
+ * Key figures count up on load and highlight when they change after a save
+ * elsewhere, so it is visible that the numbers are live. Shows a layout-shaped
+ * skeleton while loading, an error state with retry, and a welcome message
+ * when not authenticated.
+ *
  * Uses useDashboard hook to fetch aggregated dashboard data.
  * Uses AppContext to check authentication state and access user info.
- * 
+ *
  * @component
  * @example
  * // Basic usage in route
@@ -42,7 +48,7 @@ import { Slot } from '../../plugins/slots';
  *     <Dashboard />
  *   </AuthGuard>
  * } />
- * 
+ *
  * @returns {JSX.Element} Dashboard with metrics, charts, and recent activity
  */
 export default function Dashboard() {
@@ -52,25 +58,24 @@ export default function Dashboard() {
 
   if (!state.isAuthenticated) {
     return (
-      <div className="p-6">
-        <div className="rounded-xl border border-gray-200 bg-white p-6 text-gray-700 shadow-sm dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200">
-          <h2 className="text-xl font-semibold">{t('welcome.title')}</h2>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            {t('welcome.message')}
-          </p>
-        </div>
-      </div>
+      <EmptyState
+        bordered
+        icon={LayoutDashboard}
+        title={t('welcome.title')}
+        description={t('welcome.message')}
+      />
     );
   }
 
+  const userName = state.user?.username;
+
   return (
-    <div className="space-y-8 p-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">{t('title')}</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          {t('greeting', { name: state.user?.username ?? 'there' })}
-        </p>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        title={t('title')}
+        subtitle={userName ? t('greeting', { name: userName }) : t('greetingNoName')}
+        actions={<QuickActions />}
+      />
 
       {isLoading ? (
         <DashboardSkeleton />
@@ -78,45 +83,40 @@ export default function Dashboard() {
         <DashboardErrorState message={error instanceof Error ? error.message : undefined} onRetry={() => void refetch()} />
       ) : (
         <Fragment>
-          {/* Yearly Financial Summary - Prominent at top */}
+          {/* Primary: the year's financial key figures and tax-relevant overview */}
           <YearlyFinancialSummary />
 
-          <MetricsGrid metrics={data.metrics} />
+          {/* Operational metrics */}
+          <DashboardSection title={t('sections.atAGlance')}>
+            <MetricsGrid metrics={data.metrics} />
+          </DashboardSection>
 
           {/* Analytics Charts */}
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t('analyticsInsights')}</h2>
+          <DashboardSection title={t('analyticsInsights')}>
             <div className="grid gap-6 lg:grid-cols-2">
               <TimeTrendChart />
               <RevenueByClientChart />
             </div>
             <ProjectTimeBudgets />
-          </div>
+          </DashboardSection>
+
+          {/* Recent activity, side by side on wide screens */}
+          <DashboardSection title={t('sections.recentActivity')}>
+            <div className="grid gap-6 xl:grid-cols-5">
+              <div className="min-w-0 xl:col-span-2">
+                <RecentTimeEntries entries={data.recentTimeEntries} />
+              </div>
+              <div className="min-w-0 xl:col-span-3">
+                <RecentInvoices invoices={data.recentInvoices} />
+              </div>
+            </div>
+          </DashboardSection>
 
           {/* Depreciation Section */}
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Abschreibungen (AfA)</h2>
-            <div className="grid gap-6 lg:grid-cols-1">
-              <DepreciationScheduleChart />
-              <AssetRegisterTable />
-            </div>
-          </div>
-
-          <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('recentTimeEntries.title')}</h2>
-              <RecentTimeEntries entries={data.recentTimeEntries} />
-            </div>
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('quickActions.title')}</h2>
-              <QuickActions />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('recentInvoices.title')}</h2>
-            <RecentInvoices invoices={data.recentInvoices} />
-          </div>
+          <DashboardSection title={t('depreciation.title')}>
+            <DepreciationScheduleChart />
+            <AssetRegisterTable />
+          </DashboardSection>
 
           {/* Addon-contributed dashboard widgets */}
           <Slot name="dashboard-widgets" context={{ metrics: data.metrics }} />

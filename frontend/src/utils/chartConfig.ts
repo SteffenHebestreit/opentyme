@@ -193,6 +193,8 @@ export const getLineChartOptions = (yAxisLabel?: string, theme: ChartTheme = cur
     elements: {
       line: {
         tension: 0.35,
+        // keeps curves from overshooting below zero / above peaks on sparse data
+        cubicInterpolationMode: 'monotone',
         borderWidth: 2,
       },
       point: {

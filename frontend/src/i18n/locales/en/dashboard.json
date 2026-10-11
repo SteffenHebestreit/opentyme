@@ -15,7 +15,8 @@
     "revenueThisMonth": "Revenue This Month",
     "revenueLastMonth": "Revenue Last Month",
     "totalRevenue": "Total Revenue",
-    "billableHours": "Billable Hours"
+    "billableHours": "Billable Hours",
+    "lastMonth": "Last month"
   },
   "charts": {
     "timeTrend": {
@@ -25,7 +26,11 @@
       "nonBillableHours": "Non-Billable Hours",
       "days": "days",
       "noData": "No data available",
-      "startTracking": "Start tracking time to see trends"
+      "startTracking": "Start tracking time to see trends",
+      "subtitle": "Logged hours per day",
+      "hoursAxis": "Hours",
+      "tooltip": "{{label}}: {{value}} h",
+      "range": "Time range"
     },
     "revenueByClient": {
       "title": "Top Clients by Revenue",
@@ -33,7 +38,8 @@
       "revenue": "Revenue",
       "invoices": "Invoices",
       "noData": "No revenue data available",
-      "createInvoices": "Create and receive payments to see client revenue"
+      "createInvoices": "Create and receive payments to see client revenue",
+      "axis": "Revenue"
     },
     "billableRatio": {
       "title": "Billable Ratio",
@@ -47,7 +53,8 @@
       "loading": "Loading chart data...",
       "error": "Failed to load data",
       "noData": "No time entries yet",
-      "noDataDescription": "Track time to see your billable ratio"
+      "noDataDescription": "Track time to see your billable ratio",
+      "tooltip": "{{label}}: {{value}} h ({{percent}}%)"
     },
     "projectProfitability": {
       "title": "Project Profitability",
@@ -88,7 +95,15 @@
     "createInvoice": "Create your first invoice",
     "invoice": "Invoice",
     "due": "Due",
-    "updated": "Updated"
+    "updated": "Updated",
+    "statuses": {
+      "draft": "Draft",
+      "sent": "Sent",
+      "partially_paid": "Partially paid",
+      "paid": "Paid",
+      "overdue": "Overdue",
+      "cancelled": "Cancelled"
+    }
   },
   "quickActions": {
     "title": "Quick Actions",
@@ -129,5 +144,58 @@
     "vatPrepayments": "VAT Prepayments",
     "incomeTaxPrepayments": "Income Tax Prepayments",
     "totalPrepayments": "Total Prepayments"
+  },
+  "greetingNoName": "Welcome back! Here's what's happening across your workspace today.",
+  "loading": "Loading dashboard…",
+  "sections": {
+    "atAGlance": "At a glance",
+    "recentActivity": "Recent activity"
+  },
+  "projectBudgets": {
+    "title": "Project time budgets",
+    "subtitle": "Logged vs. estimated hours",
+    "overBudget": "Over budget by {{hours}}h"
+  },
+  "depreciation": {
+    "title": "Depreciation (AfA)",
+    "schedule": {
+      "title": "Depreciation schedule",
+      "subtitle": "Planned depreciation per year",
+      "annual": "Annual depreciation",
+      "axis": "Amount",
+      "tooltipAmount": "Depreciation: {{amount}}",
+      "tooltipAssets": "Assets: {{count}}",
+      "error": "Failed to load the depreciation schedule",
+      "empty": "No depreciation yet",
+      "emptyHint": "Expenses booked as depreciable assets will show up here.",
+      "years_one": "{{count}} year",
+      "years_other": "{{count}} years"
+    },
+    "register": {
+      "title": "Asset register",
+      "columns": {
+        "description": "Description",
+        "purchaseDate": "Acquired",
+        "netAmount": "Acquisition cost",
+        "usefulLife": "Useful life",
+        "annual": "Annual",
+        "remaining": "Remaining value",
+        "status": "Status"
+      },
+      "statusActive": "Active",
+      "statusDepreciated": "Fully depreciated",
+      "filterAll": "All",
+      "filterActive": "Active",
+      "filterDepreciated": "Fully depreciated",
+      "empty": "No assets yet",
+      "emptyHint": "Depreciable purchases from your expenses are listed here.",
+      "error": "Failed to load the asset register",
+      "total_one": "Total: {{count}} asset",
+      "total_other": "Total: {{count}} assets"
+    }
+  },
+  "trendChart": {
+    "max": "Max",
+    "total": "Total"
   }
 }

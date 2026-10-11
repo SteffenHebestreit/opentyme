@@ -39,7 +39,7 @@ interface ProgressBarProps {
 }
 
 const variantClasses: Record<ProgressVariant, string> = {
-  primary: 'bg-gradient-to-r from-purple-600 to-pink-600',
+  primary: 'bg-purple-600 dark:bg-purple-500',
   secondary: 'bg-gray-600 dark:bg-gray-500',
   success: 'bg-green-600',
   warning: 'bg-yellow-500',

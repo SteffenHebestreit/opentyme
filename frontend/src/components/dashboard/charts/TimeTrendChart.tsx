@@ -1,13 +1,13 @@
 /**
  * @fileoverview Time Trend Chart component.
- * 
+ *
  * Displays a line chart showing time tracking trends over days:
- * - Total hours (purple line)
- * - Billable hours (green line)
- * - Non-billable hours (red line)
- * 
- * Includes date range selector (30/60/90 days).
- * 
+ * - Total hours (violet line with a soft area fill)
+ * - Billable hours (emerald line)
+ * - Non-billable hours (dashed grey line)
+ *
+ * Includes a date range selector (30/60/90 days). Follows the light/dark theme.
+ *
  * @module components/dashboard/charts/TimeTrendChart
  */
 
@@ -20,13 +20,20 @@ import {
   PointElement,
   LineElement,
   LineController,
+  Filler,
   Title,
   Tooltip,
   Legend,
   ChartOptions,
 } from 'chart.js';
+import { LineChart } from 'lucide-react';
 import { useTimeTrend } from '../../../hooks/api/useAnalytics';
-import { chartColors, getLineChartOptions, formatNumber } from '../../../utils/chartConfig';
+import { useChartTheme } from '../../../hooks/ui/useChartTheme';
+import { chartColors, getLineChartOptions, withAlpha } from '../../../utils/chartConfig';
+import { parseYmd } from '../../../utils/date';
+import { Tabs } from '../../common/Tabs';
+import { ChartPanel, ChartStatus } from './ChartPanel';
+import { formatDecimal } from './chartFormat';
 
 // Register Chart.js components
 ChartJS.register(
@@ -35,6 +42,7 @@ ChartJS.register(
   PointElement,
   LineElement,
   LineController,
+  Filler,
   Title,
   Tooltip,
   Legend
@@ -47,17 +55,27 @@ type DayRange = 30 | 60 | 90;
 
 const dayRangeOptions: DayRange[] = [30, 60, 90];
 
+const TAB_PREFIX = 'time-trend-';
+const CHART_HEIGHT = 300;
+
 /**
  * TimeTrendChart Component
- * 
+ *
  * @returns Line chart showing time tracking trends
  */
 const TimeTrendChart: React.FC = () => {
-  const { t } = useTranslation('dashboard');
+  const { t, i18n } = useTranslation('dashboard');
+  const theme = useChartTheme();
+  const locale = i18n.language;
   const [selectedDays, setSelectedDays] = useState<DayRange>(90);
   const { data, isLoading, error } = useTimeTrend(selectedDays);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<ChartJS | null>(null);
+
+  const hasHours = !!data && data.some(
+    (point) => point.total_hours > 0 || point.billable_hours > 0 || point.non_billable_hours > 0
+  );
+  const status: ChartStatus = isLoading ? 'loading' : error ? 'error' : hasHours ? 'ready' : 'empty';
 
   useEffect(() => {
     if (!canvasRef.current || !data || data.length === 0) return;
@@ -67,53 +85,84 @@ const TimeTrendChart: React.FC = () => {
       chartRef.current.destroy();
     }
 
+    const nonBillableColor = theme === 'dark' ? chartColors.gray[500] : chartColors.gray[400];
+
     // Prepare chart data
     const chartData = {
       labels: data.map((point) => {
-        const date = new Date(point.date);
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const date = parseYmd(point.date) ?? new Date(point.date);
+        return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
       }),
       datasets: [
         {
           label: t('charts.timeTrend.totalHours'),
           data: data.map((point) => point.total_hours),
           borderColor: chartColors.primary,
-          backgroundColor: chartColors.primary + '20',
-          fill: false,
+          backgroundColor: withAlpha(chartColors.primary, theme === 'dark' ? 0.14 : 0.08),
+          pointBackgroundColor: chartColors.primary,
+          fill: 'origin' as const,
         },
         {
           label: t('charts.timeTrend.billableHours'),
           data: data.map((point) => point.billable_hours),
           borderColor: chartColors.success,
-          backgroundColor: chartColors.success + '20',
+          backgroundColor: chartColors.success,
+          pointBackgroundColor: chartColors.success,
           fill: false,
         },
         {
           label: t('charts.timeTrend.nonBillableHours'),
           data: data.map((point) => point.non_billable_hours),
-          borderColor: chartColors.danger,
-          backgroundColor: chartColors.danger + '20',
+          borderColor: nonBillableColor,
+          backgroundColor: nonBillableColor,
+          pointBackgroundColor: nonBillableColor,
+          borderDash: [4, 4],
           fill: false,
         },
       ],
     };
 
     // Chart options
+    const base = getLineChartOptions(t('charts.timeTrend.hoursAxis'), theme);
     const options: ChartOptions<'line'> = {
-      ...getLineChartOptions('Hours'),
+      ...base,
+      maintainAspectRatio: false,
       plugins: {
-        ...getLineChartOptions('Hours').plugins,
+        ...base.plugins,
         title: {
           display: false,
         },
+        legend: {
+          ...base.plugins?.legend,
+          labels: {
+            ...base.plugins?.legend?.labels,
+            // Solid dots in the legend (the area fill of "total" is too pale for a swatch)
+            generateLabels: (chart) =>
+              ChartJS.defaults.plugins.legend.labels
+                .generateLabels(chart)
+                .map((item) => ({ ...item, fillStyle: item.strokeStyle })),
+          },
+        },
         tooltip: {
-          ...getLineChartOptions('Hours').plugins?.tooltip,
+          ...base.plugins?.tooltip,
           callbacks: {
-            label: (context) => {
-              const label = context.dataset.label || '';
-              const value = context.parsed.y ?? 0;
-              return `${label}: ${formatNumber(value, 1)} hours`;
-            },
+            label: (context) =>
+              t('charts.timeTrend.tooltip', {
+                label: context.dataset.label || '',
+                value: formatDecimal(context.parsed.y ?? 0, locale),
+              }),
+          },
+        },
+      },
+      scales: {
+        ...base.scales,
+        x: {
+          ...base.scales?.x,
+          ticks: {
+            ...base.scales?.x?.ticks,
+            autoSkip: true,
+            maxTicksLimit: 8,
+            maxRotation: 0,
           },
         },
       },
@@ -130,79 +179,38 @@ const TimeTrendChart: React.FC = () => {
     return () => {
       if (chartRef.current) {
         chartRef.current.destroy();
+        chartRef.current = null;
       }
     };
-  }, [data]);
+  }, [data, theme, t, locale]);
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-lg">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('charts.timeTrend.title')}</h3>
-        
-        {/* Day range selector */}
-        <div className="flex gap-2">
-          {dayRangeOptions.map((days) => (
-            <button
-              key={days}
-              onClick={() => setSelectedDays(days)}
-              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                selectedDays === days
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-              }`}
-            >
-              {days} {t('charts.timeTrend.days')}
-            </button>
-          ))}
-        </div>
+    <ChartPanel
+      title={t('charts.timeTrend.title')}
+      subtitle={t('charts.timeTrend.subtitle')}
+      action={
+        <Tabs
+          variant="pills"
+          tabs={dayRangeOptions.map((days) => ({
+            id: `${TAB_PREFIX}${days}`,
+            label: `${days} ${t('charts.timeTrend.days')}`,
+          }))}
+          activeTab={`${TAB_PREFIX}${selectedDays}`}
+          onChange={(id) => setSelectedDays(Number(id.slice(TAB_PREFIX.length)) as DayRange)}
+        />
+      }
+      height={CHART_HEIGHT}
+      status={status}
+      errorTitle={t('errors:unknown.title')}
+      errorMessage={error?.message}
+      emptyIcon={LineChart}
+      emptyTitle={t('charts.timeTrend.noData')}
+      emptyHint={t('charts.timeTrend.startTracking')}
+    >
+      <div className="relative h-full">
+        <canvas ref={canvasRef} />
       </div>
-
-      {/* Chart content */}
-      <div className="relative" style={{ height: '300px' }}>
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-gray-900 bg-opacity-75 dark:bg-opacity-75 rounded z-10">
-            <div className="flex flex-col items-center gap-3">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500"></div>
-              <p className="text-gray-600 dark:text-gray-400 text-sm">{t('common:buttons.loading')}</p>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-gray-900 rounded z-10">
-            <div className="text-center">
-              <p className="text-red-400 font-medium mb-2">{t('errors:unknown.title')}</p>
-              <p className="text-gray-600 dark:text-gray-400 text-sm">{error.message}</p>
-            </div>
-          </div>
-        )}
-
-        {!isLoading && !error && data && data.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-gray-900 rounded z-10">
-            <div className="text-center">
-              <svg
-                className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600 mb-3"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
-              <p className="text-gray-700 dark:text-gray-400 font-medium">{t('charts.timeTrend.noData')}</p>
-              <p className="text-gray-500 dark:text-gray-500 text-sm mt-1">{t('charts.timeTrend.startTracking')}</p>
-            </div>
-          </div>
-        )}
-
-        <canvas ref={canvasRef} style={{ maxHeight: '300px' }}></canvas>
-      </div>
-    </div>
+    </ChartPanel>
   );
 };
 

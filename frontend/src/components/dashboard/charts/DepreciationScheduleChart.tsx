@@ -1,9 +1,9 @@
 /**
  * @fileoverview Depreciation Schedule Chart component
- * 
+ *
  * Displays a bar chart showing future depreciation amounts by year
- * with asset count breakdown
- * 
+ * with asset count breakdown. Follows the light/dark theme.
+ *
  * @module components/dashboard/charts/DepreciationScheduleChart
  */
 
@@ -21,8 +21,14 @@ import {
   ChartOptions,
 } from 'chart.js';
 import { useQuery } from '@tanstack/react-query';
+import { CalendarRange } from 'lucide-react';
 import { getDepreciationSchedule } from '../../../api/services/depreciation.service';
-import { chartColors, getBarChartOptions, formatCurrency } from '../../../utils/chartConfig';
+import { useChartTheme } from '../../../hooks/ui/useChartTheme';
+import { chartColors, getBarChartOptions, withAlpha } from '../../../utils/chartConfig';
+import { formatCurrency } from '../../../utils/currency';
+import { Tabs } from '../../common/Tabs';
+import { ChartPanel, ChartStatus } from './ChartPanel';
+import { formatCompactCurrency } from './chartFormat';
 
 // Register Chart.js components
 ChartJS.register(
@@ -35,13 +41,19 @@ ChartJS.register(
   Legend
 );
 
+const yearOptions = [3, 5, 10];
+const TAB_PREFIX = 'depreciation-years-';
+const CHART_HEIGHT = 260;
+
 /**
  * DepreciationScheduleChart Component
- * 
+ *
  * @returns Bar chart showing depreciation schedule
  */
 const DepreciationScheduleChart: React.FC = () => {
-  const { t: _t } = useTranslation('dashboard');
+  const { t, i18n } = useTranslation('dashboard');
+  const theme = useChartTheme();
+  const locale = i18n.language;
   const [years, setYears] = useState(5);
   const { data, isLoading, error } = useQuery({
     queryKey: ['depreciation-schedule', years],
@@ -49,6 +61,9 @@ const DepreciationScheduleChart: React.FC = () => {
   });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<ChartJS | null>(null);
+
+  const hasDepreciation = !!data && data.schedule.some((item) => Number(item.total_depreciation) !== 0);
+  const status: ChartStatus = isLoading ? 'loading' : error ? 'error' : hasDepreciation ? 'ready' : 'empty';
 
   useEffect(() => {
     if (!canvasRef.current || !data || data.schedule.length === 0) return;
@@ -63,116 +78,96 @@ const DepreciationScheduleChart: React.FC = () => {
       labels: data.schedule.map((item) => item.year.toString()),
       datasets: [
         {
-          label: 'Jährliche Abschreibung',
+          label: t('depreciation.schedule.annual'),
           data: data.schedule.map((item) => item.total_depreciation),
-          backgroundColor: chartColors.primary + '80',
-          borderColor: chartColors.primary,
-          borderWidth: 2,
+          backgroundColor: withAlpha(chartColors.primary, theme === 'dark' ? 0.8 : 0.85),
+          hoverBackgroundColor: chartColors.primaryDark,
           borderRadius: 6,
+          maxBarThickness: 48,
         },
       ],
     };
 
     // Chart options
+    const base = getBarChartOptions(t('depreciation.schedule.axis'), false, theme);
     const options: ChartOptions<'bar'> = {
-      ...getBarChartOptions('Betrag (€)', false),
+      ...base,
+      maintainAspectRatio: false,
       plugins: {
-        ...getBarChartOptions('Betrag (€)', false).plugins,
+        ...base.plugins,
+        legend: {
+          display: false, // Single series — the card title names it
+        },
         tooltip: {
-          ...getBarChartOptions('Betrag (€)', false).plugins?.tooltip,
+          ...base.plugins?.tooltip,
           callbacks: {
             label: (context) => {
               const value = context.parsed.y;
               const yearData = data.schedule[context.dataIndex];
               return [
-                `Abschreibung: ${formatCurrency(value ?? 0)}`,
-                `Vermögenswerte: ${yearData.assets.length}`,
+                t('depreciation.schedule.tooltipAmount', { amount: formatCurrency(value ?? 0) }),
+                t('depreciation.schedule.tooltipAssets', { count: yearData?.assets.length ?? 0 }),
               ];
             },
           },
         },
       },
       scales: {
+        ...base.scales,
         y: {
+          ...base.scales?.y,
           beginAtZero: true,
           ticks: {
-            callback: (value) => formatCurrency(Number(value)),
+            ...base.scales?.y?.ticks,
+            maxTicksLimit: 6,
+            callback: (value) => formatCompactCurrency(Number(value), locale),
           },
         },
       },
     };
 
     // Create chart
-    const ctx = canvasRef.current.getContext('2d');
-    if (ctx) {
-      chartRef.current = new ChartJS(ctx, {
-        type: 'bar',
-        data: chartData,
-        options: options as any,
-      });
-    }
+    chartRef.current = new ChartJS(canvasRef.current, {
+      type: 'bar',
+      data: chartData,
+      options,
+    });
 
     return () => {
       if (chartRef.current) {
         chartRef.current.destroy();
+        chartRef.current = null;
       }
     };
-  }, [data]);
+  }, [data, theme, t, locale]);
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Abschreibungsplan
-          </h3>
-        </div>
-        
-        <div className="flex gap-2">
-          {[3, 5, 10].map((y) => (
-            <button
-              key={y}
-              onClick={() => setYears(y)}
-              className={`rounded-lg px-3 py-1 text-sm font-medium transition-colors ${
-                years === y
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-              }`}
-            >
-              {y} Jahre
-            </button>
-          ))}
-        </div>
+    <ChartPanel
+      title={t('depreciation.schedule.title')}
+      subtitle={t('depreciation.schedule.subtitle')}
+      action={
+        <Tabs
+          variant="pills"
+          tabs={yearOptions.map((y) => ({
+            id: `${TAB_PREFIX}${y}`,
+            label: t('depreciation.schedule.years', { count: y }),
+          }))}
+          activeTab={`${TAB_PREFIX}${years}`}
+          onChange={(id) => setYears(Number(id.slice(TAB_PREFIX.length)))}
+        />
+      }
+      height={CHART_HEIGHT}
+      status={status}
+      errorTitle={t('depreciation.schedule.error')}
+      errorMessage={error instanceof Error ? error.message : undefined}
+      emptyIcon={CalendarRange}
+      emptyTitle={t('depreciation.schedule.empty')}
+      emptyHint={t('depreciation.schedule.emptyHint')}
+    >
+      <div className="relative h-full">
+        <canvas ref={canvasRef} />
       </div>
-
-      {isLoading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
-        </div>
-      ) : error ? (
-        <div className="flex h-64 items-center justify-center">
-          <p className="text-sm text-red-600 dark:text-red-400">
-            Fehler beim Laden des Abschreibungsplans
-          </p>
-        </div>
-      ) : !data || data.schedule.length === 0 ? (
-        <div className="flex h-64 flex-col items-center justify-center gap-2">
-          <svg className="h-12 w-12 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-          </svg>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Keine Abschreibungen vorhanden
-          </p>
-        </div>
-      ) : (
-        <div className="relative h-64">
-          <canvas ref={canvasRef}></canvas>
-        </div>
-      )}
-    </div>
+    </ChartPanel>
   );
 };
 

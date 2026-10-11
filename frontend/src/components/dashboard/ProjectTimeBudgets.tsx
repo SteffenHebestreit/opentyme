@@ -12,7 +12,10 @@
 import { FC } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { AlertTriangle } from 'lucide-react';
 import { getProjectTimeBudgets, ProjectTimeBudget } from '../../api/services/analytics.service';
+import { cn } from '../../lib/cn';
+import { Card, CardHeader } from '../common/Card';
 
 /**
  * Clamp a percentage into the 0–100 range for bar widths.
@@ -31,36 +34,54 @@ const BudgetRow: FC<{ budget: ProjectTimeBudget }> = ({ budget }) => {
     ? 'bg-red-500'
     : budget.percentage >= 80
       ? 'bg-amber-500'
-      : 'bg-purple-500';
+      : 'bg-purple-500 dark:bg-purple-400';
 
   return (
-    <div className="space-y-1">
-      <div className="flex items-baseline justify-between gap-2">
-        <div className="min-w-0">
+    <div className="min-w-0 space-y-1.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="flex min-w-0 items-baseline gap-2">
           <span className="truncate text-sm font-medium text-gray-900 dark:text-white">
             {budget.project_name}
           </span>
           {budget.client_name && (
-            <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">{budget.client_name}</span>
+            <span className="truncate text-xs text-gray-500 dark:text-gray-400">{budget.client_name}</span>
           )}
         </div>
-        <div className="shrink-0 text-xs text-gray-600 dark:text-gray-300">
+        <div className="shrink-0 text-xs tabular-nums text-gray-600 dark:text-gray-300">
           {budget.logged_hours.toFixed(1)}
           {hasEstimate ? ` / ${budget.estimated_hours.toFixed(1)}h` : 'h'}
           {hasEstimate && (
-            <span className={budget.over_budget ? 'ml-1 font-semibold text-red-600 dark:text-red-400' : 'ml-1 text-gray-400'}>
+            <span
+              className={cn(
+                'ml-1',
+                budget.over_budget
+                  ? 'font-semibold text-red-600 dark:text-red-400'
+                  : 'text-gray-400 dark:text-gray-500'
+              )}
+            >
               ({budget.percentage.toFixed(0)}%)
             </span>
           )}
         </div>
       </div>
       {hasEstimate && (
-        <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
-          <div className={`h-full rounded-full ${barColor}`} style={{ width: `${barWidth}%` }} />
+        <div
+          className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800"
+          role="progressbar"
+          aria-label={budget.project_name}
+          aria-valuenow={Math.round(barWidth)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
+          <div
+            className={cn('h-full rounded-full transition-[width] duration-700 ease-out-expo', barColor)}
+            style={{ width: `${barWidth}%` }}
+          />
         </div>
       )}
       {budget.over_budget && (
-        <p className="text-xs text-red-600 dark:text-red-400">
+        <p className="flex items-center gap-1 text-xs font-medium text-red-600 dark:text-red-400">
+          <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
           {t('projectBudgets.overBudget', {
             defaultValue: 'Over budget by {{hours}}h',
             hours: Math.abs(budget.remaining_hours).toFixed(1),
@@ -95,16 +116,17 @@ export const ProjectTimeBudgets: FC = () => {
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-      <h3 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">
-        {t('projectBudgets.title', { defaultValue: 'Project Time Budgets' })}
-      </h3>
-      <div className="space-y-4">
+    <Card className="animate-fade-in">
+      <CardHeader
+        title={t('projectBudgets.title', { defaultValue: 'Project Time Budgets' })}
+        subtitle={t('projectBudgets.subtitle')}
+      />
+      <div className="grid gap-x-10 gap-y-5 px-6 py-5 md:grid-cols-2">
         {budgets.slice(0, 8).map((budget) => (
           <BudgetRow key={budget.project_id} budget={budget} />
         ))}
       </div>
-    </div>
+    </Card>
   );
 };
 

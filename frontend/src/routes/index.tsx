@@ -9,62 +9,18 @@
  * @module routes
  */
 
-import { createBrowserRouter, Link, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import type { ComponentType } from 'react';
-import { frontendPluginRegistry } from '@/plugins/plugin-registry';
 
 // Always-loaded shell (small, on every page)
-import Layout from '@/components/common/Layout';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
-import AIChatWidget from '@/components/ai/AIChatWidget';
+import { PluginRoute, RedirectKeepingQuery, RootLayout } from './RouteComponents';
 import { authGuardLoader } from './loaders/authGuardLoader';
 
 /** Wraps a dynamic `import()` of a default-exported page into a React Router lazy module. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- route pages take no props; any admits every component signature
 const page = (factory: () => Promise<{ default: ComponentType<any> }>) => () =>
   factory().then((m) => ({ Component: m.default }));
-
-/**
- * Renders the component registered by an addon for the current path.
- * Placed before the 404 catch-all so addon routes resolve correctly.
- */
-function PluginRoute() {
-  const { pathname } = useLocation();
-  const routes = frontendPluginRegistry.getAllRoutes();
-  const match = routes.find((r) => pathname === r.path || pathname.startsWith(r.path + '/'));
-
-  if (!match) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="text-center">
-          <p className="text-sm font-semibold text-purple-600 dark:text-purple-400">404</p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">Page not found</h1>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">The page you are looking for does not exist.</p>
-          <Link
-            to="/dashboard"
-            className="mt-6 inline-flex h-9 items-center rounded-lg bg-purple-600 px-4 text-sm font-medium text-white shadow-sm transition-colors hover:bg-purple-500"
-          >
-            Return to Dashboard
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const Component = match.component;
-  return <Component />;
-}
-
-/**
- * Root layout component that renders Layout with Outlet for nested routes
- */
-function RootLayout() {
-  return (
-    <Layout overlay={<AIChatWidget />}>
-      <Outlet />
-    </Layout>
-  );
-}
 
 /**
  * Main router configuration using Data API. Page components are lazy-loaded.
@@ -105,8 +61,8 @@ export const router = createBrowserRouter(
         { path: 'email-templates/:id', loader: authGuardLoader, lazy: page(() => import('@/pages/email-templates/EmailTemplateBuilder')) },
 
         // Backward compatibility redirects
-        { path: 'invoices', element: <Navigate to="/finances" replace /> },
-        { path: 'payments', element: <Navigate to="/finances" replace /> },
+        { path: 'invoices', element: <RedirectKeepingQuery to="/finances" /> },
+        { path: 'payments', element: <RedirectKeepingQuery to="/finances" /> },
 
         // Addon routes + 404 catch-all
         { path: '*', loader: authGuardLoader, Component: PluginRoute },

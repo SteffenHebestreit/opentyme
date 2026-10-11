@@ -1,9 +1,10 @@
 /**
  * @fileoverview Revenue By Client Chart component.
- * 
+ *
  * Displays a horizontal bar chart showing top clients by revenue.
- * Shows client names, revenue amounts, and invoice counts.
- * 
+ * Shows client names, revenue amounts, and invoice counts. Follows the
+ * light/dark theme.
+ *
  * @module components/dashboard/charts/RevenueByClientChart
  */
 
@@ -20,8 +21,13 @@ import {
   Legend,
   ChartOptions,
 } from 'chart.js';
+import { Wallet } from 'lucide-react';
 import { useRevenueByClient } from '../../../hooks/api/useAnalytics';
-import { chartPalette, getBarChartOptions, formatCurrency } from '../../../utils/chartConfig';
+import { useChartTheme } from '../../../hooks/ui/useChartTheme';
+import { chartColors, getBarChartOptions, withAlpha } from '../../../utils/chartConfig';
+import { formatCurrency } from '../../../utils/currency';
+import { ChartPanel, ChartStatus } from './ChartPanel';
+import { formatCompactCurrency } from './chartFormat';
 
 // Register Chart.js components
 ChartJS.register(
@@ -34,17 +40,30 @@ ChartJS.register(
   Legend
 );
 
+const CHART_HEIGHT = 300;
+const MAX_LABEL_LENGTH = 18;
+
 /**
  * RevenueByClientChart Component
- * 
+ *
  * @returns Horizontal bar chart showing revenue by client
  */
 const RevenueByClientChart: React.FC = () => {
-  const { t } = useTranslation('dashboard');
+  const { t, i18n } = useTranslation('dashboard');
+  const theme = useChartTheme();
+  const locale = i18n.language;
   const currentYear = new Date().getFullYear();
   const { data, isLoading, error } = useRevenueByClient(10, currentYear);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<ChartJS | null>(null);
+
+  const status: ChartStatus = isLoading
+    ? 'loading'
+    : error
+      ? 'error'
+      : data && data.length > 0
+        ? 'ready'
+        : 'empty';
 
   useEffect(() => {
     if (!canvasRef.current || !data || data.length === 0) return;
@@ -54,30 +73,37 @@ const RevenueByClientChart: React.FC = () => {
       chartRef.current.destroy();
     }
 
-    // Prepare chart data
+    // Prepare chart data — one series, one brand colour
     const chartData = {
       labels: data.map((client) => client.client_name),
       datasets: [
         {
           label: t('charts.revenueByClient.revenue'),
           data: data.map((client) => client.total_revenue),
-          backgroundColor: chartPalette.map((color) => color + 'CC'), // Add transparency
-          borderColor: chartPalette,
-          borderWidth: 1,
+          backgroundColor: withAlpha(chartColors.primary, theme === 'dark' ? 0.8 : 0.85),
+          hoverBackgroundColor: chartColors.primaryDark,
+          borderRadius: 6,
+          maxBarThickness: 22,
         },
       ],
     };
 
     // Chart options
+    const base = getBarChartOptions(t('charts.revenueByClient.axis'), true, theme);
     const options: ChartOptions<'bar'> = {
-      ...getBarChartOptions('Revenue (€)', true),
+      ...base,
+      maintainAspectRatio: false,
+      interaction: { mode: 'nearest', axis: 'y', intersect: false },
       plugins: {
-        ...getBarChartOptions('Revenue (€)', true).plugins,
+        ...base.plugins,
         legend: {
           display: false, // Hide legend for single dataset
         },
         tooltip: {
-          ...getBarChartOptions('Revenue (€)', true).plugins?.tooltip,
+          ...base.plugins?.tooltip,
+          mode: 'index',
+          axis: 'y',
+          intersect: false,
           callbacks: {
             label: (context) => {
               const value = context.parsed.x ?? 0;
@@ -87,6 +113,27 @@ const RevenueByClientChart: React.FC = () => {
                 `${t('charts.revenueByClient.revenue')}: ${formatCurrency(value)}`,
                 `${t('charts.revenueByClient.invoices')}: ${invoiceCount}`,
               ];
+            },
+          },
+        },
+      },
+      scales: {
+        ...base.scales,
+        x: {
+          ...base.scales?.x,
+          ticks: {
+            ...base.scales?.x?.ticks,
+            maxTicksLimit: 6,
+            callback: (value) => formatCompactCurrency(Number(value), locale),
+          },
+        },
+        y: {
+          ...base.scales?.y,
+          ticks: {
+            ...base.scales?.y?.ticks,
+            callback: function (value) {
+              const label = String(this.getLabelForValue(Number(value)));
+              return label.length > MAX_LABEL_LENGTH ? `${label.slice(0, MAX_LABEL_LENGTH - 1)}…` : label;
             },
           },
         },
@@ -104,63 +151,27 @@ const RevenueByClientChart: React.FC = () => {
     return () => {
       if (chartRef.current) {
         chartRef.current.destroy();
+        chartRef.current = null;
       }
     };
-  }, [data]);
+  }, [data, theme, t, locale]);
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-lg">
-      {/* Header */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('charts.revenueByClient.title')}</h3>
-        <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">{t('charts.revenueByClient.subtitle')}</p>
+    <ChartPanel
+      title={t('charts.revenueByClient.title')}
+      subtitle={t('charts.revenueByClient.subtitle')}
+      height={CHART_HEIGHT}
+      status={status}
+      errorTitle={t('errors:unknown.title')}
+      errorMessage={error?.message}
+      emptyIcon={Wallet}
+      emptyTitle={t('charts.revenueByClient.noData')}
+      emptyHint={t('charts.revenueByClient.createInvoices')}
+    >
+      <div className="relative h-full">
+        <canvas ref={canvasRef} />
       </div>
-
-      {/* Chart content */}
-      <div className="relative" style={{ height: '350px' }}>
-        {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-gray-900 bg-opacity-75 dark:bg-opacity-75 rounded">
-            <div className="flex flex-col items-center gap-3">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-500"></div>
-              <p className="text-gray-600 dark:text-gray-400 text-sm">{t('common:buttons.loading')}</p>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-gray-900 rounded">
-            <div className="text-center">
-              <p className="text-red-400 font-medium mb-2">{t('errors:unknown.title')}</p>
-              <p className="text-gray-600 dark:text-gray-400 text-sm">{error.message}</p>
-            </div>
-          </div>
-        )}
-
-        {!isLoading && !error && data && data.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-gray-900 rounded">
-            <div className="text-center">
-              <svg
-                className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-600 mb-3"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
-              <p className="text-gray-700 dark:text-gray-400 font-medium">{t('charts.revenueByClient.noData')}</p>
-              <p className="text-gray-500 dark:text-gray-500 text-sm mt-1">{t('charts.revenueByClient.createInvoices')}</p>
-            </div>
-          </div>
-        )}
-
-        <canvas ref={canvasRef} style={{ maxHeight: '350px' }}></canvas>
-      </div>
-    </div>
+    </ChartPanel>
   );
 };
 

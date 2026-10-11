@@ -1,26 +1,41 @@
 /**
  * @fileoverview Asset Register Table component
- * 
+ *
  * Displays a table of all depreciated assets with filtering options
- * 
+ *
  * @module components/dashboard/AssetRegisterTable
  */
 
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getAssetRegister } from '../../api/services/depreciation.service';
+import { useTranslation } from 'react-i18next';
+import { AlertTriangle, Package } from 'lucide-react';
+import { Asset, getAssetRegister } from '../../api/services/depreciation.service';
 import { formatCurrency } from '../../utils/currency';
+import { formatYmd } from '../../utils/date';
+import { Badge } from '../common/Badge';
+import { Card } from '../common/Card';
+import { EmptyState } from '../common/EmptyState';
+import { SkeletonItem } from '../common/Skeleton';
 import { Table, Column } from '../common/Table';
+import { Tabs } from '../common/Tabs';
+
+type StatusFilter = 'all' | 'active' | 'fully_depreciated';
+
+const statusFilters: StatusFilter[] = ['all', 'active', 'fully_depreciated'];
+const TAB_PREFIX = 'asset-register-';
 
 /**
  * AssetRegisterTable Component
- * 
+ *
  * @returns Table showing all depreciated assets
  */
 const AssetRegisterTable: React.FC = () => {
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'fully_depreciated'>('all');
+  const { t, i18n } = useTranslation('dashboard');
+  const locale = i18n.language;
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const currentYear = new Date().getFullYear();
-  
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['asset-register', currentYear, statusFilter === 'all' ? undefined : statusFilter],
     queryFn: () => getAssetRegister({
@@ -29,22 +44,20 @@ const AssetRegisterTable: React.FC = () => {
     }),
   });
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('de-DE', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
+  const filterLabels: Record<StatusFilter, string> = {
+    all: t('depreciation.register.filterAll'),
+    active: t('depreciation.register.filterActive'),
+    fully_depreciated: t('depreciation.register.filterDepreciated'),
   };
 
-  const columns: Column<any>[] = useMemo(() => [
+  const columns: Column<Asset>[] = useMemo(() => [
     {
       key: 'description',
       accessorKey: 'description',
-      header: 'Beschreibung',
+      header: t('depreciation.register.columns.description'),
       render: (asset) => (
         <>
-          <div className="font-medium">{asset.description}</div>
+          <div className="font-medium text-gray-900 dark:text-white">{asset.description}</div>
           <div className="text-xs text-gray-500 dark:text-gray-400">
             {asset.useful_life_category}
           </div>
@@ -55,155 +68,142 @@ const AssetRegisterTable: React.FC = () => {
     {
       key: 'purchaseDate',
       accessorKey: 'purchase_date',
-      header: 'Anschaffung',
+      header: t('depreciation.register.columns.purchaseDate'),
+      className: 'whitespace-nowrap',
       render: (asset) => (
-        <div className="text-gray-600 dark:text-gray-400">
-          {formatDate(asset.purchase_date)}
-        </div>
+        <span className="tabular-nums text-gray-600 dark:text-gray-400">
+          {formatYmd(asset.purchase_date, locale)}
+        </span>
       ),
       sortable: true,
     },
     {
       key: 'netAmount',
       accessorKey: 'net_amount',
-      header: 'Anschaffungswert',
+      header: t('depreciation.register.columns.netAmount'),
       align: 'right',
+      className: 'whitespace-nowrap',
       render: (asset) => (
-        <div className="font-medium text-gray-900 dark:text-white">
+        <span className="font-medium tabular-nums text-gray-900 dark:text-white">
           {formatCurrency(asset.net_amount)}
-        </div>
+        </span>
       ),
       sortable: true,
     },
     {
       key: 'years',
       accessorKey: 'depreciation_years',
-      header: 'Nutzungsdauer',
+      header: t('depreciation.register.columns.usefulLife'),
       align: 'center',
+      className: 'whitespace-nowrap',
       render: (asset) => (
-        <div className="text-gray-600 dark:text-gray-400">
-          {asset.depreciation_years} Jahre
-        </div>
+        <span className="tabular-nums text-gray-600 dark:text-gray-400">
+          {t('depreciation.schedule.years', { count: asset.depreciation_years })}
+        </span>
       ),
       sortable: true,
     },
     {
       key: 'annual',
       accessorKey: 'annual_depreciation',
-      header: 'Jährlich',
+      header: t('depreciation.register.columns.annual'),
       align: 'right',
+      className: 'whitespace-nowrap',
       render: (asset) => (
-        <div className="text-gray-600 dark:text-gray-400">
+        <span className="tabular-nums text-gray-600 dark:text-gray-400">
           {formatCurrency(asset.annual_depreciation)}
-        </div>
+        </span>
       ),
       sortable: true,
     },
     {
       key: 'remaining',
       accessorKey: 'remaining_value',
-      header: 'Restwert',
+      header: t('depreciation.register.columns.remaining'),
       align: 'right',
+      className: 'whitespace-nowrap',
       render: (asset) => (
-        <div className="font-medium text-gray-900 dark:text-white">
+        <span className="font-medium tabular-nums text-gray-900 dark:text-white">
           {formatCurrency(asset.remaining_value)}
-        </div>
+        </span>
       ),
       sortable: true,
     },
     {
       key: 'status',
       accessorKey: 'status',
-      header: 'Status',
+      header: t('depreciation.register.columns.status'),
       align: 'center',
       render: (asset) => (
         asset.status === 'active' ? (
-          <span className="inline-flex rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
-            Aktiv
-          </span>
+          <Badge variant="green" dot>{t('depreciation.register.statusActive')}</Badge>
         ) : (
-          <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800 dark:bg-gray-900/30 dark:text-gray-400">
-            Abgeschrieben
-          </span>
+          <Badge variant="gray">{t('depreciation.register.statusDepreciated')}</Badge>
         )
       ),
       sortable: true,
     },
-  ], []);
+  ], [t, locale]);
 
-  if (error) {
-    return (
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <div className="flex h-48 items-center justify-center">
-          <p className="text-sm text-red-600 dark:text-red-400">
-            Fehler beim Laden des Anlagenverzeichnisses
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const assets = data?.assets || [];
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-          </svg>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Anlagenverzeichnis
-          </h3>
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 sm:px-6 dark:border-gray-800">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Package className="h-5 w-5 shrink-0 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+          <h3 className="section-title truncate">{t('depreciation.register.title')}</h3>
         </div>
-        
-        <div className="flex gap-2">
-          <button
-            onClick={() => setStatusFilter('all')}
-            className={`rounded-lg px-3 py-1 text-sm font-medium transition-colors ${
-              statusFilter === 'all'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-            }`}
-          >
-            Alle
-          </button>
-          <button
-            onClick={() => setStatusFilter('active')}
-            className={`rounded-lg px-3 py-1 text-sm font-medium transition-colors ${
-              statusFilter === 'active'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-            }`}
-          >
-            Aktiv
-          </button>
-          <button
-            onClick={() => setStatusFilter('fully_depreciated')}
-            className={`rounded-lg px-3 py-1 text-sm font-medium transition-colors ${
-              statusFilter === 'fully_depreciated'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-            }`}
-          >
-            Vollständig abgeschrieben
-          </button>
-        </div>
+        <Tabs
+          variant="pills"
+          tabs={statusFilters.map((filter) => ({ id: `${TAB_PREFIX}${filter}`, label: filterLabels[filter] }))}
+          activeTab={`${TAB_PREFIX}${statusFilter}`}
+          onChange={(id) => setStatusFilter(id.slice(TAB_PREFIX.length) as StatusFilter)}
+        />
       </div>
 
-      <Table
-        data={data?.assets || []}
-        columns={columns}
-        isLoading={isLoading}
-        emptyMessage="Keine Vermögenswerte vorhanden"
-        className="border-0 shadow-none"
-        pageSize={10}
-      />
-      
-      {data && (
-        <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-          Gesamt: {data.total} Vermögenswerte
+      {error ? (
+        <div className="flex h-48 animate-fade-in flex-col items-center justify-center gap-2 px-6 text-center" role="alert">
+          <AlertTriangle className="h-5 w-5 text-red-500 dark:text-red-400" aria-hidden="true" />
+          <p className="text-sm font-medium text-red-600 dark:text-red-400">
+            {t('depreciation.register.error')}
+          </p>
+        </div>
+      ) : isLoading ? (
+        <div className="divide-y divide-gray-100 dark:divide-gray-800/70" aria-busy="true">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="flex items-center justify-between gap-6 px-6 py-4">
+              <div className="flex-1 space-y-2">
+                <SkeletonItem className="h-4 w-1/3" />
+                <SkeletonItem className="h-3 w-1/4" />
+              </div>
+              <SkeletonItem className="h-4 w-20" />
+              <SkeletonItem className="h-4 w-20" />
+            </div>
+          ))}
+        </div>
+      ) : assets.length === 0 ? (
+        <EmptyState
+          compact
+          icon={Package}
+          title={t('depreciation.register.empty')}
+          description={t('depreciation.register.emptyHint')}
+        />
+      ) : (
+        <Table
+          data={assets}
+          columns={columns}
+          className="!rounded-none !border-0 !shadow-none"
+          pageSize={10}
+        />
+      )}
+
+      {data && !error && (
+        <div className="border-t border-gray-100 bg-gray-50/60 px-6 py-3 text-sm text-gray-500 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-400">
+          {t('depreciation.register.total', { count: data.total })}
         </div>
       )}
-    </div>
+    </Card>
   );
 };
 

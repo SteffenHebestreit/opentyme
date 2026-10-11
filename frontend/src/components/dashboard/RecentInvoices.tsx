@@ -1,13 +1,20 @@
 import { FC, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Invoice } from '../../api/types';
-import { formatDate, formatDistanceToNow } from '../../utils/date';
-import clsx from 'clsx';
+import { useNavigate } from 'react-router-dom';
+import { FilePlus2, FileText } from 'lucide-react';
+import { Invoice, InvoiceStatus } from '../../api/types';
+import { formatDistanceToNow, formatYmd } from '../../utils/date';
+import { formatCurrency } from '../../utils/currency';
+import { Badge, BadgeVariant } from '../common/Badge';
+import { Button } from '../common/Button';
+import { Card, CardHeader } from '../common/Card';
+import { EmptyState } from '../common/EmptyState';
 import { Table, Column } from '../common/Table';
+import { ViewAllLink } from './DashboardSection';
 
 /**
  * Props for the RecentInvoices component.
- * 
+ *
  * @interface RecentInvoicesProps
  * @property {Invoice[]} invoices - Array of recent invoice records
  */
@@ -16,77 +23,49 @@ interface RecentInvoicesProps {
 }
 
 /**
- * Status badge styling map.
- * Maps invoice status to Tailwind CSS classes for color-coded badges.
- * 
+ * Status badge colour per invoice status.
+ *
  * @constant
  */
-const statusStyles: Record<string, string> = {
-  paid: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-  sent: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  draft: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
-  overdue: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
-  cancelled: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
+const statusVariant: Record<InvoiceStatus, BadgeVariant> = {
+  paid: 'green',
+  sent: 'blue',
+  partially_paid: 'teal',
+  draft: 'gray',
+  overdue: 'red',
+  cancelled: 'gray',
 };
 
 /**
- * Formats amount as USD currency.
- * 
- * @param {number} amount - Dollar amount to format
- * @returns {string} Formatted currency (e.g., "$1,234.56")
- * 
- * @example
- * formatCurrency(1234.56) // "$1,234.56"
- * formatCurrency(1000000) // "$1,000,000.00"
- */
-function formatCurrency(amount: number): string {
-  return amount.toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  });
-}
-
-/**
- * Displays a table of recent invoices from the dashboard.
- * 
+ * Card with a table of the most recent invoices on the dashboard.
+ *
  * Features:
- * - Responsive table with horizontal scroll
- * - Six columns: Invoice #, Client, Due Date, Amount, Status, Last Updated
- * - Color-coded status badges (paid, sent, draft, overdue, cancelled)
- * - Currency formatting with locale support
+ * - Six sortable columns: Invoice #, Client, Due Date, Amount, Status, Last Updated
+ * - Colour-coded, translated status badges (paid, sent, partially paid, draft, overdue, cancelled)
+ * - Amount in the invoice's own currency, right-aligned
  * - Relative timestamp for updates
- * - Hover effects on rows
- * - Empty state with dashed border
- * - Dark mode support
- * 
- * Status colors:
- * - Paid: emerald (green)
- * - Sent: blue
- * - Draft: gray
- * - Overdue: rose (red)
- * - Cancelled: gray (lighter)
- * 
+ * - Header link to the full invoice list
+ * - Intentional empty state with a "Create invoice" action
+ * - Horizontal scroll on narrow screens
+ *
  * @component
  * @example
- * // With invoices
  * <RecentInvoices invoices={dashboardData.recentInvoices} />
- * 
- * @example
- * // Empty state
- * <RecentInvoices invoices={[]} />
- * 
+ *
  * @param {RecentInvoicesProps} props - Component props
- * @returns {JSX.Element} Table of recent invoices or empty state
+ * @returns {JSX.Element} Card with recent invoices or an empty state
  */
 export const RecentInvoices: FC<RecentInvoicesProps> = ({ invoices }) => {
-  const { t } = useTranslation('dashboard');
-  
+  const { t, i18n } = useTranslation('dashboard');
+  const navigate = useNavigate();
+  const locale = i18n.language;
+
   const columns: Column<Invoice>[] = useMemo(() => [
     {
       key: 'invoice_number',
       accessorKey: 'invoice_number',
       header: t('recentInvoices.invoice'),
+      className: 'whitespace-nowrap',
       render: (invoice) => (
         <span className="font-medium text-gray-900 dark:text-white">
           {invoice.invoice_number}
@@ -99,7 +78,7 @@ export const RecentInvoices: FC<RecentInvoicesProps> = ({ invoices }) => {
       accessorKey: 'client_name',
       header: t('recentInvoices.client'),
       render: (invoice) => (
-        <span className="text-gray-600 dark:text-gray-300">
+        <span className="block max-w-[12rem] truncate text-gray-600 dark:text-gray-300">
           {invoice.client_name ?? '—'}
         </span>
       ),
@@ -109,9 +88,10 @@ export const RecentInvoices: FC<RecentInvoicesProps> = ({ invoices }) => {
       key: 'due_date',
       accessorKey: 'due_date',
       header: t('recentInvoices.due'),
+      className: 'whitespace-nowrap',
       render: (invoice) => (
-        <span className="text-gray-600 dark:text-gray-300">
-          {formatDate(invoice.due_date)}
+        <span className="tabular-nums text-gray-600 dark:text-gray-300">
+          {formatYmd(invoice.due_date, locale)}
         </span>
       ),
       sortable: true,
@@ -120,9 +100,11 @@ export const RecentInvoices: FC<RecentInvoicesProps> = ({ invoices }) => {
       key: 'total_amount',
       accessorKey: 'total_amount',
       header: t('recentInvoices.amount'),
+      align: 'right',
+      className: 'whitespace-nowrap',
       render: (invoice) => (
-        <span className="font-medium text-gray-900 dark:text-white">
-          {formatCurrency(invoice.total_amount)}
+        <span className="font-medium tabular-nums text-gray-900 dark:text-white">
+          {formatCurrency(invoice.total_amount, invoice.currency)}
         </span>
       ),
       sortable: true,
@@ -132,14 +114,9 @@ export const RecentInvoices: FC<RecentInvoicesProps> = ({ invoices }) => {
       accessorKey: 'status',
       header: t('recentInvoices.status'),
       render: (invoice) => (
-        <span
-          className={clsx(
-            'inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold capitalize',
-            statusStyles[invoice.status] ?? statusStyles.draft
-          )}
-        >
-          {invoice.status}
-        </span>
+        <Badge variant={statusVariant[invoice.status] ?? 'gray'} dot>
+          {t(`recentInvoices.statuses.${invoice.status}`, { defaultValue: invoice.status })}
+        </Badge>
       ),
       sortable: true,
     },
@@ -147,6 +124,7 @@ export const RecentInvoices: FC<RecentInvoicesProps> = ({ invoices }) => {
       key: 'updated_at',
       accessorKey: 'updated_at',
       header: t('recentInvoices.updated'),
+      className: 'whitespace-nowrap',
       render: (invoice) => (
         <span className="text-gray-500 dark:text-gray-400">
           {formatDistanceToNow(invoice.updated_at ?? invoice.issue_date)}
@@ -154,22 +132,42 @@ export const RecentInvoices: FC<RecentInvoicesProps> = ({ invoices }) => {
       ),
       sortable: true,
     },
-  ], [t]);
-
-  if (invoices.length === 0) {
-    return (
-      <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
-        {t('recentInvoices.noInvoices')}
-      </div>
-    );
-  }
+  ], [t, locale]);
 
   return (
-    <Table
-      data={invoices}
-      columns={columns}
-      className="border-0 shadow-none"
-      pageSize={10}
-    />
+    <Card className="flex h-full flex-col">
+      <CardHeader
+        title={t('recentInvoices.title')}
+        action={<ViewAllLink to="/finances?tab=invoices">{t('recentInvoices.viewAll')}</ViewAllLink>}
+      />
+
+      {invoices.length === 0 ? (
+        <EmptyState
+          compact
+          className="flex-1"
+          icon={FileText}
+          title={t('recentInvoices.noInvoices')}
+          description={t('recentInvoices.createInvoice')}
+          action={
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              leftIcon={<FilePlus2 className="h-4 w-4" />}
+              onClick={() => navigate('/invoices?wizard=start')}
+            >
+              {t('quickActions.createInvoice')}
+            </Button>
+          }
+        />
+      ) : (
+        <Table
+          data={invoices}
+          columns={columns}
+          className="!rounded-none !border-0 !shadow-none"
+          pageSize={10}
+        />
+      )}
+    </Card>
   );
 };

@@ -226,5 +226,10 @@
       "open": "Suche und Schnellnavigation",
       "trigger": "Springen zu…"
     }
+  },
+  "notFound": {
+    "title": "Seite nicht gefunden",
+    "description": "Die gesuchte Seite gibt es nicht.",
+    "back": "Zurück zum Dashboard"
   }
 }
