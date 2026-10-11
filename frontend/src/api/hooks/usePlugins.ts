@@ -9,11 +9,15 @@ import * as pluginService from '../services/plugin.service';
 
 /**
  * Hook to get list of all plugins
+ *
+ * @param options.enabled - set false while signed out: a 401 from this request
+ *   sends the browser to /login, which made public pages unreachable
  */
-export const usePlugins = () => {
+export const usePlugins = (options?: { enabled?: boolean }) => {
   return useQuery({
     queryKey: ['plugins'],
     queryFn: pluginService.getPlugins,
+    enabled: options?.enabled ?? true,
   });
 };
 

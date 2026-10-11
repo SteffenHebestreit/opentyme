@@ -1,16 +1,20 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { LogIn, ShieldCheck } from 'lucide-react';
 import { Button } from '../../components/common/Button';
+import { Alert } from '../../components/common/Alert';
+import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useAuth } from '../../contexts/AuthContext';
+import { AuthCard, authLinkClass } from './AuthCard';
 
 /**
  * Login Page
- * 
+ *
  * This page redirects users to Keycloak for authentication.
  * No credentials are handled by the frontend - all authentication
  * is managed by Keycloak directly.
- * 
+ *
  * Flow:
  * 1. User clicks "Sign in"
  * 2. Redirected to Keycloak login page
@@ -23,11 +27,19 @@ const Login = (): JSX.Element => {
   const location = useLocation();
   const { login, isAuthenticated, isLoadingAuth } = useAuth();
 
+  /** Message handed over by the registration page after a successful sign-up */
+  const successMessage = (location.state as { successMessage?: string } | null)?.successMessage;
+
   /**
    * If user is already authenticated, redirect to intended page or dashboard
    */
+  // Redirect once. In development React runs effects twice; the second run used
+  // to find the stored path already consumed and sent the user to /dashboard.
+  const redirectedRef = useRef(false);
+
   useEffect(() => {
-    if (!isLoadingAuth && isAuthenticated) {
+    if (!isLoadingAuth && isAuthenticated && !redirectedRef.current) {
+      redirectedRef.current = true;
       // First check for stored redirect path from authGuardLoader
       const redirectAfterLogin = sessionStorage.getItem('redirectAfterLogin');
       if (redirectAfterLogin) {
@@ -35,7 +47,7 @@ const Login = (): JSX.Element => {
         navigate(redirectAfterLogin, { replace: true });
         return;
       }
-      
+
       // Otherwise get the page user was trying to access from location state
       const from = (location.state as any)?.from?.pathname || '/dashboard';
       navigate(from, { replace: true });
@@ -44,7 +56,7 @@ const Login = (): JSX.Element => {
 
   /**
    * Handle login button click
-   * 
+   *
    * Calls keycloak.login() which redirects to Keycloak login page.
    * After successful authentication, user is redirected back to the app.
    */
@@ -55,79 +67,55 @@ const Login = (): JSX.Element => {
   // Show loading state while checking authentication
   if (isLoadingAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">{t('login.checkingAuth')}</p>
-        </div>
+      <div className="flex flex-col items-center justify-center gap-4 px-4 py-24 text-center">
+        <LoadingSpinner size="lg" />
+        <p className="text-sm text-gray-500 dark:text-gray-400">{t('login.checkingAuth')}</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-4xl font-extrabold text-gray-900 dark:bg-gradient-to-r dark:from-purple-200 dark:to-pink-200 dark:bg-clip-text dark:text-transparent">
-            {t('login.title')}
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            {t('login.subtitle')}
-          </p>
-        </div>
+    <AuthCard
+      title={t('login.title')}
+      subtitle={t('login.subtitle')}
+      footer={
+        <p>
+          {t('login.noAccount')}{' '}
+          <button type="button" onClick={() => navigate('/register')} className={authLinkClass}>
+            {t('login.signUp')}
+          </button>
+        </p>
+      }
+    >
+      <div className="space-y-6">
+        {successMessage && <Alert type="success" message={successMessage} />}
 
-        <div className="card">
-          <div className="space-y-6">
-            <div className="text-center">
-              <svg
-                className="mx-auto h-16 w-16 text-purple-600 dark:text-purple-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                />
-              </svg>
-              <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-gray-100">
-                {t('login.keycloakAuth')}
-              </h3>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                {t('login.keycloakDescription')}
-              </p>
-            </div>
-
-            <Button
-              onClick={handleLogin}
-              className="btn w-full"
-            >
-              {t('login.signInButton')}
-            </Button>
-
-            <div className="text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {t('login.noAccount')}{' '}
-                <button
-                  type="button"
-                  onClick={() => navigate('/register')}
-                  className="font-medium text-purple-700 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300 transition-colors"
-                >
-                  {t('login.signUp')}
-                </button>
-              </p>
-            </div>
+        <div className="flex items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 ring-1 ring-inset ring-emerald-600/15 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/20">
+            <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">{t('login.keycloakAuth')}</h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('login.keycloakDescription')}</p>
           </div>
         </div>
 
-        <div className="text-center text-xs text-gray-500 dark:text-gray-400">
-          <p>{t('login.poweredBy')}</p>
+        <Button
+          type="button"
+          size="lg"
+          onClick={handleLogin}
+          className="w-full"
+          leftIcon={<LogIn className="h-5 w-5" aria-hidden="true" />}
+        >
+          {t('login.signInButton')}
+        </Button>
+
+        <div className="border-t border-gray-100 pt-5 text-center text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
+          <p className="font-medium text-gray-600 dark:text-gray-300">{t('login.poweredBy')}</p>
           <p className="mt-1">{t('login.enterpriseGrade')}</p>
         </div>
       </div>
-    </div>
+    </AuthCard>
   );
 };
 

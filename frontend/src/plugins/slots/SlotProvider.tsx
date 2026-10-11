@@ -9,6 +9,7 @@ import React, { createContext, useContext, useMemo, ReactNode } from 'react';
 import { frontendPluginRegistry } from '../plugin-registry';
 import { LoadedSlotComponent } from '../../types/plugin.types';
 import { usePlugins } from '../../api/hooks/usePlugins';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface SlotProviderContextType {
   getSlotComponents: (slotName: string) => LoadedSlotComponent[];
@@ -26,7 +27,9 @@ interface SlotProviderProps {
  * Wraps the application to provide slot functionality
  */
 export const SlotProvider: React.FC<SlotProviderProps> = ({ children }) => {
-  const { data: pluginsData } = usePlugins();
+  const { isAuthenticated } = useAuth();
+  // Signed out there is nothing to filter — and the request would 401 → /login
+  const { data: pluginsData } = usePlugins({ enabled: isAuthenticated });
 
   // Set of user-enabled plugin names. null = data not yet loaded = show all.
   const userEnabledSet = useMemo(() => {
