@@ -243,6 +243,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return;
     }
 
+    // Persist every refreshed token, whichever path refreshed it (interval,
+    // request interceptor, AI stream, onTokenExpired) — requests read it from storage.
+    keycloak.onAuthRefreshSuccess = () => {
+      if (keycloak.token && keycloak.refreshToken) {
+        setTokens(keycloak.token, keycloak.refreshToken, keycloak.idToken);
+        setToken(keycloak.token);
+      }
+    };
+
     // Token expired event
     keycloak.onTokenExpired = () => {
       console.warn('[Auth] ⚠️ Token expired, refreshing...');

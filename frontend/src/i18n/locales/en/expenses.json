@@ -274,7 +274,14 @@
     "depreciationNeedsData": "Please fill in a description and amount first.",
     "depreciationNoResult": "No depreciation recommendation returned.",
     "depreciationDone": "Depreciation analysis complete",
-    "depreciationFailed": "Depreciation analysis failed"
+    "depreciationFailed": "Depreciation analysis failed",
+    "depreciationRulesOnly": "The AI was not available — this is a rule-based estimate. Please check it.",
+    "errors": {
+      "noText": "No text could be read from this receipt. Please enter the details manually.",
+      "unreachable": "The AI service is not reachable. Check the AI settings or try again later.",
+      "timeout": "The AI took too long to read the receipt. Please try again.",
+      "disabled": "The AI assistant is switched off in the settings."
+    }
   },
   "analysis": {
     "title": "AI depreciation analysis",
@@ -311,7 +318,10 @@
     "apply": "Apply settings",
     "applying": "Applying...",
     "methodLinear": "Linear",
-    "methodDegressive": "Declining balance"
+    "methodDegressive": "Declining balance",
+    "rulesOnlyTitle": "Rule-based estimate",
+    "rulesOnlyHint": "The AI was not available, so standard rules were applied. Please check the result.",
+    "rulesBadge": "Rules"
   },
   "detail": {
     "title": "Expense details",

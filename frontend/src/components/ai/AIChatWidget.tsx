@@ -3,7 +3,8 @@
  * Only renders when ai_enabled is true in user settings.
  */
 
-import React, { useState, useEffect, Component } from 'react';
+import React, { useState, useEffect, useRef, Component } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Sparkles, X } from 'lucide-react';
 import { useAIChat } from '../../api/hooks/useAIChat';
@@ -45,6 +46,27 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
   const [open, setOpen] = useState(false);
   const chat = useAIChat();
   const { mounted, closing } = usePresence(open, 160);
+  const fabRef = useRef<HTMLButtonElement>(null);
+
+  const close = () => {
+    setOpen(false);
+    fabRef.current?.focus({ preventScroll: true });
+  };
+
+  // Escape closes the panel — unless something inside (a menu, a dialog) handled it
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented && !document.querySelector('[role="dialog"][aria-modal="true"]')) {
+        setOpen(false);
+        fabRef.current?.focus({ preventScroll: true });
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open]);
+
+  const approvalWaiting = !!chat.pendingApproval && chat.pendingApproval.actions.length > 0 && !chat.isStreaming;
 
   return (
     <>
@@ -56,7 +78,7 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
               'fixed inset-0 z-40 bg-gray-950/40 backdrop-blur-[2px] sm:hidden dark:bg-black/60',
               closing ? 'animate-fade-out' : 'animate-fade-in'
             )}
-            onClick={() => setOpen(false)}
+            onClick={close}
             aria-hidden="true"
           />
 
@@ -81,7 +103,11 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
               sttEnabled={sttEnabled}
               pendingApproval={chat.pendingApproval}
               onApprove={chat.approve}
-              onClose={() => setOpen(false)}
+              onClose={close}
+              onRetryMessage={chat.retryMessage}
+              restoreFailed={chat.restoreFailed}
+              onRetryRestore={chat.retryRestore}
+              onDismissError={chat.dismissError}
             />
           </div>
         </>
@@ -89,6 +115,7 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
 
       {/* FAB button (hidden on mobile while the sheet is open — the sheet has its own close button) */}
       <button
+        ref={fabRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={cn(
@@ -97,7 +124,9 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950',
           open && 'max-sm:hidden'
         )}
-        aria-label={open ? t('ai.close') : t('ai.open')}
+        aria-label={
+          open ? t('ai.close') : approvalWaiting ? `${t('ai.open')} — ${t('ai.approvalWaiting', 'changes are waiting for your approval')}` : t('ai.open')
+        }
         aria-expanded={open}
       >
         <Sparkles
@@ -117,6 +146,14 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
         {!open && chat.isStreaming && (
           <span className="absolute right-0.5 top-0.5 h-3 w-3 animate-soft-pulse rounded-full border-2 border-white bg-emerald-400 dark:border-gray-950" />
         )}
+        {!open && approvalWaiting && (
+          <span
+            className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[1.25rem] animate-pop-in items-center justify-center rounded-full border-2 border-white bg-amber-500 px-1 text-[10px] font-bold text-white dark:border-gray-950"
+            aria-hidden="true"
+          >
+            {chat.pendingApproval?.actions.length}
+          </span>
+        )}
       </button>
     </>
   );
@@ -126,18 +163,16 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
 
 export default function AIChatWidget() {
   const { isAuthenticated, isLoadingAuth } = useAuth();
-  const [aiEnabled, setAiEnabled] = useState<boolean | null>(null);
-  const [sttEnabled, setSttEnabled] = useState(false);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    getSettings()
-      .then((s) => {
-        setAiEnabled(!!s.ai_enabled);
-        setSttEnabled(!!s.stt_enabled);
-      })
-      .catch(() => setAiEnabled(false));
-  }, [isAuthenticated]);
+  // Through React Query: saving the settings refreshes this (lib/dataSync), so
+  // switching AI or speech input on/off applies without a reload.
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: getSettings,
+    enabled: isAuthenticated,
+    staleTime: 5 * 60 * 1000,
+  });
+  const aiEnabled = !!settings?.ai_enabled;
+  const sttEnabled = !!settings?.stt_enabled;
 
   // Not authenticated, still loading auth, or AI is disabled → don't render
   if (isLoadingAuth || !isAuthenticated || !aiEnabled) return null;

@@ -268,7 +268,10 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
         if (context.length) setNotes(context.join('\n'));
 
         if (extracted.currency) setCurrency(extracted.currency);
-        if (extracted.tax_rate) setTaxRate((extracted.tax_rate * 100).toString());
+        // 0 % is a valid rate (e.g. reverse charge, small business) — only skip when absent
+        if (extracted.tax_rate !== undefined && extracted.tax_rate !== null) {
+          setTaxRate((extracted.tax_rate * 100).toString());
+        }
 
         const confidence = result.data.confidence || 0;
         setAnalysisMessage({ tone: 'success', text: t('ai.analysisComplete', { confidence }) });
@@ -288,7 +291,17 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
       }
     } catch (error) {
       console.error('Failed to analyze receipt:', error);
-      setAnalysisMessage({ tone: 'error', text: `${t('ai.analysisFailed')}: ${extractErrorMessage(error)}` });
+      const code = (error as { response?: { data?: { code?: string } } })?.response?.data?.code;
+      const byCode: Record<string, string> = {
+        NO_TEXT: t('ai.errors.noText', 'No text could be read from this receipt. Please enter the details manually.'),
+        AI_UNREACHABLE: t('ai.errors.unreachable', 'The AI service is not reachable. Check the AI settings or try again later.'),
+        AI_TIMEOUT: t('ai.errors.timeout', 'The AI took too long to read the receipt. Please try again.'),
+        AI_DISABLED: t('ai.errors.disabled', 'The AI assistant is switched off in the settings.'),
+      };
+      setAnalysisMessage({
+        tone: code === 'NO_TEXT' ? 'warning' : 'error',
+        text: (code && byCode[code]) || `${t('ai.analysisFailed')}: ${extractErrorMessage(error)}`,
+      });
     } finally {
       setIsAnalyzing(false);
     }
@@ -348,9 +361,13 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
       }
 
       setOfferDepreciationAnalysis(false);
+      const rulesOnly = (result.source ?? analysis.source) === 'rules';
+      const confidence = Math.round((Number(analysis.confidence) || 0) * (Number(analysis.confidence) <= 1 ? 100 : 1));
       setDepreciationMessage({
-        tone: 'success',
-        text: `${t('ai.depreciationDone', 'Depreciation analysis complete')} (${analysis.confidence}%): ${analysis.reasoning}`,
+        tone: rulesOnly ? 'warning' : 'success',
+        text: rulesOnly
+          ? `${t('ai.depreciationRulesOnly', 'The AI was not available — this is a rule-based estimate. Please check it.')} ${analysis.reasoning}`
+          : `${t('ai.depreciationDone', 'Depreciation analysis complete')} (${confidence} %): ${analysis.reasoning}`,
       });
     } catch (error) {
       console.error('Failed to analyze depreciation:', error);

@@ -11,9 +11,9 @@
  * @module pages/admin/GeneralSettingsPage
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Building2, Contact, Globe2, ImageIcon, Mic, Save, Sparkles } from 'lucide-react';
+import { Building2, Contact, Globe2, ImageIcon, Mic, RotateCcw, Save, Sparkles } from 'lucide-react';
 import { CURRENCIES } from '@/constants/currencies';
 import { CustomSelect } from '@/components/forms/CustomSelect';
 import { fieldClasses } from '@/components/forms/fieldStyles';
@@ -30,7 +30,9 @@ import {
 } from '@/components/admin/SettingsSection';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/cn';
-import { getSettings, updateSettings } from '@/api/services/settings.service';
+import { getSettings, testAiConnection, testSttConnection, updateSettings } from '@/api/services/settings.service';
+import { SecretField, type SecretChange } from '@/components/admin/SecretField';
+import { ConnectionTest } from '@/components/admin/ConnectionTest';
 import { Settings } from '@/api/types';
 import { GERMAN_STATES } from '@/utils/holidays-api';
 
@@ -56,71 +58,86 @@ import { GERMAN_STATES } from '@/utils/holidays-api';
 export default function GeneralSettingsPage() {
   const { t } = useTranslation('settings');
 
-  // Form state
-  const [settings, setSettings] = useState<Partial<Settings>>({
-    default_currency: 'EUR',
-    user_region: '',
-    company_name: '',
-    company_subline: '',
-    company_address: '',
-    company_email: '',
-    company_phone: '',
-    company_website: '',
-    company_tax_id: '',
-    company_logo_url: '',
-    ai_enabled: false,
-    ai_provider: 'openai',
-    ai_api_url: '',
-    ai_api_key: '',
-    ai_model: '',
-    stt_enabled: false,
-    stt_provider: 'whisper',
-    stt_api_url: '',
-    stt_api_key: '',
-    stt_model: 'large-v3',
-    stt_language: '',
-  });
+  // Form state (filled from the server — the form is not shown until that worked)
+  const [settings, setSettings] = useState<Partial<Settings>>({});
+  // What the server last sent — saving sends only the fields that differ from it
+  const [loaded, setLoaded] = useState<Partial<Settings> | null>(null);
+  // Write-only API keys: undefined = keep, null = remove, string = replace
+  const [secretChanges, setSecretChanges] = useState<{ ai_api_key?: SecretChange; stt_api_key?: SecretChange }>({});
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState<string>('');
-  // Last loaded/saved state — to show whether there are unsaved changes
-  const [savedSnapshot, setSavedSnapshot] = useState<string>('');
+
+  const loadSettings = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError('');
+    try {
+      const data = await getSettings();
+      setSettings(data);
+      setLoaded(data);
+      setSecretChanges({});
+      // Sync user_region to localStorage for use in charts
+      if (data.user_region) {
+        localStorage.setItem('user_region', data.user_region);
+      }
+    } catch (error) {
+      console.error('Failed to load settings:', error);
+      setLoadError(t('admin.general.loadError'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [t]);
 
   // Load settings from API on mount
   useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const data = await getSettings();
-        setSettings(data);
-        setSavedSnapshot(JSON.stringify(data));
-        // Sync user_region to localStorage for use in charts
-        if (data.user_region) {
-          localStorage.setItem('user_region', data.user_region);
-        }
-      } catch (error) {
-        console.error('Failed to load settings:', error);
-        setLoadError(t('admin.general.loadError'));
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    void loadSettings();
+  }, [loadSettings]);
 
-    loadSettings();
-  }, [t]);
+  /** Server-managed or write-only fields that are never sent back as they are */
+  const NOT_SENT = new Set<string>([
+    'id', 'user_id', 'created_at', 'updated_at', 'invoice_number_current',
+    'ai_api_key', 'stt_api_key', 'mcp_server_api_key', 'smtp_pass',
+    'ai_api_key_set', 'stt_api_key_set', 'mcp_server_api_key_set', 'smtp_pass_set',
+  ]);
+
+  const changedFields = (): Partial<Settings> => {
+    if (!loaded) return {};
+    const changes: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(settings)) {
+      if (NOT_SENT.has(key)) continue;
+      if (JSON.stringify(value ?? null) !== JSON.stringify((loaded as Record<string, unknown>)[key] ?? null)) {
+        changes[key] = value;
+      }
+    }
+    for (const [key, change] of Object.entries(secretChanges)) {
+      if (change !== undefined) changes[key] = change;
+    }
+    return changes as Partial<Settings>;
+  };
 
   // Save settings to API
   const handleSave = async () => {
+    const changes = changedFields();
+    if (Object.keys(changes).length === 0) return;
     setIsSaving(true);
 
     try {
-      const updatedSettings = await updateSettings(settings);
+      const updatedSettings = await updateSettings(changes);
       setSettings(updatedSettings);
-      setSavedSnapshot(JSON.stringify(updatedSettings));
+      setLoaded(updatedSettings);
+      setSecretChanges({});
       toast.success(t('admin.general.saveSuccess'));
     } catch (error) {
       console.error('Failed to save settings:', error);
-      toast.error(t('admin.general.saveError'));
+      const body = (error as { response?: { data?: { code?: string; field?: string } } })?.response?.data;
+      if (body?.code === 'INVALID_URL') {
+        toast.error(t('admin.general.saveError'), {
+          description: t('admin.general.invalidUrl', 'Not a valid http(s) URL: {{field}}', { field: body.field ?? '' }),
+        });
+      } else {
+        toast.error(t('admin.general.saveError'));
+      }
     } finally {
       setIsSaving(false);
     }
@@ -136,7 +153,20 @@ export default function GeneralSettingsPage() {
     label: `${currency.symbol} ${currency.name} (${currency.code})`,
   }));
 
-  const isDirty = !!savedSnapshot && JSON.stringify(settings) !== savedSnapshot;
+  const isDirty = !!loaded && Object.keys(changedFields()).length > 0;
+
+  /** Provider values the AI services actually support (all speak the OpenAI API) */
+  const providerOptions = [
+    { value: 'local', label: t('admin.general.providerLocal', 'OpenAI-compatible server (LM Studio, llama-swap, Ollama, vLLM …)') },
+    { value: 'openai', label: 'OpenAI' },
+  ];
+  const currentProvider = settings.ai_provider || 'local';
+  if (!providerOptions.some((o) => o.value === currentProvider)) {
+    providerOptions.push({
+      value: currentProvider,
+      label: currentProvider === 'lm_studio' ? 'LM Studio' : t('admin.general.providerUnsupported', '{{name}} (not supported — choose another)', { name: currentProvider }),
+    });
+  }
   const field = fieldClasses();
 
   if (isLoading) {
@@ -152,6 +182,19 @@ export default function GeneralSettingsPage() {
     );
   }
 
+  if (loadError || !loaded) {
+    // Never show the form on defaults: saving it would overwrite the real settings
+    return (
+      <div className="space-y-6">
+        <SettingsHeader title={t('admin.general.title')} description={t('admin.general.subtitle')} />
+        <Alert type="error" message={loadError || t('admin.general.loadError')} />
+        <Button type="button" variant="secondary" onClick={() => void loadSettings()} leftIcon={<RotateCcw className="h-4 w-4" />}>
+          {t('admin.general.retryLoad', 'Try again')}
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <SettingsHeader
@@ -159,7 +202,6 @@ export default function GeneralSettingsPage() {
         description={t('admin.general.subtitle')}
       />
 
-      {loadError && <Alert type="error" message={loadError} />}
 
       {/* Company Information */}
       <SettingsSection
@@ -379,14 +421,15 @@ export default function GeneralSettingsPage() {
             <SettingsField label={t('admin.general.llmProvider')} htmlFor="gs-ai-provider">
               <select
                 id="gs-ai-provider"
-                value={settings.ai_provider || 'openai'}
+                value={currentProvider}
                 onChange={(e) => handleFieldChange('ai_provider', e.target.value)}
                 className={field}
               >
-                <option value="openai">{t('admin.general.providerOpenAICompat')}</option>
-                <option value="anthropic">Anthropic Claude</option>
-                <option value="azure">Azure OpenAI</option>
-                <option value="custom">{t('admin.general.providerCustom')}</option>
+                {providerOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </SettingsField>
 
@@ -417,17 +460,34 @@ export default function GeneralSettingsPage() {
               />
             </SettingsField>
 
-            <SettingsField label={t('admin.general.apiKey')} htmlFor="gs-ai-key" className="md:col-span-2">
-              <input
+            <SettingsField
+              label={t('admin.general.apiKey')}
+              htmlFor="gs-ai-key"
+              hint={t('admin.general.apiKeyHint', 'Optional for local servers. Stored write-only — it is never shown again.')}
+              className="md:col-span-2"
+            >
+              <SecretField
                 id="gs-ai-key"
-                type="password"
-                value={settings.ai_api_key || ''}
-                onChange={(e) => handleFieldChange('ai_api_key', e.target.value)}
-                className={field}
+                isSet={!!settings.ai_api_key_set}
+                change={secretChanges.ai_api_key}
+                onChange={(change) => setSecretChanges((prev) => ({ ...prev, ai_api_key: change }))}
                 placeholder="sk-..."
-                autoComplete="new-password"
               />
             </SettingsField>
+
+            <div className="md:col-span-2">
+              <ConnectionTest
+                disabled={!settings.ai_api_url}
+                run={() =>
+                  testAiConnection({
+                    ai_api_url: settings.ai_api_url,
+                    ai_model: settings.ai_model,
+                    ...(typeof secretChanges.ai_api_key === 'string' ? { ai_api_key: secretChanges.ai_api_key } : {}),
+                  })
+                }
+                onPickModel={(model) => handleFieldChange('ai_model', model)}
+              />
+            </div>
           </div>
         ) : undefined}
       </SettingsSection>
@@ -489,14 +549,12 @@ export default function GeneralSettingsPage() {
             </SettingsField>
 
             <SettingsField label={t('admin.general.sttApiKeyOptional')} htmlFor="gs-stt-key">
-              <input
+              <SecretField
                 id="gs-stt-key"
-                type="password"
-                value={settings.stt_api_key || ''}
-                onChange={(e) => handleFieldChange('stt_api_key', e.target.value)}
-                className={field}
+                isSet={!!settings.stt_api_key_set}
+                change={secretChanges.stt_api_key}
+                onChange={(change) => setSecretChanges((prev) => ({ ...prev, stt_api_key: change }))}
                 placeholder={t('admin.general.sttApiKeyPlaceholder')}
-                autoComplete="new-password"
               />
             </SettingsField>
 
@@ -511,6 +569,17 @@ export default function GeneralSettingsPage() {
                 maxLength={10}
               />
             </SettingsField>
+            <div className="md:col-span-2">
+              <ConnectionTest
+                disabled={!settings.stt_api_url}
+                run={() =>
+                  testSttConnection({
+                    stt_api_url: settings.stt_api_url,
+                    ...(typeof secretChanges.stt_api_key === 'string' ? { stt_api_key: secretChanges.stt_api_key } : {}),
+                  })
+                }
+              />
+            </div>
           </div>
         ) : undefined}
       </SettingsSection>
@@ -529,6 +598,7 @@ export default function GeneralSettingsPage() {
           type="button"
           onClick={handleSave}
           isLoading={isSaving}
+          disabled={!isDirty}
           leftIcon={<Save className="h-4 w-4" />}
         >
           {isSaving ? t('admin.general.saving') : t('admin.general.saveButton')}

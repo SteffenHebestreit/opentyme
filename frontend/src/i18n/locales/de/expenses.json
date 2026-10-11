@@ -274,7 +274,14 @@
     "depreciationNeedsData": "Bitte geben Sie zuerst Beschreibung und Betrag ein.",
     "depreciationNoResult": "Keine Abschreibungsempfehlung erhalten.",
     "depreciationDone": "Abschreibungsanalyse abgeschlossen",
-    "depreciationFailed": "Abschreibungsanalyse fehlgeschlagen"
+    "depreciationFailed": "Abschreibungsanalyse fehlgeschlagen",
+    "depreciationRulesOnly": "Die KI war nicht erreichbar – das ist eine regelbasierte Schätzung. Bitte prüfen.",
+    "errors": {
+      "noText": "Aus diesem Beleg ließ sich kein Text lesen. Bitte die Angaben manuell eintragen.",
+      "unreachable": "Der KI-Dienst ist nicht erreichbar. Prüfen Sie die KI-Einstellungen oder versuchen Sie es später erneut.",
+      "timeout": "Die KI hat zu lange zum Lesen des Belegs gebraucht. Bitte erneut versuchen.",
+      "disabled": "Der KI-Assistent ist in den Einstellungen ausgeschaltet."
+    }
   },
   "analysis": {
     "title": "KI-Abschreibungsanalyse",
@@ -311,7 +318,10 @@
     "apply": "Einstellungen übernehmen",
     "applying": "Wird übernommen...",
     "methodLinear": "Linear",
-    "methodDegressive": "Degressiv"
+    "methodDegressive": "Degressiv",
+    "rulesOnlyTitle": "Regelbasierte Schätzung",
+    "rulesOnlyHint": "Die KI war nicht erreichbar, daher wurden Standardregeln angewendet. Bitte prüfen Sie das Ergebnis.",
+    "rulesBadge": "Regelwerk"
   },
   "detail": {
     "title": "Ausgabendetails",

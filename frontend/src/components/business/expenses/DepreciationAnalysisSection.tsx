@@ -140,6 +140,8 @@ export const DepreciationAnalysisSection: React.FC<DepreciationAnalysisSectionPr
 
   const result = analysis?.analysis;
   const confidence = result ? Number(result.confidence) || 0 : 0;
+  // The AI was not reachable and the server fell back to its rule-based estimate
+  const rulesOnly = ((analysis as { source?: string } | null | undefined)?.source ?? result?.source) === 'rules';
   const deductible = result?.tax_deductible_percentage;
 
   return (
@@ -184,26 +186,45 @@ export const DepreciationAnalysisSection: React.FC<DepreciationAnalysisSectionPr
       {result && (
         <div className="animate-fade-up overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
           {/* Header */}
-          <div className="flex items-start justify-between gap-3 border-b border-gray-100 bg-emerald-50/60 px-4 py-3 dark:border-gray-800 dark:bg-emerald-500/[0.06]">
+          <div
+            className={
+              rulesOnly
+                ? 'flex items-start justify-between gap-3 border-b border-gray-100 bg-amber-50/70 px-4 py-3 dark:border-gray-800 dark:bg-amber-500/[0.06]'
+                : 'flex items-start justify-between gap-3 border-b border-gray-100 bg-emerald-50/60 px-4 py-3 dark:border-gray-800 dark:bg-emerald-500/[0.06]'
+            }
+          >
             <div className="flex items-start gap-2.5">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+              <CheckCircle2
+                className={
+                  rulesOnly
+                    ? 'mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400'
+                    : 'mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400'
+                }
+                aria-hidden="true"
+              />
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-                  {t('analysis.complete')}
+                  {rulesOnly ? t('analysis.rulesOnlyTitle', 'Rule-based estimate') : t('analysis.complete')}
                 </h4>
                 <p className="mt-0.5 text-xs tabular-nums text-gray-500 dark:text-gray-400">
-                  {t('analysis.confidence', { value: (confidence * 100).toFixed(0) })}
+                  {rulesOnly
+                    ? t('analysis.rulesOnlyHint', 'The AI was not available, so standard rules were applied. Please check the result.')
+                    : t('analysis.confidence', { value: (confidence * 100).toFixed(0) })}
                 </p>
               </div>
             </div>
-            {/* Confidence Badge */}
-            <Badge variant={confidence >= 0.8 ? 'green' : confidence >= 0.6 ? 'yellow' : 'gray'}>
-              {confidence >= 0.8
-                ? t('analysis.confidenceHigh')
-                : confidence >= 0.6
-                ? t('analysis.confidenceMedium')
-                : t('analysis.confidenceLow')}
-            </Badge>
+            {/* Confidence Badge — a rule-based estimate has no AI confidence */}
+            {rulesOnly ? (
+              <Badge variant="amber">{t('analysis.rulesBadge', 'Rules')}</Badge>
+            ) : (
+              <Badge variant={confidence >= 0.8 ? 'green' : confidence >= 0.6 ? 'yellow' : 'gray'}>
+                {confidence >= 0.8
+                  ? t('analysis.confidenceHigh')
+                  : confidence >= 0.6
+                  ? t('analysis.confidenceMedium')
+                  : t('analysis.confidenceLow')}
+              </Badge>
+            )}
           </div>
 
           <div className="space-y-5 p-4">

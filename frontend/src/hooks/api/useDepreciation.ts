@@ -19,6 +19,9 @@ import { queryKeys } from './queryKeys';
 export interface DepreciationAnalysis {
   eligible: boolean;
   reason?: string;
+  /** 'rules' = the AI was not available and a rule-based estimate was returned */
+  source?: 'ai' | 'rules';
+  ai_error_code?: 'AI_UNREACHABLE' | 'AI_TIMEOUT' | 'AI_AUTH' | 'AI_DISABLED' | 'AI_INVALID_RESPONSE';
   analysis?: {
     recommendation: 'immediate' | 'partial';
     depreciation_type: 'immediate' | 'partial';
@@ -35,6 +38,8 @@ export interface DepreciationAnalysis {
     tax_deductible_percentage?: number; // 0-100
     tax_deductibility_reasoning?: string;
     references?: string[];
+    source?: 'ai' | 'rules';
+    ai_error_code?: string;
   };
 }
 

@@ -32,7 +32,7 @@ const READ_ONLY_WRITE_ENDPOINTS = [
   /\/validate-payment\b/,
   /\/analyze-receipt\b/,
   /\/analyze-depreciation\b/,
-  /\/test-smtp\b/,
+  /\/test-(smtp|ai|stt)\b/,
   /^\/?auth\//,
   /^\/?ai\//,
 ];

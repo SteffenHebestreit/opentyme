@@ -671,14 +671,22 @@ export interface Settings {
   ai_enabled: boolean;
   ai_provider: string;
   ai_api_url: string | null;
-  ai_api_key: string | null;
+  /** Write-only: never returned by the API — send a new value to set, null to remove */
+  ai_api_key?: string | null;
+  /** Whether an AI API key is stored */
+  ai_api_key_set?: boolean;
   ai_model: string | null;
   mcp_server_url: string | null;
-  mcp_server_api_key: string | null;
+  /** Write-only (see ai_api_key) */
+  mcp_server_api_key?: string | null;
+  mcp_server_api_key_set?: boolean;
   stt_enabled: boolean;
   stt_provider: string;
   stt_api_url: string | null;
-  stt_api_key: string | null;
+  /** Write-only (see ai_api_key) */
+  stt_api_key?: string | null;
+  stt_api_key_set?: boolean;
+  smtp_pass_set?: boolean;
   stt_model: string | null;
   stt_language: string | null;
   invoice_language: string | null;
