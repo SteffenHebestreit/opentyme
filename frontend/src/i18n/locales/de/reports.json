@@ -30,8 +30,10 @@
       "csvDescription": "Tabellenformat für Excel/Numbers",
       "excelDescription": "Excel-Arbeitsmappe mit Formatierung, mehreren Blättern und Filtern",
       "pdfDescription": "Druckfertiges Dokument mit Formatierung",
-      "emailDescription": "Als PDF-Anhang per E-Mail versenden"
-    }
+      "emailDescription": "Als PDF-Anhang per E-Mail versenden",
+      "email": "E-Mail"
+    },
+    "emailSent": "Bericht an {{to}} gesendet"
   },
   "quickPeriods": {
     "thisMonth": "Dieser Monat",
@@ -102,7 +104,9 @@
     "prepaymentsTotal": "Steuervorauszahlungen",
     "filesInPackage": "Dateien im Paket",
     "generating": "Wird erstellt...",
-    "download": "ZIP herunterladen"
+    "download": "ZIP herunterladen",
+    "loadYearsError": "Verfügbare Jahre konnten nicht geladen werden",
+    "downloadError": "Steuerpaket konnte nicht heruntergeladen werden"
   },
   "vat": {
     "title": "Umsatzsteuervoranmeldung",
@@ -244,5 +248,14 @@
   "includeTaxExcluded": "Steuerlich ausgeschlossene Einträge einbeziehen",
   "includeTaxExcludedHelp": "Aktivieren, um Rechnungen/Ausgaben einzuschließen, die als nicht geschäftliche Einträge markiert sind",
   "noData": "Keine Daten für den ausgewählten Zeitraum verfügbar",
-  "loading": "Lade Berichtsdaten..."
+  "loading": "Lade Berichtsdaten...",
+  "parameters": "Parameter",
+  "periodHint": "Zeitraum wählen oder Daten eingeben.",
+  "rawData": "Rohdaten (JSON)",
+  "filters": {
+    "client": "Kunde filtern (optional)",
+    "allClients": "Alle Kunden",
+    "project": "Projekt filtern (optional)",
+    "allProjects": "Alle Projekte"
+  }
 }

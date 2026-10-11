@@ -1,27 +1,42 @@
 /**
  * @fileoverview General settings page for application-wide configuration.
- * 
+ *
  * Provides interface for:
  * - Default currency selection
  * - Company information (name, address, contact details)
  * - Tax identification
  * - Company logo
  * - Invoice settings
- * 
+ *
  * @module pages/admin/GeneralSettingsPage
  */
 
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Building2, Contact, Globe2, ImageIcon, Mic, Save, Sparkles } from 'lucide-react';
 import { CURRENCIES } from '@/constants/currencies';
 import { CustomSelect } from '@/components/forms/CustomSelect';
+import { fieldClasses } from '@/components/forms/fieldStyles';
+import { Button } from '@/components/common/Button';
+import { Alert } from '@/components/common/Alert';
+import { Badge } from '@/components/common/Badge';
+import { SkeletonCard, SkeletonItem } from '@/components/common/Skeleton';
+import {
+  SettingsField,
+  SettingsHeader,
+  SettingsSaveBar,
+  SettingsSection,
+  SettingsSwitch,
+} from '@/components/admin/SettingsSection';
+import { toast } from '@/lib/toast';
+import { cn } from '@/lib/cn';
 import { getSettings, updateSettings } from '@/api/services/settings.service';
 import { Settings } from '@/api/types';
 import { GERMAN_STATES } from '@/utils/holidays-api';
 
 /**
  * General settings page component.
- * 
+ *
  * Features:
  * - Default currency configuration
  * - Company information management
@@ -31,16 +46,16 @@ import { GERMAN_STATES } from '@/utils/holidays-api';
  * - Invoice settings
  * - Persistent storage via API
  * - Dark mode support
- * 
+ *
  * @component
  * @example
  * <GeneralSettingsPage />
- * 
+ *
  * @returns {JSX.Element} General settings configuration interface
  */
 export default function GeneralSettingsPage() {
   const { t } = useTranslation('settings');
-  
+
   // Form state
   const [settings, setSettings] = useState<Partial<Settings>>({
     default_currency: 'EUR',
@@ -65,10 +80,12 @@ export default function GeneralSettingsPage() {
     stt_model: 'large-v3',
     stt_language: '',
   });
-  
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<string>('');
+  const [loadError, setLoadError] = useState<string>('');
+  // Last loaded/saved state — to show whether there are unsaved changes
+  const [savedSnapshot, setSavedSnapshot] = useState<string>('');
 
   // Load settings from API on mount
   useEffect(() => {
@@ -76,13 +93,14 @@ export default function GeneralSettingsPage() {
       try {
         const data = await getSettings();
         setSettings(data);
+        setSavedSnapshot(JSON.stringify(data));
         // Sync user_region to localStorage for use in charts
         if (data.user_region) {
           localStorage.setItem('user_region', data.user_region);
         }
       } catch (error) {
         console.error('Failed to load settings:', error);
-        setSaveMessage(t('admin.general.loadError'));
+        setLoadError(t('admin.general.loadError'));
       } finally {
         setIsLoading(false);
       }
@@ -94,20 +112,15 @@ export default function GeneralSettingsPage() {
   // Save settings to API
   const handleSave = async () => {
     setIsSaving(true);
-    setSaveMessage('');
 
     try {
       const updatedSettings = await updateSettings(settings);
       setSettings(updatedSettings);
-      setSaveMessage(t('admin.general.saveSuccess'));
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSaveMessage('');
-      }, 3000);
+      setSavedSnapshot(JSON.stringify(updatedSettings));
+      toast.success(t('admin.general.saveSuccess'));
     } catch (error) {
       console.error('Failed to save settings:', error);
-      setSaveMessage(t('admin.general.saveError'));
+      toast.error(t('admin.general.saveError'));
     } finally {
       setIsSaving(false);
     }
@@ -123,194 +136,175 @@ export default function GeneralSettingsPage() {
     label: `${currency.symbol} ${currency.name} (${currency.code})`,
   }));
 
+  const isDirty = !!savedSnapshot && JSON.stringify(settings) !== savedSnapshot;
+  const field = fieldClasses();
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-gray-600 dark:text-gray-400">
-          {t('common.loading') || 'Loading...'}
+      <div className="space-y-6" aria-busy="true">
+        <div className="space-y-2">
+          <SkeletonItem className="h-6 w-48" />
+          <SkeletonItem className="h-4 w-72" />
         </div>
+        <SkeletonCard />
+        <SkeletonCard />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
-          {t('admin.general.title')}
-        </h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          {t('admin.general.subtitle')}
-        </p>
-      </div>
+      <SettingsHeader
+        title={t('admin.general.title')}
+        description={t('admin.general.subtitle')}
+      />
+
+      {loadError && <Alert type="error" message={loadError} />}
 
       {/* Company Information */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          {t('admin.general.companyInfo')}
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Company Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Company Name
-            </label>
+      <SettingsSection
+        icon={Building2}
+        title={t('admin.general.companyInfo')}
+        description={t('admin.general.companyInfoHint')}
+      >
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <SettingsField label={t('admin.general.companyName')} htmlFor="gs-company-name">
             <input
+              id="gs-company-name"
               type="text"
               value={settings.company_name || ''}
               onChange={(e) => handleFieldChange('company_name', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="Your Company Ltd."
+              className={field}
+              placeholder={t('admin.general.companyNamePlaceholder')}
             />
-          </div>
+          </SettingsField>
 
-          {/* Company Subline */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {t('admin.general.companyTagline')}
-            </label>
+          <SettingsField label={t('admin.general.companyTagline')} htmlFor="gs-company-subline">
             <input
+              id="gs-company-subline"
               type="text"
               value={settings.company_subline || ''}
               onChange={(e) => handleFieldChange('company_subline', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="Professional Services"
+              className={field}
+              placeholder={t('admin.general.companyTaglinePlaceholder')}
             />
-          </div>
+          </SettingsField>
 
-          {/* Company Address */}
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {t('admin.general.address')}
-            </label>
+          <SettingsField label={t('admin.general.address')} htmlFor="gs-company-address" className="md:col-span-2">
             <textarea
+              id="gs-company-address"
               value={settings.company_address || ''}
               onChange={(e) => handleFieldChange('company_address', e.target.value)}
               rows={2}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="123 Main Street&#10;12345 City, Country"
+              className={fieldClasses({ multiline: true })}
+              placeholder={t('admin.general.addressPlaceholder')}
             />
-          </div>
+          </SettingsField>
         </div>
-      </div>
+      </SettingsSection>
 
       {/* Tax & Contact Information */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          {t('admin.general.taxContactInfo')}
-        </h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Tax ID */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {t('admin.general.taxId')}
-            </label>
+      <SettingsSection
+        icon={Contact}
+        title={t('admin.general.taxContactInfo')}
+        description={t('admin.general.taxContactInfoHint')}
+      >
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <SettingsField label={t('admin.general.taxId')} htmlFor="gs-tax-id">
             <input
+              id="gs-tax-id"
               type="text"
               value={settings.company_tax_id || ''}
               onChange={(e) => handleFieldChange('company_tax_id', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className={field}
               placeholder="DE123456789"
             />
-          </div>
+          </SettingsField>
 
-          {/* Email */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Email
-            </label>
+          <SettingsField label={t('admin.general.email')} htmlFor="gs-email">
             <input
+              id="gs-email"
               type="email"
               value={settings.company_email || ''}
               onChange={(e) => handleFieldChange('company_email', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className={field}
               placeholder="info@company.com"
             />
-          </div>
+          </SettingsField>
 
-          {/* Phone */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Phone
-            </label>
+          <SettingsField label={t('admin.general.phone')} htmlFor="gs-phone">
             <input
+              id="gs-phone"
               type="tel"
               value={settings.company_phone || ''}
               onChange={(e) => handleFieldChange('company_phone', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className={field}
               placeholder="+49 123 456789"
             />
-          </div>
+          </SettingsField>
 
-          {/* Website */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Website
-            </label>
+          <SettingsField label={t('admin.general.website')} htmlFor="gs-website">
             <input
+              id="gs-website"
               type="url"
               value={settings.company_website || ''}
               onChange={(e) => handleFieldChange('company_website', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className={field}
               placeholder="https://www.company.com"
             />
-          </div>
+          </SettingsField>
         </div>
-      </div>
+      </SettingsSection>
 
       {/* Company Logo */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          {t('admin.general.companyLogo')}
-        </h3>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            {t('admin.general.logoUrl')}
-          </label>
-          <input
-            type="url"
-            value={settings.company_logo_url || ''}
-            onChange={(e) => handleFieldChange('company_logo_url', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            placeholder="https://example.com/logo.png"
-          />
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            {t('admin.general.logoUrlHint')}
-          </p>
+      <SettingsSection icon={ImageIcon} title={t('admin.general.companyLogo')}>
+        <div className={cn('grid grid-cols-1 gap-5', settings.company_logo_url && 'md:grid-cols-[minmax(0,1fr)_auto] md:items-start')}>
+          <SettingsField
+            label={t('admin.general.logoUrl')}
+            htmlFor="gs-logo-url"
+            hint={t('admin.general.logoUrlHint')}
+          >
+            <input
+              id="gs-logo-url"
+              type="url"
+              value={settings.company_logo_url || ''}
+              onChange={(e) => handleFieldChange('company_logo_url', e.target.value)}
+              className={field}
+              placeholder="https://example.com/logo.png"
+            />
+          </SettingsField>
           {settings.company_logo_url && (
-            <div className="mt-3 p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{t('admin.general.logoPreview')}</p>
-              <img 
-                src={settings.company_logo_url} 
-                alt="Company Logo" 
-                className="max-h-24 object-contain"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
+            <div className="animate-fade-in">
+              <p className="eyebrow mb-1.5">{t('admin.general.logoPreview')}</p>
+              <div className="flex h-24 w-full items-center justify-center rounded-lg border border-dashed border-gray-300 bg-white p-3 md:w-56 dark:border-gray-700">
+                <img
+                  src={settings.company_logo_url}
+                  alt={t('admin.general.logoAlt')}
+                  className="max-h-full max-w-full object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
             </div>
           )}
         </div>
-      </div>
+      </SettingsSection>
 
-      {/* User Location Settings */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          {t('admin.general.userLocation')}
-        </h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          {t('admin.general.userLocationHint')}
-        </p>
-
-        <div className="grid grid-cols-1 gap-4 max-w-lg">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {t('admin.general.regionLabel')}
-            </label>
+      {/* Region, currency and invoice number format */}
+      <SettingsSection
+        icon={Globe2}
+        title={t('admin.general.regionFormats')}
+        description={t('admin.general.userLocationHint')}
+      >
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <SettingsField
+            label={t('admin.general.regionLabel')}
+            htmlFor="gs-region"
+            hint={t('admin.general.regionHint')}
+          >
             <select
+              id="gs-region"
               value={settings.user_region || ''}
               onChange={(e) => {
                 handleFieldChange('user_region', e.target.value);
@@ -321,7 +315,7 @@ export default function GeneralSettingsPage() {
                   localStorage.removeItem('user_region');
                 }
               }}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className={field}
             >
               <option value="">{t('admin.general.noRegion')}</option>
               {GERMAN_STATES.map((state) => (
@@ -330,24 +324,12 @@ export default function GeneralSettingsPage() {
                 </option>
               ))}
             </select>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              {t('admin.general.regionHint')}
-            </p>
-          </div>
-        </div>
-      </div>
+          </SettingsField>
 
-      {/* Currency Settings */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          {t('admin.general.currencySettings')}
-        </h3>
-        
-        <div className="grid grid-cols-1 gap-4 max-w-lg">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {t('admin.general.defaultCurrency')}
-            </label>
+          <SettingsField
+            label={t('admin.general.defaultCurrency')}
+            hint={t('admin.general.currencyDescription')}
+          >
             <CustomSelect
               value={settings.default_currency || 'EUR'}
               onChange={(value: string) => handleFieldChange('default_currency', value)}
@@ -355,28 +337,18 @@ export default function GeneralSettingsPage() {
               placeholder={t('admin.general.currencyPlaceholder')}
               size="md"
             />
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              {t('admin.general.currencyDescription')}
-            </p>
-          </div>
-        </div>
-      </div>
+          </SettingsField>
 
-      {/* Invoice PDF Language */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          {t('admin.general.invoiceLanguage', { defaultValue: 'Invoice PDF Format' })}
-        </h3>
-
-        <div className="grid grid-cols-1 gap-4 max-w-lg">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {t('admin.general.invoiceLanguageLabel', { defaultValue: 'Number & date format' })}
-            </label>
+          <SettingsField
+            label={t('admin.general.invoiceLanguageLabel')}
+            htmlFor="gs-invoice-language"
+            hint={t('admin.general.invoiceLanguageHint')}
+          >
             <select
+              id="gs-invoice-language"
               value={settings.invoice_language || 'de'}
               onChange={(e) => handleFieldChange('invoice_language', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className={field}
             >
               <option value="de">Deutsch (de-DE)</option>
               <option value="en">English (en-US)</option>
@@ -385,265 +357,183 @@ export default function GeneralSettingsPage() {
               <option value="it">Italiano (it-IT)</option>
               <option value="nl">Nederlands (nl-NL)</option>
             </select>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              {t('admin.general.invoiceLanguageHint', {
-                defaultValue: 'Controls how dates and amounts are formatted on generated invoice PDFs.',
-              })}
-            </p>
-          </div>
+          </SettingsField>
         </div>
-      </div>
+      </SettingsSection>
 
       {/* AI Assistant Settings */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          {t('admin.general.aiAssistant')}
-        </h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          {t('admin.general.aiAssistantHint')}
-        </p>
-
-        {/* Enable toggle */}
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={!!settings.ai_enabled}
-            onClick={() => handleFieldChange('ai_enabled', !settings.ai_enabled)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
-              settings.ai_enabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                settings.ai_enabled ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </button>
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            {t('admin.general.enableAI')}
-          </span>
-        </div>
-
-        {settings.ai_enabled && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 border-l-2 border-purple-200 dark:border-purple-800">
-            {/* Provider */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('admin.general.llmProvider')}
-              </label>
+      <SettingsSection
+        icon={Sparkles}
+        title={t('admin.general.aiAssistant')}
+        description={t('admin.general.aiAssistantHint')}
+        action={
+          <SettingsSwitch
+            checked={!!settings.ai_enabled}
+            onChange={(checked) => handleFieldChange('ai_enabled', checked)}
+            label={t('admin.general.enableAI')}
+          />
+        }
+      >
+        {settings.ai_enabled ? (
+          <div className="grid animate-fade-up grid-cols-1 gap-5 md:grid-cols-2">
+            <SettingsField label={t('admin.general.llmProvider')} htmlFor="gs-ai-provider">
               <select
+                id="gs-ai-provider"
                 value={settings.ai_provider || 'openai'}
                 onChange={(e) => handleFieldChange('ai_provider', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className={field}
               >
-                <option value="openai">OpenAI-compatible (local / LM Studio / vLLM)</option>
+                <option value="openai">{t('admin.general.providerOpenAICompat')}</option>
                 <option value="anthropic">Anthropic Claude</option>
                 <option value="azure">Azure OpenAI</option>
-                <option value="custom">Custom</option>
+                <option value="custom">{t('admin.general.providerCustom')}</option>
               </select>
-            </div>
+            </SettingsField>
 
-            {/* Model */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('admin.general.modelName')}
-              </label>
+            <SettingsField label={t('admin.general.modelName')} htmlFor="gs-ai-model">
               <input
+                id="gs-ai-model"
                 type="text"
                 value={settings.ai_model || ''}
                 onChange={(e) => handleFieldChange('ai_model', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder="e.g. gpt-4o, llama-3.3-70b, claude-opus-4-6"
+                className={field}
+                placeholder={t('admin.general.modelPlaceholder')}
               />
-            </div>
+            </SettingsField>
 
-            {/* API URL */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('admin.general.apiBaseUrl')}
-              </label>
+            <SettingsField
+              label={t('admin.general.apiBaseUrl')}
+              htmlFor="gs-ai-url"
+              hint={t('admin.general.apiBaseUrlHint')}
+              className="md:col-span-2"
+            >
               <input
+                id="gs-ai-url"
                 type="url"
                 value={settings.ai_api_url || ''}
                 onChange={(e) => handleFieldChange('ai_api_url', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder="http://localhost:11434/v1  (leave blank for OpenAI default)"
+                className={field}
+                placeholder={t('admin.general.apiBaseUrlPlaceholder')}
               />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {t('admin.general.apiBaseUrlHint')}
-              </p>
-            </div>
+            </SettingsField>
 
-            {/* API Key */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('admin.general.apiKey')}
-              </label>
+            <SettingsField label={t('admin.general.apiKey')} htmlFor="gs-ai-key" className="md:col-span-2">
               <input
+                id="gs-ai-key"
                 type="password"
                 value={settings.ai_api_key || ''}
                 onChange={(e) => handleFieldChange('ai_api_key', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className={field}
                 placeholder="sk-..."
                 autoComplete="new-password"
               />
-            </div>
+            </SettingsField>
           </div>
-        )}
-      </div>
+        ) : undefined}
+      </SettingsSection>
 
       {/* Speech-to-Text Settings */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          {t('admin.general.stt')}
-        </h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          {t('admin.general.sttHint')}
-        </p>
-
-        {/* Enable toggle */}
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={!!settings.stt_enabled}
-            onClick={() => handleFieldChange('stt_enabled', !settings.stt_enabled)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
-              settings.stt_enabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                settings.stt_enabled ? 'translate-x-6' : 'translate-x-1'
-              }`}
-            />
-          </button>
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            {t('admin.general.enableSTT')}
-          </span>
-        </div>
-
-        {settings.stt_enabled && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 border-l-2 border-purple-200 dark:border-purple-800">
-            {/* STT Provider */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('admin.general.sttEngine')}
-              </label>
+      <SettingsSection
+        icon={Mic}
+        title={t('admin.general.stt')}
+        description={t('admin.general.sttHint')}
+        action={
+          <SettingsSwitch
+            checked={!!settings.stt_enabled}
+            onChange={(checked) => handleFieldChange('stt_enabled', checked)}
+            label={t('admin.general.enableSTT')}
+          />
+        }
+      >
+        {settings.stt_enabled ? (
+          <div className="grid animate-fade-up grid-cols-1 gap-5 md:grid-cols-2">
+            <SettingsField label={t('admin.general.sttEngine')} htmlFor="gs-stt-provider">
               <select
+                id="gs-stt-provider"
                 value={settings.stt_provider || 'whisper'}
                 onChange={(e) => handleFieldChange('stt_provider', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className={field}
               >
-                <option value="faster_whisper">faster-whisper (recommended)</option>
+                <option value="faster_whisper">{t('admin.general.sttFasterWhisper')}</option>
                 <option value="qwen_asr">Qwen3 ASR</option>
-                <option value="whisper">OpenAI-compat (fast-whisper server)</option>
-                <option value="custom">Custom OpenAI-compat</option>
+                <option value="whisper">{t('admin.general.sttWhisperServer')}</option>
+                <option value="custom">{t('admin.general.sttCustom')}</option>
               </select>
-            </div>
+            </SettingsField>
 
-            {/* STT Model */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('admin.general.sttModel')}
-              </label>
+            <SettingsField label={t('admin.general.sttModel')} htmlFor="gs-stt-model">
               <input
+                id="gs-stt-model"
                 type="text"
                 value={settings.stt_model || ''}
                 onChange={(e) => handleFieldChange('stt_model', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className={field}
                 placeholder="large-v3"
               />
-            </div>
+            </SettingsField>
 
-            {/* STT API URL */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('admin.general.sttServerUrl')}
-              </label>
+            <SettingsField
+              label={t('admin.general.sttServerUrl')}
+              htmlFor="gs-stt-url"
+              hint={t('admin.general.sttServerUrlHint')}
+              className="md:col-span-2"
+            >
               <input
+                id="gs-stt-url"
                 type="url"
                 value={settings.stt_api_url || ''}
                 onChange={(e) => handleFieldChange('stt_api_url', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className={field}
                 placeholder="http://localhost:8080"
               />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {t('admin.general.sttServerUrlHint')}
-              </p>
-            </div>
+            </SettingsField>
 
-            {/* STT API Key */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('admin.general.sttApiKeyOptional')}
-              </label>
+            <SettingsField label={t('admin.general.sttApiKeyOptional')} htmlFor="gs-stt-key">
               <input
+                id="gs-stt-key"
                 type="password"
                 value={settings.stt_api_key || ''}
                 onChange={(e) => handleFieldChange('stt_api_key', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder="Leave blank if not required"
+                className={field}
+                placeholder={t('admin.general.sttApiKeyPlaceholder')}
                 autoComplete="new-password"
               />
-            </div>
+            </SettingsField>
 
-            {/* STT Language */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('admin.general.sttLanguageOptional')}
-              </label>
+            <SettingsField label={t('admin.general.sttLanguageOptional')} htmlFor="gs-stt-language">
               <input
+                id="gs-stt-language"
                 type="text"
                 value={settings.stt_language || ''}
                 onChange={(e) => handleFieldChange('stt_language', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className={field}
                 placeholder={t('admin.general.sttLanguagePlaceholder')}
                 maxLength={10}
               />
-            </div>
+            </SettingsField>
           </div>
-        )}
-      </div>
+        ) : undefined}
+      </SettingsSection>
 
       {/* Save Button */}
-      <div className="flex items-center gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-        <button
+      <SettingsSaveBar
+        status={
+          isDirty ? (
+            <Badge variant="amber" dot>{t('admin.general.unsavedChanges')}</Badge>
+          ) : (
+            <span className="hidden sm:inline">{t('admin.general.saveHint')}</span>
+          )
+        }
+      >
+        <Button
+          type="button"
           onClick={handleSave}
-          disabled={isSaving}
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white rounded-lg font-medium transition-colors"
+          isLoading={isSaving}
+          leftIcon={<Save className="h-4 w-4" />}
         >
           {isSaving ? t('admin.general.saving') : t('admin.general.saveButton')}
-        </button>
-        
-        {saveMessage && (
-          <p
-            className={`text-sm font-medium ${
-              saveMessage.includes('success') || saveMessage.includes('erfolgreich') || saveMessage.includes('Success')
-                ? 'text-green-600 dark:text-green-400'
-                : 'text-red-600 dark:text-red-400'
-            }`}
-          >
-            {saveMessage}
-          </p>
-        )}
-      </div>
-
-      {/* Information Box */}
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900/30 dark:bg-blue-900/20">
-        <div className="flex items-start gap-3">
-          <span className="text-xl">ℹ️</span>
-          <div className="flex-1">
-            <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
-              About Settings
-            </h4>
-            <p className="text-sm text-blue-700 dark:text-blue-300">
-              Your company information will appear on all generated invoices and documents. Make sure to keep this information up to date.
-            </p>
-          </div>
-        </div>
-      </div>
+        </Button>
+      </SettingsSaveBar>
     </div>
   );
 }

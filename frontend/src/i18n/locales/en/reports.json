@@ -30,8 +30,10 @@
       "csvDescription": "Spreadsheet-compatible format for Excel/Numbers",
       "excelDescription": "Excel workbook with formatting, multiple sheets, and filters",
       "pdfDescription": "Print-ready document with formatting",
-      "emailDescription": "Send as PDF attachment via email"
-    }
+      "emailDescription": "Send as PDF attachment via email",
+      "email": "Email"
+    },
+    "emailSent": "Report sent to {{to}}"
   },
   "quickPeriods": {
     "thisMonth": "This Month",
@@ -102,7 +104,9 @@
     "prepaymentsTotal": "tax prepayments",
     "filesInPackage": "files in package",
     "generating": "Generating...",
-    "download": "Download ZIP"
+    "download": "Download ZIP",
+    "loadYearsError": "Failed to load available years",
+    "downloadError": "Failed to download tax package"
   },
   "vat": {
     "title": "VAT Report (Umsatzsteuervoranmeldung)",
@@ -244,5 +248,14 @@
   "includeTaxExcluded": "Include items excluded from tax declaration",
   "includeTaxExcludedHelp": "Check this to include invoices/expenses marked as non-business items in the report",
   "noData": "No data available for the selected period",
-  "loading": "Loading report data..."
+  "loading": "Loading report data...",
+  "parameters": "Parameters",
+  "periodHint": "Pick a period or enter dates.",
+  "rawData": "Raw data (JSON)",
+  "filters": {
+    "client": "Filter by client (optional)",
+    "allClients": "All clients",
+    "project": "Filter by project (optional)",
+    "allProjects": "All projects"
+  }
 }

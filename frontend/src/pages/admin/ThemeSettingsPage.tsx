@@ -6,10 +6,18 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Eye, ImageIcon, Palette, RotateCcw, Save } from 'lucide-react';
 import apiClient from '@/api/services/client';
 import { Button } from '@/components/common/Button';
-import { Alert } from '@/components/common/Alert';
-import { Input } from '@/components/forms/Input';
+import { fieldClasses } from '@/components/forms/fieldStyles';
+import {
+  SettingsField,
+  SettingsHeader,
+  SettingsSaveBar,
+  SettingsSection,
+} from '@/components/admin/SettingsSection';
+import { toast } from '@/lib/toast';
+import { cn } from '@/lib/cn';
 
 interface ThemeSettings {
   theme_primary_color: string;
@@ -31,7 +39,6 @@ export default function ThemeSettingsPage() {
   const { t } = useTranslation('settings');
   const [theme, setTheme] = useState<ThemeSettings>(DEFAULT_THEME);
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     apiClient.get('/settings').then((res) => {
@@ -48,7 +55,6 @@ export default function ThemeSettingsPage() {
 
   const handleSave = async () => {
     setSaving(true);
-    setSaveMsg(null);
     try {
       await apiClient.put('/settings', {
         theme_primary_color: theme.theme_primary_color,
@@ -57,9 +63,9 @@ export default function ThemeSettingsPage() {
         theme_background_image_url: theme.theme_background_image_url || null,
         company_logo_url: theme.company_logo_url || null,
       });
-      setSaveMsg({ type: 'success', text: t('admin.theme.saveSuccess') });
+      toast.success(t('admin.theme.saveSuccess'));
     } catch {
-      setSaveMsg({ type: 'error', text: t('admin.theme.saveError') });
+      toast.error(t('admin.theme.saveError'));
     } finally {
       setSaving(false);
     }
@@ -72,19 +78,29 @@ export default function ThemeSettingsPage() {
     label: string,
     description: string
   ) => (
-    <div className="flex items-start gap-4">
-      <div className="relative flex-shrink-0">
+    <div className="flex items-start gap-4 py-4 first:pt-0 last:pb-0">
+      <label
+        className="relative h-11 w-11 shrink-0 cursor-pointer overflow-hidden rounded-lg shadow-sm ring-1 ring-inset ring-black/10 transition-shadow hover:ring-black/20 dark:ring-white/15 dark:hover:ring-white/30"
+        style={{ backgroundColor: theme[key] }}
+        title={label}
+      >
         <input
           type="color"
           value={theme[key]}
           onChange={(e) => setTheme((s) => ({ ...s, [key]: e.target.value }))}
-          className="h-12 w-12 cursor-pointer rounded-lg border border-gray-300 dark:border-gray-600 p-1"
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          aria-label={label}
         />
+      </label>
+      <div className="min-w-0 flex-1">
+        <label htmlFor={`theme-${key}`} className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+          {label}
+        </label>
+        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{description}</p>
       </div>
-      <div className="flex-1">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">{label}</label>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{description}</p>
+      <div className="w-24 shrink-0">
         <input
+          id={`theme-${key}`}
           type="text"
           value={theme[key]}
           onChange={(e) => {
@@ -92,7 +108,8 @@ export default function ThemeSettingsPage() {
             if (/^#[0-9a-fA-F]{0,6}$/.test(val)) setTheme((s) => ({ ...s, [key]: val }));
           }}
           maxLength={7}
-          className="mt-1 w-32 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-xs font-mono text-gray-900 dark:text-gray-100"
+          spellCheck={false}
+          className={cn(fieldClasses({ size: 'sm' }), 'font-mono uppercase')}
         />
       </div>
     </div>
@@ -100,97 +117,129 @@ export default function ThemeSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-          {t('admin.theme.title')}
-        </h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {t('admin.theme.subtitle')}
-        </p>
-      </div>
+      <SettingsHeader title={t('admin.theme.title')} description={t('admin.theme.subtitle')} />
 
-      {/* Color pickers */}
-      <div className="space-y-5">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          {t('admin.theme.colors')}
-        </h3>
-        {colorField('theme_primary_color', t('admin.theme.primaryColor'), t('admin.theme.primaryColorDesc'))}
-        {colorField('theme_secondary_color', t('admin.theme.secondaryColor'), t('admin.theme.secondaryColorDesc'))}
-        {colorField('theme_accent_color', t('admin.theme.accentColor'), t('admin.theme.accentColorDesc'))}
-      </div>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
+        {/* Color pickers */}
+        <SettingsSection icon={Palette} title={t('admin.theme.colors')} className="xl:col-span-3">
+          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+            {colorField('theme_primary_color', t('admin.theme.primaryColor'), t('admin.theme.primaryColorDesc'))}
+            {colorField('theme_secondary_color', t('admin.theme.secondaryColor'), t('admin.theme.secondaryColorDesc'))}
+            {colorField('theme_accent_color', t('admin.theme.accentColor'), t('admin.theme.accentColorDesc'))}
+          </div>
+        </SettingsSection>
 
-      {/* Preview strip */}
-      <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-        <div
-          className="px-6 py-4 text-white font-semibold"
-          style={{ backgroundColor: theme.theme_primary_color }}
+        {/* Preview: a miniature document using the colours */}
+        <SettingsSection
+          icon={Eye}
+          title={t('admin.theme.preview')}
+          description={t('admin.theme.previewHint')}
+          className="xl:col-span-2"
         >
-          {t('admin.theme.preview')} — {t('admin.theme.primaryColor')}
-        </div>
-        <div
-          className="px-6 py-3 text-white text-sm"
-          style={{ backgroundColor: theme.theme_secondary_color }}
-        >
-          {t('admin.theme.secondaryColor')}
-        </div>
-        <div
-          className="px-6 py-2 text-white text-xs"
-          style={{ backgroundColor: theme.theme_accent_color }}
-        >
-          {t('admin.theme.accentColor')}
-        </div>
+          <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700">
+            <div
+              className="flex items-center justify-between gap-3 px-5 py-4 text-white transition-colors duration-300"
+              style={{ backgroundColor: theme.theme_primary_color }}
+            >
+              <span className="text-sm font-semibold">{t('admin.theme.primaryColor')}</span>
+              {theme.company_logo_url && (
+                <img
+                  src={theme.company_logo_url}
+                  alt=""
+                  className="h-6 max-w-[96px] rounded bg-white/90 object-contain p-0.5"
+                  onError={(e) => (e.currentTarget.style.display = 'none')}
+                />
+              )}
+            </div>
+            <div
+              className="px-5 py-2.5 text-xs font-medium text-white transition-colors duration-300"
+              style={{ backgroundColor: theme.theme_secondary_color }}
+            >
+              {t('admin.theme.secondaryColor')}
+            </div>
+            <div className="space-y-2 px-5 py-4">
+              <div className="h-2 w-3/4 rounded-full bg-gray-200" />
+              <div className="h-2 w-1/2 rounded-full bg-gray-200" />
+              <div className="h-2 w-2/3 rounded-full bg-gray-200" />
+              <div className="pt-2">
+                <span
+                  className="inline-flex rounded-md px-3 py-1.5 text-xs font-semibold text-white transition-colors duration-300"
+                  style={{ backgroundColor: theme.theme_accent_color }}
+                >
+                  {t('admin.theme.accentColor')}
+                </span>
+              </div>
+            </div>
+          </div>
+        </SettingsSection>
       </div>
 
       {/* Branding URLs */}
-      <div>
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-4">
-          {t('admin.theme.branding')}
-        </h3>
-        <div className="max-w-lg space-y-2">
-          <Input
+      <SettingsSection icon={ImageIcon} title={t('admin.theme.branding')}>
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <SettingsField
             label={t('admin.theme.logoUrl')}
-            type="url"
-            value={theme.company_logo_url}
-            onChange={(e) => setTheme((s) => ({ ...s, company_logo_url: e.target.value }))}
-            placeholder="https://example.com/logo.png"
-            helperText={t('admin.theme.logoUrlDesc')}
-          />
-          <Input
+            htmlFor="theme-logo-url"
+            hint={t('admin.theme.logoUrlDesc')}
+          >
+            <input
+              id="theme-logo-url"
+              type="url"
+              value={theme.company_logo_url}
+              onChange={(e) => setTheme((s) => ({ ...s, company_logo_url: e.target.value }))}
+              placeholder="https://example.com/logo.png"
+              className={fieldClasses()}
+            />
+          </SettingsField>
+          <SettingsField
             label={t('admin.theme.backgroundImageUrl')}
-            type="url"
-            value={theme.theme_background_image_url}
-            onChange={(e) => setTheme((s) => ({ ...s, theme_background_image_url: e.target.value }))}
-            placeholder="https://example.com/background.png"
-            helperText={t('admin.theme.backgroundImageUrlDesc')}
-          />
+            htmlFor="theme-bg-url"
+            hint={t('admin.theme.backgroundImageUrlDesc')}
+          >
+            <input
+              id="theme-bg-url"
+              type="url"
+              value={theme.theme_background_image_url}
+              onChange={(e) => setTheme((s) => ({ ...s, theme_background_image_url: e.target.value }))}
+              placeholder="https://example.com/background.png"
+              className={fieldClasses()}
+            />
+          </SettingsField>
         </div>
-      </div>
 
-      {/* Logo preview */}
-      {theme.company_logo_url && (
-        <div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">{t('admin.theme.logoPreview')}</p>
-          <img
-            src={theme.company_logo_url}
-            alt="Logo preview"
-            className="h-16 object-contain rounded border border-gray-200 dark:border-gray-700 bg-white p-2"
-            onError={(e) => (e.currentTarget.style.display = 'none')}
-          />
-        </div>
-      )}
+        {/* Logo preview */}
+        {theme.company_logo_url && (
+          <div className="mt-5 animate-fade-in">
+            <p className="eyebrow mb-1.5">{t('admin.theme.logoPreview')}</p>
+            <img
+              src={theme.company_logo_url}
+              alt={t('admin.theme.logoPreview')}
+              className="h-16 rounded-lg border border-gray-200 bg-white object-contain p-2 dark:border-gray-700"
+              onError={(e) => (e.currentTarget.style.display = 'none')}
+            />
+          </div>
+        )}
+      </SettingsSection>
 
       {/* Actions */}
-      <div className="flex items-center gap-3 pt-2">
-        <Button variant="primary" size="sm" isLoading={saving} onClick={handleSave}>
-          {t('admin.theme.save')}
-        </Button>
-        <Button variant="outline" size="sm" onClick={resetDefaults}>
+      <SettingsSaveBar>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={resetDefaults}
+          leftIcon={<RotateCcw className="h-4 w-4" />}
+        >
           {t('admin.theme.reset')}
         </Button>
-      </div>
-      {saveMsg && (
-        <Alert type={saveMsg.type} message={saveMsg.text} />
-      )}
+        <Button
+          type="button"
+          isLoading={saving}
+          onClick={handleSave}
+          leftIcon={<Save className="h-4 w-4" />}
+        >
+          {t('admin.theme.save')}
+        </Button>
+      </SettingsSaveBar>
     </div>
   );
 }

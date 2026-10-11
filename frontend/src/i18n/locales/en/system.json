@@ -46,7 +46,11 @@
     "deleteSuccess": "Backup deleted successfully",
     "deleteError": "Failed to delete backup",
     "createSuccess": "Backup created successfully",
-    "createError": "Failed to create backup"
+    "createError": "Failed to create backup",
+    "subtitle": "Manual and scheduled backups of your data.",
+    "noBackupsHint": "Create your first backup to be able to restore your data.",
+    "confirmRestoreTitle": "Restore “{{name}}”?",
+    "confirmDeleteTitle": "Delete “{{name}}”?"
   },
   "schedules": {
     "title": "Backup Schedules",
@@ -70,7 +74,10 @@
     "createSuccess": "Schedule created successfully",
     "createError": "Failed to create schedule",
     "updateSuccess": "Schedule updated successfully",
-    "updateError": "Failed to update schedule"
+    "updateError": "Failed to update schedule",
+    "subtitle": "Automatic backups that run on a cron schedule.",
+    "noSchedulesHint": "Create a schedule to back up your data automatically.",
+    "confirmDeleteTitle": "Delete schedule “{{name}}”?"
   },
   "createBackupModal": {
     "title": "Create Backup",
@@ -109,5 +116,10 @@
     "loadBackups": "Failed to load backups",
     "loadSchedules": "Failed to load schedules",
     "generic": "An error occurred. Please try again."
+  },
+  "dangerZone": {
+    "title": "Danger zone",
+    "restore": "Restoring a backup overwrites all current data with the state of that backup.",
+    "delete": "Deleting a backup removes it permanently — it cannot be restored afterwards."
   }
 }

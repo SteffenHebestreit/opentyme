@@ -46,7 +46,11 @@
     "deleteSuccess": "Backup erfolgreich gelöscht",
     "deleteError": "Löschen des Backups fehlgeschlagen",
     "createSuccess": "Backup erfolgreich erstellt",
-    "createError": "Erstellen des Backups fehlgeschlagen"
+    "createError": "Erstellen des Backups fehlgeschlagen",
+    "subtitle": "Manuelle und geplante Sicherungen Ihrer Daten.",
+    "noBackupsHint": "Erstellen Sie Ihre erste Sicherung, um Daten wiederherstellen zu können.",
+    "confirmRestoreTitle": "„{{name}}“ wiederherstellen?",
+    "confirmDeleteTitle": "„{{name}}“ löschen?"
   },
   "schedules": {
     "title": "Backup-Zeitpläne",
@@ -70,7 +74,10 @@
     "createSuccess": "Zeitplan erfolgreich erstellt",
     "createError": "Erstellen des Zeitplans fehlgeschlagen",
     "updateSuccess": "Zeitplan erfolgreich aktualisiert",
-    "updateError": "Aktualisierung des Zeitplans fehlgeschlagen"
+    "updateError": "Aktualisierung des Zeitplans fehlgeschlagen",
+    "subtitle": "Automatische Sicherungen nach Cron-Zeitplan.",
+    "noSchedulesHint": "Legen Sie einen Zeitplan an, um Ihre Daten automatisch zu sichern.",
+    "confirmDeleteTitle": "Zeitplan „{{name}}“ löschen?"
   },
   "createBackupModal": {
     "title": "Backup erstellen",
@@ -109,5 +116,10 @@
     "loadBackups": "Laden der Backups fehlgeschlagen",
     "loadSchedules": "Laden der Zeitpläne fehlgeschlagen",
     "generic": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut."
+  },
+  "dangerZone": {
+    "title": "Gefahrenbereich",
+    "restore": "Eine Wiederherstellung überschreibt alle aktuellen Daten mit dem Stand der Sicherung.",
+    "delete": "Gelöschte Sicherungen sind endgültig entfernt und können nicht wiederhergestellt werden."
   }
 }

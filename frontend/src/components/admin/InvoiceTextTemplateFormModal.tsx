@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FileText } from 'lucide-react';
 import {
   useCreateInvoiceTextTemplate,
   useUpdateInvoiceTextTemplate,
@@ -9,6 +10,8 @@ import { Button } from '../common/Button';
 import { Input, CustomSelect, Textarea } from '../forms';
 import { InvoiceTextTemplate, InvoiceTextTemplatePayload, TemplateCategory } from '../../api/types';
 import PlaceholderHelper from '../business/invoices/PlaceholderHelper';
+import { toast } from '../../lib/toast';
+import { SettingsCheckbox } from './SettingsSection';
 
 interface InvoiceTextTemplateFormModalProps {
   template: InvoiceTextTemplate | null;
@@ -48,6 +51,7 @@ const InvoiceTextTemplateFormModal: React.FC<InvoiceTextTemplateFormModalProps> 
 
   const createMutation = useCreateInvoiceTextTemplate();
   const updateMutation = useUpdateInvoiceTextTemplate();
+  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   useEffect(() => {
     if (template) {
@@ -87,7 +91,7 @@ const InvoiceTextTemplateFormModal: React.FC<InvoiceTextTemplateFormModalProps> 
         onSuccess(t('admin.templates.form.createSuccess'));
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || t('admin.templates.form.operationError'));
+      toast.error(t('admin.templates.form.operationError'), { description: err.response?.data?.message });
     }
   };
 
@@ -95,8 +99,9 @@ const InvoiceTextTemplateFormModal: React.FC<InvoiceTextTemplateFormModalProps> 
     <Modal
       open={open}
       title={template ? t('admin.templates.form.editTitle') : t('admin.templates.form.addTitle')}
+      icon={<FileText className="h-4 w-4" />}
       onClose={onClose}
-      size="xl"
+      size="lg"
       footer={
         <>
           <Button onClick={onClose} variant="secondary" type="button">
@@ -105,55 +110,55 @@ const InvoiceTextTemplateFormModal: React.FC<InvoiceTextTemplateFormModalProps> 
           <Button
             onClick={handleSubmit}
             variant="primary"
-            disabled={createMutation.isPending || updateMutation.isPending}
+            isLoading={isSaving}
           >
-            {createMutation.isPending || updateMutation.isPending ? t('admin.templates.form.saving') : t('admin.templates.form.saveButton')}
+            {isSaving ? t('admin.templates.form.saving') : t('admin.templates.form.saveButton')}
           </Button>
         </>
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          label={t('admin.templates.form.nameLabel')}
-          name="name"
-          value={formData.name}
-          onChange={handleChange}
-          placeholder={t('admin.templates.form.namePlaceholder')}
-          required
-        />
-
-        <CustomSelect
-          label={t('admin.templates.form.categoryLabel')}
-          value={formData.category}
-          onChange={(value) => setFormData({ ...formData, category: value as TemplateCategory })}
-          options={TEMPLATE_CATEGORIES}
-          required
-          size="md"
-        />
-
-        <div>
-          <Textarea
-            label={t('admin.templates.form.contentLabel')}
-            id="content"
-            name="content"
-            value={formData.content}
+      <form onSubmit={handleSubmit}>
+        <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+          <Input
+            label={t('admin.templates.form.nameLabel')}
+            name="name"
+            value={formData.name}
             onChange={handleChange}
-            rows={8}
+            placeholder={t('admin.templates.form.namePlaceholder')}
             required
-            placeholder={t('admin.templates.form.contentPlaceholder')}
-            className="font-mono text-sm"
           />
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {t('admin.templates.form.contentDescription')}
-          </p>
-          
-          {/* Placeholder Helper */}
-          <div className="mt-3">
-            <PlaceholderHelper collapsed={true} />
+
+          <div className="mb-4">
+            <CustomSelect
+              label={t('admin.templates.form.categoryLabel')}
+              value={formData.category}
+              onChange={(value) => setFormData({ ...formData, category: value as TemplateCategory })}
+              options={TEMPLATE_CATEGORIES}
+              required
+              size="md"
+            />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <Textarea
+          label={t('admin.templates.form.contentLabel')}
+          id="content"
+          name="content"
+          value={formData.content}
+          onChange={handleChange}
+          rows={8}
+          required
+          placeholder={t('admin.templates.form.contentPlaceholder')}
+          helperText={t('admin.templates.form.contentDescription')}
+          className="font-mono text-sm"
+        />
+
+        {/* Placeholder Helper */}
+        <div className="mb-4">
+          <PlaceholderHelper collapsed={true} />
+        </div>
+
+        <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
           <Input
             label={t('admin.templates.form.languageLabel')}
             name="language"
@@ -171,33 +176,23 @@ const InvoiceTextTemplateFormModal: React.FC<InvoiceTextTemplateFormModalProps> 
             value={formData.sort_order}
             onChange={handleChange}
             min="0"
+            className="tabular-nums"
           />
         </div>
 
-        <div className="flex items-center space-x-6">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              name="is_default"
-              checked={formData.is_default}
-              onChange={handleChange}
-              className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300">
-              {t('admin.templates.form.setDefaultLabel')}
-            </span>
-          </label>
-
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              name="is_active"
-              checked={formData.is_active}
-              onChange={handleChange}
-              className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300">{t('admin.templates.form.activeLabel')}</span>
-          </label>
+        <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50/60 p-4 sm:flex-row sm:gap-8 dark:border-gray-800 dark:bg-white/[0.02]">
+          <SettingsCheckbox
+            name="is_default"
+            checked={!!formData.is_default}
+            onChange={handleChange}
+            label={t('admin.templates.form.setDefaultLabel')}
+          />
+          <SettingsCheckbox
+            name="is_active"
+            checked={!!formData.is_active}
+            onChange={handleChange}
+            label={t('admin.templates.form.activeLabel')}
+          />
         </div>
       </form>
     </Modal>

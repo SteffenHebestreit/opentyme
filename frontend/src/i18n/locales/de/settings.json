@@ -90,7 +90,30 @@
       "aboutItem2": "Neue Ausgabeneinträge",
       "aboutItem3": "Finanzübersichtsanzeigen (wenn keine bestimmte Währung festgelegt ist)",
       "aboutItem4": "Zahlungserfassungsformulare",
-      "aboutOverride": "Sie können diese Einstellung bei Bedarf für einzelne Transaktionen überschreiben."
+      "aboutOverride": "Sie können diese Einstellung bei Bedarf für einzelne Transaktionen überschreiben.",
+      "companyInfoHint": "Erscheint auf allen erzeugten Rechnungen und Dokumenten – bitte aktuell halten.",
+      "companyName": "Firmenname",
+      "companyNamePlaceholder": "Ihre Firma GmbH",
+      "companyTaglinePlaceholder": "Professionelle Dienstleistungen",
+      "addressPlaceholder": "Musterstraße 1\n12345 Stadt, Land",
+      "taxContactInfoHint": "Steuernummer und Kontaktdaten für Ihre Dokumente.",
+      "email": "E-Mail",
+      "phone": "Telefon",
+      "website": "Website",
+      "logoAlt": "Firmenlogo",
+      "regionFormats": "Region & Formate",
+      "invoiceLanguageLabel": "Zahlen- & Datumsformat (Rechnungs-PDF)",
+      "invoiceLanguageHint": "Legt fest, wie Datumsangaben und Beträge auf erzeugten Rechnungs-PDFs formatiert werden.",
+      "providerOpenAICompat": "OpenAI-kompatibel (lokal / LM Studio / vLLM)",
+      "providerCustom": "Benutzerdefiniert",
+      "modelPlaceholder": "z. B. gpt-4o, llama-3.3-70b, claude-opus-4-6",
+      "apiBaseUrlPlaceholder": "http://localhost:11434/v1  (leer lassen für OpenAI-Standard)",
+      "sttFasterWhisper": "faster-whisper (empfohlen)",
+      "sttWhisperServer": "OpenAI-kompatibel (fast-whisper-Server)",
+      "sttCustom": "Benutzerdefiniert (OpenAI-kompatibel)",
+      "sttApiKeyPlaceholder": "Leer lassen, falls nicht benötigt",
+      "unsavedChanges": "Ungespeicherte Änderungen",
+      "saveHint": "Änderungen werden nach dem Speichern wirksam."
     },
     "ai": {
       "title": "KI-Integration",
@@ -152,7 +175,8 @@
         "createSuccess": "Steuersatz erfolgreich erstellt",
         "updateSuccess": "Steuersatz erfolgreich aktualisiert",
         "operationError": "Vorgang fehlgeschlagen"
-      }
+      },
+      "deleteTitle": "Steuersatz löschen?"
     },
     "templates": {
       "title": "Rechnungstextvorlagen",
@@ -200,7 +224,8 @@
         "createSuccess": "Vorlage erfolgreich erstellt",
         "updateSuccess": "Vorlage erfolgreich aktualisiert",
         "operationError": "Vorgang fehlgeschlagen"
-      }
+      },
+      "deleteTitle": "Vorlage löschen?"
     },
     "tabs": {
       "general": "Allgemeine Einstellungen",
@@ -208,7 +233,8 @@
       "templates": "Rechnungsvorlagen",
       "emailTemplates": "E-Mail-Vorlagen",
       "email": "E-Mail",
-      "theme": "Design"
+      "theme": "Design",
+      "plugins": "Addons"
     },
     "email": {
       "title": "E-Mail-Einstellungen",
@@ -230,7 +256,12 @@
       "sendTest": "Test senden",
       "sending": "Wird gesendet...",
       "testSuccess": "Test-E-Mail gesendet an {{to}}",
-      "testError": "Fehler beim Senden der Test-E-Mail."
+      "testError": "Fehler beim Senden der Test-E-Mail.",
+      "serverTitle": "SMTP-Server",
+      "serverHint": "Mailserver für den Versand von Rechnungen, Erinnerungen und Berichten.",
+      "notificationsTitle": "Benachrichtigungen",
+      "overdueRemindersHint": "Wenn aktiviert, sendet OpenTYME Ihnen täglich eine Übersicht Ihrer überfälligen Rechnungen. Erfordert einen oben konfigurierten SMTP-Server.",
+      "overdueReminders": "Mich per E-Mail über überfällige Rechnungen informieren"
     },
     "theme": {
       "title": "Ausgabe-Design",
@@ -253,12 +284,61 @@
       "saving": "Wird gespeichert...",
       "reset": "Standard zurücksetzen",
       "saveSuccess": "Design erfolgreich gespeichert.",
-      "saveError": "Fehler beim Speichern des Designs."
+      "saveError": "Fehler beim Speichern des Designs.",
+      "previewHint": "So wirken die Farben auf erzeugten Dokumenten."
+    },
+    "navLabel": "Einstellungsbereiche",
+    "navGroups": {
+      "business": "Geschäft",
+      "communication": "Kommunikation",
+      "appearance": "Darstellung",
+      "extensions": "Erweiterungen"
+    },
+    "plugins": {
+      "title": "Addons",
+      "subtitle": "Installierte Addons verwalten. Klicken Sie auf ein Addon, um Details zu sehen und es zu konfigurieren.",
+      "total": "Gesamt",
+      "enabled": "Aktiviert",
+      "disabled": "Deaktiviert",
+      "statusEnabled": "Aktiv",
+      "statusDisabled": "Inaktiv",
+      "empty": "Keine Addons installiert.",
+      "emptyHint": "Installierte Addons erscheinen hier.",
+      "openDetails": "Details zu {{name}} öffnen",
+      "enable": "Addon aktivieren",
+      "disable": "Addon deaktivieren",
+      "backend": "Backend",
+      "frontend": "Frontend",
+      "settings": "Einstellungen",
+      "backendApi": "Backend-API",
+      "frontendUi": "Frontend-UI",
+      "userSettings": "Benutzereinstellungen",
+      "saveSettings": "Einstellungen speichern",
+      "settingsSaved": "Einstellungen gespeichert.",
+      "settingsSaveError": "Einstellungen konnten nicht gespeichert werden.",
+      "toggleError": "Der Status des Addons konnte nicht geändert werden.",
+      "loadError": "Addons konnten nicht geladen werden"
     }
   },
   "messages": {
     "updateSuccess": "Einstellungen erfolgreich aktualisiert",
     "updateError": "Aktualisierung der Einstellungen fehlgeschlagen",
     "passwordChangeSuccess": "Passwort erfolgreich geändert"
+  },
+  "profilePage": {
+    "title": "Mein Profil",
+    "subtitle": "Ihre Kontoinformationen ansehen und verwalten",
+    "accountDetails": "Kontodaten",
+    "accountDetailsHint": "Schreibgeschützt – wird aus Ihrem Keycloak-Konto übernommen.",
+    "email": "E-Mail-Adresse",
+    "username": "Benutzername",
+    "firstName": "Vorname",
+    "lastName": "Nachname",
+    "userId": "Benutzer-ID",
+    "security": "Kontosicherheit",
+    "securityHint": "Ändern Sie Ihr Passwort über das sichere Anmeldesystem von Keycloak.",
+    "changePassword": "Passwort ändern",
+    "keycloakTitle": "Anmeldung über Keycloak",
+    "keycloakText": "Ihre Kontoinformationen werden über Keycloak verwaltet. Profildaten sind schreibgeschützt und werden aus Ihrem Keycloak-Konto übernommen. Um Ihr Passwort zu ändern oder die Zwei-Faktor-Authentifizierung zu aktivieren, klicken Sie oben auf „Passwort ändern“."
   }
 }

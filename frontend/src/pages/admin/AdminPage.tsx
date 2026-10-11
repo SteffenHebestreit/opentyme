@@ -7,11 +7,27 @@
  * - Plugin management
  * - Addon-injected settings tabs (via slot)
  *
+ * The active tab lives in the URL (`/config/:tab`). Wide screens get a sticky
+ * vertical sub-navigation, narrow screens a horizontally scrolling tab bar.
+ *
  * @module pages/admin/AdminPage
  */
 
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import {
+  Blocks,
+  FileText,
+  LayoutTemplate,
+  Palette,
+  Percent,
+  Puzzle,
+  Send,
+  Settings2,
+  SlidersHorizontal,
+  type LucideIcon,
+} from 'lucide-react';
 import TaxRatesPage from './TaxRatesPage';
 import InvoiceTemplatesPage from './InvoiceTemplatesPage';
 import GeneralSettingsPage from './GeneralSettingsPage';
@@ -21,8 +37,23 @@ import ThemeSettingsPage from './ThemeSettingsPage';
 import EmailTemplatesPage from '../email-templates/EmailTemplatesPage';
 import { Slot } from '@/plugins/slots';
 import { frontendPluginRegistry } from '@/plugins/plugin-registry';
+import { PageHeader } from '@/components/common/PageHeader';
+import { Tabs } from '@/components/common/Tabs';
+import { cn } from '@/lib/cn';
 
 type CoreTab = 'general' | 'tax-rates' | 'invoice-templates' | 'email-templates' | 'email' | 'theme' | 'plugins';
+
+interface NavTab {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+}
+
+interface NavGroup {
+  id: string;
+  label: string;
+  tabs: NavTab[];
+}
 
 /**
  * Main admin page component with tabbed interface.
@@ -34,16 +65,25 @@ export default function AdminPage() {
   const navigate = useNavigate();
   const activeTab = tab || 'general';
   const setActiveTab = (id: string) => navigate(`/config/${id}`);
+  const mobileTabsRef = useRef<HTMLDivElement>(null);
 
-  const coreTabs = [
-    { id: 'general' as CoreTab, label: t('admin.tabs.general'), icon: '⚙️' },
-    { id: 'tax-rates' as CoreTab, label: t('admin.tabs.taxRates'), icon: '💰' },
-    { id: 'invoice-templates' as CoreTab, label: t('admin.tabs.templates'), icon: '📝' },
-    { id: 'email-templates' as CoreTab, label: t('admin.tabs.emailTemplates'), icon: '✉️' },
-    { id: 'email' as CoreTab, label: t('admin.tabs.email'), icon: '📧' },
-    { id: 'theme' as CoreTab, label: t('admin.tabs.theme'), icon: '🎨' },
-    { id: 'plugins' as CoreTab, label: 'Addons', icon: '🧩' },
-  ];
+  // Keep the active tab visible in the horizontally scrolling bar (narrow screens)
+  useEffect(() => {
+    const scroller = mobileTabsRef.current?.firstElementChild as HTMLElement | null;
+    const button = scroller?.querySelector<HTMLElement>(`[data-tab-id="${activeTab}"]`);
+    if (!scroller || !button || scroller.clientWidth === 0) return;
+    scroller.scrollLeft = button.offsetLeft - (scroller.clientWidth - button.offsetWidth) / 2;
+  }, [activeTab]);
+
+  const coreTabs: Record<CoreTab, NavTab> = {
+    general: { id: 'general', label: t('admin.tabs.general'), icon: SlidersHorizontal },
+    'tax-rates': { id: 'tax-rates', label: t('admin.tabs.taxRates'), icon: Percent },
+    'invoice-templates': { id: 'invoice-templates', label: t('admin.tabs.templates'), icon: FileText },
+    'email-templates': { id: 'email-templates', label: t('admin.tabs.emailTemplates'), icon: LayoutTemplate },
+    email: { id: 'email', label: t('admin.tabs.email'), icon: Send },
+    theme: { id: 'theme', label: t('admin.tabs.theme'), icon: Palette },
+    plugins: { id: 'plugins', label: t('admin.tabs.plugins'), icon: Puzzle },
+  };
 
   // Collect addon-contributed tab metadata from slot components
   // Each slot component may expose a static `tabMeta` property: { id, label, icon }
@@ -56,47 +96,106 @@ export default function AdminPage() {
       })
       .filter(Boolean) as Array<{ id: string; label: string; icon?: string }>;
 
-  const allTabs = [...coreTabs, ...addonTabMetas];
+  // Addon icons are free-form strings (often emoji); show one consistent icon instead
+  const addonTabs: NavTab[] = addonTabMetas.map((meta) => ({ id: meta.id, label: meta.label, icon: Blocks }));
+
+  const groups: NavGroup[] = [
+    {
+      id: 'business',
+      label: t('admin.navGroups.business'),
+      tabs: [coreTabs.general, coreTabs['tax-rates'], coreTabs['invoice-templates']],
+    },
+    {
+      id: 'communication',
+      label: t('admin.navGroups.communication'),
+      tabs: [coreTabs['email-templates'], coreTabs.email],
+    },
+    {
+      id: 'appearance',
+      label: t('admin.navGroups.appearance'),
+      tabs: [coreTabs.theme],
+    },
+    {
+      id: 'extensions',
+      label: t('admin.navGroups.extensions'),
+      tabs: [coreTabs.plugins, ...addonTabs],
+    },
+  ];
+
+  const allTabs = groups.flatMap((group) => group.tabs);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* Page Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">
-          {t('admin.title')}
-        </h1>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          {t('admin.subtitle')}
-        </p>
+    <div className="space-y-6">
+      <PageHeader
+        title={t('admin.title')}
+        subtitle={t('admin.subtitle')}
+        icon={Settings2}
+      />
+
+      {/* Narrow screens: horizontal, scrollable tab bar */}
+      <div ref={mobileTabsRef} className="lg:hidden">
+        <Tabs
+          tabs={allTabs}
+          activeTab={activeTab}
+          onChange={setActiveTab}
+        />
       </div>
 
-      {/* Tab Navigation */}
-      <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
-        <nav className="-mb-px flex space-x-8 overflow-x-auto" aria-label="Configuration tabs">
-          {allTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`
-                flex items-center space-x-2 whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium transition-colors
-                ${
-                  activeTab === tab.id
-                    ? 'border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
-                    : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-300'
-                }
-              `}
-              aria-current={activeTab === tab.id ? 'page' : undefined}
-            >
-              {tab.icon && <span className="text-lg">{tab.icon}</span>}
-              <span>{tab.label}</span>
-            </button>
-          ))}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
+        {/* Wide screens: sticky vertical sub-navigation */}
+        <nav
+          className="hidden w-56 shrink-0 lg:sticky lg:top-20 lg:block"
+          aria-label={t('admin.navLabel')}
+        >
+          <div className="space-y-5">
+            {groups.map((group) => (
+              <div key={group.id}>
+                <p className="eyebrow mb-1.5 px-3">{group.label}</p>
+                <ul className="space-y-0.5">
+                  {group.tabs.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeTab === item.id;
+                    return (
+                      <li key={item.id}>
+                        <Link
+                          to={`/config/${item.id}`}
+                          aria-current={isActive ? 'page' : undefined}
+                          className={cn(
+                            'group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                            'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500',
+                            isActive
+                              ? 'bg-white text-gray-900 shadow-soft ring-1 ring-gray-200 dark:bg-white/[0.06] dark:text-white dark:shadow-none dark:ring-white/10'
+                              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.04] dark:hover:text-gray-100'
+                          )}
+                        >
+                          {isActive && (
+                            <span
+                              aria-hidden="true"
+                              className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-purple-600 dark:bg-purple-400"
+                            />
+                          )}
+                          <Icon
+                            className={cn(
+                              'h-4 w-4 shrink-0 transition-colors',
+                              isActive
+                                ? 'text-purple-600 dark:text-purple-400'
+                                : 'text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300'
+                            )}
+                            aria-hidden="true"
+                          />
+                          <span className="truncate">{item.label}</span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
         </nav>
-      </div>
 
-      {/* Tab Content */}
-      <div className="relative">
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        {/* Tab Content */}
+        <div key={activeTab} id={`${activeTab}-panel`} className="min-w-0 flex-1 animate-fade-in">
           {activeTab === 'general' && <GeneralSettingsPage />}
           {activeTab === 'tax-rates' && <TaxRatesPage />}
           {activeTab === 'invoice-templates' && <InvoiceTemplatesPage />}

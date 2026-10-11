@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Percent } from 'lucide-react';
 import { useCreateTaxRate, useUpdateTaxRate } from '../../hooks/api/useTaxRates';
 import { Modal } from '../ui/Modal';
 import { Button } from '../common/Button';
 import { Input, Textarea } from '../forms';
 import { TaxRate, TaxRatePayload } from '../../api/types';
+import { toast } from '../../lib/toast';
+import { SettingsCheckbox } from './SettingsSection';
 
 interface TaxRateFormModalProps {
   taxRate: TaxRate | null;
@@ -30,6 +33,7 @@ const TaxRateFormModal: React.FC<TaxRateFormModalProps> = ({ taxRate, open, onCl
 
   const createMutation = useCreateTaxRate();
   const updateMutation = useUpdateTaxRate();
+  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   useEffect(() => {
     if (taxRate) {
@@ -67,7 +71,7 @@ const TaxRateFormModal: React.FC<TaxRateFormModalProps> = ({ taxRate, open, onCl
         onSuccess(t('admin.taxRates.form.createSuccess'));
       }
     } catch (err: any) {
-      alert(err.response?.data?.message || t('admin.taxRates.form.operationError'));
+      toast.error(t('admin.taxRates.form.operationError'), { description: err.response?.data?.message });
     }
   };
 
@@ -75,8 +79,9 @@ const TaxRateFormModal: React.FC<TaxRateFormModalProps> = ({ taxRate, open, onCl
     <Modal
       open={open}
       title={taxRate ? t('admin.taxRates.form.editTitle') : t('admin.taxRates.form.addTitle')}
+      icon={<Percent className="h-4 w-4" />}
       onClose={onClose}
-      size="lg"
+      size="md"
       footer={
         <>
           <Button onClick={onClose} variant="secondary" type="button">
@@ -85,34 +90,39 @@ const TaxRateFormModal: React.FC<TaxRateFormModalProps> = ({ taxRate, open, onCl
           <Button
             onClick={handleSubmit}
             variant="primary"
-            disabled={createMutation.isPending || updateMutation.isPending}
+            isLoading={isSaving}
           >
-            {createMutation.isPending || updateMutation.isPending ? t('admin.taxRates.form.saving') : t('admin.taxRates.form.saveButton')}
+            {isSaving ? t('admin.taxRates.form.saving') : t('admin.taxRates.form.saveButton')}
           </Button>
         </>
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          label={t('admin.taxRates.form.nameLabel')}
-          name="name"
-          value={formData.name}
-          onChange={handleChange}
-          placeholder={t('admin.taxRates.form.namePlaceholder')}
-          required
-        />
+      <form onSubmit={handleSubmit}>
+        <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-3">
+          <div className="sm:col-span-2">
+            <Input
+              label={t('admin.taxRates.form.nameLabel')}
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              placeholder={t('admin.taxRates.form.namePlaceholder')}
+              required
+            />
+          </div>
 
-        <Input
-          label={t('admin.taxRates.form.rateLabel')}
-          name="rate"
-          type="number"
-          value={formData.rate}
-          onChange={handleChange}
-          step="0.01"
-          min="0"
-          max="100"
-          required
-        />
+          <Input
+            label={t('admin.taxRates.form.rateLabel')}
+            name="rate"
+            type="number"
+            value={formData.rate}
+            onChange={handleChange}
+            step="0.01"
+            min="0"
+            max="100"
+            required
+            className="tabular-nums"
+          />
+        </div>
 
         <Textarea
           label={t('admin.taxRates.form.descriptionLabel')}
@@ -124,46 +134,40 @@ const TaxRateFormModal: React.FC<TaxRateFormModalProps> = ({ taxRate, open, onCl
           placeholder={t('admin.taxRates.form.descriptionPlaceholder')}
         />
 
-        <Input
-          label={t('admin.taxRates.form.countryLabel')}
-          name="country_code"
-          value={formData.country_code || ''}
-          onChange={handleChange}
-          placeholder={t('admin.taxRates.form.countryPlaceholder')}
-          maxLength={2}
-        />
+        <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+          <Input
+            label={t('admin.taxRates.form.countryLabel')}
+            name="country_code"
+            value={formData.country_code || ''}
+            onChange={handleChange}
+            placeholder={t('admin.taxRates.form.countryPlaceholder')}
+            maxLength={2}
+          />
 
-        <Input
-          label={t('admin.taxRates.form.sortLabel')}
-          name="sort_order"
-          type="number"
-          value={formData.sort_order}
-          onChange={handleChange}
-          min="0"
-        />
+          <Input
+            label={t('admin.taxRates.form.sortLabel')}
+            name="sort_order"
+            type="number"
+            value={formData.sort_order}
+            onChange={handleChange}
+            min="0"
+            className="tabular-nums"
+          />
+        </div>
 
-        <div className="flex items-center space-x-6">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              name="is_default"
-              checked={formData.is_default}
-              onChange={handleChange}
-              className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300">{t('admin.taxRates.form.setDefaultLabel')}</span>
-          </label>
-
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              name="is_active"
-              checked={formData.is_active}
-              onChange={handleChange}
-              className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300">{t('admin.taxRates.form.activeLabel')}</span>
-          </label>
+        <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50/60 p-4 sm:flex-row sm:gap-8 dark:border-gray-800 dark:bg-white/[0.02]">
+          <SettingsCheckbox
+            name="is_default"
+            checked={!!formData.is_default}
+            onChange={handleChange}
+            label={t('admin.taxRates.form.setDefaultLabel')}
+          />
+          <SettingsCheckbox
+            name="is_active"
+            checked={!!formData.is_active}
+            onChange={handleChange}
+            label={t('admin.taxRates.form.activeLabel')}
+          />
         </div>
       </form>
     </Modal>

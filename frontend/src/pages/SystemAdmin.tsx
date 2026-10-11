@@ -1,34 +1,52 @@
 /**
  * @fileoverview System Admin - Backup & Recovery page
- * 
+ *
  * Allows system administrators to:
  * - Create manual backups
  * - View backup history
  * - Restore from backups
  * - Schedule automatic backups
  * - Manage retention policies
- * 
+ *
  * @module pages/SystemAdmin
  */
 
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Database,
-  RotateCcw,
-  Trash2,
-  Calendar,
+  AlertTriangle,
+  ArchiveRestore,
+  CalendarClock,
+  CheckCircle2,
   Clock,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
+  Database,
+  HardDrive,
+  History,
+  Loader2,
+  Pencil,
   Plus,
+  ShieldCheck,
+  Trash2,
+  XCircle,
 } from 'lucide-react';
 import { backupService } from '../api/services/backup.service';
 import Modal from '../components/ui/Modal';
 import { Input } from '../components/forms/Input';
-import { Table, Column, Badge, Tabs, TabPanel } from '../components/common';
+import { fieldLabelClass } from '../components/forms/fieldStyles';
+import {
+  Alert,
+  Badge,
+  Button,
+  EmptyState,
+  PageHeader,
+  Table,
+  Column,
+  Tabs,
+  TabPanel,
+} from '../components/common';
 import type { BadgeVariant } from '../components/common/Badge';
+import { toast } from '../lib/toast';
+import { confirmDialog } from '../lib/confirm';
 
 interface Backup {
   id: string;
@@ -60,6 +78,42 @@ interface Schedule {
   last_run_status?: string;
   next_run_at?: string;
   created_at: string;
+}
+
+const checkboxClass =
+  'h-4 w-4 shrink-0 rounded border-gray-300 text-purple-600 accent-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900';
+
+const iconButton =
+  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-500';
+
+const statusVariant: Record<Backup['status'], BadgeVariant> = {
+  completed: 'green',
+  failed: 'red',
+  in_progress: 'blue',
+  pending: 'gray',
+};
+
+/** Labelled checkbox used in both dialogs. */
+function IncludeOption({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className={checkboxClass}
+      />
+      <span className="text-sm text-gray-700 dark:text-gray-300">{label}</span>
+    </label>
+  );
 }
 
 export default function SystemAdmin() {
@@ -125,7 +179,7 @@ export default function SystemAdmin() {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       await backupService.createBackup({
         ...backupForm,
         backup_name: backupForm.backup_name || `manual_${Date.now()}`,
@@ -138,27 +192,34 @@ export default function SystemAdmin() {
         includes_storage: true,
         includes_config: false,
       });
-      
+      toast.success(t('backups.createSuccess'));
+
       await loadBackups();
     } catch (err: any) {
-      setError(err.message || 'Failed to create backup');
+      setError(err.message || t('backups.createError'));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleRestoreBackup = async (backupId: string) => {
-    if (!confirm(t('backups.confirmRestore'))) {
+  const handleRestoreBackup = async (backup: Backup) => {
+    const confirmed = await confirmDialog({
+      title: t('backups.confirmRestoreTitle', { name: backup.backup_name }),
+      message: t('backups.confirmRestore'),
+      tone: 'danger',
+      confirmLabel: t('backups.actions.restore'),
+    });
+    if (!confirmed) {
       return;
     }
 
     try {
       setIsLoading(true);
       setError(null);
-      
-      await backupService.restoreBackup(backupId);
-      
-      alert(t('backups.restoreSuccess'));
+
+      await backupService.restoreBackup(backup.id);
+
+      toast.success(t('backups.restoreSuccess'), { duration: 8000 });
     } catch (err: any) {
       setError(err.message || t('backups.restoreError'));
     } finally {
@@ -166,13 +227,20 @@ export default function SystemAdmin() {
     }
   };
 
-  const handleDeleteBackup = async (backupId: string) => {
-    if (!confirm(t('backups.confirmDelete'))) {
+  const handleDeleteBackup = async (backup: Backup) => {
+    const confirmed = await confirmDialog({
+      title: t('backups.confirmDeleteTitle', { name: backup.backup_name }),
+      message: t('backups.confirmDelete'),
+      tone: 'danger',
+      confirmLabel: t('backups.actions.delete'),
+    });
+    if (!confirmed) {
       return;
     }
 
     try {
-      await backupService.deleteBackup(backupId);
+      await backupService.deleteBackup(backup.id);
+      toast.success(t('backups.deleteSuccess'));
       await loadBackups();
     } catch (err: any) {
       setError(err.message || t('backups.deleteError'));
@@ -183,12 +251,13 @@ export default function SystemAdmin() {
     try {
       setIsLoading(true);
       setError(null);
-      
+
       if (selectedSchedule) {
         await backupService.updateSchedule(selectedSchedule.id, scheduleForm);
       } else {
         await backupService.createSchedule(scheduleForm);
       }
+      toast.success(selectedSchedule ? t('schedules.updateSuccess') : t('schedules.createSuccess'));
 
       setShowScheduleModal(false);
       setSelectedSchedule(null);
@@ -201,10 +270,10 @@ export default function SystemAdmin() {
         includes_config: false,
         retention_days: 30,
       });
-      
+
       await loadSchedules();
     } catch (err: any) {
-      setError(err.message || 'Failed to save schedule');
+      setError(err.message || (selectedSchedule ? t('schedules.updateError') : t('schedules.createError')));
     } finally {
       setIsLoading(false);
     }
@@ -224,21 +293,33 @@ export default function SystemAdmin() {
     setShowScheduleModal(true);
   };
 
-  const handleDeleteSchedule = async (scheduleId: string) => {
-    if (!confirm(t('schedules.confirmDelete'))) {
+  const handleDeleteSchedule = async (schedule: Schedule) => {
+    const confirmed = await confirmDialog({
+      title: t('schedules.confirmDeleteTitle', { name: schedule.schedule_name }),
+      message: t('schedules.confirmDelete'),
+      tone: 'danger',
+      confirmLabel: t('schedules.actions.delete'),
+    });
+    if (!confirmed) {
       return;
     }
 
     try {
-      await backupService.deleteSchedule(scheduleId);
+      await backupService.deleteSchedule(schedule.id);
+      toast.success(t('schedules.deleteSuccess'));
       await loadSchedules();
     } catch (err: any) {
       setError(err.message || t('schedules.deleteError'));
     }
   };
 
+  const closeScheduleModal = () => {
+    setShowScheduleModal(false);
+    setSelectedSchedule(null);
+  };
+
   const formatBytes = (bytes?: number) => {
-    if (!bytes) return 'N/A';
+    if (!bytes) return '—';
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
     return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
@@ -247,22 +328,48 @@ export default function SystemAdmin() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
-        return <CheckCircle className="w-5 h-5 text-green-500" />;
+        return <CheckCircle2 className="h-3 w-3" />;
       case 'failed':
-        return <XCircle className="w-5 h-5 text-red-500" />;
+        return <XCircle className="h-3 w-3" />;
       case 'in_progress':
-        return <Clock className="w-5 h-5 text-blue-500 animate-spin" />;
+        return <Loader2 className="h-3 w-3 animate-spin" />;
       default:
-        return <AlertCircle className="w-5 h-5 text-gray-400" />;
+        return <Clock className="h-3 w-3" />;
     }
   };
+
+  const includeBadges = (item: { includes_database: boolean; includes_storage: boolean; includes_config: boolean }) => (
+    <div className="flex flex-wrap gap-1.5">
+      {item.includes_database && (
+        <Badge variant="purple" size="sm">
+          {t('backups.includes.database')}
+        </Badge>
+      )}
+      {item.includes_storage && (
+        <Badge variant="orange" size="sm">
+          {t('backups.includes.storage')}
+        </Badge>
+      )}
+      {item.includes_config && (
+        <Badge variant="teal" size="sm">
+          {t('backups.includes.config')}
+        </Badge>
+      )}
+    </div>
+  );
 
   const columns: Column<Backup>[] = useMemo(() => [
     {
       key: 'status',
       accessorKey: 'status',
       header: t('backups.table.status'),
-      render: (backup) => getStatusIcon(backup.status),
+      render: (backup) => (
+        <span title={backup.error_message || undefined}>
+          <Badge variant={statusVariant[backup.status] ?? 'gray'} icon={getStatusIcon(backup.status)}>
+            {t(`backups.status.${backup.status}`, { defaultValue: backup.status })}
+          </Badge>
+        </span>
+      ),
       sortable: true,
     },
     {
@@ -270,7 +377,7 @@ export default function SystemAdmin() {
       accessorKey: 'backup_name',
       header: t('backups.table.name'),
       render: (backup) => (
-        <span className="text-sm font-medium text-gray-900 dark:text-white">
+        <span className="whitespace-nowrap font-medium text-gray-900 dark:text-white">
           {backup.backup_name}
         </span>
       ),
@@ -281,7 +388,7 @@ export default function SystemAdmin() {
       accessorKey: 'backup_type',
       header: t('backups.table.type'),
       render: (backup) => {
-        const variant: BadgeVariant = 
+        const variant: BadgeVariant =
           backup.backup_type === 'manual' ? 'blue' :
           backup.backup_type === 'scheduled' ? 'green' : 'gray';
         return (
@@ -295,32 +402,15 @@ export default function SystemAdmin() {
     {
       key: 'includes',
       header: t('backups.table.includes'),
-      render: (backup) => (
-        <div className="flex space-x-2">
-          {backup.includes_database && (
-            <Badge variant="purple" size="sm">
-              {t('backups.includes.database')}
-            </Badge>
-          )}
-          {backup.includes_storage && (
-            <Badge variant="orange" size="sm">
-              {t('backups.includes.storage')}
-            </Badge>
-          )}
-          {backup.includes_config && (
-            <Badge variant="teal" size="sm">
-              {t('backups.includes.config')}
-            </Badge>
-          )}
-        </div>
-      ),
+      render: (backup) => includeBadges(backup),
     },
     {
       key: 'size',
       accessorKey: 'file_size_bytes',
       header: t('backups.table.size'),
+      align: 'right',
       render: (backup) => (
-        <span className="text-sm text-gray-500 dark:text-gray-400">
+        <span className="whitespace-nowrap tabular-nums text-gray-500 dark:text-gray-400">
           {formatBytes(backup.file_size_bytes)}
         </span>
       ),
@@ -331,7 +421,7 @@ export default function SystemAdmin() {
       accessorKey: 'started_at',
       header: t('backups.table.created'),
       render: (backup) => (
-        <span className="text-sm text-gray-500 dark:text-gray-400">
+        <span className="whitespace-nowrap tabular-nums text-gray-500 dark:text-gray-400">
           {new Date(backup.started_at).toLocaleString()}
         </span>
       ),
@@ -339,25 +429,29 @@ export default function SystemAdmin() {
     },
     {
       key: 'actions',
-      header: t('backups.table.actions'),
+      header: <span className="sr-only">{t('backups.table.actions')}</span>,
       align: 'right',
       render: (backup) => (
-        <div className="flex justify-end space-x-2">
+        <div className="flex justify-end gap-1">
           {backup.status === 'completed' && (
             <button
-              onClick={() => handleRestoreBackup(backup.id)}
-              className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+              type="button"
+              onClick={() => handleRestoreBackup(backup)}
+              className={`${iconButton} hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-500/10 dark:hover:text-amber-400`}
               title={t('backups.actions.restore')}
+              aria-label={t('backups.actions.restore')}
             >
-              <RotateCcw className="w-5 h-5" />
+              <ArchiveRestore className="h-4 w-4" />
             </button>
           )}
           <button
-            onClick={() => handleDeleteBackup(backup.id)}
-            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+            type="button"
+            onClick={() => handleDeleteBackup(backup)}
+            className={`${iconButton} hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400`}
             title={t('backups.actions.delete')}
+            aria-label={t('backups.actions.delete')}
           >
-            <Trash2 className="w-5 h-5" />
+            <Trash2 className="h-4 w-4" />
           </button>
         </div>
       ),
@@ -365,32 +459,17 @@ export default function SystemAdmin() {
   ], [t]);
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          {t('title')}
-        </h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">
-          {t('subtitle')}
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader title={t('title')} subtitle={t('subtitle')} icon={ShieldCheck} />
 
       {/* Error Display */}
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <div className="flex items-center">
-            <XCircle className="w-5 h-5 text-red-500 mr-2" />
-            <span className="text-red-700 dark:text-red-400">{error}</span>
-          </div>
-        </div>
-      )}
+      {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
 
       {/* Tabs */}
       <Tabs
         tabs={[
-          { id: 'backups', label: t('tabs.backups'), icon: Database },
-          { id: 'schedules', label: t('tabs.schedules'), icon: Calendar }
+          { id: 'backups', label: t('tabs.backups'), icon: Database, badge: backups.length },
+          { id: 'schedules', label: t('tabs.schedules'), icon: CalendarClock, badge: schedules.length }
         ]}
         activeTab={activeTab}
         onChange={(tabId) => setActiveTab(tabId as 'backups' | 'schedules')}
@@ -399,29 +478,57 @@ export default function SystemAdmin() {
       {/* Backups Tab */}
       <TabPanel tabId="backups" activeTab={activeTab}>
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              {t('backups.title')}
-            </h2>
-            <button
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="section-title">{t('backups.title')}</h2>
+              <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{t('backups.subtitle')}</p>
+            </div>
+            <Button
+              type="button"
               onClick={() => setShowBackupModal(true)}
               disabled={isLoading}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center space-x-2 disabled:opacity-50"
+              leftIcon={<Plus className="h-4 w-4" />}
             >
-              <Plus className="w-5 h-5" />
-              <span>{t('backups.createButton')}</span>
-            </button>
+              {t('backups.createButton')}
+            </Button>
           </div>
 
           {/* Backups List */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <Table
-              columns={columns}
-              data={backups}
-              isLoading={isLoading}
-              emptyMessage={t('backups.emptyState')}
-              pageSize={10}
-            />
+          <Table
+            columns={columns}
+            data={backups}
+            isLoading={isLoading}
+            emptyMessage={
+              <EmptyState
+                compact
+                icon={HardDrive}
+                title={t('backups.noBackups')}
+                description={t('backups.noBackupsHint')}
+              />
+            }
+            pageSize={10}
+          />
+
+          {/* Danger zone: what restore and delete do */}
+          <div className="rounded-xl border border-red-200 bg-red-50/50 p-4 sm:p-5 dark:border-red-500/20 dark:bg-red-500/[0.05]">
+            <div className="flex items-start gap-3">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-400">
+                <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <div className="min-w-0 text-sm">
+                <h3 className="font-semibold text-red-900 dark:text-red-200">{t('dangerZone.title')}</h3>
+                <ul className="mt-1.5 space-y-1 text-red-800/90 dark:text-red-200/80">
+                  <li className="flex items-start gap-2">
+                    <ArchiveRestore className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {t('dangerZone.restore')}
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Trash2 className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {t('dangerZone.delete')}
+                  </li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
       </TabPanel>
@@ -429,97 +536,106 @@ export default function SystemAdmin() {
       {/* Schedules Tab */}
       <TabPanel tabId="schedules" activeTab={activeTab}>
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              {t('schedules.title')}
-            </h2>
-            <button
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="section-title">{t('schedules.title')}</h2>
+              <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{t('schedules.subtitle')}</p>
+            </div>
+            <Button
+              type="button"
               onClick={() => {
                 setSelectedSchedule(null);
                 setShowScheduleModal(true);
               }}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center space-x-2"
+              leftIcon={<Plus className="h-4 w-4" />}
             >
-              <Plus className="w-5 h-5" />
-              <span>{t('schedules.createButton')}</span>
-            </button>
+              {t('schedules.createButton')}
+            </Button>
           </div>
 
           {/* Schedules List */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {schedules.map((schedule) => (
-              <div
-                key={schedule.id}
-                className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 space-y-4"
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {schedule.schedule_name}
-                    </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      {schedule.cron_expression}
-                    </p>
-                  </div>
-                  <Badge variant={schedule.is_enabled ? 'green' : 'gray'}>
-                    {schedule.is_enabled ? t('schedules.enabled') : t('schedules.disabled')}
-                  </Badge>
-                </div>
-
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center text-gray-600 dark:text-gray-400">
-                    <Database className="w-4 h-4 mr-2" />
-                    <span>{t('schedules.retention')}: {schedule.retention_days} {t('common:time.days')}</span>
-                  </div>
-                  {schedule.last_run_at && (
-                    <div className="flex items-center text-gray-600 dark:text-gray-400">
-                      <Clock className="w-4 h-4 mr-2" />
-                      <span>{t('schedules.lastRun')}: {new Date(schedule.last_run_at).toLocaleString()}</span>
+          {schedules.length === 0 ? (
+            <EmptyState
+              bordered
+              icon={CalendarClock}
+              title={t('schedules.noSchedules')}
+              description={t('schedules.noSchedulesHint')}
+            />
+          ) : (
+            <div className="stagger grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {schedules.map((schedule) => (
+                <div key={schedule.id} className="surface flex flex-col overflow-hidden">
+                  <div className="flex-1 space-y-4 p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate font-semibold text-gray-900 dark:text-white">
+                          {schedule.schedule_name}
+                        </h3>
+                        <code className="mt-1 inline-block rounded-md bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-600 dark:bg-white/[0.06] dark:text-gray-300">
+                          {schedule.cron_expression}
+                        </code>
+                      </div>
+                      <Badge variant={schedule.is_enabled ? 'green' : 'gray'} dot>
+                        {schedule.is_enabled ? t('schedules.enabled') : t('schedules.disabled')}
+                      </Badge>
                     </div>
-                  )}
-                  {schedule.next_run_at && (
-                    <div className="flex items-center text-gray-600 dark:text-gray-400">
-                      <Calendar className="w-4 h-4 mr-2" />
-                      <span>{t('schedules.nextRun')}: {new Date(schedule.next_run_at).toLocaleString()}</span>
-                    </div>
-                  )}
-                </div>
 
-                <div className="flex space-x-2">
-                  {schedule.includes_database && (
-                    <span className="px-2 py-1 bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 rounded text-xs">
-                      {t('backups.includes.database')}
-                    </span>
-                  )}
-                  {schedule.includes_storage && (
-                    <span className="px-2 py-1 bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 rounded text-xs">
-                      {t('backups.includes.storage')}
-                    </span>
-                  )}
-                  {schedule.includes_config && (
-                    <span className="px-2 py-1 bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400 rounded text-xs">
-                      {t('backups.includes.config')}
-                    </span>
-                  )}
-                </div>
+                    <dl className="space-y-1.5 text-sm">
+                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                        <History className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                        <dt>{t('schedules.retention')}:</dt>
+                        <dd className="tabular-nums text-gray-900 dark:text-gray-200">
+                          {schedule.retention_days} {t('common:time.days')}
+                        </dd>
+                      </div>
+                      {schedule.last_run_at && (
+                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                          <Clock className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                          <dt>{t('schedules.lastRun')}:</dt>
+                          <dd className="tabular-nums text-gray-900 dark:text-gray-200">
+                            {new Date(schedule.last_run_at).toLocaleString()}
+                          </dd>
+                        </div>
+                      )}
+                      {schedule.next_run_at && (
+                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                          <CalendarClock className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                          <dt>{t('schedules.nextRun')}:</dt>
+                          <dd className="tabular-nums text-gray-900 dark:text-gray-200">
+                            {new Date(schedule.next_run_at).toLocaleString()}
+                          </dd>
+                        </div>
+                      )}
+                    </dl>
 
-                <div className="flex justify-end space-x-2 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <button
-                    onClick={() => handleEditSchedule(schedule)}
-                    className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 rounded transition-colors"
-                  >
-                    {t('schedules.actions.edit')}
-                  </button>
-                  <button
-                    onClick={() => handleDeleteSchedule(schedule.id)}
-                    className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded transition-colors"
-                  >
-                    {t('schedules.actions.delete')}
-                  </button>
+                    {includeBadges(schedule)}
+                  </div>
+
+                  <div className="flex justify-end gap-2 border-t border-gray-100 bg-gray-50/70 px-5 py-3 dark:border-gray-800 dark:bg-white/[0.02]">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteSchedule(schedule)}
+                      leftIcon={<Trash2 className="h-4 w-4" />}
+                      className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300"
+                    >
+                      {t('schedules.actions.delete')}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleEditSchedule(schedule)}
+                      leftIcon={<Pencil className="h-4 w-4" />}
+                    >
+                      {t('schedules.actions.edit')}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </TabPanel>
 
@@ -527,27 +643,21 @@ export default function SystemAdmin() {
       <Modal
         open={showBackupModal}
         title={t('createBackupModal.title')}
+        icon={<Database className="h-4 w-4" />}
         onClose={() => setShowBackupModal(false)}
         size="sm"
         footer={
           <>
-            <button
-              onClick={() => setShowBackupModal(false)}
-              className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            >
+            <Button type="button" variant="secondary" onClick={() => setShowBackupModal(false)}>
               {t('createBackupModal.cancel')}
-            </button>
-            <button
-              onClick={handleCreateBackup}
-              disabled={isLoading}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
-            >
+            </Button>
+            <Button type="button" onClick={handleCreateBackup} isLoading={isLoading}>
               {isLoading ? t('createBackupModal.creatingButton') : t('createBackupModal.createButton')}
-            </button>
+            </Button>
           </>
         }
       >
-        <div className="space-y-4">
+        <div className="space-y-1">
           <Input
             label={t('createBackupModal.nameLabel')}
             type="text"
@@ -556,34 +666,25 @@ export default function SystemAdmin() {
             placeholder={t('createBackupModal.namePlaceholder')}
           />
 
-          <div className="space-y-3">
-            <label className="flex items-center cursor-pointer">
-              <input
-                type="checkbox"
+          <div>
+            <p className={fieldLabelClass()}>{t('createBackupModal.includesLabel')}</p>
+            <div className="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 dark:divide-gray-800 dark:border-gray-800">
+              <IncludeOption
                 checked={backupForm.includes_database}
-                onChange={(e) => setBackupForm({ ...backupForm, includes_database: e.target.checked })}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-gray-600 dark:focus:ring-blue-600"
+                onChange={(checked) => setBackupForm({ ...backupForm, includes_database: checked })}
+                label={t('createBackupModal.includeDatabase')}
               />
-              <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">{t('createBackupModal.includeDatabase')}</span>
-            </label>
-            <label className="flex items-center cursor-pointer">
-              <input
-                type="checkbox"
+              <IncludeOption
                 checked={backupForm.includes_storage}
-                onChange={(e) => setBackupForm({ ...backupForm, includes_storage: e.target.checked })}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-gray-600 dark:focus:ring-blue-600"
+                onChange={(checked) => setBackupForm({ ...backupForm, includes_storage: checked })}
+                label={t('createBackupModal.includeStorage')}
               />
-              <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">{t('createBackupModal.includeStorage')}</span>
-            </label>
-            <label className="flex items-center cursor-pointer">
-              <input
-                type="checkbox"
+              <IncludeOption
                 checked={backupForm.includes_config}
-                onChange={(e) => setBackupForm({ ...backupForm, includes_config: e.target.checked })}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-gray-600 dark:focus:ring-blue-600"
+                onChange={(checked) => setBackupForm({ ...backupForm, includes_config: checked })}
+                label={t('createBackupModal.includeConfig')}
               />
-              <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">{t('createBackupModal.includeConfig')}</span>
-            </label>
+            </div>
           </div>
         </div>
       </Modal>
@@ -592,33 +693,21 @@ export default function SystemAdmin() {
       <Modal
         open={showScheduleModal}
         title={selectedSchedule ? t('scheduleModal.titleEdit') : t('scheduleModal.titleCreate')}
-        onClose={() => {
-          setShowScheduleModal(false);
-          setSelectedSchedule(null);
-        }}
+        icon={<CalendarClock className="h-4 w-4" />}
+        onClose={closeScheduleModal}
         size="md"
         footer={
           <>
-            <button
-              onClick={() => {
-                setShowScheduleModal(false);
-                setSelectedSchedule(null);
-              }}
-              className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            >
+            <Button type="button" variant="secondary" onClick={closeScheduleModal}>
               {t('scheduleModal.cancel')}
-            </button>
-            <button
-              onClick={handleCreateSchedule}
-              disabled={isLoading}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
-            >
+            </Button>
+            <Button type="button" onClick={handleCreateSchedule} isLoading={isLoading}>
               {isLoading ? t('scheduleModal.savingButton') : selectedSchedule ? t('scheduleModal.updateButton') : t('scheduleModal.createButton')}
-            </button>
+            </Button>
           </>
         }
       >
-        <div className="space-y-4">
+        <div className="space-y-1">
           <Input
             label={t('scheduleModal.nameLabel')}
             type="text"
@@ -627,61 +716,50 @@ export default function SystemAdmin() {
             placeholder={t('scheduleModal.namePlaceholder')}
           />
 
-          <Input
-            label={t('scheduleModal.cronLabel')}
-            type="text"
-            value={scheduleForm.cron_expression}
-            onChange={(e) => setScheduleForm({ ...scheduleForm, cron_expression: e.target.value })}
-            placeholder={t('scheduleModal.cronPlaceholder')}
-            helperText={t('scheduleModal.cronHelperText')}
-            className="font-mono text-sm"
-          />
+          <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-3">
+            <div className="sm:col-span-2">
+              <Input
+                label={t('scheduleModal.cronLabel')}
+                type="text"
+                value={scheduleForm.cron_expression}
+                onChange={(e) => setScheduleForm({ ...scheduleForm, cron_expression: e.target.value })}
+                placeholder={t('scheduleModal.cronPlaceholder')}
+                helperText={t('scheduleModal.cronHelperText')}
+                className="font-mono text-sm"
+              />
+            </div>
 
-          <Input
-            label={t('scheduleModal.retentionLabel')}
-            type="number"
-            value={scheduleForm.retention_days}
-            onChange={(e) => setScheduleForm({ ...scheduleForm, retention_days: parseInt(e.target.value) })}
-            min="1"
-          />
+            <Input
+              label={t('scheduleModal.retentionLabel')}
+              type="number"
+              value={scheduleForm.retention_days}
+              onChange={(e) => setScheduleForm({ ...scheduleForm, retention_days: parseInt(e.target.value) })}
+              min="1"
+              className="tabular-nums"
+            />
+          </div>
 
-          <div className="space-y-3">
-            <label className="flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={scheduleForm.is_enabled}
-                onChange={(e) => setScheduleForm({ ...scheduleForm, is_enabled: e.target.checked })}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-gray-600 dark:focus:ring-blue-600"
-              />
-              <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">{t('scheduleModal.enableSchedule')}</span>
-            </label>
-            <label className="flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={scheduleForm.includes_database}
-                onChange={(e) => setScheduleForm({ ...scheduleForm, includes_database: e.target.checked })}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-gray-600 dark:focus:ring-blue-600"
-              />
-              <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">{t('scheduleModal.includeDatabase')}</span>
-            </label>
-            <label className="flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={scheduleForm.includes_storage}
-                onChange={(e) => setScheduleForm({ ...scheduleForm, includes_storage: e.target.checked })}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-gray-600 dark:focus:ring-blue-600"
-              />
-              <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">{t('scheduleModal.includeStorage')}</span>
-            </label>
-            <label className="flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={scheduleForm.includes_config}
-                onChange={(e) => setScheduleForm({ ...scheduleForm, includes_config: e.target.checked })}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-gray-600 dark:focus:ring-blue-600"
-              />
-              <span className="ml-3 text-sm text-gray-700 dark:text-gray-300">{t('scheduleModal.includeConfig')}</span>
-            </label>
+          <div className="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 dark:divide-gray-800 dark:border-gray-800">
+            <IncludeOption
+              checked={scheduleForm.is_enabled}
+              onChange={(checked) => setScheduleForm({ ...scheduleForm, is_enabled: checked })}
+              label={t('scheduleModal.enableSchedule')}
+            />
+            <IncludeOption
+              checked={scheduleForm.includes_database}
+              onChange={(checked) => setScheduleForm({ ...scheduleForm, includes_database: checked })}
+              label={t('scheduleModal.includeDatabase')}
+            />
+            <IncludeOption
+              checked={scheduleForm.includes_storage}
+              onChange={(checked) => setScheduleForm({ ...scheduleForm, includes_storage: checked })}
+              label={t('scheduleModal.includeStorage')}
+            />
+            <IncludeOption
+              checked={scheduleForm.includes_config}
+              onChange={(checked) => setScheduleForm({ ...scheduleForm, includes_config: checked })}
+              label={t('scheduleModal.includeConfig')}
+            />
           </div>
         </div>
       </Modal>

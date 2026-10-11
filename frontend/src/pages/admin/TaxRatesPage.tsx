@@ -1,12 +1,21 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Edit2, Trash2, Star } from 'lucide-react';
+import { Plus, Pencil, Percent, Trash2, Star } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useTaxRates, useDeleteTaxRate, useSetDefaultTaxRate } from '../../hooks/api/useTaxRates';
 import { Button } from '../../components/common/Button';
 import { Alert } from '../../components/common/Alert';
+import { Badge } from '../../components/common/Badge';
+import { EmptyState } from '../../components/common/EmptyState';
+import { SkeletonItem } from '../../components/common/Skeleton';
 import { Table, Column } from '../../components/common/Table';
+import { SettingsHeader } from '../../components/admin/SettingsSection';
 import TaxRateFormModal from '../../components/admin/TaxRateFormModal';
 import { TaxRate } from '../../api/types';
+import { toast } from '../../lib/toast';
+import { confirmDialog } from '../../lib/confirm';
+
+const iconButton =
+  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500';
 
 /**
  * Admin page for managing tax rates.
@@ -16,7 +25,6 @@ const TaxRatesPage: React.FC = () => {
   const { t } = useTranslation('settings');
   const [showModal, setShowModal] = useState(false);
   const [editingRate, setEditingRate] = useState<TaxRate | null>(null);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const { data: taxRates, isLoading, error } = useTaxRates(false);
   const deleteMutation = useDeleteTaxRate();
@@ -33,36 +41,37 @@ const TaxRatesPage: React.FC = () => {
   };
 
   const handleDelete = async (rate: TaxRate) => {
-    if (!window.confirm(t('admin.taxRates.deleteConfirm', { name: rate.name }))) {
+    const confirmed = await confirmDialog({
+      title: t('admin.taxRates.deleteTitle'),
+      message: t('admin.taxRates.deleteConfirm', { name: rate.name }),
+      tone: 'danger',
+      confirmLabel: t('common:buttons.delete'),
+    });
+    if (!confirmed) {
       return;
     }
 
     try {
       await deleteMutation.mutateAsync(rate.id);
-      setMessage({ type: 'success', text: t('admin.taxRates.deleteSuccess') });
-      setTimeout(() => setMessage(null), 3000);
+      toast.success(t('admin.taxRates.deleteSuccess'));
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.response?.data?.message || t('admin.taxRates.deleteError') });
-      setTimeout(() => setMessage(null), 5000);
+      toast.error(t('admin.taxRates.deleteError'), { description: err.response?.data?.message });
     }
   };
 
   const handleSetDefault = async (rate: TaxRate) => {
     try {
       await setDefaultMutation.mutateAsync(rate.id);
-      setMessage({ type: 'success', text: t('admin.taxRates.setDefaultSuccess', { name: rate.name }) });
-      setTimeout(() => setMessage(null), 3000);
+      toast.success(t('admin.taxRates.setDefaultSuccess', { name: rate.name }));
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.response?.data?.message || t('admin.taxRates.setDefaultError') });
-      setTimeout(() => setMessage(null), 5000);
+      toast.error(t('admin.taxRates.setDefaultError'), { description: err.response?.data?.message });
     }
   };
 
   const handleModalSuccess = (successMessage: string) => {
     setShowModal(false);
     setEditingRate(null);
-    setMessage({ type: 'success', text: successMessage });
-    setTimeout(() => setMessage(null), 3000);
+    toast.success(successMessage);
   };
 
   const columns: Column<TaxRate>[] = useMemo(() => [
@@ -71,12 +80,12 @@ const TaxRatesPage: React.FC = () => {
       accessorKey: 'name',
       header: t('admin.taxRates.name'),
       render: (rate) => (
-        <div>
-          <div className="text-sm font-medium text-gray-900 dark:text-white">
+        <div className="min-w-0">
+          <div className="font-medium text-gray-900 dark:text-white">
             {rate.name}
           </div>
           {rate.description && (
-            <div className="text-sm text-gray-500 dark:text-gray-400">
+            <div className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
               {rate.description}
             </div>
           )}
@@ -88,8 +97,9 @@ const TaxRatesPage: React.FC = () => {
       key: 'rate',
       accessorKey: 'rate',
       header: t('admin.taxRates.rate'),
+      align: 'right',
       render: (rate) => (
-        <span className="text-sm text-gray-900 dark:text-white">
+        <span className="font-medium tabular-nums text-gray-900 dark:text-white">
           {parseFloat(rate.rate as any).toFixed(2)}%
         </span>
       ),
@@ -100,9 +110,11 @@ const TaxRatesPage: React.FC = () => {
       accessorKey: 'country_code',
       header: t('admin.taxRates.country'),
       render: (rate) => (
-        <span className="text-sm text-gray-900 dark:text-white">
-          {rate.country_code || '-'}
-        </span>
+        rate.country_code ? (
+          <span className="font-mono text-xs text-gray-700 dark:text-gray-300">{rate.country_code}</span>
+        ) : (
+          <span className="text-gray-400 dark:text-gray-500">—</span>
+        )
       ),
       sortable: true,
     },
@@ -111,15 +123,9 @@ const TaxRatesPage: React.FC = () => {
       accessorKey: 'is_active',
       header: t('admin.taxRates.status'),
       render: (rate) => (
-        <span
-          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-            rate.is_active
-              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-              : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-          }`}
-        >
+        <Badge variant={rate.is_active ? 'green' : 'gray'} dot>
           {rate.is_active ? t('admin.taxRates.active') : t('admin.taxRates.inactive')}
-        </span>
+        </Badge>
       ),
       sortable: true,
     },
@@ -127,16 +133,21 @@ const TaxRatesPage: React.FC = () => {
       key: 'default',
       accessorKey: 'is_default',
       header: t('admin.taxRates.default'),
+      align: 'center',
       render: (rate) => (
         rate.is_default ? (
-          <Star className="w-5 h-5 text-yellow-500 fill-current" />
+          <span className="inline-flex h-8 w-8 items-center justify-center" title={t('admin.taxRates.default')}>
+            <Star className="h-4 w-4 fill-amber-400 text-amber-500" aria-label={t('admin.taxRates.default')} />
+          </span>
         ) : (
           <button
+            type="button"
             onClick={() => handleSetDefault(rate)}
-            className="text-gray-400 hover:text-yellow-500 transition-colors"
+            className={`${iconButton} hover:bg-amber-50 hover:text-amber-500 dark:text-gray-500 dark:hover:bg-amber-500/10 dark:hover:text-amber-400`}
             title={t('admin.taxRates.setDefault')}
+            aria-label={t('admin.taxRates.setDefault')}
           >
-            <Star className="w-5 h-5" />
+            <Star className="h-4 w-4" />
           </button>
         )
       ),
@@ -144,72 +155,81 @@ const TaxRatesPage: React.FC = () => {
     },
     {
       key: 'actions',
-      header: t('admin.taxRates.actions'),
+      header: <span className="sr-only">{t('admin.taxRates.actions')}</span>,
       align: 'right',
       render: (rate) => (
-        <div className="flex justify-end space-x-4">
+        <div className="flex justify-end gap-1">
           <button
+            type="button"
             onClick={() => handleEdit(rate)}
-            className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+            className={`${iconButton} hover:bg-gray-100 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-200`}
+            title={t('common:buttons.edit')}
+            aria-label={t('common:buttons.edit')}
           >
-            <Edit2 className="w-4 h-4" />
+            <Pencil className="h-4 w-4" />
           </button>
           <button
+            type="button"
             onClick={() => handleDelete(rate)}
-            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+            className={`${iconButton} hover:bg-red-50 hover:text-red-600 dark:text-gray-500 dark:hover:bg-red-500/10 dark:hover:text-red-400`}
+            title={t('common:buttons.delete')}
+            aria-label={t('common:buttons.delete')}
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="h-4 w-4" />
           </button>
         </div>
       ),
     },
   ], [t]);
 
+  const header = (
+    <SettingsHeader
+      title={t('admin.taxRates.title')}
+      description={t('admin.taxRates.subtitle')}
+      actions={
+        <Button type="button" onClick={handleAdd} leftIcon={<Plus className="h-4 w-4" />}>
+          {t('admin.taxRates.addButton')}
+        </Button>
+      }
+    />
+  );
+
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="space-y-6" aria-busy="true">
+        {header}
+        <div className="surface divide-y divide-gray-100 overflow-hidden dark:divide-gray-800">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-6 px-5 py-4">
+              <SkeletonItem className="h-4 w-48" />
+              <SkeletonItem className="ml-auto h-4 w-16" />
+              <SkeletonItem className="h-5 w-16 rounded-full" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="container mx-auto px-4 py-8">
+      <div className="space-y-6">
+        {header}
         <Alert type="error" message={t('admin.taxRates.loadError')} />
       </div>
     );
   }
 
   return (
-    <>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{t('admin.taxRates.title')}</h2>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            {t('admin.taxRates.subtitle')}
-          </p>
-        </div>
-        <Button onClick={handleAdd} variant="primary">
-          <Plus className="w-4 h-4 mr-2" />
-          {t('admin.taxRates.addButton')}
-        </Button>
-      </div>
+    <div className="space-y-6">
+      {header}
 
-      {message && (
-        <div className="mb-4">
-          <Alert type={message.type} message={message.text} />
-        </div>
-      )}
-
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        <Table
-          data={taxRates || []}
-          columns={columns}
-          emptyMessage={t('admin.taxRates.noRatesMessage')}
-          pageSize={10}
-        />
-      </div>
+      <Table
+        data={taxRates || []}
+        columns={columns}
+        emptyMessage={<EmptyState compact icon={Percent} title={t('admin.taxRates.noRatesMessage')} />}
+        pageSize={10}
+      />
 
       {showModal && (
         <TaxRateFormModal
@@ -222,7 +242,7 @@ const TaxRatesPage: React.FC = () => {
           onSuccess={handleModalSuccess}
         />
       )}
-    </>
+    </div>
   );
 };
 

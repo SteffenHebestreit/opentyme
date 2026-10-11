@@ -90,7 +90,30 @@
       "aboutItem2": "New expense entries",
       "aboutItem3": "Financial summary displays (when no specific currency is set)",
       "aboutItem4": "Payment recording forms",
-      "aboutOverride": "You can override this setting on individual transactions when needed."
+      "aboutOverride": "You can override this setting on individual transactions when needed.",
+      "companyInfoHint": "Appears on all generated invoices and documents — keep it up to date.",
+      "companyName": "Company Name",
+      "companyNamePlaceholder": "Your Company Ltd.",
+      "companyTaglinePlaceholder": "Professional Services",
+      "addressPlaceholder": "123 Main Street\n12345 City, Country",
+      "taxContactInfoHint": "Tax ID and contact details shown on your documents.",
+      "email": "Email",
+      "phone": "Phone",
+      "website": "Website",
+      "logoAlt": "Company logo",
+      "regionFormats": "Region & formats",
+      "invoiceLanguageLabel": "Invoice PDF number & date format",
+      "invoiceLanguageHint": "Controls how dates and amounts are formatted on generated invoice PDFs.",
+      "providerOpenAICompat": "OpenAI-compatible (local / LM Studio / vLLM)",
+      "providerCustom": "Custom",
+      "modelPlaceholder": "e.g. gpt-4o, llama-3.3-70b, claude-opus-4-6",
+      "apiBaseUrlPlaceholder": "http://localhost:11434/v1  (leave blank for OpenAI default)",
+      "sttFasterWhisper": "faster-whisper (recommended)",
+      "sttWhisperServer": "OpenAI-compat (fast-whisper server)",
+      "sttCustom": "Custom OpenAI-compat",
+      "sttApiKeyPlaceholder": "Leave blank if not required",
+      "unsavedChanges": "Unsaved changes",
+      "saveHint": "Changes take effect once saved."
     },
     "ai": {
       "title": "AI Integration",
@@ -152,7 +175,8 @@
         "createSuccess": "Tax rate created successfully",
         "updateSuccess": "Tax rate updated successfully",
         "operationError": "Operation failed"
-      }
+      },
+      "deleteTitle": "Delete tax rate?"
     },
     "templates": {
       "title": "Invoice Text Templates",
@@ -200,7 +224,8 @@
         "createSuccess": "Template created successfully",
         "updateSuccess": "Template updated successfully",
         "operationError": "Operation failed"
-      }
+      },
+      "deleteTitle": "Delete template?"
     },
     "tabs": {
       "general": "General Settings",
@@ -208,7 +233,8 @@
       "templates": "Invoice Templates",
       "emailTemplates": "Email Templates",
       "email": "Email",
-      "theme": "Theme"
+      "theme": "Theme",
+      "plugins": "Addons"
     },
     "email": {
       "title": "Email Settings",
@@ -230,7 +256,12 @@
       "sendTest": "Send Test",
       "sending": "Sending...",
       "testSuccess": "Test email sent to {{to}}",
-      "testError": "Failed to send test email."
+      "testError": "Failed to send test email.",
+      "serverTitle": "SMTP server",
+      "serverHint": "Mail server used to send invoices, reminders and reports.",
+      "notificationsTitle": "Notifications",
+      "overdueRemindersHint": "When enabled, OpenTYME emails you a daily digest of your overdue invoices. Requires SMTP above to be configured.",
+      "overdueReminders": "Email me about overdue invoices"
     },
     "theme": {
       "title": "Output Theme",
@@ -253,12 +284,61 @@
       "saving": "Saving...",
       "reset": "Reset Defaults",
       "saveSuccess": "Theme saved successfully.",
-      "saveError": "Failed to save theme."
+      "saveError": "Failed to save theme.",
+      "previewHint": "How the colours appear on generated documents."
+    },
+    "navLabel": "Settings sections",
+    "navGroups": {
+      "business": "Business",
+      "communication": "Communication",
+      "appearance": "Appearance",
+      "extensions": "Extensions"
+    },
+    "plugins": {
+      "title": "Addons",
+      "subtitle": "Manage installed addons. Click an addon to view details and configure its settings.",
+      "total": "Total",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "statusEnabled": "Enabled",
+      "statusDisabled": "Disabled",
+      "empty": "No addons installed.",
+      "emptyHint": "Installed addons appear here.",
+      "openDetails": "Open details for {{name}}",
+      "enable": "Enable addon",
+      "disable": "Disable addon",
+      "backend": "Backend",
+      "frontend": "Frontend",
+      "settings": "Settings",
+      "backendApi": "Backend API",
+      "frontendUi": "Frontend UI",
+      "userSettings": "User settings",
+      "saveSettings": "Save settings",
+      "settingsSaved": "Settings saved.",
+      "settingsSaveError": "Failed to save settings.",
+      "toggleError": "Could not change the addon status.",
+      "loadError": "Failed to load addons"
     }
   },
   "messages": {
     "updateSuccess": "Settings updated successfully",
     "updateError": "Failed to update settings",
     "passwordChangeSuccess": "Password changed successfully"
+  },
+  "profilePage": {
+    "title": "My profile",
+    "subtitle": "View and manage your account information",
+    "accountDetails": "Account details",
+    "accountDetailsHint": "Read-only — synchronized from your Keycloak account.",
+    "email": "Email address",
+    "username": "Username",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "userId": "User ID",
+    "security": "Account security",
+    "securityHint": "Update your password through Keycloak's secure authentication system.",
+    "changePassword": "Change password",
+    "keycloakTitle": "Authentication managed by Keycloak",
+    "keycloakText": "Your account information is managed through Keycloak. Profile details are read-only and synchronized from your Keycloak account. To change your password or enable two-factor authentication, click \"Change password\" above."
   }
 }

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Edit2, Trash2, Star, Filter } from 'lucide-react';
+import { Plus, Pencil, Trash2, Star, Filter, FileText } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   useInvoiceTextTemplates,
@@ -7,10 +7,19 @@ import {
 } from '../../hooks/api/useInvoiceTextTemplates';
 import { Button } from '../../components/common/Button';
 import { Alert } from '../../components/common/Alert';
+import { Badge } from '../../components/common/Badge';
+import { EmptyState } from '../../components/common/EmptyState';
+import { SkeletonItem } from '../../components/common/Skeleton';
 import { Table, Column } from '../../components/common/Table';
 import { CustomSelect } from '../../components/forms';
+import { SettingsHeader } from '../../components/admin/SettingsSection';
 import InvoiceTextTemplateFormModal from '../../components/admin/InvoiceTextTemplateFormModal';
 import { InvoiceTextTemplate, TemplateCategory } from '../../api/types';
+import { toast } from '../../lib/toast';
+import { confirmDialog } from '../../lib/confirm';
+
+const iconButton =
+  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500';
 
 /**
  * Admin page for managing invoice text templates.
@@ -21,7 +30,6 @@ const InvoiceTemplatesPage: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<InvoiceTextTemplate | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<TemplateCategory | ''>('');
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const TEMPLATE_CATEGORIES: { value: TemplateCategory | ''; label: string }[] = [
     { value: '', label: t('admin.templates.allCategories') },
@@ -50,25 +58,28 @@ const InvoiceTemplatesPage: React.FC = () => {
   };
 
   const handleDelete = async (template: InvoiceTextTemplate) => {
-    if (!window.confirm(t('admin.templates.deleteConfirm', { name: template.name }))) {
+    const confirmed = await confirmDialog({
+      title: t('admin.templates.deleteTitle'),
+      message: t('admin.templates.deleteConfirm', { name: template.name }),
+      tone: 'danger',
+      confirmLabel: t('common:buttons.delete'),
+    });
+    if (!confirmed) {
       return;
     }
 
     try {
       await deleteMutation.mutateAsync(template.id);
-      setMessage({ type: 'success', text: t('admin.templates.deleteSuccess') });
-      setTimeout(() => setMessage(null), 3000);
+      toast.success(t('admin.templates.deleteSuccess'));
     } catch (err: any) {
-      setMessage({ type: 'error', text: err.response?.data?.message || t('admin.templates.deleteError') });
-      setTimeout(() => setMessage(null), 5000);
+      toast.error(t('admin.templates.deleteError'), { description: err.response?.data?.message });
     }
   };
 
   const handleModalSuccess = (successMessage: string) => {
     setShowModal(false);
     setEditingTemplate(null);
-    setMessage({ type: 'success', text: successMessage });
-    setTimeout(() => setMessage(null), 3000);
+    toast.success(successMessage);
   };
 
   const getCategoryLabel = (category: TemplateCategory): string => {
@@ -82,11 +93,11 @@ const InvoiceTemplatesPage: React.FC = () => {
       accessorKey: 'name',
       header: t('admin.templates.name'),
       render: (template) => (
-        <div>
-          <div className="text-sm font-medium text-gray-900 dark:text-white">
+        <div className="min-w-0">
+          <div className="font-medium text-gray-900 dark:text-white">
             {template.name}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400 max-w-md truncate">
+          <div className="mt-0.5 max-w-md truncate text-xs text-gray-500 dark:text-gray-400">
             {template.content.substring(0, 100)}
             {template.content.length > 100 && '...'}
           </div>
@@ -99,9 +110,7 @@ const InvoiceTemplatesPage: React.FC = () => {
       accessorKey: 'category',
       header: t('admin.templates.category'),
       render: (template) => (
-        <span className="text-sm text-gray-900 dark:text-white">
-          {getCategoryLabel(template.category)}
-        </span>
+        <Badge variant="purple">{getCategoryLabel(template.category)}</Badge>
       ),
       sortable: true,
     },
@@ -110,7 +119,7 @@ const InvoiceTemplatesPage: React.FC = () => {
       accessorKey: 'language',
       header: t('admin.templates.language'),
       render: (template) => (
-        <span className="text-sm text-gray-900 dark:text-white">
+        <span className="font-mono text-xs text-gray-700 dark:text-gray-300">
           {template.language.toUpperCase()}
         </span>
       ),
@@ -121,15 +130,9 @@ const InvoiceTemplatesPage: React.FC = () => {
       accessorKey: 'is_active',
       header: t('admin.templates.status'),
       render: (template) => (
-        <span
-          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-            template.is_active
-              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-              : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-          }`}
-        >
+        <Badge variant={template.is_active ? 'green' : 'gray'} dot>
           {template.is_active ? t('admin.templates.active') : t('admin.templates.inactive')}
-        </span>
+        </Badge>
       ),
       sortable: true,
     },
@@ -137,88 +140,108 @@ const InvoiceTemplatesPage: React.FC = () => {
       key: 'default',
       accessorKey: 'is_default',
       header: t('admin.templates.default'),
+      align: 'center',
       render: (template) => (
         template.is_default ? (
-          <Star className="w-5 h-5 text-yellow-500 fill-current" />
+          <Star
+            className="mx-auto h-4 w-4 fill-amber-400 text-amber-500"
+            aria-label={t('admin.templates.default')}
+          />
         ) : null
       ),
       sortable: true,
     },
     {
       key: 'actions',
-      header: t('admin.templates.actions'),
+      header: <span className="sr-only">{t('admin.templates.actions')}</span>,
       align: 'right',
       render: (template) => (
-        <div className="flex justify-end space-x-4">
+        <div className="flex justify-end gap-1">
           <button
+            type="button"
             onClick={() => handleEdit(template)}
-            className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+            className={`${iconButton} hover:bg-gray-100 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-200`}
+            title={t('common:buttons.edit')}
+            aria-label={t('common:buttons.edit')}
           >
-            <Edit2 className="w-4 h-4" />
+            <Pencil className="h-4 w-4" />
           </button>
           <button
+            type="button"
             onClick={() => handleDelete(template)}
-            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+            className={`${iconButton} hover:bg-red-50 hover:text-red-600 dark:text-gray-500 dark:hover:bg-red-500/10 dark:hover:text-red-400`}
+            title={t('common:buttons.delete')}
+            aria-label={t('common:buttons.delete')}
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="h-4 w-4" />
           </button>
         </div>
       ),
     },
   ], [t]);
 
+  const header = (
+    <SettingsHeader
+      title={t('admin.templates.title')}
+      description={t('admin.templates.subtitle')}
+      actions={
+        <Button type="button" onClick={handleAdd} leftIcon={<Plus className="h-4 w-4" />}>
+          {t('admin.templates.addButton')}
+        </Button>
+      }
+    />
+  );
+
+  const filter = (
+    <div className="flex items-center gap-2">
+      <Filter className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+      <div className="w-full sm:w-64">
+        <CustomSelect
+          value={selectedCategory}
+          onChange={(value) => setSelectedCategory(value as TemplateCategory | '')}
+          options={TEMPLATE_CATEGORIES}
+          size="md"
+        />
+      </div>
+    </div>
+  );
+
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="space-y-6" aria-busy="true">
+        {header}
+        <div className="surface divide-y divide-gray-100 overflow-hidden dark:divide-gray-800">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="space-y-2 px-5 py-4">
+              <SkeletonItem className="h-4 w-48" />
+              <SkeletonItem className="h-3 w-80 max-w-full" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <Alert type="error" message={t('admin.templates.loadError')} />
+      <div className="space-y-6">
+        {header}
+        <Alert type="error" message={t('admin.templates.loadError')} />
+      </div>
     );
   }
 
   return (
-    <>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{t('admin.templates.title')}</h2>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            {t('admin.templates.subtitle')}
-          </p>
-        </div>
-        <Button onClick={handleAdd} variant="primary">
-          <Plus className="w-4 h-4 mr-2" />
-          {t('admin.templates.addButton')}
-        </Button>
-      </div>
+    <div className="space-y-6">
+      {header}
 
-      {message && (
-        <div className="mb-4">
-          <Alert type={message.type} message={message.text} />
-        </div>
-      )}
+      <div className="space-y-4">
+        {filter}
 
-      <div className="mb-4 flex items-center space-x-2">
-        <Filter className="w-5 h-5 text-gray-500" />
-        <div className="w-64">
-          <CustomSelect
-            value={selectedCategory}
-            onChange={(value) => setSelectedCategory(value as TemplateCategory | '')}
-            options={TEMPLATE_CATEGORIES}
-            size="md"
-          />
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
         <Table
           data={templates || []}
           columns={columns}
-          emptyMessage={t('admin.templates.noTemplatesMessage')}
+          emptyMessage={<EmptyState compact icon={FileText} title={t('admin.templates.noTemplatesMessage')} />}
           pageSize={10}
         />
       </div>
@@ -234,7 +257,7 @@ const InvoiceTemplatesPage: React.FC = () => {
           onSuccess={handleModalSuccess}
         />
       )}
-    </>
+    </div>
   );
 };
 

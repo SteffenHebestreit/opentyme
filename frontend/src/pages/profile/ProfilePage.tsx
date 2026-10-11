@@ -1,10 +1,37 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { IdCard, KeyRound, ShieldCheck, UserRound } from 'lucide-react';
 import { Button } from '../../components/common/Button';
-import { Input } from '../../components/forms/Input';
+import { Alert } from '../../components/common/Alert';
+import { PageHeader } from '../../components/common/PageHeader';
+import { SkeletonItem } from '../../components/common/Skeleton';
+import { SettingsSection } from '../../components/admin/SettingsSection';
 import { useAuth } from '../../contexts/AuthContext';
 import { keycloak } from '../../config/keycloak.config';
+import { cn } from '../../lib/cn';
+
+/** One read-only account attribute. */
+const Detail: React.FC<{ label: string; value: string; mono?: boolean; className?: string }> = ({
+  label,
+  value,
+  mono,
+  className,
+}) => (
+  <div className={cn('min-w-0', className)}>
+    <dt className="eyebrow">{label}</dt>
+    <dd
+      className={cn(
+        'mt-1 break-words text-sm text-gray-900 dark:text-gray-100',
+        mono && 'break-all font-mono text-xs text-gray-700 dark:text-gray-300'
+      )}
+    >
+      {value}
+    </dd>
+  </div>
+);
 
 const ProfilePage: React.FC = () => {
+  const { t } = useTranslation('settings');
   const { user, isLoadingAuth } = useAuth();
 
   const handleChangePassword = () => {
@@ -19,144 +46,83 @@ const ProfilePage: React.FC = () => {
 
   if (isLoadingAuth || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-lg text-gray-600 dark:text-gray-400">Loading...</div>
+      <div className="space-y-6" aria-busy="true">
+        <div className="space-y-2">
+          <SkeletonItem className="h-7 w-40" />
+          <SkeletonItem className="h-4 w-72" />
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <SkeletonItem className="h-56 rounded-xl" />
+          <SkeletonItem className="h-56 rounded-xl lg:col-span-2" />
+        </div>
       </div>
     );
   }
 
+  const initial = user.firstName?.[0] || user.username[0].toUpperCase();
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl w-full mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Profile</h1>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            View and manage your account information
-          </p>
+    <div className="space-y-6">
+      <PageHeader title={t('profilePage.title')} subtitle={t('profilePage.subtitle')} icon={UserRound} />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start">
+        {/* Identity */}
+        <div className="surface flex flex-col items-center px-6 py-8 text-center">
+          <div
+            className="flex h-20 w-20 items-center justify-center rounded-full bg-purple-50 text-3xl font-semibold text-purple-600 ring-1 ring-inset ring-purple-600/15 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20"
+            aria-hidden="true"
+          >
+            {initial}
+          </div>
+          <h2 className="mt-4 text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
+            {user.name || user.username}
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">@{user.username}</p>
+          {user.email && (
+            <p className="mt-3 max-w-full truncate text-sm text-gray-600 dark:text-gray-300">{user.email}</p>
+          )}
         </div>
 
-        {/* Profile Card */}
-        <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden">
-          {/* Profile Header */}
-          <div className="bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-8">
-            <div className="flex items-center space-x-4">
-              {/* Avatar */}
-              <div className="w-20 h-20 rounded-full bg-white dark:bg-gray-700 flex items-center justify-center text-3xl font-bold text-purple-600 dark:text-purple-400">
-                {user.firstName?.[0] || user.username[0].toUpperCase()}
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-white">
-                  {user.name || user.username}
-                </h2>
-                <p className="text-purple-100">@{user.username}</p>
-              </div>
-            </div>
-          </div>
-
+        <div className="space-y-6 lg:col-span-2">
           {/* Profile Details */}
-          <div className="px-6 py-8 space-y-6">
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Email Address
-              </label>
-              <Input
-                value={user.email}
-                disabled
-                type="email"
-              />
-            </div>
-
-            {/* Username */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Username
-              </label>
-              <Input
-                value={user.username}
-                disabled
-                type="text"
-              />
-            </div>
-
-            {/* First Name */}
-            {user.firstName && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  First Name
-                </label>
-                <Input
-                  value={user.firstName}
-                  disabled
-                  type="text"
-                />
-              </div>
-            )}
-
-            {/* Last Name */}
-            {user.lastName && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Last Name
-                </label>
-                <Input
-                  value={user.lastName}
-                  disabled
-                  type="text"
-                />
-              </div>
-            )}
-
-            {/* User ID */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                User ID
-              </label>
-              <Input
-                value={user.id}
-                disabled
-                type="text"
-              />
-            </div>
-          </div>
+          <SettingsSection
+            icon={IdCard}
+            title={t('profilePage.accountDetails')}
+            description={t('profilePage.accountDetailsHint')}
+          >
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+              <Detail label={t('profilePage.email')} value={user.email} />
+              <Detail label={t('profilePage.username')} value={user.username} />
+              {user.firstName && <Detail label={t('profilePage.firstName')} value={user.firstName} />}
+              {user.lastName && <Detail label={t('profilePage.lastName')} value={user.lastName} />}
+              <Detail label={t('profilePage.userId')} value={user.id} mono className="sm:col-span-2" />
+            </dl>
+          </SettingsSection>
 
           {/* Actions */}
-          <div className="px-6 py-4 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Account Security
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Update your password through Keycloak's secure authentication system
-                </p>
-              </div>
+          <SettingsSection
+            icon={ShieldCheck}
+            title={t('profilePage.security')}
+            description={t('profilePage.securityHint')}
+            footer={
               <Button
+                type="button"
                 onClick={handleChangePassword}
                 variant="primary"
+                leftIcon={<KeyRound className="h-4 w-4" />}
+                className="w-full sm:w-auto"
               >
-                Change Password
+                {t('profilePage.changePassword')}
               </Button>
-            </div>
-          </div>
+            }
+          />
 
           {/* Info Banner */}
-          <div className="px-6 py-4 bg-purple-50 dark:bg-purple-900/20 border-t border-purple-100 dark:border-purple-800">
-            <div className="flex items-start space-x-3">
-              <svg className="w-5 h-5 text-purple-600 dark:text-purple-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div className="flex-1">
-                <h4 className="text-sm font-medium text-purple-900 dark:text-purple-200">
-                  Authentication Managed by Keycloak
-                </h4>
-                <p className="mt-1 text-sm text-purple-700 dark:text-purple-300">
-                  Your account information is managed through Keycloak. Profile details are read-only and synchronized from your Keycloak account. To change your password or enable two-factor authentication, click "Change Password" above.
-                </p>
-              </div>
-            </div>
-          </div>
+          <Alert
+            type="info"
+            title={t('profilePage.keycloakTitle')}
+            message={t('profilePage.keycloakText')}
+          />
         </div>
       </div>
     </div>

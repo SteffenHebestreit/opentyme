@@ -5,11 +5,21 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { BellRing, MailCheck, Save, Send, Server } from 'lucide-react';
 import apiClient from '@/api/services/client';
 import { Button } from '@/components/common/Button';
 import { Alert } from '@/components/common/Alert';
-import { Input } from '@/components/forms/Input';
-import { Checkbox } from '@/components/forms/CheckboxRadioSwitch';
+import { fieldClasses } from '@/components/forms/fieldStyles';
+import {
+  SettingsCheckbox,
+  SettingsField,
+  SettingsHeader,
+  SettingsSaveBar,
+  SettingsSection,
+  SettingsSwitch,
+} from '@/components/admin/SettingsSection';
+import { toast } from '@/lib/toast';
+import { cn } from '@/lib/cn';
 
 interface SmtpSettings {
   smtp_enabled: boolean;
@@ -37,7 +47,6 @@ export default function EmailSettingsPage() {
   const [testEmail, setTestEmail] = useState('');
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [testMsg, setTestMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
@@ -59,7 +68,6 @@ export default function EmailSettingsPage() {
 
   const handleSave = async () => {
     setSaving(true);
-    setSaveMsg(null);
     try {
       const payload: Record<string, any> = {
         smtp_enabled: settings.smtp_enabled,
@@ -73,9 +81,9 @@ export default function EmailSettingsPage() {
       // Only send password if user typed something
       if (settings.smtp_pass) payload.smtp_pass = settings.smtp_pass;
       await apiClient.put('/settings', payload);
-      setSaveMsg({ type: 'success', text: t('admin.email.saveSuccess') });
+      toast.success(t('admin.email.saveSuccess'));
     } catch {
-      setSaveMsg({ type: 'error', text: t('admin.email.saveError') });
+      toast.error(t('admin.email.saveError'));
     } finally {
       setSaving(false);
     }
@@ -103,136 +111,167 @@ export default function EmailSettingsPage() {
     }
   };
 
+  const field = fieldClasses();
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-          {t('admin.email.title')}
-        </h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {t('admin.email.subtitle')}
-        </p>
-      </div>
+      <SettingsHeader title={t('admin.email.title')} description={t('admin.email.subtitle')} />
 
-      {/* Enable SMTP */}
-      <Checkbox
-        label={t('admin.email.enableSmtp')}
-        checked={settings.smtp_enabled}
-        onChange={(e) => setSettings((s) => ({ ...s, smtp_enabled: e.target.checked }))}
-      />
-
-      {/* SMTP fields */}
-      <div className={`grid grid-cols-1 gap-x-6 sm:grid-cols-2 transition-opacity ${!settings.smtp_enabled ? 'opacity-50 pointer-events-none' : ''}`}>
-        <Input
-          label={t('admin.email.host')}
-          value={settings.smtp_host}
-          onChange={(e) => setSettings((s) => ({ ...s, smtp_host: e.target.value }))}
-          placeholder="mailhog"
-        />
-        <Input
-          label={t('admin.email.port')}
-          type="number"
-          value={settings.smtp_port}
-          onChange={(e) => setSettings((s) => ({ ...s, smtp_port: parseInt(e.target.value) || 587 }))}
-          placeholder="587"
-        />
-        <Input
-          label={t('admin.email.user')}
-          value={settings.smtp_user}
-          onChange={(e) => setSettings((s) => ({ ...s, smtp_user: e.target.value }))}
-          placeholder="user@example.com"
-        />
-        <Input
-          label={t('admin.email.pass')}
-          type="password"
-          value={settings.smtp_pass}
-          onChange={(e) => setSettings((s) => ({ ...s, smtp_pass: e.target.value }))}
-          placeholder="••••••••"
-        />
-        <Input
-          label={t('admin.email.from')}
-          value={settings.smtp_from}
-          onChange={(e) => setSettings((s) => ({ ...s, smtp_from: e.target.value }))}
-          placeholder="noreply@example.com"
-        />
-        <div className="flex items-end pb-6">
-          <Checkbox
-            label={`${t('admin.email.secure')} (TLS/SSL)`}
-            checked={settings.smtp_secure}
-            onChange={(e) => setSettings((s) => ({ ...s, smtp_secure: e.target.checked }))}
-          />
+      {/* SMTP server */}
+      <SettingsSection
+        icon={Server}
+        title={t('admin.email.serverTitle')}
+        description={t('admin.email.serverHint')}
+        action={
+          <>
+            <label
+              htmlFor="smtp-enabled"
+              className="hidden cursor-pointer text-sm font-medium text-gray-600 sm:block dark:text-gray-300"
+            >
+              {t('admin.email.enableSmtp')}
+            </label>
+            <SettingsSwitch
+              id="smtp-enabled"
+              checked={settings.smtp_enabled}
+              onChange={(checked) => setSettings((s) => ({ ...s, smtp_enabled: checked }))}
+              label={t('admin.email.enableSmtp')}
+            />
+          </>
+        }
+      >
+        <div
+          className={cn(
+            'grid grid-cols-1 gap-5 transition-opacity duration-200 sm:grid-cols-2',
+            !settings.smtp_enabled && 'pointer-events-none opacity-50'
+          )}
+          aria-disabled={!settings.smtp_enabled || undefined}
+        >
+          <SettingsField label={t('admin.email.host')} htmlFor="smtp-host">
+            <input
+              id="smtp-host"
+              value={settings.smtp_host}
+              onChange={(e) => setSettings((s) => ({ ...s, smtp_host: e.target.value }))}
+              placeholder="mailhog"
+              className={field}
+            />
+          </SettingsField>
+          <SettingsField label={t('admin.email.port')} htmlFor="smtp-port">
+            <input
+              id="smtp-port"
+              type="number"
+              value={settings.smtp_port}
+              onChange={(e) => setSettings((s) => ({ ...s, smtp_port: parseInt(e.target.value) || 587 }))}
+              placeholder="587"
+              className={cn(field, 'tabular-nums')}
+            />
+          </SettingsField>
+          <SettingsField label={t('admin.email.user')} htmlFor="smtp-user">
+            <input
+              id="smtp-user"
+              value={settings.smtp_user}
+              onChange={(e) => setSettings((s) => ({ ...s, smtp_user: e.target.value }))}
+              placeholder="user@example.com"
+              className={field}
+            />
+          </SettingsField>
+          <SettingsField label={t('admin.email.pass')} htmlFor="smtp-pass">
+            <input
+              id="smtp-pass"
+              type="password"
+              value={settings.smtp_pass}
+              onChange={(e) => setSettings((s) => ({ ...s, smtp_pass: e.target.value }))}
+              placeholder="••••••••"
+              className={field}
+            />
+          </SettingsField>
+          <SettingsField label={t('admin.email.from')} htmlFor="smtp-from">
+            <input
+              id="smtp-from"
+              value={settings.smtp_from}
+              onChange={(e) => setSettings((s) => ({ ...s, smtp_from: e.target.value }))}
+              placeholder="noreply@example.com"
+              className={field}
+            />
+          </SettingsField>
+          <div className="flex items-end sm:pb-2.5">
+            <SettingsCheckbox
+              label={t('admin.email.secure')}
+              checked={settings.smtp_secure}
+              onChange={(e) => setSettings((s) => ({ ...s, smtp_secure: e.target.checked }))}
+            />
+          </div>
         </div>
-      </div>
+      </SettingsSection>
 
       {/* Notification preferences */}
-      <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
-          {t('admin.email.notificationsTitle', { defaultValue: 'Notifications' })}
-        </h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-          {t('admin.email.overdueRemindersHint', {
-            defaultValue:
-              'When enabled, OpenTYME emails you a daily digest of your overdue invoices. Requires SMTP above to be configured.',
-          })}
-        </p>
-        <Checkbox
-          label={t('admin.email.overdueReminders', { defaultValue: 'Email me about overdue invoices' })}
+      <SettingsSection
+        icon={BellRing}
+        title={t('admin.email.notificationsTitle')}
+        description={t('admin.email.overdueRemindersHint')}
+      >
+        <SettingsCheckbox
+          label={t('admin.email.overdueReminders')}
           checked={settings.overdue_reminders_enabled}
           onChange={(e) => setSettings((s) => ({ ...s, overdue_reminders_enabled: e.target.checked }))}
         />
-      </div>
+      </SettingsSection>
 
       {/* Save */}
-      <div>
-        <Button variant="primary" size="sm" isLoading={saving} onClick={handleSave}>
+      <SettingsSaveBar status={<span className="hidden sm:inline">{t('admin.general.saveHint')}</span>}>
+        <Button
+          type="button"
+          isLoading={saving}
+          onClick={handleSave}
+          leftIcon={<Save className="h-4 w-4" />}
+        >
           {t('admin.email.save')}
         </Button>
-        {saveMsg && (
-          <div className="mt-3">
-            <Alert type={saveMsg.type} message={saveMsg.text} />
-          </div>
-        )}
-      </div>
+      </SettingsSaveBar>
 
       {/* Test email section */}
-      <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
-          {t('admin.email.testTitle')}
-        </h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-          {t('admin.email.testSubtitle')}
-        </p>
-        <div className="flex items-end gap-3 max-w-lg">
-          <div className="flex-1">
-            <Input
-              label={t('admin.email.testRecipient')}
+      <SettingsSection
+        icon={MailCheck}
+        title={t('admin.email.testTitle')}
+        description={t('admin.email.testSubtitle')}
+      >
+        <div className="flex max-w-xl flex-col gap-3 sm:flex-row sm:items-end">
+          <SettingsField label={t('admin.email.testRecipient')} htmlFor="smtp-test-to" className="flex-1">
+            <input
+              id="smtp-test-to"
               type="email"
               value={testEmail}
               onChange={(e) => setTestEmail(e.target.value)}
               placeholder="you@example.com"
+              className={field}
             />
-          </div>
-          <div className="pb-6">
-            <Button
-              variant="primary"
-              size="sm"
-              isLoading={testing}
-              disabled={!testEmail}
-              onClick={handleTest}
-            >
-              {t('admin.email.sendTest')}
-            </Button>
-          </div>
+          </SettingsField>
+          <Button
+            type="button"
+            variant="secondary"
+            className="min-h-10"
+            isLoading={testing}
+            disabled={!testEmail}
+            onClick={handleTest}
+            leftIcon={<Send className="h-4 w-4" />}
+          >
+            {testing ? t('admin.email.sending') : t('admin.email.sendTest')}
+          </Button>
         </div>
         {testMsg && (
-          <div className="mt-2">
-            <Alert type={testMsg.type} message={testMsg.text} />
-          </div>
+          <Alert type={testMsg.type} message={testMsg.text} className="mt-4" onClose={() => setTestMsg(null)} />
         )}
-        <p className="mt-3 text-xs text-gray-400">
-          MailHog UI: <a href="http://localhost:8025" target="_blank" rel="noreferrer" className="underline">http://localhost:8025</a>
+        <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+          MailHog UI:{' '}
+          <a
+            href="http://localhost:8025"
+            target="_blank"
+            rel="noreferrer"
+            className="font-medium text-purple-600 underline-offset-2 hover:underline dark:text-purple-400"
+          >
+            http://localhost:8025
+          </a>
         </p>
-      </div>
+      </SettingsSection>
     </div>
   );
 }
