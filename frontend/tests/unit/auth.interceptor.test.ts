@@ -1,11 +1,13 @@
 import type { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { setupAuthInterceptor } from '@/api/interceptors/auth.interceptor';
 import * as tokenManager from '@/services/auth/tokenManager';
+import { keycloak } from '@/config/keycloak.config';
 
 type ErrorHandler = (error: any) => Promise<never>;
 
 describe('setupAuthInterceptor', () => {
   let responseErrorHandler: ErrorHandler;
+  let requestHandler: (config: InternalAxiosRequestConfig) => Promise<InternalAxiosRequestConfig> | InternalAxiosRequestConfig;
 
   // jsdom's `window.location` and its `replace` method are both non-configurable
   // and read-only, so the navigation itself cannot be spied on. The interceptor
@@ -25,7 +27,10 @@ describe('setupAuthInterceptor', () => {
     const instance = {
       interceptors: {
         request: {
-          use: jest.fn((_success: (config: InternalAxiosRequestConfig) => InternalAxiosRequestConfig) => 0),
+          use: jest.fn((success: typeof requestHandler) => {
+            requestHandler = success;
+            return 0;
+          }),
         },
         response: {
           use: jest.fn((_success: (response: AxiosResponse) => AxiosResponse, errorHandler: ErrorHandler) => {
@@ -64,5 +69,63 @@ describe('setupAuthInterceptor', () => {
     // Missing/expired token → forced logout: tokens cleared (and a /login redirect
     // is triggered, which is a no-op under jsdom).
     expect(clearTokensSpy).toHaveBeenCalled();
+  });
+
+  describe('refreshing before a request', () => {
+    const config = () => ({ headers: {} }) as unknown as InternalAxiosRequestConfig;
+
+    // keycloak.updateToken is already a jest.fn in the keycloak-js mock, so spies
+    // on it share call history between tests
+    beforeEach(() => jest.clearAllMocks());
+
+    afterEach(() => {
+      keycloak.authenticated = false;
+      keycloak.token = undefined;
+      keycloak.refreshToken = undefined;
+    });
+
+    it('refreshes an expired token first and sends the new one', async () => {
+      keycloak.authenticated = true;
+      jest.spyOn(tokenManager, 'isTokenExpired').mockReturnValue(true);
+      jest.spyOn(tokenManager, 'shouldRefreshToken').mockReturnValue(false);
+      const setTokens = jest.spyOn(tokenManager, 'setTokens').mockImplementation(() => undefined);
+      jest.spyOn(keycloak, 'updateToken').mockImplementation(async () => {
+        keycloak.token = 'fresh';
+        keycloak.refreshToken = 'refresh';
+        return true;
+      });
+      jest.spyOn(tokenManager, 'getAccessToken').mockReturnValue('fresh');
+
+      setupAuthInterceptor(createAxiosInstance());
+      const sent = await requestHandler(config());
+
+      expect(keycloak.updateToken).toHaveBeenCalledWith(30);
+      expect(setTokens).toHaveBeenCalledWith('fresh', 'refresh', undefined);
+      expect(sent.headers.Authorization).toBe('Bearer fresh');
+    });
+
+    it('does not refresh a token that is still valid for a while', async () => {
+      keycloak.authenticated = true;
+      jest.spyOn(tokenManager, 'isTokenExpired').mockReturnValue(false);
+      jest.spyOn(tokenManager, 'shouldRefreshToken').mockReturnValue(false);
+      const updateToken = jest.spyOn(keycloak, 'updateToken');
+      jest.spyOn(tokenManager, 'getAccessToken').mockReturnValue('still-good');
+
+      setupAuthInterceptor(createAxiosInstance());
+      const sent = await requestHandler(config());
+
+      expect(updateToken).not.toHaveBeenCalled();
+      expect(sent.headers.Authorization).toBe('Bearer still-good');
+    });
+
+    it('still sends the request when the refresh fails', async () => {
+      keycloak.authenticated = true;
+      jest.spyOn(tokenManager, 'isTokenExpired').mockReturnValue(true);
+      jest.spyOn(keycloak, 'updateToken').mockRejectedValue(new Error('session ended'));
+      jest.spyOn(tokenManager, 'getAccessToken').mockReturnValue('old');
+
+      setupAuthInterceptor(createAxiosInstance());
+      await expect(requestHandler(config())).resolves.toBeDefined();
+    });
   });
 });

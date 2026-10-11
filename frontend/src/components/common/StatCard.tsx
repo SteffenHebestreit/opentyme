@@ -39,7 +39,7 @@ interface StatCardProps {
   footer?: ReactNode;
 }
 
-export const statAccentClasses: Record<StatCardVariant, string> = {
+const statAccentClasses: Record<StatCardVariant, string> = {
   blue: 'bg-blue-50 text-blue-600 ring-blue-600/10 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-400/20',
   green: 'bg-emerald-50 text-emerald-600 ring-emerald-600/10 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-400/20',
   yellow: 'bg-amber-50 text-amber-600 ring-amber-600/10 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-400/20',

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { markAuthReady } from '../lib/authReady';
 import { keycloak, TOKEN_REFRESH_THRESHOLD, TOKEN_CHECK_INTERVAL, getPkceMethod, hasWebCrypto } from '../config/keycloak.config';
 import { setTokens, clearTokens, getUserFromToken } from '../services/auth/tokenManager';
 import { useApp } from '../store/AppContext';
@@ -175,6 +176,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       } finally {
         setIsLoadingAuth(false);
+        markAuthReady();
       }
     };
 

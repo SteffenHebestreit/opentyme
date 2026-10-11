@@ -35,7 +35,7 @@ const baseClasses =
   'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950 ' +
   'active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50';
 
-export const buttonVariantClasses: Record<ButtonVariant, string> = {
+const buttonVariantClasses: Record<ButtonVariant, string> = {
   primary:
     'bg-purple-600 text-white shadow-sm shadow-purple-900/10 hover:bg-purple-500 focus-visible:ring-purple-500 ' +
     'dark:bg-purple-600 dark:hover:bg-purple-500',
@@ -52,7 +52,7 @@ export const buttonVariantClasses: Record<ButtonVariant, string> = {
     'dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white',
 };
 
-export const buttonSizeClasses: Record<ButtonSize, string> = {
+const buttonSizeClasses: Record<ButtonSize, string> = {
   sm: 'min-h-8 px-3 py-1 text-sm',
   md: 'min-h-9 px-4 py-1.5 text-sm',
   lg: 'min-h-11 px-5 py-2 text-base',

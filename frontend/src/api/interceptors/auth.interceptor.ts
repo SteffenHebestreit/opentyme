@@ -15,7 +15,29 @@
  */
 
 import { AxiosError, AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
-import { getAccessToken, clearTokens, isTokenExpired } from '@/services/auth/tokenManager';
+import { getAccessToken, clearTokens, isTokenExpired, setTokens, shouldRefreshToken } from '@/services/auth/tokenManager';
+import { keycloak } from '@/config/keycloak.config';
+
+/**
+ * Refresh an access token that is about to expire before sending a request.
+ *
+ * Browsers throttle timers in background tabs, so the periodic refresh in
+ * AuthContext can fall behind; the first request after returning to the tab
+ * (e.g. React Query's refetch on window focus) would otherwise go out with an
+ * expired token and trigger the forced logout below.
+ */
+async function ensureFreshToken(): Promise<void> {
+  // shouldRefreshToken() is false once the token has already expired — cover both
+  if (!keycloak.authenticated || !(isTokenExpired() || shouldRefreshToken(30))) return;
+  try {
+    const refreshed = await keycloak.updateToken(30);
+    if (refreshed && keycloak.token && keycloak.refreshToken) {
+      setTokens(keycloak.token, keycloak.refreshToken, keycloak.idToken);
+    }
+  } catch {
+    // Refresh failed (session ended) — send as is; the 401 handling decides.
+  }
+}
 
 /**
  * Setup authentication interceptor for an Axios instance
@@ -42,7 +64,9 @@ export const setupAuthInterceptor = (axiosInstance: AxiosInstance): AxiosInstanc
    * we always use the latest token (important after token refresh).
    */
   axiosInstance.interceptors.request.use(
-    (config: InternalAxiosRequestConfig) => {
+    async (config: InternalAxiosRequestConfig) => {
+      await ensureFreshToken();
+
       // Get the current access token from localStorage
       const token = getAccessToken();
       
