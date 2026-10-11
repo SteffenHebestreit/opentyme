@@ -243,7 +243,8 @@
       "disabled": "Speech-to-text is switched off in the settings.",
       "failed": "Transcription failed (error {{status}}).",
       "timeout": "Speech recognition took too long. Please try again.",
-      "network": "Connection to the server failed."
+      "network": "Connection to the server failed.",
+      "invalidAudio": "The recording could not be processed. Please try again."
     }
   },
   "shell": {

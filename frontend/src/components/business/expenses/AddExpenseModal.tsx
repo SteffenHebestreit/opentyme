@@ -239,7 +239,15 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
     try {
       const result = await analyzeReceipt(receiptFile);
 
-      if (result.success && result.data) {
+      if (result.success && result.ai_enabled === false) {
+        // AI switched off: the receipt text was read, but nothing was extracted from it
+        const rawText = (result.data as { raw_text?: string } | undefined)?.raw_text?.trim();
+        if (rawText) setNotes((prev) => prev || rawText);
+        setAnalysisMessage({
+          tone: 'warning',
+          text: t('ai.aiDisabledRawText', 'The AI assistant is switched off — the receipt text was copied to the notes. Please fill in the details manually.'),
+        });
+      } else if (result.success && result.data) {
         const extracted = result.data;
 
         // Pre-fill form with extracted data.
@@ -297,6 +305,10 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
         AI_UNREACHABLE: t('ai.errors.unreachable', 'The AI service is not reachable. Check the AI settings or try again later.'),
         AI_TIMEOUT: t('ai.errors.timeout', 'The AI took too long to read the receipt. Please try again.'),
         AI_DISABLED: t('ai.errors.disabled', 'The AI assistant is switched off in the settings.'),
+        AI_AUTH: t('ai.errors.auth', 'The AI service rejected the API key. Check it in the AI settings.'),
+        AI_INVALID_RESPONSE: t('ai.errors.invalidResponse', 'The AI returned an unusable answer. Please try again or enter the details manually.'),
+        EXTRACTION_FAILED: t('ai.errors.extractionFailed', 'The receipt could not be read (document converter error). Please try again or enter the details manually.'),
+        UNSUPPORTED_TYPE: t('ai.errors.unsupportedType', 'This file type cannot be analysed. Use a PDF or an image.'),
       };
       setAnalysisMessage({
         tone: code === 'NO_TEXT' ? 'warning' : 'error',

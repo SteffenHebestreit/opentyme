@@ -191,6 +191,15 @@ async function uploadAudio(blob: Blob, mimeType: string): Promise<string> {
       if (body.code === 'STT_DISABLED') {
         throw new Error(t('disabled', 'Speech-to-text is switched off in the settings.'));
       }
+      if (body.code === 'STT_TIMEOUT') {
+        throw new Error(t('timeout', 'Speech recognition took too long. Please try again.'));
+      }
+      if (body.code === 'NO_AUDIO') {
+        throw new Error(t('noSpeech', 'No speech detected — please try again.'));
+      }
+      if (body.code === 'INVALID_AUDIO') {
+        throw new Error(t('invalidAudio', 'The recording could not be processed. Please try again.'));
+      }
       if (response?.status === 401 || response?.status === 403) {
         throw new Error(t('auth', 'Your session has expired — please reload the page.'));
       }

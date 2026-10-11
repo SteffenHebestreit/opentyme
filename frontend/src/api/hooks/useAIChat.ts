@@ -192,6 +192,30 @@ export function useAIChat() {
     if (threadIdRef.current) restore(threadIdRef.current);
   }, [restore]);
 
+  /** Re-read which approval is pending on the server (after STALE_APPROVAL or a stopped run). */
+  const reloadPendingApproval = useCallback((tid: string) => {
+    void getConversation(tid)
+      .then((conv) => {
+        if (threadIdRef.current !== tid) return;
+        const awaiting = [...conv.messages]
+          .reverse()
+          .find((m) => m.role === 'assistant' && m.metadata?.status === 'awaiting_approval');
+        const pending = awaiting?.metadata?.pending ?? [];
+        if (awaiting && pending.length > 0) {
+          setPendingApproval({
+            planText: awaiting.content ?? '',
+            batchId: awaiting.id,
+            actions: pending.map((tc) => ({
+              toolCallId: tc.id,
+              toolName: tc.function.name,
+              arguments: safeParseJson(tc.function.arguments),
+            })),
+          });
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+
   const appendMessage = useCallback((msg: UIMessage) => {
     setMessages((prev) => {
       const next = [...prev, msg];
@@ -313,27 +337,7 @@ export function useAIChat() {
           setError(runErrorMessage(event.code, event.message));
           if (event.code === 'STALE_APPROVAL' && threadIdRef.current) {
             // Show the batch that is actually pending now
-            const tid = threadIdRef.current;
-            void getConversation(tid)
-              .then((conv) => {
-                if (threadIdRef.current !== tid) return;
-                const awaiting = [...conv.messages]
-                  .reverse()
-                  .find((m) => m.role === 'assistant' && m.metadata?.status === 'awaiting_approval');
-                const pending = awaiting?.metadata?.pending ?? [];
-                if (awaiting && pending.length > 0) {
-                  setPendingApproval({
-                    planText: awaiting.content ?? '',
-                    batchId: awaiting.id,
-                    actions: pending.map((tc) => ({
-                      toolCallId: tc.id,
-                      toolName: tc.function.name,
-                      arguments: safeParseJson(tc.function.arguments),
-                    })),
-                  });
-                }
-              })
-              .catch(() => undefined);
+            reloadPendingApproval(threadIdRef.current);
           }
           if (event.code === '404') {
             localStorage.removeItem(THREAD_STORAGE_KEY);
@@ -347,7 +351,7 @@ export function useAIChat() {
           break;
       }
     },
-    [appendMessage, updateLastAssistantMessage]
+    [appendMessage, updateLastAssistantMessage, reloadPendingApproval]
   );
 
   /** Start a run; anything it reports after a newer run (or a reset) took over is ignored. */
@@ -462,9 +466,13 @@ export function useAIChat() {
         if (result.error || result.aborted) setPendingApproval(approval);
       }
       if (run.isCurrent() && result?.error) setError(result.error.message);
+      // Stopped mid-run: the server puts actions that hadn't started back up for approval
+      if (result?.aborted && result.started && threadIdRef.current === conversationId) {
+        setTimeout(() => reloadPendingApproval(conversationId), 800);
+      }
       run.finish();
     },
-    [isStreaming, pendingApproval, beginRun]
+    [isStreaming, pendingApproval, beginRun, reloadPendingApproval]
   );
 
   const stopStreaming = useCallback(() => {

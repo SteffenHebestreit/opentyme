@@ -29,6 +29,7 @@ import type { ApprovalAction, ApprovalDecision } from '../../api/services/ai-cha
 import { startRecording } from '../../api/services/ai-transcription.service';
 import type { RecordingHandle, RecordingStatus, TranscriptionError } from '../../api/services/ai-transcription.service';
 import { Slot } from '../../plugins/slots/Slot';
+import { MarkdownText } from './MarkdownText';
 import { Button } from '../common/Button';
 import { cn } from '../../lib/cn';
 
@@ -446,9 +447,9 @@ const MessageBubble = memo(function MessageBubble({
             : 'rounded-bl-md bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100',
           msg.failed && 'opacity-60'
         )}
-        style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+        style={{ whiteSpace: isUser ? 'pre-wrap' : undefined, wordBreak: 'break-word' }}
       >
-        {msg.content}
+        {isUser || !msg.content ? msg.content : <MarkdownText text={msg.content} />}
         {msg.role === 'assistant' && msg.content === '' && (
           <span className="inline-flex items-center gap-1 py-1.5" aria-hidden="true">
             {[0, 200, 400].map((delay) => (

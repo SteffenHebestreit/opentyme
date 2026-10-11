@@ -129,6 +129,8 @@ export interface AnalyzedLineItem {
 
 export interface AnalyzedReceiptData {
   success: boolean;
+  /** false: the AI is switched off — only the receipt's raw text was read (data.raw_text) */
+  ai_enabled?: boolean;
   data?: {
     amount?: number;
     currency?: string;

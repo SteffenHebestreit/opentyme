@@ -280,8 +280,13 @@
       "noText": "No text could be read from this receipt. Please enter the details manually.",
       "unreachable": "The AI service is not reachable. Check the AI settings or try again later.",
       "timeout": "The AI took too long to read the receipt. Please try again.",
-      "disabled": "The AI assistant is switched off in the settings."
-    }
+      "disabled": "The AI assistant is switched off in the settings.",
+      "auth": "The AI service rejected the API key. Check it in the AI settings.",
+      "invalidResponse": "The AI returned an unusable answer. Please try again or enter the details manually.",
+      "extractionFailed": "The receipt could not be read (document converter error). Please try again or enter the details manually.",
+      "unsupportedType": "This file type cannot be analysed. Use a PDF or an image."
+    },
+    "aiDisabledRawText": "The AI assistant is switched off — the receipt text was copied to the notes. Please fill in the details manually."
   },
   "analysis": {
     "title": "AI depreciation analysis",

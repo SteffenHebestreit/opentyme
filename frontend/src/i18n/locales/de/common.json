@@ -243,7 +243,8 @@
       "disabled": "Die Spracheingabe ist in den Einstellungen ausgeschaltet.",
       "failed": "Die Transkription ist fehlgeschlagen (Fehler {{status}}).",
       "timeout": "Die Spracherkennung hat zu lange gebraucht. Bitte erneut versuchen.",
-      "network": "Keine Verbindung zum Server."
+      "network": "Keine Verbindung zum Server.",
+      "invalidAudio": "Die Aufnahme konnte nicht verarbeitet werden. Bitte erneut versuchen."
     }
   },
   "shell": {

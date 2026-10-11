@@ -280,8 +280,13 @@
       "noText": "Aus diesem Beleg ließ sich kein Text lesen. Bitte die Angaben manuell eintragen.",
       "unreachable": "Der KI-Dienst ist nicht erreichbar. Prüfen Sie die KI-Einstellungen oder versuchen Sie es später erneut.",
       "timeout": "Die KI hat zu lange zum Lesen des Belegs gebraucht. Bitte erneut versuchen.",
-      "disabled": "Der KI-Assistent ist in den Einstellungen ausgeschaltet."
-    }
+      "disabled": "Der KI-Assistent ist in den Einstellungen ausgeschaltet.",
+      "auth": "Der KI-Dienst hat den API-Schlüssel abgelehnt. Prüfen Sie ihn in den KI-Einstellungen.",
+      "invalidResponse": "Die KI hat eine unbrauchbare Antwort geliefert. Bitte erneut versuchen oder manuell ausfüllen.",
+      "extractionFailed": "Der Beleg konnte nicht gelesen werden (Fehler beim Dokumentenkonverter). Bitte erneut versuchen oder manuell ausfüllen.",
+      "unsupportedType": "Dieser Dateityp kann nicht analysiert werden. Bitte ein PDF oder Bild verwenden."
+    },
+    "aiDisabledRawText": "Der KI-Assistent ist ausgeschaltet – der Belegtext wurde in die Notizen übernommen. Bitte die Angaben manuell ausfüllen."
   },
   "analysis": {
     "title": "KI-Abschreibungsanalyse",
