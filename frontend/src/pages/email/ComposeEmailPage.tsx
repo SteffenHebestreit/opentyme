@@ -17,8 +17,7 @@ import type { EmailTemplate } from '@/api/services/email-template.service';
 import apiClient from '@/api/services/client';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/common/Button';
-import { Badge } from '@/components/common/Badge';
-import type { BadgeVariant } from '@/components/common/Badge';
+import { InvoiceStatusBadge } from '@/components/business/invoices/InvoiceStatusBadge';
 import { Alert } from '@/components/common/Alert';
 import { SkeletonItem } from '@/components/common/Skeleton';
 import { fieldClasses, fieldLabelClass } from '@/components/forms/fieldStyles';
@@ -36,12 +35,6 @@ const REPORT_TYPES = [
   { value: 'expense', labelKey: 'expense' },
   { value: 'time-tracking', labelKey: 'timeTracking' },
 ] as const;
-
-const INVOICE_STATUS_BADGE: Record<string, BadgeVariant> = {
-  paid: 'green',
-  overdue: 'red',
-  sent: 'blue',
-};
 
 interface ReportEntry {
   id: string;
@@ -206,10 +199,6 @@ export default function ComposeEmailPage() {
     const labelKey = REPORT_TYPES.find((rt) => rt.value === reportType)?.labelKey;
     return labelKey ? t(`compose.reportTypes.${labelKey}`) : reportType;
   };
-
-  /** Translated invoice status (falls back to the raw value) */
-  const invoiceStatusLabel = (status: string) =>
-    t(`invoices:status.${status.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())}`, { defaultValue: status });
 
   /** Returns the invoice email for a client: billing_email if set, otherwise contact email */
   const clientInvoiceEmail = (c: (typeof clients)[0]) =>
@@ -649,9 +638,7 @@ export default function ComposeEmailPage() {
                       <span className="hidden text-xs tabular-nums text-gray-500 sm:inline dark:text-gray-400">
                         {formatDate(parseYmd(inv.issue_date))}
                       </span>
-                      <Badge variant={INVOICE_STATUS_BADGE[inv.status] ?? 'gray'} size="sm">
-                        {invoiceStatusLabel(inv.status)}
-                      </Badge>
+                      <InvoiceStatusBadge status={inv.status} size="sm" />
                       <span className="w-24 text-right text-sm tabular-nums text-gray-700 dark:text-gray-300">
                         {formatCurrency(Number(inv.total_amount), inv.currency)}
                       </span>

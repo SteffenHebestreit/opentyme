@@ -259,6 +259,13 @@
       "system": "System"
     },
     "appearance": "Darstellung",
+    "colorVision": {
+      "title": "Farbsehen",
+      "standard": "Standard",
+      "standardHint": "Grün, Gelb und Rot für Status",
+      "redgreen": "Rot-Grün-Sehschwäche",
+      "redgreenHint": "Blau, Gelb und Orange statt Grün und Rot"
+    },
     "timerRunning": "Timer läuft – zur Zeiterfassung",
     "syncing": "Daten werden aktualisiert…",
     "openMenu": "Menü öffnen",

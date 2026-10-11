@@ -143,7 +143,9 @@
     "expenseTax": "Expense Tax (Vorsteuer)",
     "vatPrepayments": "VAT Prepayments",
     "incomeTaxPrepayments": "Income Tax Prepayments",
-    "totalPrepayments": "Total Prepayments"
+    "totalPrepayments": "Total Prepayments",
+    "taxRefund": "Refund",
+    "taxDue": "Amount due"
   },
   "greetingNoName": "Welcome back! Here's what's happening across your workspace today.",
   "loading": "Loading dashboard…",
@@ -154,7 +156,8 @@
   "projectBudgets": {
     "title": "Project time budgets",
     "subtitle": "Logged vs. estimated hours",
-    "overBudget": "Over budget by {{hours}}h"
+    "overBudget": "Over budget by {{hours}}h",
+    "nearBudget": "Near limit: {{hours}}h left"
   },
   "depreciation": {
     "title": "Depreciation (AfA)",

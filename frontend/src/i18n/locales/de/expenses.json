@@ -230,7 +230,8 @@
     "overTime": "Ausgaben über Zeit",
     "expenses": "Ausgaben",
     "noData": "Keine Daten für diesen Zeitraum",
-    "noCategoryData": "Noch keine Kategoriedaten"
+    "noCategoryData": "Noch keine Kategoriedaten",
+    "otherCategories": "Weitere ({{count}})"
   },
   "depreciationSummary": {
     "title": "Abschreibungen (AfA) {{year}}",

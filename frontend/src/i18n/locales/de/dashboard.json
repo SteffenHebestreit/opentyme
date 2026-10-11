@@ -143,7 +143,9 @@
     "expenseTax": "Vorsteuer",
     "vatPrepayments": "USt-Vorauszahlungen",
     "incomeTaxPrepayments": "ESt-Vorauszahlungen",
-    "totalPrepayments": "Vorauszahlungen gesamt"
+    "totalPrepayments": "Vorauszahlungen gesamt",
+    "taxRefund": "Erstattung",
+    "taxDue": "Nachzahlung"
   },
   "greetingNoName": "Willkommen zurück! Hier ist, was heute in Ihrem Arbeitsbereich passiert.",
   "loading": "Dashboard wird geladen…",
@@ -154,7 +156,8 @@
   "projectBudgets": {
     "title": "Projekt-Zeitbudgets",
     "subtitle": "Erfasste vs. geschätzte Stunden",
-    "overBudget": "Budget um {{hours}} h überschritten"
+    "overBudget": "Budget um {{hours}} h überschritten",
+    "nearBudget": "Fast erreicht: noch {{hours}} h"
   },
   "depreciation": {
     "title": "Abschreibungen (AfA)",

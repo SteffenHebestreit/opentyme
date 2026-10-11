@@ -216,6 +216,8 @@
       "time": "Zeit"
     },
     "unknownProject": "Unbekanntes Projekt",
-    "holiday": "Feiertag"
+    "holiday": "Feiertag",
+    "holidayNational": "Feiertag (bundesweit)",
+    "holidayRegional": "Feiertag (regional)"
   }
 }

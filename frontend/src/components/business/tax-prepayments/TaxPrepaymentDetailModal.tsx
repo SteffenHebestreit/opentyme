@@ -244,6 +244,8 @@ export function TaxPrepaymentDetailModal({
                   : 'text-gray-900 dark:text-white'
               )}
             >
+              {/* Refunds carry a "+" so they read as money in without relying on the green */}
+              {prepayment.status === 'refund' && Number(prepayment.amount) > 0 && '+'}
               {formatCurrency(prepayment.amount)}
             </p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">

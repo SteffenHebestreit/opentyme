@@ -873,8 +873,22 @@ export default function AIChatPanel({
         <div className="mt-1.5 flex items-center justify-between gap-3 px-1 text-[11px] text-gray-400 dark:text-gray-500">
           <span className="hidden truncate sm:block">{t('ai.inputHint')}</span>
           {inputLength > MAX_INPUT_LENGTH * 0.8 && (
-            <span className={cn('ml-auto tabular-nums', overLimit && 'text-red-600 dark:text-red-400')}>
-              {inputLength}/{MAX_INPUT_LENGTH}
+            <span
+              className={cn(
+                'ml-auto inline-flex items-center gap-1 tabular-nums',
+                overLimit && 'text-red-600 dark:text-red-400'
+              )}
+            >
+              {/* Over the limit is spelled out, not only shown by the red border and counter */}
+              {overLimit && (
+                <>
+                  <AlertCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  {t('validation:tooLong', 'Too long')}
+                </>
+              )}
+              <span>
+                {inputLength}/{MAX_INPUT_LENGTH}
+              </span>
             </span>
           )}
         </div>

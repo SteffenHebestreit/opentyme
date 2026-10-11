@@ -51,6 +51,25 @@ const violet = {
   950: '#291950',
 };
 
+/*
+ * Status colours come from CSS variables (index.css) so the colour-vision setting can
+ * swap them: standard = Tailwind's emerald/amber/red, red-green = blue/yellow/orange
+ * (and the info blues `blue`/`sky` move to the brand cyan so they stay apart from it).
+ * The Tailwind names stay usable (`text-emerald-600`), opacity modifiers keep working.
+ */
+const channelScale = (name) =>
+  Object.fromEntries(
+    [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].map((step) => [
+      step,
+      `rgb(var(--${name}-${step}) / <alpha-value>)`,
+    ])
+  );
+const success = channelScale('success');
+const warning = channelScale('warning');
+const danger = channelScale('danger');
+const blue = channelScale('blue');
+const sky = channelScale('sky');
+
 export default {
   darkMode: 'class',
   content: [
@@ -63,6 +82,16 @@ export default {
         gray: neutral,
         brand,
         violet,
+        success,
+        warning,
+        danger,
+        emerald: success,
+        green: success,
+        amber: warning,
+        yellow: warning,
+        red: danger,
+        blue,
+        sky,
       },
       fontFamily: {
         sans: [

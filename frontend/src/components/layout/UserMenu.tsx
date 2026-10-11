@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Check, LogOut, Monitor, Moon, Settings, Sun, UserRound } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { useAuth } from '../../contexts/AuthContext';
-import { useApp, type ThemePreference } from '../../store/AppContext';
+import { useApp, type ColorVision, type ThemePreference } from '../../store/AppContext';
 import { usePresence } from '../../hooks/ui/usePresence';
 
 const LANGUAGES = [
@@ -53,6 +53,10 @@ export function UserMenu() {
     { value: 'light', label: t('shell.theme.light', 'Light'), icon: Sun },
     { value: 'dark', label: t('shell.theme.dark', 'Dark'), icon: Moon },
     { value: 'system', label: t('shell.theme.system', 'System'), icon: Monitor },
+  ];
+  const colorVisionOptions: { value: ColorVision; label: string; hint: string }[] = [
+    { value: 'standard', label: t('shell.colorVision.standard'), hint: t('shell.colorVision.standardHint') },
+    { value: 'redgreen', label: t('shell.colorVision.redgreen'), hint: t('shell.colorVision.redgreenHint') },
   ];
 
   return (
@@ -120,6 +124,26 @@ export function UserMenu() {
               );
             })}
           </div>
+
+          <p className="eyebrow px-2.5 pb-1 pt-2 text-[11px]">{t('shell.colorVision.title')}</p>
+          {colorVisionOptions.map(({ value, label, hint }) => (
+            <button
+              key={value}
+              type="button"
+              role="menuitemradio"
+              aria-checked={state.colorVision === value}
+              className={itemClass}
+              onClick={() => dispatch({ type: 'SET_COLOR_VISION', payload: value })}
+            >
+              <span className="flex min-w-0 flex-1 flex-col text-left">
+                <span>{label}</span>
+                <span className="text-[11px] leading-4 text-gray-500 dark:text-gray-400">{hint}</span>
+              </span>
+              {state.colorVision === value && (
+                <Check className="h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" aria-hidden="true" />
+              )}
+            </button>
+          ))}
 
           <p className="eyebrow px-2.5 pb-1 pt-2 text-[11px]">{t('language.title')}</p>
           {LANGUAGES.map(({ code, label }) => (

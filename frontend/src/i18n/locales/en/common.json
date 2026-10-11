@@ -259,6 +259,13 @@
       "system": "System"
     },
     "appearance": "Appearance",
+    "colorVision": {
+      "title": "Colour vision",
+      "standard": "Standard",
+      "standardHint": "Green, yellow and red for status",
+      "redgreen": "Red-green colour blindness",
+      "redgreenHint": "Blue, yellow and orange instead of green and red"
+    },
     "timerRunning": "Timer running – go to time tracking",
     "syncing": "Updating data…",
     "openMenu": "Open menu",

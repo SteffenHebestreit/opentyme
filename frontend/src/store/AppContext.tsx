@@ -10,6 +10,11 @@ export interface User {
 
 export type ResolvedTheme = 'light' | 'dark';
 export type ThemePreference = ResolvedTheme | 'system';
+/**
+ * Colour vision the status and chart colours are tuned for. `redgreen` swaps the
+ * green/red/amber status colours for blue/orange/yellow (protanopia, deuteranopia).
+ */
+export type ColorVision = 'standard' | 'redgreen';
 
 interface AppState {
   activeProjectId?: string | null;
@@ -19,15 +24,27 @@ interface AppState {
   theme: ResolvedTheme;
   /** What the user picked: a fixed theme or "follow the OS". */
   themePreference: ThemePreference;
+  colorVision: ColorVision;
 }
 
 type AppAction =
   | { type: 'LOGIN_SUCCESS'; payload: User }
   | { type: 'LOGOUT' }
   | { type: 'SET_THEME'; payload: ThemePreference }
-  | { type: 'SYSTEM_THEME_CHANGED'; payload: ResolvedTheme };
+  | { type: 'SYSTEM_THEME_CHANGED'; payload: ResolvedTheme }
+  | { type: 'SET_COLOR_VISION'; payload: ColorVision };
 
 const THEME_STORAGE_KEY = 'theme';
+// Also read before first paint by the inline script in index.html — keep the key in sync
+const COLOR_VISION_STORAGE_KEY = 'colorVision';
+
+const readStoredColorVision = (): ColorVision => {
+  try {
+    return localStorage.getItem(COLOR_VISION_STORAGE_KEY) === 'redgreen' ? 'redgreen' : 'standard';
+  } catch {
+    return 'standard';
+  }
+};
 
 const systemTheme = (): ResolvedTheme =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -52,6 +69,7 @@ const createInitialState = (): AppState => {
     isAuthenticated: false,
     themePreference,
     theme: resolve(themePreference),
+    colorVision: readStoredColorVision(),
   };
 };
 
@@ -78,6 +96,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     case 'SYSTEM_THEME_CHANGED':
       return state.themePreference === 'system' ? { ...state, theme: action.payload } : state;
+    case 'SET_COLOR_VISION':
+      return { ...state, colorVision: action.payload };
     default:
       return state;
   }
@@ -118,6 +138,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     return () => window.cancelAnimationFrame(frame);
   }, [state.theme, state.themePreference]);
+
+  // Status colours follow `data-vision` on <html> (CSS variables in index.css)
+  useEffect(() => {
+    const root = document.documentElement;
+    if (state.colorVision === 'standard') delete root.dataset.vision;
+    else root.dataset.vision = state.colorVision;
+    try {
+      localStorage.setItem(COLOR_VISION_STORAGE_KEY, state.colorVision);
+    } catch {
+      // storage unavailable — the choice just won't survive a reload
+    }
+  }, [state.colorVision]);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>

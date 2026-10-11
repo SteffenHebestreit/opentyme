@@ -17,11 +17,12 @@ import { FC, useMemo, useState, useEffect, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TimeEntry, Project } from '../../../api/types';
 import { Calendar, ChevronDown } from 'lucide-react';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartOptions, ScriptableScaleContext, TooltipItem } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartOptions, Scale, ScriptableScaleContext, TooltipItem } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
-import { getChartColorForDate, prefetchHolidays, holidayDateCache } from '../../../utils/holidays-api';
+import { getDayKindForDate, prefetchHolidays, holidayDateCache } from '../../../utils/holidays-api';
 import { useChartTheme } from '../../../hooks/ui/useChartTheme';
-import { chartColors, chartPalette, getBarChartOptions, getChartThemeColors } from '../../../utils/chartConfig';
+import { chartColors, getBarChartOptions, getChartThemeColors, getDayTickStyle, getSeriesFill } from '../../../utils/chartConfig';
+import { DayMarkerLegend } from './DayMarkerLegend';
 import { AnimatedNumber } from '../../common/AnimatedNumber';
 import { fieldClasses, fieldLabelClass } from '../../forms/fieldStyles';
 import { cn } from '../../../lib/cn';
@@ -50,20 +51,6 @@ interface DailyHours {
 }
 
 type GroupMode = 'none' | 'project' | 'task' | 'client';
-
-/**
- * Gets project color for chart (the app's categorical chart palette).
- */
-function getProjectChartColor(projectName: string): string {
-  let hash = 0;
-  for (let i = 0; i < projectName.length; i++) {
-    hash = projectName.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return chartPalette[Math.abs(hash) % chartPalette.length];
-}
-
-/** Colour getChartColorForDate() returns for an ordinary working day. */
-const REGULAR_DAY_COLOR = 'rgba(168, 85, 247, 0.8)';
 
 const formatHours = (value: number) => `${value.toFixed(2)}h`;
 
@@ -224,61 +211,34 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
       };
     }
     
-    // Stacked bar chart - grouped by project
-    if (groupMode === 'project') {
-      const allProjects = Array.from(
-        new Set(weekEntries.map(e => e.project_name).filter(Boolean))
-      );
-      
-      const datasets = allProjects.map(projectName => ({
-        label: projectName ?? '',
-        data: dailyHours.map(day => day.projectHours[projectName!] || 0),
-        backgroundColor: getProjectChartColor(projectName!),
+    // Stacked bar chart - grouped by project, task or client. Series are ordered by their
+    // week total (biggest first) and get distinct palette slots — from the seventh on the
+    // colours come back hatched — so no two series share a fill.
+    const key = groupMode === 'project' ? 'projectHours' : groupMode === 'task' ? 'taskHours' : 'clientHours';
+    const totals = new Map<string, number>();
+    dailyHours.forEach(day =>
+      Object.entries(day[key]).forEach(([name, hours]) => totals.set(name, (totals.get(name) || 0) + hours))
+    );
+    const names = [...totals.keys()].sort((a, b) => (totals.get(b) || 0) - (totals.get(a) || 0));
+    const datasets = names.map((name, index) => {
+      const { color, fill } = getSeriesFill(index, theme);
+      return {
+        label: name,
+        data: dailyHours.map(day => day[key][name] || 0),
+        backgroundColor: fill,
+        hoverBackgroundColor: color,
         ...stackedSegmentStyle,
-      }));
-      
-      return { labels, datasets };
-    }
-    
-    if (groupMode === 'task') {
-      // Stacked bar chart - grouped by task
-      const allTasks = Array.from(
-        new Set(weekEntries.map(e => e.task_name).filter(Boolean))
-      );
-      
-      const datasets = allTasks.map((taskName, index) => ({
-        label: taskName ?? '',
-        data: dailyHours.map(day => day.taskHours[taskName!] || 0),
-        backgroundColor: getProjectChartColor(taskName! + index),
-        ...stackedSegmentStyle,
-      }));
-      
-      return { labels, datasets };
-    }
-    
-    if (groupMode === 'client') {
-      // Stacked bar chart - grouped by client
-      const allClients = Array.from(
-        new Set(weekEntries.map(e => e.client_name).filter(Boolean))
-      );
-      
-      const datasets = allClients.map((clientName, index) => ({
-        label: clientName ?? '',
-        data: dailyHours.map(day => day.clientHours[clientName!] || 0),
-        backgroundColor: getProjectChartColor(clientName! + index),
-        ...stackedSegmentStyle,
-      }));
-      
-      return { labels, datasets };
-    }
-    
-    return { labels, datasets: [] };
-  }, [dailyHours, groupMode, weekEntries, t, region, theme]);
+      };
+    });
+
+    return { labels, datasets };
+  }, [dailyHours, groupMode, t, theme]);
   
   const chartOptions = useMemo<ChartOptions<'bar'>>(() => {
     const base = getBarChartOptions(undefined, false, theme);
-    const colors = getChartThemeColors(theme);
     const stacked = groupMode !== 'none';
+    const dayKindAt = (index?: number) =>
+      index != null && index < dailyHours.length ? getDayKindForDate(dailyHours[index].date, 'DE', region) : 'weekday';
     return {
       ...base,
       maintainAspectRatio: false,
@@ -317,18 +277,14 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
           stacked,
           ticks: {
             ...base.scales?.x?.ticks,
-            // Weekends and holidays keep their marker colour; ordinary days use the axis colour
-            color: (context: ScriptableScaleContext) => {
-              const index = context.index;
-              if (index < dailyHours.length) {
-                const dayColor = getChartColorForDate(dailyHours[index].date, 'DE', region);
-                return dayColor === REGULAR_DAY_COLOR ? colors.text : dayColor.replace('0.8)', '1)');
-              }
-              return colors.text;
-            },
-            font: {
+            // Weekends recede, holidays get colour, weight and a marker (never colour alone)
+            color: (context: ScriptableScaleContext) => getDayTickStyle(dayKindAt(context.tick?.value), theme).color,
+            font: (context: ScriptableScaleContext) => ({
               size: 11,
-              weight: 600,
+              weight: getDayTickStyle(dayKindAt(context.tick?.value), theme).weight,
+            }),
+            callback: function (this: Scale, value: string | number) {
+              return this.getLabelForValue(Number(value)) + getDayTickStyle(dayKindAt(Number(value)), theme).marker;
             },
           },
         },
@@ -443,6 +399,7 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
       <div className="h-64">
         <Bar data={chartData} options={chartOptions} />
       </div>
+      <DayMarkerLegend dates={dailyHours.map(day => day.date)} region={region} />
     </section>
   );
 };

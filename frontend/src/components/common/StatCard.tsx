@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { LucideIcon } from 'lucide-react';
+import { LucideIcon, TrendingDown, TrendingUp } from 'lucide-react';
 import { cn } from '../../lib/cn';
 import { AnimatedNumber } from './AnimatedNumber';
 
@@ -70,6 +70,11 @@ export const StatCard: React.FC<StatCardProps> = ({
   className = '',
   footer,
 }) => {
+  // Trend direction is shown as an icon too, so it does not rely on green/red alone
+  const trendUp = Boolean(trend?.startsWith('+'));
+  const trendDown = Boolean(trend && /^[-\u2212]/.test(trend));
+  const TrendIcon = trendUp ? TrendingUp : trendDown ? TrendingDown : null;
+
   return (
     <div
       className={cn(
@@ -93,13 +98,16 @@ export const StatCard: React.FC<StatCardProps> = ({
           <span
             className={cn(
               'text-sm font-medium tabular-nums',
-              trend.startsWith('+')
+              trendUp
                 ? 'text-emerald-600 dark:text-emerald-400'
-                : trend.startsWith('-')
+                : trendDown
                 ? 'text-red-600 dark:text-red-400'
                 : 'text-gray-500 dark:text-gray-400'
             )}
           >
+            {TrendIcon && (
+              <TrendIcon className="mr-0.5 inline-block h-3.5 w-3.5 align-middle" aria-hidden="true" />
+            )}
             {trend}
           </span>
         )}

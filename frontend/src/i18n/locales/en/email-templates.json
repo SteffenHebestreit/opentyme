@@ -51,7 +51,9 @@
       "company": "Company",
       "invoice": "Invoice",
       "client": "Client"
-    }
+    },
+    "nameRequired": "Please enter a template name.",
+    "subjectRequired": "Please enter a subject."
   },
   "categories": {
     "custom": "Custom",

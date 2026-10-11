@@ -18,9 +18,10 @@
 import { FC, useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TimeEntry, Project } from '../../../api/types';
-import { Clock } from 'lucide-react';
+import { Check, Clock } from 'lucide-react';
 import { cn } from '../../../lib/cn';
-import { chartPalette } from '../../../utils/chartConfig';
+import { getSeriesCss, projectSlotsForDay } from '../../../utils/chartConfig';
+import { useChartTheme } from '../../../hooks/ui/useChartTheme';
 
 /**
  * Represents a 15-minute time slot in the timeline.
@@ -98,22 +99,6 @@ function isSlotOccupied(slot: TimeSlot, entry: TimeEntry): boolean {
 }
 
 /**
- * Gets a color for a project by hashing its name — the same categorical
- * chart palette and hash as the daily hours chart, so a project looks alike in both.
- */
-function getProjectColor(projectId: string, projects: Project[]): string {
-  const project = projects.find(p => p.id === projectId);
-  if (project) {
-    let hash = 0;
-    for (let i = 0; i < project.name.length; i++) {
-      hash = project.name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return chartPalette[Math.abs(hash) % chartPalette.length];
-  }
-  return chartPalette[0]; // Brand cyan
-}
-
-/**
  * Time slot picker component for visual time entry creation.
  * 
  * Displays a scrollable 24-hour timeline with existing time entries and allows
@@ -131,7 +116,14 @@ export const TimeSlotPicker: FC<TimeSlotPickerProps> = ({
   endTime,
 }) => {
   const { t } = useTranslation('time-tracking');
+  const theme = useChartTheme();
   const [slots, setSlots] = useState<TimeSlot[]>(generateTimeSlots());
+
+  // Same palette slots as the daily hours chart: projects in order of their first entry
+  const projectName = (entry: TimeEntry) =>
+    entry.project_name || projects.find(p => p.id === entry.project_id)?.name || entry.project_id;
+  const projectSlots = projectSlotsForDay(timeEntries.map(e => ({ project_name: projectName(e), entry_time: e.entry_time })));
+  const projectStyle = (entry: TimeEntry) => getSeriesCss(projectSlots.get(projectName(entry)) ?? 0, theme);
   const [isSelectingEnd, setIsSelectingEnd] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
 
@@ -235,9 +227,7 @@ export const TimeSlotPicker: FC<TimeSlotPickerProps> = ({
                 <div className="grid grid-cols-4 border-b border-gray-100 dark:border-gray-800">
                   {hourSlots.map((slot) => {
                     const isSelected = isSlotSelected(slot);
-                    const bgColor = slot.isOccupied && slot.entry
-                      ? getProjectColor(slot.entry.project_id, projects)
-                      : isSelected
+                    const bgClass = isSelected
                       ? 'bg-brand-200 dark:bg-brand-500/40'
                       : 'bg-white hover:bg-brand-50 dark:bg-gray-900 dark:hover:bg-brand-500/10';
                     
@@ -252,13 +242,18 @@ export const TimeSlotPicker: FC<TimeSlotPickerProps> = ({
                           'focus:outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500',
                           slot.isOccupied ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'
                         )}
-                        style={slot.isOccupied && slot.entry ? { backgroundColor: bgColor } : undefined}
+                        style={slot.isOccupied && slot.entry ? projectStyle(slot.entry) : undefined}
                         title={slotLabel(slot)}
                         aria-label={slotLabel(slot)}
                         aria-pressed={slot.isOccupied ? undefined : isSelected}
                       >
                         {!slot.isOccupied && (
-                          <div className={cn('absolute inset-0 transition-colors', bgColor)} />
+                          <div className={cn('absolute inset-0 flex items-center justify-center transition-colors', bgClass)}>
+                            {/* Selected slots carry a mark, not just a tint */}
+                            {isSelected && (
+                              <Check className="h-3.5 w-3.5 text-brand-800 dark:text-brand-100" aria-hidden="true" />
+                            )}
+                          </div>
                         )}
                       </button>
                     );
@@ -277,24 +272,22 @@ export const TimeSlotPicker: FC<TimeSlotPickerProps> = ({
           <span>{t('form.timeSlotPicker.available')}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded bg-brand-200 dark:bg-brand-500/40" aria-hidden="true" />
+          <span className="flex h-3 w-3 items-center justify-center rounded bg-brand-200 dark:bg-brand-500/40" aria-hidden="true">
+            <Check className="h-2.5 w-2.5 text-brand-800 dark:text-brand-100" />
+          </span>
           <span>{t('form.timeSlotPicker.selected')}</span>
         </div>
         {/* Show actual projects with their colors */}
-        {Array.from(new Set(timeEntries.map(e => e.project_id))).map(projectId => {
-          const project = projects.find(p => p.id === projectId);
-          if (!project) return null;
-          return (
-            <div key={projectId} className="flex items-center gap-2">
-              <span
-                className="h-3 w-3 rounded"
-                style={{ backgroundColor: getProjectColor(projectId, projects) }}
-                aria-hidden="true"
-              />
-              <span>{project.name}</span>
-            </div>
-          );
-        })}
+        {[...projectSlots.keys()].map(name => (
+          <div key={name} className="flex items-center gap-2">
+            <span
+              className="h-3 w-3 rounded"
+              style={getSeriesCss(projectSlots.get(name) ?? 0, theme)}
+              aria-hidden="true"
+            />
+            <span>{name}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

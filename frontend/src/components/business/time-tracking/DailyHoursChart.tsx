@@ -31,7 +31,7 @@ import {
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 import { useChartTheme } from '../../../hooks/ui/useChartTheme';
-import { chartPalette, getChartThemeColors, getDefaultChartOptions } from '../../../utils/chartConfig';
+import { getChartThemeColors, getDefaultChartOptions, getSeriesCss, getSeriesFill, projectSlotsForDay } from '../../../utils/chartConfig';
 import { AnimatedNumber } from '../../common/AnimatedNumber';
 import { cn } from '../../../lib/cn';
 
@@ -71,18 +71,6 @@ interface TimelineSegment {
   taskName: string | null;
   startTime: string;
   endTime?: string | null;
-}
-
-/**
- * Gets a consistent color for a project by hashing its name
- * (the app's categorical chart palette, so a project keeps its colour).
- */
-function getProjectColor(projectName: string): string {
-  let hash = 0;
-  for (let i = 0; i < projectName.length; i++) {
-    hash = projectName.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return chartPalette[Math.abs(hash) % chartPalette.length];
 }
 
 const formatHours = (value: number) => `${value.toFixed(2)}h`;
@@ -164,6 +152,15 @@ export const DailyHoursChart: FC<DailyHoursChartProps> = ({
     });
   }, [currentDate, isToday, t, i18n.language]);
   
+  // Palette slot per project, in order of the day's first entry (shared with the time slot picker)
+  const projectSlots = useMemo(
+    () =>
+      projectSlotsForDay(
+        filteredEntries.map(e => ({ project_name: e.project_name || t('charts.unknownProject'), entry_time: e.entry_time }))
+      ),
+    [filteredEntries, t]
+  );
+
   // Prepare data for horizontal stacked bar chart
   const chartData = useMemo(() => {
     // Group entries by project
@@ -201,7 +198,7 @@ export const DailyHoursChart: FC<DailyHoursChartProps> = ({
       return {
         label: projectName,
         data,
-        backgroundColor: getProjectColor(projectName),
+        backgroundColor: getSeriesFill(projectSlots.get(projectName) ?? 0, theme).fill,
         // A hairline in the card colour keeps back-to-back entries apart
         borderColor: getChartThemeColors(theme).surface,
         borderWidth: 1,
@@ -216,7 +213,7 @@ export const DailyHoursChart: FC<DailyHoursChartProps> = ({
       labels: ['Today'],
       datasets,
     };
-  }, [filteredEntries, t, theme]);
+  }, [filteredEntries, projectSlots, t, theme]);
   
   const options = useMemo<ChartOptions<'bar'>>(() => {
     const colors = getChartThemeColors(theme);
@@ -378,7 +375,7 @@ export const DailyHoursChart: FC<DailyHoursChartProps> = ({
         <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
           {legendProjects.map(projectName => (
             <div key={projectName} className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: getProjectColor(projectName!) }} aria-hidden="true" />
+              <span className="h-2.5 w-2.5 rounded-full" style={getSeriesCss(projectSlots.get(projectName!) ?? 0, theme)} aria-hidden="true" />
               <span className="text-xs text-gray-600 dark:text-gray-400">{projectName}</span>
             </div>
           ))}

@@ -12,6 +12,22 @@
   (JetBrains Mono, self-hosted), cards in dark mode get a faint light edge, and charts use the
   new palette.
 
+### Colour vision — usable with colour blindness
+- **New setting "Colour vision"** (user menu): *Red-green colour blindness* shows status colours
+  as blue, yellow and orange instead of green, amber and red — everywhere, charts included.
+- **Charts use a palette checked for colour blindness:** six colours per theme that stay
+  distinguishable with protanopia, deuteranopia and tritanopia (on par with or better than the
+  Okabe–Ito palette). From the seventh series on, colours repeat with a hatch pattern; series
+  no longer share a colour by chance.
+- **Fixed: the expenses-by-category chart** showed many categories in the same grey and two
+  near-identical violets. Slices now take the palette in order of size; beyond six categories
+  the smallest are combined under "Other" (listed below it).
+- Status no longer depends on colour alone: invoice statuses carry an icon, payment amounts a
+  +/− sign, the tax KPI says "Refund" or "Amount due", near-budget projects say so in text,
+  selected time slots show a check mark, the hours trend lines differ by point shape, and
+  holidays on the hours charts get a marker and a short legend (weekends are set lighter).
+- Fixed: ordinary weekdays on the hours charts were coloured like weekends.
+
 ### Security — every account only ever sees and changes its own data
 - **Fixed: several endpoints did not check who owns a record.** Invoices, projects, time
   entries, payments, expenses and recurring invoices could be read, changed or deleted by id

@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Braces, Code2, Eye, Mail, Save, Upload } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Braces, Code2, Eye, Mail, Save, Upload } from 'lucide-react';
 import { Slot } from '@/plugins/slots';
 import { useSlotProvider } from '@/plugins/slots/SlotProvider';
 import { useEmailTemplate, useCreateEmailTemplate, useUpdateEmailTemplate } from '@/api/hooks/useEmailTemplates';
@@ -18,7 +18,7 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/common/Button';
 import { Tabs } from '@/components/common/Tabs';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { fieldClasses, fieldLabelClass } from '@/components/forms/fieldStyles';
+import { fieldClasses, fieldErrorClass, fieldLabelClass } from '@/components/forms/fieldStyles';
 import { usePresence } from '@/hooks/ui/usePresence';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/cn';
@@ -229,8 +229,15 @@ export default function EmailTemplateBuilder() {
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t('builder.namePlaceholder')}
                 aria-invalid={nameMissing || undefined}
+                aria-describedby={nameMissing ? 'tpl-name-error' : undefined}
                 className={fieldClasses({ error: nameMissing })}
               />
+              {nameMissing && (
+                <p id="tpl-name-error" className={cn(fieldErrorClass, 'flex items-center gap-1')}>
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  {t('builder.nameRequired')}
+                </p>
+              )}
             </div>
             <div className="lg:col-span-7">
               <label htmlFor="tpl-subject" className={fieldLabelClass(subjectMissing)}>
@@ -243,8 +250,15 @@ export default function EmailTemplateBuilder() {
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder={t('builder.subjectPlaceholder')}
                 aria-invalid={subjectMissing || undefined}
+                aria-describedby={subjectMissing ? 'tpl-subject-error' : undefined}
                 className={fieldClasses({ error: subjectMissing })}
               />
+              {subjectMissing && (
+                <p id="tpl-subject-error" className={cn(fieldErrorClass, 'flex items-center gap-1')}>
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  {t('builder.subjectRequired')}
+                </p>
+              )}
             </div>
             <div className="lg:col-span-3">
               <label htmlFor="tpl-category" className={fieldLabelClass()}>

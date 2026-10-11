@@ -41,6 +41,17 @@ const isIncome = (payment: Payment) =>
   (payment.payment_type as string) === 'vat_refund' ||
   (payment.payment_type as string) === 'income_tax_refund';
 
+/**
+ * Amount with an explicit direction sign ("+" in, "−" out), so the direction does not depend on
+ * the green/red colour alone.
+ */
+const formatSignedAmount = (payment: Payment) => {
+  const value = Number(payment.amount);
+  const signed = isIncome(payment) ? value : -value;
+  const sign = signed > 0 ? '+' : signed < 0 ? '\u2212' : '';
+  return `${sign}${formatCurrency(Math.abs(value))}`;
+};
+
 interface PaymentsPageProps {
   startDate?: string;
   endDate?: string;
@@ -195,7 +206,7 @@ export default function PaymentsPage({ startDate: propStartDate, endDate: propEn
             ? 'text-emerald-600 dark:text-emerald-400'
             : 'text-red-600 dark:text-red-400'
         )}>
-          {formatCurrency(payment.amount)}
+          {formatSignedAmount(payment)}
         </span>
       ),
       sortable: true,

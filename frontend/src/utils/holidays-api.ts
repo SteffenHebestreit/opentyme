@@ -194,48 +194,46 @@ async function fetchHolidays(year: number, countryCode: string): Promise<NagerHo
   }
 }
 
+/** Kind of day on a time axis. */
+export type DayKind = 'weekday' | 'weekend' | 'national-holiday' | 'regional-holiday';
+
 /**
- * Get chart color for a date (synchronous, uses cached data)
+ * Kind of a date (synchronous, uses cached data) — charts style the axis label from it.
  * Must call prefetchHolidays first to ensure data is available
  * 
  * @param dateStr - Date string in YYYY-MM-DD format
  * @param country - Country code
  * @param region - Region/state code
- * @returns CSS color string
  */
-export function getChartColorForDate(
+export function getDayKindForDate(
   dateStr: string,
   country?: string,
   region?: string
-): string {
+): DayKind {
   const date = new Date(dateStr + 'T00:00:00Z');
   const dayOfWeek = date.getUTCDay();
   
-  // Check if it's a weekend
   if (dayOfWeek === 0 || dayOfWeek === 6) {
-    return 'rgba(59, 130, 246, 0.8)'; // blue
+    return 'weekend';
   }
   
   // Check cached holiday data
   if (country === 'DE' && holidayDateCache.has(dateStr)) {
     const holiday = holidayDateCache.get(dateStr)!;
     
-    // National holiday (global)
     if (holiday.global) {
-      return 'rgba(34, 197, 94, 0.8)'; // green
+      return 'national-holiday';
     }
     
-    // Regional holiday
     if (region && holiday.counties) {
       const countyCode = STATE_TO_COUNTY_MAP[region];
       if (countyCode && holiday.counties.includes(countyCode)) {
-        return 'rgba(249, 115, 22, 0.8)'; // orange
+        return 'regional-holiday';
       }
     }
   }
   
-  // Regular weekday
-  return 'rgba(56, 186, 224, 0.8)'; // brand cyan
+  return 'weekday';
 }
 
 /**

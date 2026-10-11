@@ -11,6 +11,7 @@
  */
 
 import { Chart, ChartOptions } from 'chart.js';
+import type { CSSProperties } from 'react';
 
 export type ChartTheme = 'light' | 'dark';
 
@@ -45,23 +46,160 @@ export const chartColors = {
   },
 };
 
-/**
- * Categorical palette for multi-series charts, in display order.
- */
-export const chartPalette = [
-  '#019bbf', // cyan (brand)
-  '#9171f1', // violet
-  '#10b981', // emerald
-  '#f59e0b', // amber
-  '#4a74dc', // blue
-  '#ec4899', // pink
-  '#f97316', // orange
-  '#ef4444', // red (teal dropped: too close to the cyan brand)
-];
-
 /** Theme currently applied to the page (used when no theme is passed). */
 export const currentChartTheme = (): ChartTheme =>
   typeof document !== 'undefined' && document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+
+/**
+ * Categorical palettes for multi-series charts, one per theme, in display order:
+ * cyan (brand), amber, violet, green, vermilion, pink.
+ *
+ * Picked by a maximin search so every pair stays apart under normal vision and
+ * simulated protanopia, deuteranopia and tritanopia (CIEDE2000 >= 12 light,
+ * >= 11 dark — on par with or above the Okabe–Ito palette), and every colour has
+ * at least ~3:1 contrast against the chart surface. A seventh series and beyond
+ * repeats the colours with a hatch pattern (see `getSeriesFill`).
+ */
+const CATEGORICAL_PALETTES: Record<ChartTheme, readonly string[]> = {
+  light: ['#019bbf', '#d18501', '#6c4cbd', '#028758', '#cc3526', '#a42c73'],
+  dark: ['#38bae0', '#ffb848', '#7976e3', '#00a56c', '#ec5d4b', '#f37ea9'],
+};
+
+export const getChartPalette = (theme: ChartTheme = currentChartTheme()): readonly string[] =>
+  CATEGORICAL_PALETTES[theme];
+
+/** Colour vision the status colours are tuned for (mirrors AppContext's setting). */
+export type ChartColorVision = 'standard' | 'redgreen';
+
+/**
+ * Status colours for charts, matching the CSS status variables in index.css:
+ * shade 600 in light mode, 400 in dark mode. Red-green vision swaps green/amber/red
+ * for blue/yellow/orange.
+ */
+const STATUS_COLORS: Record<ChartColorVision, Record<ChartTheme, { success: string; warning: string; danger: string }>> = {
+  standard: {
+    light: { success: '#059669', warning: '#d97706', danger: '#dc2626' },
+    dark: { success: '#34d399', warning: '#fbbf24', danger: '#f87171' },
+  },
+  redgreen: {
+    light: { success: '#473dac', warning: '#9a7403', danger: '#942300' },
+    dark: { success: '#4183ea', warning: '#ffdc5a', danger: '#ff8365' },
+  },
+};
+
+export const getStatusChartColors = (
+  theme: ChartTheme = currentChartTheme(),
+  vision: ChartColorVision = 'standard'
+) => STATUS_COLORS[vision][theme];
+
+const patternCache = new Map<string, CanvasPattern>();
+
+/** `color` with diagonal stripes in the chart surface colour; falls back to the plain colour. */
+function hatchPattern(color: string, surface: string, round: number): CanvasPattern | string {
+  const key = `${color}|${surface}|${round}`;
+  const cached = patternCache.get(key);
+  if (cached) return cached;
+  if (typeof document === 'undefined') return color;
+  const size = 8;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return color;
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = surface;
+  ctx.globalAlpha = 0.55;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  // round 1: "/" stripes, round 2+: "\" stripes
+  if (round % 2 === 1) {
+    ctx.moveTo(0, size);
+    ctx.lineTo(size, 0);
+    ctx.moveTo(-size / 2, size / 2);
+    ctx.lineTo(size / 2, -size / 2);
+    ctx.moveTo(size / 2, size + size / 2);
+    ctx.lineTo(size + size / 2, size / 2);
+  } else {
+    ctx.moveTo(0, 0);
+    ctx.lineTo(size, size);
+    ctx.moveTo(-size / 2, size / 2);
+    ctx.lineTo(size / 2, size + size / 2);
+    ctx.moveTo(size / 2, -size / 2);
+    ctx.lineTo(size + size / 2, size / 2);
+  }
+  ctx.stroke();
+  const pattern = ctx.createPattern(canvas, 'repeat');
+  if (!pattern) return color;
+  patternCache.set(key, pattern);
+  return pattern;
+}
+
+/**
+ * Colour of the n-th series: solid for the first round of the palette, then the same
+ * colours hatched, so series stay distinguishable beyond six without relying on hue.
+ * `color` is the solid colour (borders, legend dots); `fill` may be a pattern.
+ */
+export function getSeriesFill(index: number, theme: ChartTheme = currentChartTheme()) {
+  const palette = getChartPalette(theme);
+  const color = palette[index % palette.length];
+  const round = Math.floor(index / palette.length);
+  const fill = round === 0 ? color : hatchPattern(color, getChartThemeColors(theme).surface, round);
+  return { color, fill };
+}
+
+/** Same as `getSeriesFill` for DOM elements: CSS background with stripes from the seventh series on. */
+export function getSeriesCss(index: number, theme: ChartTheme = currentChartTheme()): CSSProperties {
+  const palette = getChartPalette(theme);
+  const backgroundColor = palette[index % palette.length];
+  const round = Math.floor(index / palette.length);
+  if (round === 0) return { backgroundColor };
+  const angle = round % 2 === 1 ? 45 : -45;
+  const stripe = withAlpha(getChartThemeColors(theme).surface, 0.55);
+  return {
+    backgroundColor,
+    backgroundImage: `repeating-linear-gradient(${angle}deg, transparent 0 3px, ${stripe} 3px 5px)`,
+  };
+}
+
+/**
+ * Palette slot per project for one day of time entries: in order of each project's
+ * first entry (then name). Components that show the same day therefore agree on the
+ * colours, and two projects of a day never share one (unlike a name hash).
+ */
+export function projectSlotsForDay(entries: { project_name?: string | null; entry_time?: string | null }[]) {
+  const first = new Map<string, string>();
+  entries.forEach((entry) => {
+    const name = entry.project_name || '';
+    const start = entry.entry_time || '99:99';
+    if (!first.has(name) || start < first.get(name)!) first.set(name, start);
+  });
+  const ordered = [...first.entries()].sort((a, b) => a[1].localeCompare(b[1]) || a[0].localeCompare(b[0]));
+  return new Map(ordered.map(([name], index) => [name, index]));
+}
+
+/** Kind of day on a time axis (see utils/holidays-api.ts `getDayKindForDate`). */
+export type ChartDayKind = 'weekday' | 'weekend' | 'national-holiday' | 'regional-holiday';
+
+/**
+ * How a day's axis label is drawn: weekends recede (lighter weight), holidays stand out
+ * by weight, colour AND a marker after the label, so they don't depend on colour alone.
+ */
+export const getDayTickStyle = (kind: ChartDayKind, theme: ChartTheme = currentChartTheme()) => {
+  const colors = getChartThemeColors(theme);
+  const palette = getChartPalette(theme);
+  switch (kind) {
+    case 'weekend':
+      // Same (readable) colour, lighter weight — no contrast is given up
+      return { color: colors.text, weight: 400, marker: '' };
+    case 'national-holiday':
+      return { color: palette[2], weight: 700, marker: ' •' };
+    case 'regional-holiday':
+      return { color: palette[1], weight: 700, marker: ' ◦' };
+    default:
+      return { color: colors.text, weight: 600, marker: '' };
+  }
+};
 
 /**
  * Text, grid and tooltip colours for a theme.

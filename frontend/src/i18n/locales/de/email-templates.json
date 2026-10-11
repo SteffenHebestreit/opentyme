@@ -51,7 +51,9 @@
       "company": "Unternehmen",
       "invoice": "Rechnung",
       "client": "Kunde"
-    }
+    },
+    "nameRequired": "Bitte einen Vorlagennamen angeben.",
+    "subjectRequired": "Bitte einen Betreff angeben."
   },
   "categories": {
     "custom": "Benutzerdefiniert",

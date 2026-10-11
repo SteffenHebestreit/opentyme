@@ -2,7 +2,8 @@
  * @fileoverview Project time-budget widget.
  *
  * Shows, per project, how many logged hours have been consumed against the
- * project's estimated_hours, with a progress bar and over-budget highlighting.
+ * project's estimated_hours, with a progress bar and near-/over-budget highlighting
+ * (each state also spelled out as text with an icon, not only by bar colour).
  * Self-contained: fetches its own data and renders nothing when there are no
  * projects with an estimate or logged time.
  *
@@ -12,7 +13,7 @@
 import { FC } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Clock } from 'lucide-react';
 import { getProjectTimeBudgets, ProjectTimeBudget } from '../../api/services/analytics.service';
 import { cn } from '../../lib/cn';
 import { Card, CardHeader } from '../common/Card';
@@ -29,10 +30,11 @@ const BudgetRow: FC<{ budget: ProjectTimeBudget }> = ({ budget }) => {
   const { t } = useTranslation('dashboard');
   const hasEstimate = budget.estimated_hours > 0;
   const barWidth = hasEstimate ? clampPercent(budget.percentage) : 0;
+  const nearBudget = hasEstimate && !budget.over_budget && budget.percentage >= 80;
 
   const barColor = budget.over_budget
     ? 'bg-red-500'
-    : budget.percentage >= 80
+    : nearBudget
       ? 'bg-amber-500'
       : 'bg-brand-500 dark:bg-brand-400';
 
@@ -85,6 +87,15 @@ const BudgetRow: FC<{ budget: ProjectTimeBudget }> = ({ budget }) => {
           {t('projectBudgets.overBudget', {
             defaultValue: 'Over budget by {{hours}}h',
             hours: Math.abs(budget.remaining_hours).toFixed(1),
+          })}
+        </p>
+      )}
+      {nearBudget && (
+        <p className="flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+          <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+          {t('projectBudgets.nearBudget', {
+            defaultValue: 'Near limit: {{hours}}h left',
+            hours: Math.max(0, budget.remaining_hours).toFixed(1),
           })}
         </p>
       )}

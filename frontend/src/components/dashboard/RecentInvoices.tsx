@@ -2,14 +2,14 @@ import { FC, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { FilePlus2, FileText } from 'lucide-react';
-import { Invoice, InvoiceStatus } from '../../api/types';
+import { Invoice } from '../../api/types';
 import { formatDistanceToNow, formatYmd } from '../../utils/date';
 import { formatCurrency } from '../../utils/currency';
-import { Badge, BadgeVariant } from '../common/Badge';
 import { Button } from '../common/Button';
 import { Card, CardHeader } from '../common/Card';
 import { EmptyState } from '../common/EmptyState';
 import { Table, Column } from '../common/Table';
+import { InvoiceStatusBadge } from '../business/invoices/InvoiceStatusBadge';
 import { ViewAllLink } from './DashboardSection';
 
 /**
@@ -23,25 +23,11 @@ interface RecentInvoicesProps {
 }
 
 /**
- * Status badge colour per invoice status.
- *
- * @constant
- */
-const statusVariant: Record<InvoiceStatus, BadgeVariant> = {
-  paid: 'green',
-  sent: 'blue',
-  partially_paid: 'teal',
-  draft: 'gray',
-  overdue: 'red',
-  cancelled: 'gray',
-};
-
-/**
  * Card with a table of the most recent invoices on the dashboard.
  *
  * Features:
  * - Six sortable columns: Invoice #, Client, Due Date, Amount, Status, Last Updated
- * - Colour-coded, translated status badges (paid, sent, partially paid, draft, overdue, cancelled)
+ * - Status chips shared with the invoice list (InvoiceStatusBadge: colour + icon per status)
  * - Amount in the invoice's own currency, right-aligned
  * - Relative timestamp for updates
  * - Header link to the full invoice list
@@ -113,11 +99,7 @@ export const RecentInvoices: FC<RecentInvoicesProps> = ({ invoices }) => {
       key: 'status',
       accessorKey: 'status',
       header: t('recentInvoices.status'),
-      render: (invoice) => (
-        <Badge variant={statusVariant[invoice.status] ?? 'gray'} dot>
-          {t(`recentInvoices.statuses.${invoice.status}`, { defaultValue: invoice.status })}
-        </Badge>
-      ),
+      render: (invoice) => <InvoiceStatusBadge status={invoice.status} />,
       sortable: true,
     },
     {

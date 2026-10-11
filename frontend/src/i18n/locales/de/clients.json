@@ -247,6 +247,7 @@
     "chip": {
       "expiring": "Vertrag endet am {{date}}",
       "expired": "Vertrag endete am {{date}}"
-    }
+    },
+    "expiringSoon": "bald ablaufend"
   }
 }

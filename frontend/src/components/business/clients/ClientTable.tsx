@@ -256,13 +256,20 @@ export const ClientTable: FC<ClientTableProps> = ({ clients, onEdit, onDelete, o
               {client.documents_count ? (
                 <span
                   className={cn(
-                    'rounded-full px-1.5 text-xs font-semibold tabular-nums',
+                    'inline-flex items-center gap-0.5 rounded-full px-1.5 text-xs font-semibold tabular-nums',
                     client.expiring_documents
                       ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300'
                       : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'
                   )}
                 >
+                  {/* Expiring documents get an icon and a spoken hint, not just the amber tint */}
+                  {client.expiring_documents ? (
+                    <CalendarClock className="h-3 w-3" aria-hidden="true" />
+                  ) : null}
                   {client.documents_count}
+                  {client.expiring_documents ? (
+                    <span className="sr-only">{`, ${t('documents.expiringSoon')}`}</span>
+                  ) : null}
                 </span>
               ) : null}
             </Button>

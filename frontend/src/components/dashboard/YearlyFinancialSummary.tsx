@@ -1,7 +1,9 @@
-import { FC } from 'react';
+import { FC, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle,
+  ArrowDownLeft,
+  ArrowUpRight,
   Landmark,
   LucideIcon,
   Receipt,
@@ -48,7 +50,7 @@ const KpiCard: FC<{
   icon: LucideIcon;
   variant: Accent;
   tone?: Tone;
-  hint?: string;
+  hint?: ReactNode;
 }> = ({ label, value, icon: Icon, variant, tone = 'neutral', hint }) => (
   <div className="surface p-5 sm:p-6">
     <div className="flex items-start justify-between gap-3">
@@ -112,7 +114,8 @@ const signTone = (value: number): Tone => (value > 0 ? 'positive' : value < 0 ? 
  *
  * Features:
  * - Values count up on load and highlight when they change (e.g. after a save)
- * - Profit/loss and refund/liability colour coding
+ * - Profit/loss and refund/liability colour coding, backed by icons and wording
+ *   (refund vs. amount due) so the meaning does not depend on colour alone
  * - Skeleton while loading, inline error with retry
  * - Light and dark mode
  *
@@ -165,6 +168,13 @@ export const YearlyFinancialSummary: FC = () => {
 
   const isProfit = data.net_profit >= 0;
   const isTaxRefund = data.remaining_tax_payable < 0; // Negative means we get money back
+  const isTaxDue = data.remaining_tax_payable > 0;
+  // Spell out the direction (refund vs. amount due) next to the hint, not just by colour
+  const taxDirection = isTaxRefund
+    ? t('yearlyFinancialSummary.taxRefund')
+    : isTaxDue
+      ? t('yearlyFinancialSummary.taxDue')
+      : null;
   const taxRelevantProfit = data.net_revenue - data.net_expenses;
 
   return (
@@ -189,10 +199,20 @@ export const YearlyFinancialSummary: FC = () => {
           <KpiCard
             label={t('yearlyFinancialSummary.taxPayable')}
             value={data.remaining_tax_payable}
-            icon={Landmark}
+            icon={isTaxRefund ? ArrowDownLeft : isTaxDue ? ArrowUpRight : Landmark}
             variant={isTaxRefund ? 'green' : 'red'}
-            tone={isTaxRefund ? 'positive' : data.remaining_tax_payable > 0 ? 'negative' : 'neutral'}
-            hint={t('yearlyFinancialSummary.remainingTaxPayableDesc')}
+            tone={isTaxRefund ? 'positive' : isTaxDue ? 'negative' : 'neutral'}
+            hint={
+              taxDirection ? (
+                <>
+                  <span className="font-medium">{taxDirection}</span>
+                  {' · '}
+                  {t('yearlyFinancialSummary.remainingTaxPayableDesc')}
+                </>
+              ) : (
+                t('yearlyFinancialSummary.remainingTaxPayableDesc')
+              )
+            }
           />
           <KpiCard
             label={t('yearlyFinancialSummary.netProfit')}

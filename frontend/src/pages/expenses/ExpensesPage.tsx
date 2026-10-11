@@ -20,7 +20,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { SkeletonItem } from '@/components/common/Skeleton';
 import { StatCard } from '@/components/common/StatCard';
 import { Tabs, TabPanel } from '@/components/common/Tabs';
-import { useChartTheme } from '@/hooks/ui/useChartTheme';
+import { useChartColors } from '@/hooks/ui/useChartTheme';
 import {
   chartColors,
   getChartThemeColors,
@@ -99,36 +99,18 @@ interface ExpensesPageProps {
 
 type ExpensesTab = 'expense-list' | 'expense-recurring';
 
-// Colour per category: distinct colours for the big categories, muted grays for minor ones
-const categoryColors: Record<string, string> = {
-  // Major expense categories
-  vehicle_car: '#3b82f6',
-  vehicle: '#3b82f6',
-  insurance: '#10b981',
-  professional_services: '#06b6d4',
-  computer: '#8b5cf6',
-  software: '#a855f7',
-
-  // Medium categories
-  travel: '#f59e0b',
-  meals: '#ec4899',
-  marketing: '#84cc16',
-  hardware: '#f97316',
-  training: '#14b8a6',
-
-  // Minor categories
-  storage: '#9ca3af',
-  telecommunications: '#9ca3af',
-  peripherals: '#9ca3af',
-  office_supplies: '#ef4444',
-  utilities: '#9ca3af',
-  other: '#6b7280',
-};
+/**
+ * The doughnut shows at most this many slices: beyond it the smallest categories are
+ * merged into "Other", so every slice gets its own colour from the colour-blind-safe
+ * chart palette (colours follow the ranking, not the category).
+ */
+const MAX_CATEGORY_SLICES = 6;
+const OTHER_SLICE_COLOR = { light: '#9ba4b0', dark: '#4c5764' } as const;
 
 export default function ExpensesPage({ startDate: propStartDate, endDate: propEndDate }: ExpensesPageProps = {}) {
   const { t, i18n } = useTranslation('expenses');
   const locale = i18n.language;
-  const theme = useChartTheme();
+  const { theme, palette } = useChartColors();
   const [activeTab, setActiveTab] = useState<ExpensesTab>('expense-list');
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -227,18 +209,42 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
     return summary.total_amount / monthCount;
   })();
 
+  // Doughnut slices: the biggest categories in palette order, the rest merged into "Other"
+  const categorySlices = useMemo(() => {
+    const head =
+      sortedCategories.length > MAX_CATEGORY_SLICES ? sortedCategories.slice(0, MAX_CATEGORY_SLICES - 1) : sortedCategories;
+    const rest = sortedCategories.slice(head.length);
+    const slices = head.map(([category, data], index) => ({
+      key: category,
+      label: getCategoryLabel(category),
+      total: data.total,
+      color: palette[index % palette.length],
+      members: [] as string[],
+    }));
+    if (rest.length > 0) {
+      slices.push({
+        key: '__other',
+        label: t('charts.otherCategories', { count: rest.length }),
+        total: rest.reduce((sum, [, data]) => sum + data.total, 0),
+        color: OTHER_SLICE_COLOR[theme],
+        members: rest.map(([category]) => getCategoryLabel(category)),
+      });
+    }
+    return slices;
+  }, [sortedCategories, getCategoryLabel, palette, theme, t]);
+
   // Doughnut: expenses by category
   const doughnutData = useMemo(
     () => ({
-      labels: sortedCategories.map(([category]) => getCategoryLabel(category)),
+      labels: categorySlices.map((slice) => slice.label),
       datasets: [
         {
-          data: sortedCategories.map(([, data]) => data.total),
-          backgroundColor: sortedCategories.map(([category]) => categoryColors[category] || categoryColors.other),
+          data: categorySlices.map((slice) => slice.total),
+          backgroundColor: categorySlices.map((slice) => slice.color),
         },
       ],
     }),
-    [sortedCategories, getCategoryLabel]
+    [categorySlices]
   );
 
   const doughnutOptions = useMemo<ChartOptions<'doughnut'>>(() => {
@@ -653,24 +659,31 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
                           <Doughnut data={doughnutData} options={doughnutOptions} />
                         </div>
                         <ul className="w-full min-w-0 flex-1 space-y-2">
-                          {sortedCategories.map(([category, data]) => {
-                            const percentage = (data.total / categoryTotal) * 100;
+                          {categorySlices.map((slice) => {
+                            const percentage = (slice.total / categoryTotal) * 100;
                             return (
-                              <li key={category} className="flex items-center gap-3 text-sm">
-                                <span
-                                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                                  style={{ backgroundColor: categoryColors[category] || categoryColors.other }}
-                                  aria-hidden="true"
-                                />
-                                <span className="min-w-0 flex-1 truncate text-gray-700 dark:text-gray-300">
-                                  {getCategoryLabel(category)}
-                                </span>
-                                <span className="whitespace-nowrap font-medium tabular-nums text-gray-900 dark:text-white">
-                                  {formatCurrency(data.total)}
-                                </span>
-                                <span className="w-12 whitespace-nowrap text-right text-xs tabular-nums text-gray-500 dark:text-gray-400">
-                                  {percentage.toFixed(1)}%
-                                </span>
+                              <li key={slice.key} className="text-sm">
+                                <div className="flex items-center gap-3">
+                                  <span
+                                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                    style={{ backgroundColor: slice.color }}
+                                    aria-hidden="true"
+                                  />
+                                  <span className="min-w-0 flex-1 truncate text-gray-700 dark:text-gray-300">
+                                    {slice.label}
+                                  </span>
+                                  <span className="whitespace-nowrap font-medium tabular-nums text-gray-900 dark:text-white">
+                                    {formatCurrency(slice.total)}
+                                  </span>
+                                  <span className="w-12 whitespace-nowrap text-right text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                                    {percentage.toFixed(1)}%
+                                  </span>
+                                </div>
+                                {slice.members.length > 0 && (
+                                  <p className="ml-[1.375rem] mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                    {slice.members.join(', ')}
+                                  </p>
+                                )}
                               </li>
                             );
                           })}

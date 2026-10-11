@@ -247,6 +247,7 @@
     "chip": {
       "expiring": "Contract ends {{date}}",
       "expired": "Contract ended {{date}}"
-    }
+    },
+    "expiringSoon": "expiring soon"
   }
 }

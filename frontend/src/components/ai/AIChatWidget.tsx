@@ -125,7 +125,13 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
           open && 'max-sm:hidden'
         )}
         aria-label={
-          open ? t('ai.close') : approvalWaiting ? `${t('ai.open')} — ${t('ai.approvalWaiting', 'changes are waiting for your approval')}` : t('ai.open')
+          open
+            ? t('ai.close')
+            : approvalWaiting
+              ? `${t('ai.open')} — ${t('ai.approvalWaiting', 'changes are waiting for your approval')}`
+              : chat.isStreaming
+                ? `${t('ai.open')} — ${t('ai.thinking')}`
+                : t('ai.open')
         }
         aria-expanded={open}
       >
@@ -143,8 +149,12 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
           )}
           aria-hidden="true"
         />
+        {/* Streaming dot is decorative; the button's label says a reply is in progress */}
         {!open && chat.isStreaming && (
-          <span className="absolute right-0.5 top-0.5 h-3 w-3 animate-soft-pulse rounded-full border-2 border-white bg-emerald-400 dark:border-gray-950" />
+          <span
+            className="absolute right-0.5 top-0.5 h-3 w-3 animate-soft-pulse rounded-full border-2 border-white bg-emerald-400 dark:border-gray-950"
+            aria-hidden="true"
+          />
         )}
         {!open && approvalWaiting && (
           <span

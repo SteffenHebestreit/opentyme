@@ -28,7 +28,7 @@ import {
 } from 'chart.js';
 import { LineChart } from 'lucide-react';
 import { useTimeTrend } from '../../../hooks/api/useAnalytics';
-import { useChartTheme } from '../../../hooks/ui/useChartTheme';
+import { useChartColors } from '../../../hooks/ui/useChartTheme';
 import { chartColors, getLineChartOptions, withAlpha } from '../../../utils/chartConfig';
 import { parseYmd } from '../../../utils/date';
 import { Tabs } from '../../common/Tabs';
@@ -65,7 +65,8 @@ const CHART_HEIGHT = 300;
  */
 const TimeTrendChart: React.FC = () => {
   const { t, i18n } = useTranslation('dashboard');
-  const theme = useChartTheme();
+  const chartColorSet = useChartColors();
+  const theme = chartColorSet.theme;
   const locale = i18n.language;
   const [selectedDays, setSelectedDays] = useState<DayRange>(90);
   const { data, isLoading, error } = useTimeTrend(selectedDays);
@@ -100,14 +101,17 @@ const TimeTrendChart: React.FC = () => {
           borderColor: chartColors.primary,
           backgroundColor: withAlpha(chartColors.primary, theme === 'dark' ? 0.14 : 0.08),
           pointBackgroundColor: chartColors.primary,
+          // Each series has its own point shape (shown in the legend) besides its colour
+          pointStyle: 'circle' as const,
           fill: 'origin' as const,
         },
         {
           label: t('charts.timeTrend.billableHours'),
           data: data.map((point) => point.billable_hours),
-          borderColor: chartColors.success,
-          backgroundColor: chartColors.success,
-          pointBackgroundColor: chartColors.success,
+          borderColor: chartColorSet.status.success,
+          backgroundColor: chartColorSet.status.success,
+          pointBackgroundColor: chartColorSet.status.success,
+          pointStyle: 'rectRot' as const,
           fill: false,
         },
         {
@@ -116,6 +120,7 @@ const TimeTrendChart: React.FC = () => {
           borderColor: nonBillableColor,
           backgroundColor: nonBillableColor,
           pointBackgroundColor: nonBillableColor,
+          pointStyle: 'triangle' as const,
           borderDash: [4, 4],
           fill: false,
         },
@@ -136,7 +141,9 @@ const TimeTrendChart: React.FC = () => {
           ...base.plugins?.legend,
           labels: {
             ...base.plugins?.legend?.labels,
-            // Solid dots in the legend (the area fill of "total" is too pale for a swatch)
+            // Legend markers take each series' point shape, so the lines are told apart without colour
+            pointStyle: undefined,
+            // Solid markers in the legend (the area fill of "total" is too pale for a swatch)
             generateLabels: (chart) =>
               ChartJS.defaults.plugins.legend.labels
                 .generateLabels(chart)
@@ -182,7 +189,7 @@ const TimeTrendChart: React.FC = () => {
         chartRef.current = null;
       }
     };
-  }, [data, theme, t, locale]);
+  }, [data, theme, chartColorSet, t, locale]);
 
   return (
     <ChartPanel

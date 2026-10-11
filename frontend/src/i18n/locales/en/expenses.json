@@ -230,7 +230,8 @@
     "overTime": "Expenses over time",
     "expenses": "Expenses",
     "noData": "No data for this period",
-    "noCategoryData": "No category data yet"
+    "noCategoryData": "No category data yet",
+    "otherCategories": "Other ({{count}})"
   },
   "depreciationSummary": {
     "title": "Depreciation (AfA) {{year}}",
