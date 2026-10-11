@@ -1,15 +1,7 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { LucideIcon } from 'lucide-react';
+import { cn } from '../../lib/cn';
 
-/**
- * Individual tab definition.
- * 
- * @interface Tab
- * @property {string} id - Unique tab identifier
- * @property {string} label - Tab label text
- * @property {LucideIcon} [icon] - Optional icon component
- * @property {number} [badge] - Optional badge count
- */
 export interface Tab {
   id: string;
   label: string;
@@ -19,72 +11,87 @@ export interface Tab {
 
 /**
  * Props for the Tabs component.
- * 
- * @interface TabsProps
- * @property {Tab[]} tabs - Array of tab definitions
- * @property {string} activeTab - Currently active tab id
- * @property {(tabId: string) => void} onChange - Callback when tab is changed
- * @property {string} [className] - Additional CSS classes
+ *
+ * @property {Tab[]} tabs - Tab definitions
+ * @property {string} activeTab - ID of the active tab
+ * @property {(tabId: string) => void} onChange - Called with the clicked tab's ID
+ * @property {'underline' | 'pills'} [variant='underline'] - Underlined tab bar or segmented pills
  */
 interface TabsProps {
   tabs: Tab[];
   activeTab: string;
   onChange: (tabId: string) => void;
+  variant?: 'underline' | 'pills';
   className?: string;
 }
 
 /**
- * Reusable tabs component for tabbed navigation.
- * 
- * Features:
- * - Clean tab interface with border bottom
- * - Active state highlighting with colored border
- * - Optional icons for each tab
- * - Optional badge counts
- * - Hover states
- * - Keyboard navigation support
- * - Dark mode support
- * - Responsive design
- * 
- * @component
- * @example
- * // Basic tabs
- * const tabs = [
- *   { id: 'overview', label: 'Overview' },
- *   { id: 'settings', label: 'Settings' },
- * ];
- * 
- * <Tabs 
- *   tabs={tabs} 
- *   activeTab={activeTab} 
- *   onChange={setActiveTab} 
- * />
- * 
- * @example
- * // Tabs with icons and badges
- * const tabs = [
- *   { id: 'backups', label: 'Backups', icon: Database, badge: 5 },
- *   { id: 'schedules', label: 'Schedules', icon: Calendar },
- * ];
- * 
- * <Tabs 
- *   tabs={tabs} 
- *   activeTab={activeTab} 
- *   onChange={setActiveTab} 
- * />
- * 
- * @param {TabsProps} props - Component props
- * @returns {JSX.Element} Tabs navigation element
+ * Tab bar with an indicator that slides to the active tab. Arrow keys move
+ * between tabs; the bar scrolls horizontally on narrow screens.
  */
 export const Tabs: React.FC<TabsProps> = ({
   tabs,
   activeTab,
   onChange,
+  variant = 'underline',
   className = '',
 }) => {
+  const listRef = useRef<HTMLDivElement>(null);
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const update = () => {
+      const active = list.querySelector<HTMLElement>('[aria-selected="true"]');
+      setIndicator(active ? { left: active.offsetLeft, width: active.offsetWidth } : null);
+    };
+    update();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+    observer?.observe(list);
+    return () => observer?.disconnect();
+  }, [activeTab, tabs]);
+
+  const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    const index = tabs.findIndex((tab) => tab.id === activeTab);
+    const next = tabs[(index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
+    onChange(next.id);
+    listRef.current?.querySelector<HTMLElement>(`[data-tab-id="${next.id}"]`)?.focus();
+    event.preventDefault();
+  };
+
+  const pills = variant === 'pills';
+
   return (
-    <div className={`border-b border-gray-200 dark:border-gray-700 ${className}`}>
-      <div className="flex space-x-8">
+    <div
+      className={cn(
+        'scrollbar-none overflow-x-auto',
+        !pills && 'border-b border-gray-200 dark:border-gray-800',
+        className
+      )}
+    >
+      <div
+        ref={listRef}
+        role="tablist"
+        onKeyDown={onKeyDown}
+        className={cn(
+          'relative flex',
+          pills ? 'inline-flex gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-900' : 'gap-6'
+        )}
+      >
+        {indicator && (
+          <span
+            aria-hidden="true"
+            className={cn(
+              'absolute transition-[left,width] duration-300 ease-out-expo',
+              pills
+                ? 'inset-y-1 rounded-md bg-white shadow-soft dark:bg-gray-800'
+                : 'bottom-0 h-0.5 rounded-full bg-purple-600 dark:bg-purple-400'
+            )}
+            style={{ left: indicator.left, width: indicator.width }}
+          />
+        )}
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -92,29 +99,38 @@ export const Tabs: React.FC<TabsProps> = ({
           return (
             <button
               key={tab.id}
+              type="button"
+              data-tab-id={tab.id}
               onClick={() => onChange(tab.id)}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              className={cn(
+                'relative z-10 flex shrink-0 items-center gap-2 whitespace-nowrap text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500',
+                pills ? 'rounded-md px-3 py-1.5' : 'px-0.5 pb-3 pt-2',
                 isActive
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
-              }`}
+                  ? pills
+                    ? 'text-gray-900 dark:text-white'
+                    : 'text-purple-700 dark:text-purple-300'
+                  : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
+              )}
               role="tab"
+              id={`${tab.id}-tab`}
               aria-selected={isActive}
               aria-controls={`${tab.id}-panel`}
+              tabIndex={isActive ? 0 : -1}
             >
-              <span className="flex items-center gap-2">
-                {Icon && <Icon className="w-5 h-5" />}
-                {tab.label}
-                {tab.badge !== undefined && tab.badge > 0 && (
-                  <span className={`ml-2 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium ${
+              {Icon && <Icon className="h-4 w-4" aria-hidden="true" />}
+              {tab.label}
+              {tab.badge !== undefined && tab.badge > 0 && (
+                <span
+                  className={cn(
+                    'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums',
                     isActive
-                      ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
-                      : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                  }`}>
-                    {tab.badge}
-                  </span>
-                )}
-              </span>
+                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-200'
+                      : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                  )}
+                >
+                  {tab.badge}
+                </span>
+              )}
             </button>
           );
         })}
@@ -123,15 +139,6 @@ export const Tabs: React.FC<TabsProps> = ({
   );
 };
 
-/**
- * Props for the TabPanel component.
- * 
- * @interface TabPanelProps
- * @property {string} tabId - Tab identifier
- * @property {string} activeTab - Currently active tab id
- * @property {ReactNode} children - Panel content
- * @property {string} [className] - Additional CSS classes
- */
 interface TabPanelProps {
   tabId: string;
   activeTab: string;
@@ -139,20 +146,6 @@ interface TabPanelProps {
   className?: string;
 }
 
-/**
- * Tab panel component for tab content.
- * 
- * Only displays content when the corresponding tab is active.
- * 
- * @component
- * @example
- * <TabPanel tabId="overview" activeTab={activeTab}>
- *   <h2>Overview Content</h2>
- * </TabPanel>
- * 
- * @param {TabPanelProps} props - Component props
- * @returns {JSX.Element | null} Tab panel element or null if inactive
- */
 export const TabPanel: React.FC<TabPanelProps> = ({
   tabId,
   activeTab,
@@ -165,8 +158,8 @@ export const TabPanel: React.FC<TabPanelProps> = ({
     <div
       role="tabpanel"
       id={`${tabId}-panel`}
-      aria-labelledby={tabId}
-      className={className}
+      aria-labelledby={`${tabId}-tab`}
+      className={cn('animate-fade-in', className)}
     >
       {children}
     </div>

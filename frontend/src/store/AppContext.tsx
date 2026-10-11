@@ -8,23 +8,51 @@ export interface User {
   role: 'user' | 'admin';
 }
 
+export type ResolvedTheme = 'light' | 'dark';
+export type ThemePreference = ResolvedTheme | 'system';
+
 interface AppState {
   activeProjectId?: string | null;
   user: User | null;
   isAuthenticated: boolean;
-  theme: 'light' | 'dark'; // For future dark/light theme implementation
+  /** The theme actually shown (system preference already resolved). */
+  theme: ResolvedTheme;
+  /** What the user picked: a fixed theme or "follow the OS". */
+  themePreference: ThemePreference;
 }
 
 type AppAction =
   | { type: 'LOGIN_SUCCESS'; payload: User }
   | { type: 'LOGOUT' }
-  | { type: 'SET_THEME'; payload: 'light' | 'dark' };
+  | { type: 'SET_THEME'; payload: ThemePreference }
+  | { type: 'SYSTEM_THEME_CHANGED'; payload: ResolvedTheme };
 
-// Initial state
-const initialState: AppState = {
-  user: null,
-  isAuthenticated: false,
-  theme: 'dark', // Default to dark theme
+const THEME_STORAGE_KEY = 'theme';
+
+const systemTheme = (): ResolvedTheme =>
+  typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+
+const readStoredPreference = (): ThemePreference => {
+  try {
+    const stored = localStorage.getItem(THEME_STORAGE_KEY);
+    if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
+  } catch {
+    // storage unavailable (private mode) — fall through
+  }
+  return 'system';
+};
+
+const resolve = (preference: ThemePreference): ResolvedTheme =>
+  preference === 'system' ? systemTheme() : preference;
+
+const createInitialState = (): AppState => {
+  const themePreference = readStoredPreference();
+  return {
+    user: null,
+    isAuthenticated: false,
+    themePreference,
+    theme: resolve(themePreference),
+  };
 };
 
 // Reducer function
@@ -45,8 +73,11 @@ function appReducer(state: AppState, action: AppAction): AppState {
     case 'SET_THEME':
       return {
         ...state,
-        theme: action.payload,
+        themePreference: action.payload,
+        theme: resolve(action.payload),
       };
+    case 'SYSTEM_THEME_CHANGED':
+      return state.themePreference === 'system' ? { ...state, theme: action.payload } : state;
     default:
       return state;
   }
@@ -60,25 +91,33 @@ const AppContext = createContext<{
 
 // Provider component
 export function AppProvider({ children }: { children: ReactNode }) {
-  // Initialize theme from localStorage or system preference
-  const [state, dispatch] = useReducer(appReducer, initialState);
+  const [state, dispatch] = useReducer(appReducer, undefined, createInitialState);
+
+  // Follow OS theme changes while the preference is "system"
+  useEffect(() => {
+    const media = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!media) return;
+    const onChange = (event: MediaQueryListEvent) =>
+      dispatch({ type: 'SYSTEM_THEME_CHANGED', payload: event.matches ? 'dark' : 'light' });
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, []);
 
   useEffect(() => {
-    const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+    const root = document.documentElement;
+    // Suppress colour transitions for the one frame the theme flips, so the
+    // whole page switches at once instead of every element fading separately.
+    root.classList.add('[&_*]:!transition-none');
+    root.classList.toggle('dark', state.theme === 'dark');
+    const frame = window.requestAnimationFrame(() => root.classList.remove('[&_*]:!transition-none'));
 
-    // Only use stored theme if exists, otherwise keep initial dark theme
-    if (storedTheme) {
-      dispatch({ type: 'SET_THEME', payload: storedTheme });
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, state.themePreference);
+    } catch {
+      // storage unavailable — the choice just won't survive a reload
     }
-  }, []); // Run only on mount
-
-  useEffect(() => {
-    // Apply the theme class to the root HTML element
-    document.documentElement.classList.toggle('dark', state.theme === 'dark');
-    
-    // Save theme preference to localStorage
-    localStorage.setItem('theme', state.theme);
-  }, [state.theme]);
+    return () => window.cancelAnimationFrame(frame);
+  }, [state.theme, state.themePreference]);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>

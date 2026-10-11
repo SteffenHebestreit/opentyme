@@ -84,6 +84,13 @@ export type { BreadcrumbItem } from './Breadcrumb';
 export { Accordion } from './Accordion';
 export type { AccordionItemData } from './Accordion';
 
+// Number that counts to its value and highlights on change
+export { AnimatedNumber } from './AnimatedNumber';
+
+// App-wide hosts for toast() and confirmDialog() (mounted by Layout)
+export { Toaster } from './Toaster';
+export { ConfirmHost } from './ConfirmHost';
+
 // Table component
 export { Table } from './Table';
 export type { Column, TableProps, PaginationProps } from './Table';

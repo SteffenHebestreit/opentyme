@@ -148,7 +148,7 @@ export const Dropdown: React.FC<DropdownProps> = ({
       ) : (
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3.5 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
           aria-expanded={isOpen}
           aria-haspopup="menu"
         >
@@ -162,19 +162,16 @@ export const Dropdown: React.FC<DropdownProps> = ({
       {isOpen && (
         <div
           role="menu"
-          className={`absolute z-50 mt-2 min-w-[12rem] origin-top-${align} rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-700 dark:bg-gray-800 ${
-            align === 'right' ? 'right-0' : 'left-0'
+          className={`absolute z-50 mt-1.5 min-w-[12rem] animate-scale-in rounded-xl border border-gray-200 bg-white p-1 shadow-lifted dark:border-gray-800 dark:bg-gray-900 ${
+            align === 'right' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'
           }`}
-          style={{
-            animation: 'dropdownFadeIn 0.15s ease-out',
-          }}
         >
           {items.map((item, index) => {
             if (item.divider) {
               return (
                 <div
                   key={index}
-                  className="my-1 border-t border-gray-200 dark:border-gray-700"
+                  className="my-1 border-t border-gray-100 dark:border-gray-800"
                 />
               );
             }
@@ -188,12 +185,12 @@ export const Dropdown: React.FC<DropdownProps> = ({
                 disabled={item.disabled}
                 role="menuitem"
                 type="button"
-                className={`flex w-full items-center gap-3 whitespace-nowrap px-4 py-2 text-left text-sm transition-colors ${
+                className={`flex w-full items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                   item.disabled
                     ? 'cursor-not-allowed opacity-50'
                     : item.danger
-                    ? 'text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30'
-                    : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                    ? 'text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10'
+                    : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5'
                 }`}
               >
                 {ItemIcon && <ItemIcon className="h-4 w-4" />}

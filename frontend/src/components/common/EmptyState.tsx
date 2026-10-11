@@ -1,95 +1,55 @@
 import React, { ReactNode } from 'react';
 import { LucideIcon } from 'lucide-react';
+import { cn } from '../../lib/cn';
 
 /**
  * Props for the EmptyState component.
- * 
- * @interface EmptyStateProps
- * @property {string} title - Main empty state title
- * @property {string} [description] - Optional description text
- * @property {LucideIcon} [icon] - Optional icon component (from lucide-react)
- * @property {ReactNode} [action] - Optional action button or element
- * @property {string} [className] - Additional CSS classes
+ *
+ * @property {string} title - What is empty ("No invoices yet")
+ * @property {string} [description] - What to do about it
+ * @property {LucideIcon} [icon] - Illustrative icon
+ * @property {ReactNode} [action] - Call to action (usually a Button)
+ * @property {boolean} [bordered] - Dashed outline, for empty areas inside a page
+ * @property {boolean} [compact] - Less vertical padding, for cards and side panels
  */
 interface EmptyStateProps {
   title: string;
   description?: string;
   icon?: LucideIcon;
   action?: ReactNode;
+  bordered?: boolean;
+  compact?: boolean;
   className?: string;
 }
 
-/**
- * Reusable empty state component for displaying when no data is available.
- * 
- * Features:
- * - Centered layout with icon, title, and description
- * - Optional call-to-action button
- * - Responsive design
- * - Dark mode support
- * - Flexible icon display
- * - Consistent styling across application
- * 
- * @component
- * @example
- * // Basic empty state
- * <EmptyState 
- *   title="No expenses found"
- *   description="Get started by adding your first expense"
- * />
- * 
- * @example
- * // With icon
- * <EmptyState 
- *   icon={FileText}
- *   title="No invoices yet"
- *   description="Create your first invoice to get started"
- * />
- * 
- * @example
- * // With action button
- * <EmptyState 
- *   icon={Users}
- *   title="No clients yet"
- *   description="Add clients to start tracking your business"
- *   action={
- *     <Button onClick={handleAddClient}>
- *       <Plus className="w-5 h-5 mr-2" />
- *       Add Client
- *     </Button>
- *   }
- * />
- * 
- * @param {EmptyStateProps} props - Component props
- * @returns {JSX.Element} Empty state element
- */
 export const EmptyState: React.FC<EmptyStateProps> = ({
   title,
   description,
   icon: Icon,
   action,
+  bordered = false,
+  compact = false,
   className = '',
 }) => {
   return (
-    <div className={`flex flex-col items-center justify-center py-12 px-4 text-center ${className}`}>
+    <div
+      className={cn(
+        'flex animate-fade-up flex-col items-center justify-center px-6 text-center',
+        compact ? 'py-8' : 'py-14',
+        bordered && 'rounded-xl border border-dashed border-gray-300 bg-gray-50/50 dark:border-gray-800 dark:bg-gray-900/30',
+        className
+      )}
+    >
       {Icon && (
-        <div className="mb-4 rounded-full bg-gray-100 dark:bg-gray-800 p-6">
-          <Icon className="h-12 w-12 text-gray-400 dark:text-gray-500" />
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white text-gray-400 shadow-soft ring-1 ring-gray-200 dark:bg-gray-900 dark:text-gray-500 dark:ring-gray-800">
+          <Icon className="h-6 w-6" aria-hidden="true" />
         </div>
       )}
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-        {title}
-      </h3>
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h3>
       {description && (
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 max-w-md">
-          {description}
-        </p>
+        <p className="mt-1 max-w-sm text-sm text-gray-500 dark:text-gray-400">{description}</p>
       )}
-      {action && (
-        <div>
-          {action}
-        </div>
-      )}
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 };

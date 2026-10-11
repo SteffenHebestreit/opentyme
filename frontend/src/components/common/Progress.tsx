@@ -120,14 +120,14 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
         </div>
       )}
       <div
-        className={`w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700 ${sizeClasses[size]}`}
+        className={`w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800 ${sizeClasses[size]}`}
         role="progressbar"
         aria-valuenow={value}
         aria-valuemin={0}
         aria-valuemax={max}
       >
         <div
-          className={`h-full transition-all duration-300 ease-out ${variantClasses[variant]} ${
+          className={`h-full transition-[width] duration-700 ease-out-expo ${variantClasses[variant]} ${
             striped ? 'bg-stripes' : ''
           } ${animated ? 'animate-stripes' : ''}`}
           style={{ width: `${percentage}%` }}

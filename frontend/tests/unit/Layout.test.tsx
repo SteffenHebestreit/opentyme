@@ -1,220 +1,148 @@
-import { render, screen } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { createMemoryRouter, RouterProvider } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Layout from '../../src/components/common/Layout';
 import { AppProvider } from '../../src/store/AppContext';
 
-// Mock the AppContext
-const mockState = {
-  theme: 'light' as 'light' | 'dark',
-  user: null,
+// --- Mocks: auth, plugins, the running-timer query, i18n ---
+
+const mockAuth = {
   isAuthenticated: false,
-  loading: false,
-  error: null,
+  isAdmin: false,
+  user: { name: 'Ada Lovelace', email: 'ada@example.com', username: 'ada' } as unknown,
+  logout: jest.fn(),
 };
 
-jest.mock('../../src/store/AppContext', () => ({
-  ...jest.requireActual('../../src/store/AppContext'),
-  useApp: () => ({
-    state: mockState,
-    dispatch: jest.fn(),
+jest.mock('../../src/contexts/AuthContext', () => ({
+  useAuth: () => mockAuth,
+}));
+
+jest.mock('../../src/api/hooks/usePlugins', () => ({
+  usePlugins: () => ({ data: { plugins: [] } }),
+}));
+
+jest.mock('../../src/hooks/api/useTimeEntries', () => ({
+  useTimeEntries: () => ({ data: [] }),
+}));
+
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, fallback?: string) => fallback || key,
+    i18n: { language: 'en', resolvedLanguage: 'en', changeLanguage: jest.fn() },
   }),
 }));
 
-// Mock the Header component to simplify tests
-jest.mock('../../src/components/common/Header', () => {
-  return function MockHeader() {
-    return <header data-testid="mock-header">Header</header>;
-  };
-});
+const renderAt = (path: string, children: React.ReactNode = <div>Page Content</div>) => {
+  const router = createMemoryRouter([{ path: '*', element: <Layout>{children}</Layout> }], {
+    initialEntries: [path],
+  });
+  return render(
+    <QueryClientProvider client={new QueryClient()}>
+      <AppProvider>
+        <RouterProvider router={router} />
+      </AppProvider>
+    </QueryClientProvider>
+  );
+};
 
-// Wrapper component for tests
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <BrowserRouter>
-    <AppProvider>{children}</AppProvider>
-  </BrowserRouter>
-);
-
-describe('Layout Component', () => {
+describe('Layout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockState.theme = 'light';
+    mockAuth.isAuthenticated = false;
+    mockAuth.isAdmin = false;
+    localStorage.clear();
   });
 
-  it('renders layout with children', () => {
-    render(
-      <Layout>
-        <div>Test Content</div>
-      </Layout>,
-      { wrapper: Wrapper }
-    );
+  describe('public pages', () => {
+    it('renders the page inside main with the public header and footer', () => {
+      renderAt('/login');
+      expect(screen.getByRole('main')).toHaveTextContent('Page Content');
+      expect(screen.getByRole('banner')).toBeInTheDocument();
+      expect(screen.getByRole('contentinfo')).toHaveTextContent(/OpenTYME\. All rights reserved/);
+    });
 
-    expect(screen.getByText('Test Content')).toBeInTheDocument();
+    it('shows no sidebar navigation', () => {
+      renderAt('/login');
+      expect(screen.queryByRole('navigation', { name: /main navigation/i })).not.toBeInTheDocument();
+    });
+
+    it('keeps the landing page public for signed-in users', () => {
+      mockAuth.isAuthenticated = true;
+      renderAt('/');
+      expect(screen.queryByRole('navigation', { name: /main navigation/i })).not.toBeInTheDocument();
+    });
   });
 
-  it('renders the header', () => {
-    render(
-      <Layout>
-        <div>Content</div>
-      </Layout>,
-      { wrapper: Wrapper }
-    );
+  describe('signed-in pages', () => {
+    beforeEach(() => {
+      mockAuth.isAuthenticated = true;
+    });
 
-    expect(screen.getByTestId('mock-header')).toBeInTheDocument();
-  });
+    it('renders the sidebar with the main sections', () => {
+      renderAt('/dashboard');
+      const nav = screen.getAllByRole('navigation', { name: /main navigation/i })[0];
+      // the i18n mock returns each label's English fallback
+      for (const label of ['Dashboard', 'Time Tracking', 'Projects', 'Clients', 'Finances', 'Reports']) {
+        expect(within(nav).getByRole('link', { name: label })).toBeInTheDocument();
+      }
+    });
 
-  it('renders the footer', () => {
-    render(
-      <Layout>
-        <div>Content</div>
-      </Layout>,
-      { wrapper: Wrapper }
-    );
+    it('marks the current section as active', () => {
+      renderAt('/projects');
+      const nav = screen.getAllByRole('navigation', { name: /main navigation/i })[0];
+      expect(within(nav).getByRole('link', { name: 'Projects' })).toHaveAttribute('aria-current', 'page');
+      expect(within(nav).getByRole('link', { name: 'Clients' })).not.toHaveAttribute('aria-current');
+    });
 
-    expect(screen.getByText(/© 2026 OpenTYME/i)).toBeInTheDocument();
-  });
+    it('shows the system admin link only to admins', () => {
+      const { unmount } = renderAt('/dashboard');
+      expect(screen.queryByRole('link', { name: 'System Admin' })).not.toBeInTheDocument();
+      unmount();
 
-  it('renders main content area', () => {
-    render(
-      <Layout>
-        <div>Main Content</div>
-      </Layout>,
-      { wrapper: Wrapper }
-    );
+      mockAuth.isAdmin = true;
+      renderAt('/dashboard');
+      expect(screen.getByRole('link', { name: 'System Admin' })).toHaveAttribute('href', '/system-admin');
+    });
 
-    const main = screen.getByRole('main');
-    expect(main).toBeInTheDocument();
-    expect(main).toHaveTextContent('Main Content');
-  });
+    it('renders the page content in main', () => {
+      renderAt('/dashboard', <section data-testid="page"><h1>Page Title</h1></section>);
+      expect(within(screen.getByRole('main')).getByTestId('page')).toBeInTheDocument();
+    });
 
-  it('applies light theme styles by default', () => {
-    mockState.theme = 'light';
-    const { container } = render(
-      <Layout>
-        <div>Content</div>
-      </Layout>,
-      { wrapper: Wrapper }
-    );
+    it('renders the overlay outside the page', () => {
+      const router = createMemoryRouter(
+        [{ path: '*', element: <Layout overlay={<div data-testid="overlay" />}><div>Page</div></Layout> }],
+        { initialEntries: ['/dashboard'] }
+      );
+      render(
+        <QueryClientProvider client={new QueryClient()}>
+          <AppProvider>
+            <RouterProvider router={router} />
+          </AppProvider>
+        </QueryClientProvider>
+      );
+      expect(screen.getByTestId('overlay')).toBeInTheDocument();
+      expect(within(screen.getByRole('main')).queryByTestId('overlay')).not.toBeInTheDocument();
+    });
 
-    const layoutDiv = container.firstChild as HTMLElement;
-    expect(layoutDiv.className).toContain('light');
-    expect(layoutDiv.className).not.toContain('dark');
-  });
+    it('collapses the sidebar and remembers it', async () => {
+      const user = userEvent.setup();
+      renderAt('/dashboard');
+      await user.click(screen.getByRole('button', { name: /collapse sidebar/i }));
+      expect(screen.getByRole('button', { name: /expand sidebar/i })).toBeInTheDocument();
+      expect(localStorage.getItem('sidebar-collapsed')).toBe('1');
+    });
 
-  it('applies dark theme styles when theme is dark', () => {
-    mockState.theme = 'dark';
-    const { container } = render(
-      <Layout>
-        <div>Content</div>
-      </Layout>,
-      { wrapper: Wrapper }
-    );
-
-    const layoutDiv = container.firstChild as HTMLElement;
-    expect(layoutDiv.className).toContain('dark');
-    expect(layoutDiv.className).toContain('from-gray-900');
-  });
-
-  it('has min-height screen layout', () => {
-    const { container } = render(
-      <Layout>
-        <div>Content</div>
-      </Layout>,
-      { wrapper: Wrapper }
-    );
-
-    const layoutDiv = container.firstChild as HTMLElement;
-    expect(layoutDiv.className).toContain('min-h-screen');
-  });
-
-  it('uses flexbox layout', () => {
-    const { container } = render(
-      <Layout>
-        <div>Content</div>
-      </Layout>,
-      { wrapper: Wrapper }
-    );
-
-    const layoutDiv = container.firstChild as HTMLElement;
-    expect(layoutDiv.className).toContain('flex');
-    expect(layoutDiv.className).toContain('flex-col');
-  });
-
-  it('main content area grows to fill space', () => {
-    render(
-      <Layout>
-        <div>Content</div>
-      </Layout>,
-      { wrapper: Wrapper }
-    );
-
-    const main = screen.getByRole('main');
-    expect(main.className).toContain('flex-grow');
-  });
-
-  it('footer has proper styling', () => {
-    render(
-      <Layout>
-        <div>Content</div>
-      </Layout>,
-      { wrapper: Wrapper }
-    );
-
-    const footer = screen.getByRole('contentinfo');
-    expect(footer.className).toContain('text-center');
-    expect(footer.className).toContain('border-t');
-    expect(footer.className).toContain('backdrop-blur-sm');
-  });
-
-  it('renders multiple children', () => {
-    render(
-      <Layout>
-        <div>First Child</div>
-        <div>Second Child</div>
-        <div>Third Child</div>
-      </Layout>,
-      { wrapper: Wrapper }
-    );
-
-    expect(screen.getByText('First Child')).toBeInTheDocument();
-    expect(screen.getByText('Second Child')).toBeInTheDocument();
-    expect(screen.getByText('Third Child')).toBeInTheDocument();
-  });
-
-  it('preserves child component structure', () => {
-    render(
-      <Layout>
-        <section data-testid="custom-section">
-          <h1>Page Title</h1>
-          <p>Page content</p>
-        </section>
-      </Layout>,
-      { wrapper: Wrapper }
-    );
-
-    const section = screen.getByTestId('custom-section');
-    expect(section).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /page title/i })).toBeInTheDocument();
-  });
-
-  it('footer displays copyright year', () => {
-    render(
-      <Layout>
-        <div>Content</div>
-      </Layout>,
-      { wrapper: Wrapper }
-    );
-
-    expect(screen.getByText(/2026/)).toBeInTheDocument();
-  });
-
-  it('footer displays all rights reserved', () => {
-    render(
-      <Layout>
-        <div>Content</div>
-      </Layout>,
-      { wrapper: Wrapper }
-    );
-
-    expect(screen.getByText(/all rights reserved/i)).toBeInTheDocument();
+    it('opens the account menu with profile, settings and logout', async () => {
+      const user = userEvent.setup();
+      renderAt('/dashboard');
+      await user.click(screen.getByRole('button', { name: /user menu/i }));
+      const menu = screen.getByRole('menu');
+      expect(within(menu).getByText('Ada Lovelace')).toBeInTheDocument();
+      expect(within(menu).getByRole('menuitem', { name: /navigation.profile/ })).toHaveAttribute('href', '/profile');
+      await user.click(within(menu).getByRole('menuitem', { name: /buttons.logout/ }));
+      expect(mockAuth.logout).toHaveBeenCalledTimes(1);
+    });
   });
 });

@@ -1,5 +1,7 @@
-import { forwardRef } from 'react';
+import { forwardRef, useId } from 'react';
 import type { SelectHTMLAttributes } from 'react';
+import { cn } from '../../lib/cn';
+import { fieldClasses, fieldErrorClass, fieldHelperClass, fieldLabelClass, fieldWrapperClass } from './fieldStyles';
 
 /**
  * Available select size variants.
@@ -24,14 +26,7 @@ interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'siz
   selectSize?: SelectSize;
 }
 
-const baseClasses =
-  'block w-full bg-transparent border-0 border-b-2 border-gray-600 dark:border-gray-400 focus:outline-none focus:border-purple-500 dark:focus:border-purple-400 text-gray-900 dark:text-gray-100 transition-all duration-200 ease-in-out appearance-none cursor-pointer accent-purple-500';
 
-const sizeClasses = {
-  sm: 'px-2 py-1 text-sm',
-  md: 'px-2 py-2 text-base',
-  lg: 'px-2 py-3 text-lg',
-};
 
 /**
  * Flexible select component with validation and error handling.
@@ -78,18 +73,15 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
   children,
   ...props
 }, ref) => {
-  const selectId = props.id || `select-${Math.random().toString(36).substr(2, 9)}`;
+  const generatedId = useId();
+  const selectId = props.id || generatedId;
 
   return (
-    <div className="mb-6">
+    <div className={fieldWrapperClass}>
       {label && (
         <label 
           htmlFor={selectId}
-          className={`block mb-2 text-sm font-medium ${
-            error 
-              ? 'text-red-500 dark:text-red-400' 
-              : 'text-gray-700 dark:text-gray-300'
-          }`}
+          className={fieldLabelClass(!!error)}
         >
           {label}
         </label>
@@ -98,10 +90,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
         <select
           ref={ref}
           id={selectId}
-          className={`${baseClasses} ${
-            sizeClasses[selectSize]
-          } ${error ? 'border-red-500 focus:border-red-500' : ''} 
-          pr-8 ${className ?? ''}`}
+          className={cn(fieldClasses({ size: selectSize, error: !!error }), 'cursor-pointer appearance-none pr-9', className)}
+          aria-invalid={error ? true : undefined}
           disabled={disabled}
           {...props}
         >
@@ -109,9 +99,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
         </select>
         
         {/* Custom dropdown arrow */}
-        <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
           <svg
-            className={`w-4 h-4 ${error ? 'text-red-500' : 'text-gray-600 dark:text-gray-400'}`}
+            className={`h-4 w-4 ${error ? 'text-red-500' : 'text-gray-400 dark:text-gray-500'}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -121,10 +111,10 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
         </div>
       </div>
       {error && (
-        <p className="mt-1 text-xs text-red-500">{error}</p>
+        <p className={fieldErrorClass}>{error}</p>
       )}
       {!error && helperText && (
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{helperText}</p>
+        <p className={fieldHelperClass}>{helperText}</p>
       )}
     </div>
   );

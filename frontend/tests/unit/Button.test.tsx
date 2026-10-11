@@ -38,26 +38,26 @@ describe('Button', () => {
   it('renders with primary variant by default', () => {
     render(<Button>Primary</Button>);
     const button = screen.getByRole('button');
-    expect(button.className).toContain('from-purple-600');
+    expect(button.className).toContain('bg-purple-600');
   });
 
   it('renders with different variants', () => {
     const { rerender } = render(<Button variant="secondary">Secondary</Button>);
-    expect(screen.getByRole('button').className).toContain('bg-gray-800/50');
+    expect(screen.getByRole('button').className).toContain('border-gray-200');
 
     rerender(<Button variant="success">Success</Button>);
-    expect(screen.getByRole('button').className).toContain('bg-green-600');
+    expect(screen.getByRole('button').className).toContain('bg-emerald-600');
 
     rerender(<Button variant="danger">Danger</Button>);
-    expect(screen.getByRole('button').className).toContain('from-red-600');
+    expect(screen.getByRole('button').className).toContain('bg-red-600');
   });
 
   it('renders with different sizes', () => {
     const { rerender } = render(<Button size="sm">Small</Button>);
-    expect(screen.getByRole('button').className).toContain('px-3 py-1.5 text-sm');
+    expect(screen.getByRole('button').className).toContain('min-h-8 px-3 py-1 text-sm');
 
     rerender(<Button size="lg">Large</Button>);
-    expect(screen.getByRole('button').className).toContain('px-6 py-3 text-lg');
+    expect(screen.getByRole('button').className).toContain('min-h-11 px-5 py-2 text-base');
   });
 
   it('renders with left icon', () => {

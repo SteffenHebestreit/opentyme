@@ -1,43 +1,36 @@
 import React from 'react';
+import { cn } from '../../lib/cn';
 
 /**
- * Props for the Card container component.
- * 
- * @interface CardProps
- * @property {React.ReactNode} children - Content to render inside the card
- * @property {string} [className] - Additional CSS classes for customization
+ * Props for the Card component.
+ *
+ * @property {React.ReactNode} children - Card content
+ * @property {string} [className] - Additional CSS classes
+ * @property {boolean} [interactive] - Lift slightly on hover (for clickable cards)
  */
-interface CardProps {
+interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
   className?: string;
+  interactive?: boolean;
 }
 
 /**
- * Card container component for grouping related content.
- * 
- * Provides a white background with shadow and rounded corners.
- * Use with CardHeader, CardBody, and CardFooter subcomponents for structured layouts.
- * 
- * @component
+ * Surface container used for grouping content.
+ *
  * @example
- * // Basic card
  * <Card>
- *   <CardHeader title="User Profile" />
- *   <CardBody>Profile content here</CardBody>
+ *   <CardHeader title="Recent invoices" action={<Button size="sm">All</Button>} />
+ *   <CardBody>…</CardBody>
  * </Card>
- * 
- * @example
- * // Card with custom styling
- * <Card className="max-w-md">
- *   <CardBody>Narrow card content</CardBody>
- * </Card>
- * 
- * @param {CardProps} props - Component props
- * @returns {JSX.Element} Card container element
  */
-export const Card: React.FC<CardProps> = ({ children, className }) => (
+export const Card: React.FC<CardProps> = ({ children, className, interactive, ...rest }) => (
   <div
-    className={`bg-gray-800/50 backdrop-blur-lg border border-purple-500/20 rounded-2xl shadow-xl overflow-hidden ${className}`}
+    className={cn(
+      'overflow-hidden rounded-xl border border-gray-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-none',
+      interactive && 'surface-interactive',
+      className
+    )}
+    {...rest}
   >
     {children}
   </div>
@@ -45,52 +38,20 @@ export const Card: React.FC<CardProps> = ({ children, className }) => (
 
 /**
  * Props for the CardHeader component.
- * 
- * @interface CardHeaderProps
- * @property {string} [title] - Main header title text
- * @property {string} [subtitle] - Secondary subtitle text
- * @property {React.ReactNode} [action] - Action buttons or links (e.g., "Edit", "Delete")
- * @property {React.ReactNode} [children] - Alternative to action prop for custom content
- * @property {string} [className] - Additional CSS classes
+ *
+ * @property {string} [title] - Header title
+ * @property {string} [subtitle] - Secondary text below the title
+ * @property {React.ReactNode} [action] - Element on the right (buttons, links); replaces children
+ * @property {React.ReactNode} [children] - Rendered on the right when no action is given
  */
 interface CardHeaderProps {
   title?: string;
   subtitle?: string;
-  action?: React.ReactNode; // For buttons or links in the header
+  action?: React.ReactNode;
   children?: React.ReactNode;
   className?: string;
 }
 
-/**
- * CardHeader component for card title and actions.
- * 
- * Displays title/subtitle on the left and action buttons on the right.
- * Includes bottom border to separate from card body.
- * 
- * @component
- * @example
- * // Header with title and subtitle
- * <CardHeader 
- *   title="Project Details" 
- *   subtitle="Last updated 2 hours ago"
- * />
- * 
- * @example
- * // Header with action button
- * <CardHeader 
- *   title="Invoice #001"
- *   action={<Button size="sm">Edit</Button>}
- * />
- * 
- * @example
- * // Header with custom children
- * <CardHeader>
- *   <CustomHeaderContent />
- * </CardHeader>
- * 
- * @param {CardHeaderProps} props - Component props
- * @returns {JSX.Element} Card header element
- */
 export const CardHeader: React.FC<CardHeaderProps> = ({
   title,
   subtitle,
@@ -99,103 +60,52 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
   className,
 }) => (
   <div
-    className={`px-6 py-4 border-b border-purple-500/20 flex justify-between items-center ${className}`}
+    className={cn(
+      'flex items-center justify-between gap-4 border-b border-gray-100 px-6 py-4 dark:border-gray-800',
+      className
+    )}
   >
     {(title || subtitle) && (
-      <div>
+      <div className="min-w-0">
         {title && (
-          <h3 className="text-lg leading-6 font-medium text-gray-100">
+          <h3 className="truncate text-base font-semibold tracking-tight text-gray-900 dark:text-gray-100">
             {title}
           </h3>
         )}
         {subtitle && (
-          <p className="mt-1 text-sm text-gray-400">{subtitle}</p>
+          <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
         )}
       </div>
     )}
     {(action || children) && (
-      <div>{action || children}</div>
+      <div className="flex shrink-0 items-center gap-2">{action || children}</div>
     )}
   </div>
 );
 
-/**
- * Props for the CardBody component.
- * 
- * @interface CardBodyProps
- * @property {React.ReactNode} children - Main card content
- * @property {string} [className] - Additional CSS classes
- */
 interface CardBodyProps {
   children: React.ReactNode;
   className?: string;
 }
 
-/**
- * CardBody component for main card content.
- * 
- * Provides consistent padding for card content area.
- * 
- * @component
- * @example
- * <CardBody>
- *   <p>This is the main content</p>
- * </CardBody>
- * 
- * @example
- * // With custom styling
- * <CardBody className="space-y-4">
- *   <p>Paragraph 1</p>
- *   <p>Paragraph 2</p>
- * </CardBody>
- * 
- * @param {CardBodyProps} props - Component props
- * @returns {JSX.Element} Card body element
- */
 export const CardBody: React.FC<CardBodyProps> = ({ children, className }) => (
-  <div className={`px-6 py-4 ${className}`}>{children}</div>
+  <div className={cn('px-6 py-4', className)}>{children}</div>
 );
 
-/**
- * Props for the CardFooter component.
- * 
- * @interface CardFooterProps
- * @property {React.ReactNode} children - Footer content (typically buttons or links)
- * @property {string} [className] - Additional CSS classes
- */
 interface CardFooterProps {
   children: React.ReactNode;
   className?: string;
 }
 
-/**
- * CardFooter component for card action area.
- * 
- * Provides light gray background with top border to separate from body.
- * Typically used for action buttons or metadata.
- * 
- * @component
- * @example
- * <CardFooter>
- *   <Button>Save</Button>
- *   <Button variant="secondary">Cancel</Button>
- * </CardFooter>
- * 
- * @example
- * // With custom styling
- * <CardFooter className="flex justify-end space-x-2">
- *   <Button>Submit</Button>
- * </CardFooter>
- * 
- * @param {CardFooterProps} props - Component props
- * @returns {JSX.Element} Card footer element
- */
 export const CardFooter: React.FC<CardFooterProps> = ({
   children,
   className,
 }) => (
   <div
-    className={`px-6 py-4 border-t border-gray-200 bg-gray-50 ${className}`}
+    className={cn(
+      'border-t border-gray-100 bg-gray-50 px-6 py-4 dark:border-gray-800 dark:bg-gray-900/60',
+      className
+    )}
   >
     {children}
   </div>

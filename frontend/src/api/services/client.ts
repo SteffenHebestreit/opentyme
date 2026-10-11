@@ -9,6 +9,7 @@
 
 import axios from 'axios';
 import { setupAuthInterceptor } from '../interceptors/auth.interceptor';
+import { isDataWrite, notifyDataChanged } from '../../lib/dataSync';
 
 /**
  * Create an Axios instance for API calls
@@ -30,5 +31,11 @@ const apiClient = axios.create({
  * and handles 401 Unauthorized responses by redirecting to login.
  */
 setupAuthInterceptor(apiClient);
+
+// Any successful write refreshes the data derived from it (dashboard, charts, …)
+apiClient.interceptors.response.use((response) => {
+  if (isDataWrite(response)) notifyDataChanged();
+  return response;
+});
 
 export default apiClient;

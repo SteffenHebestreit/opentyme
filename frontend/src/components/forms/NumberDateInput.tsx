@@ -1,4 +1,6 @@
 import { forwardRef } from 'react';
+import { cn } from '../../lib/cn';
+import { fieldClasses, fieldErrorClass, fieldHelperClass, fieldLabelClass, fieldWrapperClass } from './fieldStyles';
 import type { InputHTMLAttributes } from 'react';
 
 /**
@@ -104,15 +106,11 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(({
   };
 
   return (
-    <div className="mb-6">
+    <div className={fieldWrapperClass}>
       {label && (
         <label 
           htmlFor={inputId}
-          className={`block mb-2 text-sm font-medium ${
-            error 
-              ? 'text-red-500 dark:text-red-400' 
-              : 'text-gray-700 dark:text-gray-300'
-          }`}
+          className={fieldLabelClass(!!error)}
         >
           {label}
         </label>
@@ -133,15 +131,13 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(({
           max={max}
           step={step}
           disabled={disabled}
-          className={`block w-full bg-transparent border-0 border-b-2 
-            ${error ? 'border-red-500' : 'border-gray-600 dark:border-gray-400'}
-            focus:outline-none 
-            ${error ? 'focus:border-red-500' : 'focus:border-purple-500 dark:focus:border-purple-400'}
-            text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 
-            transition-all duration-200 ease-in-out px-2 py-2
-            ${prefix ? 'pl-8' : ''}
-            ${suffix || showButtons ? 'pr-20' : ''}
-            ${className}`}
+          className={cn(
+            fieldClasses({ error: !!error }),
+            'tabular-nums',
+            prefix && 'pl-8',
+            (suffix || showButtons) && 'pr-20',
+            className
+          )}
           {...props}
         />
         {suffix && !showButtons && (
@@ -150,7 +146,7 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(({
           </span>
         )}
         {showButtons && (
-          <div className="absolute right-0 flex">
+          <div className="absolute right-1 flex">
             <button
               type="button"
               onClick={handleDecrement}
@@ -177,10 +173,10 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(({
         )}
       </div>
       {error && (
-        <p className="mt-1 text-xs text-red-500">{error}</p>
+        <p className={fieldErrorClass}>{error}</p>
       )}
       {!error && helperText && (
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{helperText}</p>
+        <p className={fieldHelperClass}>{helperText}</p>
       )}
     </div>
   );
@@ -225,15 +221,11 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(({
   const inputId = props.id || `date-${Math.random().toString(36).substr(2, 9)}`;
 
   return (
-    <div className="mb-6">
+    <div className={fieldWrapperClass}>
       {label && (
         <label 
           htmlFor={inputId}
-          className={`block mb-2 text-sm font-medium ${
-            error 
-              ? 'text-red-500 dark:text-red-400' 
-              : 'text-gray-700 dark:text-gray-300'
-          }`}
+          className={fieldLabelClass(!!error)}
         >
           {label}
         </label>
@@ -243,20 +235,14 @@ export const DateInput = forwardRef<HTMLInputElement, DateInputProps>(({
         id={inputId}
         type="date"
         disabled={disabled}
-        className={`block w-full bg-transparent border-0 border-b-2 
-          ${error ? 'border-red-500' : 'border-gray-600 dark:border-gray-400'}
-          focus:outline-none 
-          ${error ? 'focus:border-red-500' : 'focus:border-purple-500 dark:focus:border-purple-400'}
-          text-gray-900 dark:text-gray-100 
-          transition-all duration-200 ease-in-out px-2 py-2
-          ${className}`}
+        className={cn(fieldClasses({ error: !!error }), className)}
         {...props}
       />
       {error && (
-        <p className="mt-1 text-xs text-red-500">{error}</p>
+        <p className={fieldErrorClass}>{error}</p>
       )}
       {!error && helperText && (
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{helperText}</p>
+        <p className={fieldHelperClass}>{helperText}</p>
       )}
     </div>
   );

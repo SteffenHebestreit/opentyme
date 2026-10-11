@@ -3,15 +3,14 @@ import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router-dom';
 import Header from '../../src/components/common/Header';
 
-// --- Mock app + auth + plugin + i18n dependencies the Header relies on ---
+// --- Mock app + auth + i18n dependencies the public Header relies on ---
 
 const mockDispatch = jest.fn();
 const mockState = {
   theme: 'light' as 'light' | 'dark',
+  themePreference: 'light' as 'light' | 'dark' | 'system',
   user: null,
   isAuthenticated: false,
-  loading: false,
-  error: null,
 };
 
 jest.mock('../../src/store/AppContext', () => ({
@@ -21,17 +20,13 @@ jest.mock('../../src/store/AppContext', () => ({
 
 const mockAuth = {
   isAuthenticated: false,
-  user: null as any,
+  user: null as unknown,
   isAdmin: false,
   logout: jest.fn(),
 };
 
 jest.mock('../../src/contexts/AuthContext', () => ({
   useAuth: () => mockAuth,
-}));
-
-jest.mock('../../src/api/hooks/usePlugins', () => ({
-  usePlugins: () => ({ data: { plugins: [] } }),
 }));
 
 jest.mock('react-i18next', () => ({
@@ -45,13 +40,11 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <BrowserRouter>{children}</BrowserRouter>
 );
 
-describe('Header Component', () => {
+describe('Header (public pages)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockState.theme = 'light';
     mockAuth.isAuthenticated = false;
-    mockAuth.user = null;
-    mockAuth.isAdmin = false;
   });
 
   it('renders the header banner', () => {
@@ -59,65 +52,49 @@ describe('Header Component', () => {
     expect(screen.getByRole('banner')).toBeInTheDocument();
   });
 
-  it('displays the OpenTYME brand link to "/" when unauthenticated', () => {
+  it('links the brand to "/" when unauthenticated', () => {
     render(<Header />, { wrapper: Wrapper });
-    const logo = screen.getByRole('link', { name: /opentyme/i });
-    expect(logo).toBeInTheDocument();
-    expect(logo).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: /opentyme/i })).toHaveAttribute('href', '/');
   });
 
   it('links the brand to /dashboard when authenticated', () => {
     mockAuth.isAuthenticated = true;
     render(<Header />, { wrapper: Wrapper });
-    const logo = screen.getByRole('link', { name: /opentyme/i });
-    expect(logo).toHaveAttribute('href', '/dashboard');
+    expect(screen.getByRole('link', { name: /opentyme/i })).toHaveAttribute('href', '/dashboard');
+  });
+
+  it('offers sign-in when unauthenticated and the dashboard when signed in', () => {
+    const { rerender } = render(<Header />, { wrapper: Wrapper });
+    expect(screen.getByRole('link', { name: 'buttons.login' })).toHaveAttribute('href', '/login');
+
+    mockAuth.isAuthenticated = true;
+    rerender(<Header />);
+    expect(screen.getByRole('link', { name: /navigation.dashboard/ })).toHaveAttribute('href', '/dashboard');
   });
 
   it('renders an accessible theme toggle button', () => {
     render(<Header />, { wrapper: Wrapper });
-    const themeButton = screen.getByRole('button', { name: /toggle theme/i });
-    expect(themeButton).toBeInTheDocument();
-    expect(themeButton).toHaveAccessibleName();
+    expect(screen.getByRole('button', { name: /toggle theme/i })).toHaveAccessibleName();
   });
 
-  it('displays the moon icon when theme is light', () => {
-    mockState.theme = 'light';
-    render(<Header />, { wrapper: Wrapper });
-    const themeButton = screen.getByRole('button', { name: /toggle theme/i });
-    expect(themeButton.querySelector('svg path[d*="21.752"]')).toBeInTheDocument();
-  });
-
-  it('displays the sun icon when theme is dark', () => {
-    mockState.theme = 'dark';
-    render(<Header />, { wrapper: Wrapper });
-    const themeButton = screen.getByRole('button', { name: /toggle theme/i });
-    expect(themeButton.querySelector('svg path[d*="M12 3v2.25"]')).toBeInTheDocument();
-  });
-
-  it('toggles theme from light to dark', async () => {
+  it('switches from light to dark', async () => {
     const user = userEvent.setup();
-    mockState.theme = 'light';
     render(<Header />, { wrapper: Wrapper });
-
     await user.click(screen.getByRole('button', { name: /toggle theme/i }));
-
     expect(mockDispatch).toHaveBeenCalledWith({ type: 'SET_THEME', payload: 'dark' });
   });
 
-  it('toggles theme from dark to light', async () => {
-    const user = userEvent.setup();
+  it('switches from dark to light', async () => {
     mockState.theme = 'dark';
+    const user = userEvent.setup();
     render(<Header />, { wrapper: Wrapper });
-
     await user.click(screen.getByRole('button', { name: /toggle theme/i }));
-
     expect(mockDispatch).toHaveBeenCalledWith({ type: 'SET_THEME', payload: 'light' });
   });
 
   it('dispatches the theme action once per click', async () => {
     const user = userEvent.setup();
     render(<Header />, { wrapper: Wrapper });
-
     const themeButton = screen.getByRole('button', { name: /toggle theme/i });
     await user.click(themeButton);
     expect(mockDispatch).toHaveBeenCalledTimes(1);
@@ -125,28 +102,8 @@ describe('Header Component', () => {
     expect(mockDispatch).toHaveBeenCalledTimes(2);
   });
 
-  it('applies light-mode background classes when theme is light', () => {
-    mockState.theme = 'light';
-    render(<Header />, { wrapper: Wrapper });
-    expect(screen.getByRole('banner').className).toContain('bg-white');
-  });
-
-  it('applies dark-mode background classes when theme is dark', () => {
-    mockState.theme = 'dark';
-    render(<Header />, { wrapper: Wrapper });
-    expect(screen.getByRole('banner').className).toContain('bg-gray-900');
-  });
-
-  it('shows the desktop navigation (hidden on mobile) when authenticated', () => {
+  it('has no app navigation — signed-in pages use the sidebar shell', () => {
     mockAuth.isAuthenticated = true;
-    render(<Header />, { wrapper: Wrapper });
-    const nav = screen.getByRole('navigation');
-    expect(nav.className).toContain('hidden');
-    expect(nav.className).toContain('md:flex');
-  });
-
-  it('hides navigation when not authenticated', () => {
-    mockAuth.isAuthenticated = false;
     render(<Header />, { wrapper: Wrapper });
     expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
   });

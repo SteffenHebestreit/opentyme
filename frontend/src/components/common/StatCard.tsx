@@ -1,16 +1,15 @@
 import React, { ReactNode } from 'react';
 import { LucideIcon } from 'lucide-react';
+import { cn } from '../../lib/cn';
+import { AnimatedNumber } from './AnimatedNumber';
 
-/**
- * Available stat card color variants.
- * @type {('blue' | 'green' | 'yellow' | 'red' | 'purple' | 'indigo' | 'pink' | 'teal' | 'orange')}
- */
-export type StatCardVariant = 
-  | 'blue' 
-  | 'green' 
-  | 'yellow' 
-  | 'red' 
-  | 'purple' 
+/** Accent colour of the stat's icon. */
+export type StatCardVariant =
+  | 'blue'
+  | 'green'
+  | 'yellow'
+  | 'red'
+  | 'purple'
   | 'indigo'
   | 'pink'
   | 'teal'
@@ -18,162 +17,94 @@ export type StatCardVariant =
 
 /**
  * Props for the StatCard component.
- * 
- * @interface StatCardProps
- * @property {string} label - Stat label/title
- * @property {string | number} value - Main stat value to display
- * @property {StatCardVariant} [variant='blue'] - Color variant
- * @property {LucideIcon} [icon] - Optional icon component (from lucide-react)
- * @property {string} [trend] - Optional trend indicator (e.g., "+12%", "-5%")
- * @property {string} [className] - Additional CSS classes
- * @property {ReactNode} [footer] - Optional footer content
+ *
+ * @property {string} label - Metric name
+ * @property {string | number} value - Display value; numbers count up and highlight on change
+ * @property {(value: number) => string} [format] - Formats a numeric value (currency, hours, …)
+ * @property {StatCardVariant} [variant='blue'] - Icon accent colour
+ * @property {LucideIcon} [icon] - Icon component
+ * @property {string} [trend] - "+12%" / "-3%" — coloured by sign
+ * @property {ReactNode} [hint] - Small text under the value
+ * @property {ReactNode} [footer] - Content below a divider
  */
 interface StatCardProps {
   label: string;
   value: string | number;
+  format?: (value: number) => string;
   variant?: StatCardVariant;
   icon?: LucideIcon;
   trend?: string;
+  hint?: ReactNode;
   className?: string;
   footer?: ReactNode;
 }
 
-const variantClasses: Record<StatCardVariant, { bg: string; border: string; icon: string }> = {
-  blue: {
-    bg: 'bg-blue-50 dark:bg-blue-900/20',
-    border: 'border-blue-200 dark:border-blue-900/30',
-    icon: 'text-blue-600 dark:text-blue-400',
-  },
-  green: {
-    bg: 'bg-green-50 dark:bg-green-900/20',
-    border: 'border-green-200 dark:border-green-900/30',
-    icon: 'text-green-600 dark:text-green-400',
-  },
-  yellow: {
-    bg: 'bg-yellow-50 dark:bg-yellow-900/20',
-    border: 'border-yellow-200 dark:border-yellow-900/30',
-    icon: 'text-yellow-600 dark:text-yellow-400',
-  },
-  red: {
-    bg: 'bg-red-50 dark:bg-red-900/20',
-    border: 'border-red-200 dark:border-red-900/30',
-    icon: 'text-red-600 dark:text-red-400',
-  },
-  purple: {
-    bg: 'bg-purple-50 dark:bg-purple-900/20',
-    border: 'border-purple-200 dark:border-purple-900/30',
-    icon: 'text-purple-600 dark:text-purple-400',
-  },
-  indigo: {
-    bg: 'bg-indigo-50 dark:bg-indigo-900/20',
-    border: 'border-indigo-200 dark:border-indigo-900/30',
-    icon: 'text-indigo-600 dark:text-indigo-400',
-  },
-  pink: {
-    bg: 'bg-pink-50 dark:bg-pink-900/20',
-    border: 'border-pink-200 dark:border-pink-900/30',
-    icon: 'text-pink-600 dark:text-pink-400',
-  },
-  teal: {
-    bg: 'bg-teal-50 dark:bg-teal-900/20',
-    border: 'border-teal-200 dark:border-teal-900/30',
-    icon: 'text-teal-600 dark:text-teal-400',
-  },
-  orange: {
-    bg: 'bg-orange-50 dark:bg-orange-900/20',
-    border: 'border-orange-200 dark:border-orange-900/30',
-    icon: 'text-orange-600 dark:text-orange-400',
-  },
+export const statAccentClasses: Record<StatCardVariant, string> = {
+  blue: 'bg-blue-50 text-blue-600 ring-blue-600/10 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-400/20',
+  green: 'bg-emerald-50 text-emerald-600 ring-emerald-600/10 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-400/20',
+  yellow: 'bg-amber-50 text-amber-600 ring-amber-600/10 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-400/20',
+  red: 'bg-red-50 text-red-600 ring-red-600/10 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-400/20',
+  purple: 'bg-purple-50 text-purple-600 ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20',
+  indigo: 'bg-indigo-50 text-indigo-600 ring-indigo-600/10 dark:bg-indigo-500/10 dark:text-indigo-400 dark:ring-indigo-400/20',
+  pink: 'bg-pink-50 text-pink-600 ring-pink-600/10 dark:bg-pink-500/10 dark:text-pink-400 dark:ring-pink-400/20',
+  teal: 'bg-teal-50 text-teal-600 ring-teal-600/10 dark:bg-teal-500/10 dark:text-teal-400 dark:ring-teal-400/20',
+  orange: 'bg-orange-50 text-orange-600 ring-orange-600/10 dark:bg-orange-500/10 dark:text-orange-400 dark:ring-orange-400/20',
 };
 
 /**
- * Reusable stat card component for displaying metrics and statistics.
- * 
- * Features:
- * - Color-coded variants for different metric types
- * - Optional icon display
- * - Optional trend indicator
- * - Optional footer content
- * - Rounded corners with border and background
- * - Dark mode support
- * - Responsive padding
- * 
- * @component
+ * Key-figure tile: label, big value, optional icon, trend and footer.
+ *
  * @example
- * // Basic stat card
- * <StatCard 
- *   label="Total Revenue" 
- *   value="$12,345" 
- *   variant="green"
- * />
- * 
- * @example
- * // With icon and trend
- * <StatCard 
- *   label="Total Expenses" 
- *   value="$5,678" 
- *   variant="red"
- *   icon={TrendingDown}
- *   trend="-12%"
- * />
- * 
- * @example
- * // With footer
- * <StatCard 
- *   label="Pending Invoices" 
- *   value={23}
- *   variant="blue"
- *   footer={<a href="/invoices" className="text-sm">View all →</a>}
- * />
- * 
- * @param {StatCardProps} props - Component props
- * @returns {JSX.Element} Stat card element
+ * <StatCard label="Hours this week" value={32.5} format={(h) => `${h.toFixed(1)} h`} icon={Clock} variant="purple" />
  */
 export const StatCard: React.FC<StatCardProps> = ({
   label,
   value,
+  format,
   variant = 'blue',
   icon: Icon,
   trend,
+  hint,
   className = '',
   footer,
 }) => {
-  const colors = variantClasses[variant];
-
   return (
     <div
-      className={`rounded-lg border ${colors.border} ${colors.bg} p-4 ${className}`}
+      className={cn(
+        'rounded-xl border border-gray-200 bg-white p-5 shadow-soft transition-colors dark:border-gray-800 dark:bg-gray-900 dark:shadow-none',
+        className
+      )}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-            {label}
-          </p>
-          <div className="mt-1 flex items-baseline gap-2">
-            <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-              {value}
-            </p>
-            {trend && (
-              <span className={`text-sm font-medium ${
-                trend.startsWith('+') 
-                  ? 'text-green-600 dark:text-green-400' 
-                  : trend.startsWith('-')
-                  ? 'text-red-600 dark:text-red-400'
-                  : 'text-gray-600 dark:text-gray-400'
-              }`}>
-                {trend}
-              </span>
-            )}
-          </div>
-        </div>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</p>
         {Icon && (
-          <div className={`rounded-lg p-2 ${colors.icon}`}>
-            <Icon className="h-5 w-5" />
-          </div>
+          <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset', statAccentClasses[variant])}>
+            <Icon className="h-4 w-4" aria-hidden="true" />
+          </span>
         )}
       </div>
+      <div className="mt-2 flex items-baseline gap-2">
+        <p className="text-2xl font-semibold tracking-tight text-gray-900 tabular-nums dark:text-white">
+          {typeof value === 'number' ? <AnimatedNumber value={value} format={format} /> : value}
+        </p>
+        {trend && (
+          <span
+            className={cn(
+              'text-sm font-medium tabular-nums',
+              trend.startsWith('+')
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : trend.startsWith('-')
+                ? 'text-red-600 dark:text-red-400'
+                : 'text-gray-500 dark:text-gray-400'
+            )}
+          >
+            {trend}
+          </span>
+        )}
+      </div>
+      {hint && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{hint}</p>}
       {footer && (
-        <div className="mt-3 border-t border-gray-200 dark:border-gray-700 pt-3">
+        <div className="mt-4 border-t border-gray-100 pt-3 dark:border-gray-800">
           {footer}
         </div>
       )}

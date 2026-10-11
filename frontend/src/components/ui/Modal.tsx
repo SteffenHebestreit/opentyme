@@ -1,178 +1,218 @@
-import { FC, ReactNode, useEffect } from 'react';
+import { FC, ReactNode, useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
-import clsx from 'clsx';
-
-/**
- * Modal component for displaying overlay dialogs and forms.
- *
- * **Features:**
- * - Portal-based rendering to `document.body`
- * - Backdrop overlay with blur effect
- * - Configurable sizes (sm, md, lg, xl)
- * - Keyboard support (Escape to close)
- * - Body scroll lock when open
- * - Optional header and footer sections
- * - ARIA accessibility attributes
- * - Dark mode support
- *
- * **Keyboard Interactions:**
- * - `Escape`: Closes the modal
- *
- * **Accessibility:**
- * - Uses `role="dialog"` and `aria-modal="true"`
- * - Title linked via `aria-labelledby`
- * - Close button has `aria-label`
- *
- * @component
- * @example
- * // Basic modal
- * <Modal
- *   open={isOpen}
- *   title="Confirm Delete"
- *   onClose={() => setIsOpen(false)}
- * >
- *   <p>Are you sure you want to delete this item?</p>
- * </Modal>
- *
- * @example
- * // Modal with footer actions
- * <Modal
- *   open={showModal}
- *   title="Edit Profile"
- *   size="lg"
- *   footer={
- *     <>
- *       <Button variant="outline" onClick={onCancel}>
- *         Cancel
- *       </Button>
- *       <Button variant="primary" onClick={onSave}>
- *         Save Changes
- *       </Button>
- *     </>
- *   }
- *   onClose={onCancel}
- * >
- *   <ProfileForm data={profile} onChange={setProfile} />
- * </Modal>
- *
- * @example
- * // Small confirmation modal
- * <Modal
- *   open={confirmDelete}
- *   title="Delete Item?"
- *   size="sm"
- *   footer={
- *     <>
- *       <Button variant="outline" onClick={() => setConfirmDelete(false)}>
- *         Cancel
- *       </Button>
- *       <Button variant="danger" onClick={handleDelete}>
- *         Delete
- *       </Button>
- *     </>
- *   }
- *   onClose={() => setConfirmDelete(false)}
- * >
- *   <p className="text-gray-600 dark:text-gray-300">
- *     This action cannot be undone.
- *   </p>
- * </Modal>
- */
+import { cn } from '../../lib/cn';
+import { usePresence } from '../../hooks/ui/usePresence';
 
 /**
  * Props for the Modal component.
  *
- * @interface ModalProps
- * @property {boolean} open - Whether the modal is visible
- * @property {string} [title] - Optional title displayed in the header
- * @property {ReactNode} children - Modal content body
- * @property {ReactNode} [footer] - Optional footer content (typically buttons)
- * @property {() => void} onClose - Callback when modal should close
- * @property {'sm' | 'md' | 'lg' | 'xl'} [size='md'] - Modal width size variant
+ * @property {boolean} open - Whether the dialog is shown
+ * @property {string} [title] - Heading in the dialog header
+ * @property {ReactNode} [description] - One line under the title
+ * @property {ReactNode} [icon] - Element shown before the title
+ * @property {ReactNode} [footer] - Actions; stays visible while the body scrolls
+ * @property {() => void} onClose - Called on Escape, backdrop click and the close button
+ * @property {'sm' | 'md' | 'lg' | 'xl' | 'full'} [size='md'] - Max width
+ * @property {boolean} [closeOnBackdrop=true] - Close when the backdrop is clicked
+ * @property {boolean} [closeOnEsc=true] - Close on Escape
+ * @property {boolean} [showCloseButton=true] - Show the × in the header
  */
 interface ModalProps {
   open: boolean;
   title?: string;
+  description?: ReactNode;
+  icon?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
   onClose: () => void;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  closeOnBackdrop?: boolean;
+  closeOnEsc?: boolean;
+  showCloseButton?: boolean;
+  className?: string;
+  bodyClassName?: string;
 }
 
 const sizeClass: Record<NonNullable<ModalProps['size']>, string> = {
-  sm: 'max-w-md',
-  md: 'max-w-2xl',
-  lg: 'max-w-4xl',
-  xl: 'max-w-6xl',
+  sm: 'sm:max-w-md',
+  md: 'sm:max-w-2xl',
+  lg: 'sm:max-w-4xl',
+  xl: 'sm:max-w-6xl',
+  full: 'sm:max-w-[min(96vw,1600px)]',
 };
 
-export const Modal: FC<ModalProps> = ({ open, title, children, footer, onClose, size = 'md' }) => {
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
+/* Open dialogs, innermost last — only the top one reacts to Escape. */
+const openStack: string[] = [];
+let scrollLocks = 0;
+let previousOverflow = '';
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Accessible dialog with enter/exit animation.
+ *
+ * - Escape and backdrop click close it (only the top-most when dialogs are stacked)
+ * - Focus moves into the dialog, Tab stays inside, and returns to the opener on close
+ * - Page scroll is locked while any dialog is open
+ * - Content is kept for the exit animation, so it doesn't collapse while fading out
+ */
+export const Modal: FC<ModalProps> = ({
+  open,
+  title,
+  description,
+  icon,
+  children,
+  footer,
+  onClose,
+  size = 'md',
+  closeOnBackdrop = true,
+  closeOnEsc = true,
+  showCloseButton = true,
+  className,
+  bodyClassName,
+}) => {
+  const { mounted, closing } = usePresence(open, 150);
+  const id = useId();
+  const titleId = `${id}-title`;
+  const panelRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Freeze what is shown while the exit animation runs
+  const lastContent = useRef({ children, footer, title, description });
+  if (open) lastContent.current = { children, footer, title, description };
+  const shown = open ? { children, footer, title, description } : lastContent.current;
+
+  // Stack, Escape, focus handling
+  useEffect(() => {
+    if (!open) return;
+    openStack.push(id);
+    const opener = document.activeElement as HTMLElement | null;
+
+    const focusFrame = requestAnimationFrame(() => {
+      const panel = panelRef.current;
+      if (!panel || panel.contains(document.activeElement)) return;
+      const preferred = panel.querySelector<HTMLElement>('[autofocus], [data-autofocus]');
+      (preferred ?? panel).focus({ preventScroll: true });
+    });
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (openStack[openStack.length - 1] !== id) return;
+      if (event.key === 'Escape' && closeOnEsc) {
+        event.stopPropagation();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key === 'Tab' && panelRef.current) {
+        const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+          (el) => el.offsetParent !== null
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          last.focus();
+          event.preventDefault();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          first.focus();
+          event.preventDefault();
+        }
       }
     };
+    document.addEventListener('keydown', onKeyDown);
 
-    document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      cancelAnimationFrame(focusFrame);
+      document.removeEventListener('keydown', onKeyDown);
+      const index = openStack.lastIndexOf(id);
+      if (index !== -1) openStack.splice(index, 1);
+      if (opener && document.contains(opener)) opener.focus({ preventScroll: true });
     };
-  }, [open, onClose]);
+  }, [open, id, closeOnEsc]);
 
+  // Scroll lock (counted, so nested dialogs restore correctly)
   useEffect(() => {
-    if (!open) {
-      return;
+    if (!open) return;
+    if (scrollLocks === 0) {
+      previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
     }
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    scrollLocks += 1;
     return () => {
-      document.body.style.overflow = originalOverflow;
+      scrollLocks -= 1;
+      if (scrollLocks === 0) document.body.style.overflow = previousOverflow;
     };
   }, [open]);
 
-  if (!open) {
+  if (!mounted) {
     return null;
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 sm:px-6">
-      <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6">
       <div
-        className={clsx(
-          'relative z-10 w-full rounded-2xl bg-white shadow-xl transition-all dark:bg-gray-900',
-          sizeClass[size]
+        className={cn(
+          'absolute inset-0 bg-gray-950/40 backdrop-blur-[2px] dark:bg-black/60',
+          closing ? 'animate-fade-out' : 'animate-fade-in'
+        )}
+        onClick={closeOnBackdrop ? () => onCloseRef.current() : undefined}
+        aria-hidden="true"
+      />
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        className={cn(
+          'relative z-10 flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-overlay outline-none',
+          'sm:max-h-[min(90dvh,960px)] sm:rounded-2xl',
+          'dark:border-gray-800 dark:bg-gray-900',
+          closing ? 'animate-scale-out' : 'animate-scale-in',
+          sizeClass[size],
+          className
         )}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={title ? 'modal-title' : undefined}
+        aria-labelledby={shown.title ? titleId : undefined}
+        aria-label={shown.title ? undefined : 'Dialog'}
       >
-        <div className="flex items-start justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-800">
-          {title ? (
-            <h2 id="modal-title" className="text-lg font-semibold text-gray-900 dark:text-white">
-              {title}
-            </h2>
-          ) : (
-            <span className="sr-only">Modal</span>
-          )}
-          <button
-            type="button"
-            className="rounded-full p-2 text-gray-500 transition hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:text-gray-300 dark:hover:bg-gray-800"
-            aria-label="Close modal"
-            onClick={onClose}
-          >
-            <X className="h-5 w-5" />
-          </button>
+        {(shown.title || showCloseButton) && (
+          <div className="flex shrink-0 items-start justify-between gap-4 border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+            <div className="flex min-w-0 items-center gap-3">
+              {icon && (
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-purple-600 ring-1 ring-inset ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+                  {icon}
+                </span>
+              )}
+              <div className="min-w-0">
+                {shown.title && (
+                  <h2 id={titleId} className="truncate text-base font-semibold tracking-tight text-gray-900 dark:text-white">
+                    {shown.title}
+                  </h2>
+                )}
+                {shown.description && (
+                  <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{shown.description}</p>
+                )}
+              </div>
+            </div>
+            {showCloseButton && (
+              <button
+                type="button"
+                className="-mr-2 -mt-1 rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                aria-label="Close modal"
+                onClick={() => onCloseRef.current()}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+        )}
+        <div className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-5', bodyClassName)}>
+          {shown.children}
         </div>
-        <div className="max-h-[70vh] overflow-y-auto px-6 py-5">{children}</div>
-        {footer && (
-          <div className="flex flex-col-reverse gap-3 border-t border-gray-200 px-6 py-4 sm:flex-row sm:items-center sm:justify-end dark:border-gray-800">
-            {footer}
+        {shown.footer && (
+          <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-3.5 sm:flex-row sm:items-center sm:justify-end dark:border-gray-800 dark:bg-gray-900/60">
+            {shown.footer}
           </div>
         )}
       </div>

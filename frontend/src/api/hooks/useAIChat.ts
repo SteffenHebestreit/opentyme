@@ -9,6 +9,7 @@ import { EventType } from '../../types/ag-ui-events';
 import type { AgentEvent } from '../../types/ag-ui-events';
 import { streamChat, approveActions, getConversation } from '../services/ai-chat.service';
 import type { ApprovalAction, ApprovalDecision, ToolCallRecord } from '../services/ai-chat.service';
+import { notifyDataChanged } from '../../lib/dataSync';
 
 export type MessageRole = 'user' | 'assistant' | 'tool_call' | 'tool_result';
 
@@ -58,6 +59,16 @@ export function useAIChat() {
   const abortRef = useRef<AbortController | null>(null);
   const currentAssistantIdRef = useRef<string | null>(null);
   const didRestoreRef = useRef(false);
+  // The assistant's tools run server-side, so the API client never sees those
+  // writes. Refresh the app's data once a run that called tools has finished.
+  const toolRanRef = useRef(false);
+
+  useEffect(() => {
+    if (!isStreaming && toolRanRef.current) {
+      toolRanRef.current = false;
+      notifyDataChanged();
+    }
+  }, [isStreaming]);
 
   // Restore the persisted conversation after a page reload: the threadId
   // survives in localStorage but messages and any pending write-approval only
@@ -203,6 +214,7 @@ export function useAIChat() {
 
         case EventType.TOOL_CALL_RESULT: {
           const tcId = event.toolCallId as string;
+          toolRanRef.current = true;
           appendMessage({
             id: generateId(),
             role: 'tool_result',

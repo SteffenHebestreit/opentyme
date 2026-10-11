@@ -94,15 +94,15 @@ export const ChartCard: React.FC<ChartCardProps> = ({
   height = '300px',
 }) => {
   return (
-    <div className={`rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900 ${className}`}>
+    <div className={`rounded-xl border border-gray-200 bg-white p-5 shadow-soft sm:p-6 dark:border-gray-800 dark:bg-gray-900 dark:shadow-none ${className}`}>
       {/* Header */}
       <div className="mb-4 flex items-start justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <h3 className="text-base font-semibold tracking-tight text-gray-900 dark:text-white">
             {title}
           </h3>
           {subtitle && (
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
               {subtitle}
             </p>
           )}

@@ -17,25 +17,25 @@ describe('Alert', () => {
   it('renders with info type by default', () => {
     render(<Alert message="Info message" />);
     const alert = screen.getByRole('alert');
-    expect(alert.className).toContain('border-blue-500');
+    expect(alert.className).toContain('border-blue-200');
   });
 
   it('renders with success type', () => {
     render(<Alert message="Success message" type="success" />);
     const alert = screen.getByRole('alert');
-    expect(alert.className).toContain('border-green-500');
+    expect(alert.className).toContain('border-emerald-200');
   });
 
   it('renders with warning type', () => {
     render(<Alert message="Warning message" type="warning" />);
     const alert = screen.getByRole('alert');
-    expect(alert.className).toContain('border-yellow-500');
+    expect(alert.className).toContain('border-amber-200');
   });
 
   it('renders with error type', () => {
     render(<Alert message="Error message" type="error" />);
     const alert = screen.getByRole('alert');
-    expect(alert.className).toContain('border-red-500');
+    expect(alert.className).toContain('border-red-200');
   });
 
   it('renders icon for each type', () => {
@@ -80,7 +80,7 @@ describe('ErrorAlert', () => {
   it('renders as error type', () => {
     render(<ErrorAlert message="Error occurred" />);
     const alert = screen.getByRole('alert');
-    expect(alert.className).toContain('border-red-500');
+    expect(alert.className).toContain('border-red-200');
     expect(screen.getByText('Error occurred')).toBeInTheDocument();
   });
 
@@ -100,7 +100,7 @@ describe('SuccessAlert', () => {
   it('renders as success type', () => {
     render(<SuccessAlert message="Operation successful" />);
     const alert = screen.getByRole('alert');
-    expect(alert.className).toContain('border-green-500');
+    expect(alert.className).toContain('border-emerald-200');
     expect(screen.getByText('Operation successful')).toBeInTheDocument();
   });
 

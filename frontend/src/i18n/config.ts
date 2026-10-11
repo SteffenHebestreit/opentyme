@@ -135,4 +135,12 @@ i18n
     },
   });
 
+// Keep <html lang> in sync so the browser picks the right hyphenation,
+// number input separators and screen-reader voice.
+const applyDocumentLanguage = (lng?: string) => {
+  if (typeof document !== 'undefined' && lng) document.documentElement.lang = lng.split('-')[0];
+};
+applyDocumentLanguage(i18n.language);
+i18n.on('languageChanged', applyDocumentLanguage);
+
 export default i18n;

@@ -1,94 +1,54 @@
 import React, { ReactNode } from 'react';
+import { LucideIcon } from 'lucide-react';
+import { cn } from '../../lib/cn';
 
 /**
  * Props for the PageHeader component.
- * 
- * @interface PageHeaderProps
- * @property {string} title - Main page title
- * @property {string} [subtitle] - Optional subtitle or description
- * @property {ReactNode} [actions] - Action buttons or elements to display on the right
- * @property {string} [className] - Additional CSS classes
+ *
+ * @property {string} title - Page title (rendered as the page's h1)
+ * @property {ReactNode} [subtitle] - One line explaining the page
+ * @property {ReactNode} [actions] - Primary actions, right-aligned on wide screens
+ * @property {LucideIcon} [icon] - Optional icon shown before the title
+ * @property {ReactNode} [meta] - Small content under the subtitle (badges, period, …)
  */
 interface PageHeaderProps {
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   actions?: ReactNode;
+  icon?: LucideIcon;
+  meta?: ReactNode;
   className?: string;
 }
 
 /**
- * Reusable page header component for consistent page titles and actions.
- * 
- * Features:
- * - Title and optional subtitle
- * - Flexible action area (buttons, dropdowns, etc.)
- * - Responsive layout (stacks on mobile, side-by-side on desktop)
- * - Dark mode support
- * - Consistent spacing and typography
- * 
- * @component
+ * Standard page heading: title, subtitle and actions.
+ *
  * @example
- * // Basic page header
- * <PageHeader title="Expenses" />
- * 
- * @example
- * // With subtitle
- * <PageHeader 
- *   title="Client Management" 
- *   subtitle="Manage your clients and their information"
- * />
- * 
- * @example
- * // With action button
- * <PageHeader 
- *   title="Tax Rates" 
- *   actions={
- *     <Button onClick={handleAdd}>
- *       <Plus className="w-5 h-5 mr-2" />
- *       Add Tax Rate
- *     </Button>
- *   }
- * />
- * 
- * @example
- * // With multiple actions
- * <PageHeader 
- *   title="Invoices" 
- *   subtitle="Track and manage your invoices"
- *   actions={
- *     <div className="flex gap-2">
- *       <Button variant="outline" onClick={handleExport}>Export</Button>
- *       <Button onClick={handleCreate}>Create Invoice</Button>
- *     </div>
- *   }
- * />
- * 
- * @param {PageHeaderProps} props - Component props
- * @returns {JSX.Element} Page header element
+ * <PageHeader title="Projects" subtitle="All engagements" actions={<Button>New project</Button>} />
  */
 export const PageHeader: React.FC<PageHeaderProps> = ({
   title,
   subtitle,
   actions,
+  icon: Icon,
+  meta,
   className = '',
 }) => {
   return (
-    <div className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 ${className}`}>
-      <div className="flex-1">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {title}
-        </h1>
-        {subtitle && (
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            {subtitle}
-          </p>
+    <div className={cn('mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between', className)}>
+      <div className="flex min-w-0 items-start gap-3">
+        {Icon && (
+          <span className="mt-0.5 hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600 ring-1 ring-inset ring-purple-600/10 sm:flex dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+            <Icon className="h-5 w-5" aria-hidden="true" />
+          </span>
         )}
-      </div>
-      {actions && (
-        <div className="flex-shrink-0">
-          {actions}
+        <div className="min-w-0">
+          <h1 className="page-title">{title}</h1>
+          {subtitle && <p className="page-subtitle">{subtitle}</p>}
+          {meta && <div className="mt-2 flex flex-wrap items-center gap-2">{meta}</div>}
         </div>
-      )}
+      </div>
+      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 };

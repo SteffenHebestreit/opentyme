@@ -17,7 +17,7 @@ describe('Card', () => {
     const { container } = render(<Card>Content</Card>);
     const card = container.firstChild as HTMLElement;
     expect(card.className).toContain('shadow');
-    expect(card.className).toContain('rounded-2xl');
+    expect(card.className).toContain('rounded-xl');
   });
 });
 

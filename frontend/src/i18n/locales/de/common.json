@@ -45,7 +45,9 @@
     "emailTemplates": "E-Mail-Vorlagen",
     "settings": "Einstellungen",
     "profile": "Profil",
-    "finances": "Finanzen"
+    "finances": "Finanzen",
+    "sendEmail": "E-Mail senden",
+    "systemAdmin": "Systemverwaltung"
   },
   "language": {
     "title": "Sprache"
@@ -192,5 +194,23 @@
     "approvalHint": "Eintrag antippen, um ihn zu überspringen.",
     "editArgs": "Argumente vor der Genehmigung bearbeiten",
     "invalidJson": "Kein gültiges JSON-Objekt"
+  },
+  "shell": {
+    "mainNavigation": "Hauptnavigation",
+    "addons": "Addons",
+    "expandSidebar": "Seitenleiste ausklappen",
+    "collapseSidebar": "Seitenleiste einklappen",
+    "toggleTheme": "Farbschema wechseln",
+    "theme": {
+      "light": "Hell",
+      "dark": "Dunkel",
+      "system": "System"
+    },
+    "appearance": "Darstellung",
+    "timerRunning": "Timer läuft – zur Zeiterfassung",
+    "syncing": "Daten werden aktualisiert…",
+    "openMenu": "Menü öffnen",
+    "closeMenu": "Menü schließen",
+    "skipToContent": "Zum Inhalt springen"
   }
 }

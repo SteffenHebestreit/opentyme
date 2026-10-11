@@ -219,16 +219,16 @@ export const Table = <T extends { id?: string | number }>({
       key={item.id || index}
       onClick={() => onRowClick?.(item)}
       className={clsx(
-        'transition hover:bg-gray-50 dark:hover:bg-gray-800/40',
+        'transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-white/[0.02]',
         onRowClick && 'cursor-pointer'
       )}
     >
-      {groupBy && <td className="px-6 py-4"></td>}
+      {groupBy && <td className="px-4 py-3"></td>}
       {columns.map((column) => (
         <td
           key={column.key}
           className={clsx(
-            'px-6 py-4 align-middle text-sm text-gray-700 dark:text-gray-300',
+            'px-4 py-3 align-middle text-sm text-gray-700 dark:text-gray-300 first:pl-5 last:pr-5',
             column.align === 'right' && 'text-right',
             column.align === 'center' && 'text-center',
             column.className
@@ -242,35 +242,35 @@ export const Table = <T extends { id?: string | number }>({
 
   if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-purple-500 border-t-transparent"></div>
+      <div className="flex h-64 items-center justify-center rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-purple-500/25 border-t-purple-600 dark:border-t-purple-400"></div>
       </div>
     );
   }
 
   if (data.length === 0) {
     return (
-      <div className="flex h-64 items-center justify-center rounded-2xl border border-gray-200 bg-white text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+      <div className="flex h-64 animate-fade-in items-center justify-center rounded-xl border border-dashed border-gray-300 bg-white text-sm text-gray-500 dark:border-gray-800 dark:bg-gray-900/40 dark:text-gray-400">
         {emptyMessage}
       </div>
     );
   }
 
   return (
-    <div className={clsx('overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900', className)}>
+    <div className={clsx('overflow-hidden rounded-xl border border-gray-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-none', className)}>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-          <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:bg-gray-800/60 dark:text-gray-300">
+          <thead className="bg-gray-50/80 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:bg-white/[0.02] dark:text-gray-400">
             <tr>
-              {groupBy && <th className="w-10 px-6 py-3"></th>}
+              {groupBy && <th className="w-10 px-4 py-2.5"></th>}
               {columns.map((column) => (
                 <th
                   key={column.key}
                   className={clsx(
-                    'group px-6 py-3',
+                    'group px-4 py-2.5 first:pl-5 last:pr-5',
                     column.align === 'right' && 'text-right',
                     column.align === 'center' && 'text-center',
-                    column.sortable && 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700',
+                    column.sortable && 'cursor-pointer select-none transition-colors hover:text-gray-900 dark:hover:text-gray-200',
                     column.headerClassName
                   )}
                   onClick={() => column.sortable && handleSort(column.key)}
@@ -299,7 +299,7 @@ export const Table = <T extends { id?: string | number }>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+          <tbody className="divide-y divide-gray-100 dark:divide-gray-800/70">
             {displayGroupedData ? (
               displayGroupedData.map(([groupKey, groupItems]) => {
                 const isExpanded = expandedGroups.has(groupKey);
@@ -307,13 +307,13 @@ export const Table = <T extends { id?: string | number }>({
                   <Fragment key={groupKey}>
                     {/* Group Header */}
                     <tr
-                      className="cursor-pointer bg-gray-50/50 hover:bg-gray-100 dark:bg-gray-800/30 dark:hover:bg-gray-800/50 transition"
+                      className="cursor-pointer bg-gray-50/60 transition-colors hover:bg-gray-100 dark:bg-white/[0.02] dark:hover:bg-white/[0.04]"
                       onClick={() => toggleGroup(groupKey)}
                     >
                       {groupHeaderRender ? (
                         groupHeaderRender(groupKey, groupItems, isExpanded, () => toggleGroup(groupKey))
                       ) : (
-                        <td className="px-6 py-4 align-middle" colSpan={columns.length + 1}>
+                        <td className="px-5 py-3 align-middle" colSpan={columns.length + 1}>
                           <div className="flex items-center gap-2 font-medium text-gray-900 dark:text-white">
                             {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRightIcon className="h-4 w-4" />}
                             <span>{groupKey}</span>
@@ -336,7 +336,7 @@ export const Table = <T extends { id?: string | number }>({
 
       {/* Pagination */}
       {(pagination || (internalPageSize && totalPages > 1)) && (
-        <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900 sm:px-6">
+        <div className="flex items-center justify-between border-t border-gray-100 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900 sm:px-5">
           <div className="flex flex-1 justify-between sm:hidden">
             <Button
               variant="outline"
@@ -370,7 +370,7 @@ export const Table = <T extends { id?: string | number }>({
               <select
                 value={internalPageSize}
                 onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                className="block rounded-md border-gray-300 py-1.5 pl-3 pr-8 text-base focus:border-purple-500 focus:outline-none focus:ring-purple-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white sm:text-sm"
+                className="block h-8 rounded-lg border border-gray-300 bg-white py-1 pl-2.5 pr-8 text-sm focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/15 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
               >
                 {[10, 25, 50, 100].map((size) => (
                   <option key={size} value={size}>
@@ -403,7 +403,7 @@ export const Table = <T extends { id?: string | number }>({
                     return (
                       <Button
                         key={page}
-                        variant={page === currentPage ? 'primary' : 'outline'}
+                        variant={page === currentPage ? 'primary' : 'secondary'}
                         size="sm"
                         className={clsx(
                           'rounded-none',
@@ -421,7 +421,7 @@ export const Table = <T extends { id?: string | number }>({
                     return (
                       <span
                         key={page}
-                        className="relative inline-flex items-center border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                        className="relative inline-flex min-h-8 items-center border border-gray-200 bg-white px-3 text-sm font-medium text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
                       >
                         ...
                       </span>

@@ -1,5 +1,7 @@
-import { forwardRef } from 'react';
+import { forwardRef, useId } from 'react';
 import type { InputHTMLAttributes, ReactNode } from 'react';
+import { cn } from '../../lib/cn';
+import { fieldClasses, fieldErrorClass, fieldHelperClass, fieldLabelClass, fieldWrapperClass } from './fieldStyles';
 
 /**
  * Available input size variants.
@@ -28,14 +30,7 @@ interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'>
   inputSize?: InputSize;
 }
 
-const baseClasses =
-  'block w-full bg-transparent border-0 border-b-2 border-gray-600 dark:border-gray-400 focus:outline-none focus:border-purple-500 dark:focus:border-purple-400 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200 ease-in-out accent-purple-500';
 
-const sizeClasses = {
-  sm: 'px-2 py-1 text-sm',
-  md: 'px-2 py-2 text-base',
-  lg: 'px-2 py-3 text-lg',
-};
 
 /**
  * Flexible form input component with validation, icons, and error handling.
@@ -108,43 +103,44 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
   inputSize = 'md',
   ...props
 }, ref) => {
-  const inputId = props.id || `input-${Math.random().toString(36).substr(2, 9)}`;
+  const generatedId = useId();
+  const inputId = props.id || generatedId;
 
   return (
-    <div className="mb-6">
+    <div className={fieldWrapperClass}>
       {label && (
         <label 
           htmlFor={inputId}
-          className={`block mb-2 text-sm font-medium whitespace-nowrap ${
-            error 
-              ? 'text-red-500 dark:text-red-400' 
-              : 'text-gray-700 dark:text-gray-300'
-          }`}
+          className={fieldLabelClass(!!error)}
         >
           {label}
         </label>
       )}
       <div className="relative">
         {leftIcon && (
-          <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-            <span className="text-gray-500 dark:text-gray-400 text-sm">{leftIcon}</span>
+          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+            <span className="text-sm text-gray-400 dark:text-gray-500">{leftIcon}</span>
           </div>
         )}
         <input
           ref={ref}
           id={inputId}
           type={type}
-          className={`${baseClasses} ${
-            sizeClasses[inputSize]
-          } ${error ? 'border-red-500 focus:border-red-500' : ''} 
-          ${leftIcon ? 'pl-8' : ''} ${rightIcon ? 'pr-10' : ''} ${className ?? ''}`}
+          className={cn(
+            fieldClasses({ size: inputSize, error: !!error }),
+            type === 'color' && 'cursor-pointer p-1',
+            leftIcon && 'pl-9',
+            (rightIcon || error) && 'pr-10',
+            className
+          )}
+          aria-invalid={error ? true : undefined}
           disabled={disabled}
           {...props}
         />
         {error && (
-          <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
             <svg
-              className="h-5 w-5 text-red-500"
+              className="h-4 w-4 text-red-500"
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 20 20"
               fill="currentColor"
@@ -159,16 +155,16 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
           </div>
         )}
         {!error && rightIcon && (
-          <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
-            <span className="text-gray-500 dark:text-gray-400 text-sm">{rightIcon}</span>
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+            <span className="text-sm text-gray-400 dark:text-gray-500">{rightIcon}</span>
           </div>
         )}
       </div>
       {error && (
-        <p className="mt-1 text-xs text-red-500">{error}</p>
+        <p className={fieldErrorClass}>{error}</p>
       )}
       {!error && helperText && (
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{helperText}</p>
+        <p className={fieldHelperClass}>{helperText}</p>
       )}
     </div>
   );

@@ -74,6 +74,8 @@ dist
 # Gatsby files
 .cache/
 public
+# …but Vite's static assets (favicon, self-hosted fonts) are source
+!frontend/public
 
 # Storybook build outputs
 .out

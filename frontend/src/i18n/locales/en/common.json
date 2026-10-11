@@ -45,7 +45,9 @@
     "emailTemplates": "Email Templates",
     "settings": "Settings",
     "profile": "Profile",
-    "finances": "Finances"
+    "finances": "Finances",
+    "sendEmail": "Send email",
+    "systemAdmin": "System admin"
   },
   "language": {
     "title": "Language"
@@ -192,5 +194,23 @@
     "approvalHint": "Tap an item to toggle whether it runs.",
     "editArgs": "Edit arguments before approving",
     "invalidJson": "Not a valid JSON object"
+  },
+  "shell": {
+    "mainNavigation": "Main navigation",
+    "addons": "Addons",
+    "expandSidebar": "Expand sidebar",
+    "collapseSidebar": "Collapse sidebar",
+    "toggleTheme": "Toggle theme",
+    "theme": {
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "appearance": "Appearance",
+    "timerRunning": "Timer running – go to time tracking",
+    "syncing": "Updating data…",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "skipToContent": "Skip to content"
   }
 }

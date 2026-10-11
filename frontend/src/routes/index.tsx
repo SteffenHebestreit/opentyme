@@ -9,7 +9,7 @@
  * @module routes
  */
 
-import { createBrowserRouter, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { createBrowserRouter, Link, Navigate, Outlet, useLocation } from 'react-router-dom';
 import type { ComponentType } from 'react';
 import { frontendPluginRegistry } from '@/plugins/plugin-registry';
 
@@ -35,13 +35,17 @@ function PluginRoute() {
 
   if (!match) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">404</h1>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">Page not found</p>
-          <a href="/dashboard" className="text-purple-600 hover:text-purple-700 dark:text-purple-400">
+          <p className="text-sm font-semibold text-purple-600 dark:text-purple-400">404</p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">Page not found</h1>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">The page you are looking for does not exist.</p>
+          <Link
+            to="/dashboard"
+            className="mt-6 inline-flex h-9 items-center rounded-lg bg-purple-600 px-4 text-sm font-medium text-white shadow-sm transition-colors hover:bg-purple-500"
+          >
             Return to Dashboard
-          </a>
+          </Link>
         </div>
       </div>
     );
@@ -56,9 +60,8 @@ function PluginRoute() {
  */
 function RootLayout() {
   return (
-    <Layout>
+    <Layout overlay={<AIChatWidget />}>
       <Outlet />
-      <AIChatWidget />
     </Layout>
   );
 }

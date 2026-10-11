@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import clsx from 'clsx';
+import { Check, ChevronDown } from 'lucide-react';
+import { fieldClasses, fieldErrorClass, fieldLabelClass } from './fieldStyles';
 
 /**
  * Props for the CustomSelect component.
@@ -133,16 +135,10 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
   const selectedOption = options.find(opt => opt.value === value);
   const displayText = selectedOption?.label || placeholder;
 
-  const sizeClasses = {
-    sm: 'px-2 py-1 text-sm',
-    md: 'px-2 py-2 text-base',
-    lg: 'px-2 py-3 text-lg',
-  };
-
   return (
     <div className={clsx('w-full', className)}>
       {label && (
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 whitespace-nowrap">
+        <label className={fieldLabelClass(!!error)} onClick={() => !disabled && setIsOpen(true)}>
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}
         </label>
@@ -159,33 +155,26 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
           onKeyDown={handleKeyDown}
           disabled={disabled}
           className={clsx(
-            'w-full bg-transparent border-0 border-b-2 border-gray-600 dark:border-gray-400',
-            'focus:outline-none focus:border-purple-500 dark:focus:border-purple-400',
-            'text-gray-900 dark:text-gray-100',
-            'transition-all duration-200 ease-in-out',
-            'flex items-center justify-between',
-            sizeClasses[size],
+            fieldClasses({ size, error: !!error }),
+            'flex items-center justify-between text-left',
+            isOpen && !error && 'border-purple-500 ring-4 ring-purple-500/15 dark:border-purple-400 dark:ring-purple-400/15',
             {
-              'cursor-not-allowed opacity-50': disabled,
+              'cursor-not-allowed opacity-60': disabled,
               'cursor-pointer': !disabled,
-              'text-gray-500 dark:text-gray-400': !selectedOption,
+              '!text-gray-400 dark:!text-gray-500': !selectedOption,
             }
           )}
           aria-haspopup="listbox"
           aria-expanded={isOpen}
         >
           <span className="truncate">{displayText}</span>
-          <svg
+          <ChevronDown
             className={clsx(
-              'w-4 h-4 ml-2 transition-transform duration-200 flex-shrink-0',
-              isOpen && 'transform rotate-180'
+              'ml-2 h-4 w-4 flex-shrink-0 text-gray-400 transition-transform duration-200 dark:text-gray-500',
+              isOpen && 'rotate-180'
             )}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+            aria-hidden="true"
+          />
         </button>
 
         {/* Dropdown list */}
@@ -194,12 +183,12 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
             ref={dropdownRef}
             role="listbox"
             className={clsx(
-              'absolute z-50 w-full mt-1',
-              'bg-white dark:bg-gray-800',
-              'border border-gray-300 dark:border-gray-600',
-              'rounded-lg shadow-lg',
-              'max-h-60 overflow-auto',
-              'py-1'
+              'absolute z-50 mt-1.5 w-full min-w-[12rem] origin-top animate-scale-in',
+              'bg-white dark:bg-gray-900',
+              'border border-gray-200 dark:border-gray-800',
+              'rounded-xl shadow-lifted',
+              'max-h-64 overflow-auto overscroll-contain',
+              'p-1'
             )}
           >
             {options.length === 0 ? (
@@ -218,19 +207,16 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                   }}
                   onMouseEnter={() => setHighlightedIndex(index)}
                   className={clsx(
-                    'px-3 py-2 cursor-pointer',
-                    'transition-colors duration-150',
-                    'text-gray-900 dark:text-gray-100',
-                    {
-                      'bg-purple-500 text-white': option.value === value,
-                      'bg-purple-100 dark:bg-purple-900/30': 
-                        option.value !== value && index === highlightedIndex,
-                      'hover:bg-purple-100 dark:hover:bg-purple-900/30':
-                        option.value !== value,
-                    }
+                    'flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm',
+                    'transition-colors duration-100',
+                    option.value === value
+                      ? 'font-medium text-purple-700 dark:text-purple-300'
+                      : 'text-gray-700 dark:text-gray-200',
+                    index === highlightedIndex && 'bg-gray-100 dark:bg-white/5'
                   )}
                 >
-                  {option.label}
+                  <span className="truncate">{option.label}</span>
+                  {option.value === value && <Check className="h-4 w-4 shrink-0" aria-hidden="true" />}
                 </li>
               ))
             )}
@@ -239,7 +225,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
       </div>
 
       {error && (
-        <p className="mt-1 text-sm text-red-500">{error}</p>
+        <p className={fieldErrorClass}>{error}</p>
       )}
     </div>
   );
