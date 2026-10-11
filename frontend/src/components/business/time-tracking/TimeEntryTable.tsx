@@ -12,8 +12,8 @@
  * - Active timer indication: Highlights in-progress entries with special styling
  * - Billable badges: Green for billable, gray for non-billable with hourly rate display
  * - DateTime formatting: "MMM d, yyyy · h:mm a" format
- * - Action buttons: Edit, Delete, and Stop timer (for active entries)
- * - Loading states: Shows loading text during delete/stop operations
+ * - Action buttons: Edit and Delete as labelled icon buttons
+ * - Loading states: Shows a spinner during delete operations
  * - Responsive design: Horizontal scroll on small screens
  * - Empty state: Returns null when no entries to display
  * 
@@ -21,11 +21,17 @@
  */
 
 import { FC, useMemo } from 'react';
-import clsx from 'clsx';
+import { ChevronRight, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { TimeEntry } from '../../../api/types';
-import { Button } from '../../common/Button';
 import { Table, Column } from '../../common/Table';
+import { cn } from '../../../lib/cn';
+
+/** Small square icon button used for the row actions. */
+const iconButtonClass =
+  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors ' +
+  'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 disabled:pointer-events-none disabled:opacity-50 ' +
+  'dark:text-gray-400';
 
 /**
  * Props for the TimeEntryTable component.
@@ -174,6 +180,19 @@ const formatTimeRange = (startTime: string | null | undefined, endTime: string |
 };
 
 /**
+ * Start (and end, when known) of an entry as "HH:mm – HH:mm".
+ * Falls back to the legacy start/end timestamps.
+ */
+const formatEntryTime = (entry: TimeEntry, locale: string): string => {
+  if (entry.entry_time) {
+    const start = entry.entry_time.slice(0, 5);
+    const end = entry.entry_end_time ? entry.entry_end_time.slice(0, 5) : '';
+    return end ? `${start} – ${end}` : start;
+  }
+  return formatTimeRange(entry.start_time, entry.end_time, locale);
+};
+
+/**
  * Calculates duration in hours for sorting purposes.
  */
 const getDurationInHours = (entry: TimeEntry): number => {
@@ -224,9 +243,9 @@ export const TimeEntryTable: FC<TimeEntryTableProps> = ({
       accessorKey: 'entry_date',
       header: t('table.date'),
       render: (entry) => (
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          {entry.entry_time || formatTimeRange(entry.start_time, entry.end_time, userLocale)}
-        </div>
+        <span className="whitespace-nowrap tabular-nums text-gray-600 dark:text-gray-400">
+          {formatEntryTime(entry, userLocale)}
+        </span>
       ),
       sortable: true,
       groupSortValue: (_, items) => items[0]?.entry_date || items[0]?.start_time || '',
@@ -236,9 +255,9 @@ export const TimeEntryTable: FC<TimeEntryTableProps> = ({
       accessorKey: 'client_name',
       header: t('table.client'),
       render: (entry) => (
-        <div className="text-sm text-gray-600 dark:text-gray-400">
+        <span className="text-gray-600 dark:text-gray-400">
           {entry.client_name || '—'}
-        </div>
+        </span>
       ),
       sortable: true,
       groupSortValue: (_, items) => items[0]?.client_name || '',
@@ -248,16 +267,16 @@ export const TimeEntryTable: FC<TimeEntryTableProps> = ({
       accessorKey: 'task_name',
       header: t('table.project'),
       render: (entry) => (
-        <>
+        <div className="min-w-[12rem]">
           <div className="font-medium text-gray-900 dark:text-white">
             {entry.task_name || t('timer.untitledTask')}
           </div>
           {entry.description ? (
-            <p className="mt-1 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">
+            <p className="mt-0.5 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">
               {entry.description}
             </p>
           ) : null}
-        </>
+        </div>
       ),
       sortable: true,
       sortValue: (entry) => entry.task_name || t('timer.untitledTask'),
@@ -267,10 +286,11 @@ export const TimeEntryTable: FC<TimeEntryTableProps> = ({
       key: 'duration',
       accessorKey: 'duration_hours',
       header: t('table.duration'),
+      align: 'right',
       render: (entry) => (
-        <div className="text-gray-700 dark:text-gray-300">
+        <span className="whitespace-nowrap tabular-nums text-gray-700 dark:text-gray-300">
           {entry.duration_hours && !isNaN(entry.duration_hours) ? `${entry.duration_hours.toFixed(2)}h` : formatDuration(entry)}
-        </div>
+        </span>
       ),
       sortable: true,
       sortValue: (entry) => getDurationInHours(entry),
@@ -278,29 +298,38 @@ export const TimeEntryTable: FC<TimeEntryTableProps> = ({
     },
     {
       key: 'actions',
-      header: t('table.actions'),
+      header: <span className="sr-only">{t('table.actions')}</span>,
       align: 'right',
-      render: (entry) => (
-        <div className="flex justify-end gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => onEdit(entry)}
-          >
-            {t('edit')}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="danger"
-            onClick={() => onDelete(entry)}
-            disabled={isDeletingId === entry.id}
-          >
-            {isDeletingId === entry.id ? t('deleting') : t('delete')}
-          </Button>
-        </div>
-      ),
+      render: (entry) => {
+        const isDeleting = isDeletingId === entry.id;
+        return (
+          <div className="flex justify-end gap-1">
+            <button
+              type="button"
+              onClick={() => onEdit(entry)}
+              aria-label={t('edit')}
+              title={t('edit')}
+              className={cn(iconButtonClass, 'hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-white/5 dark:hover:text-white')}
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(entry)}
+              disabled={isDeleting}
+              aria-label={isDeleting ? t('deleting') : t('delete')}
+              title={t('delete')}
+              className={cn(iconButtonClass, 'hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 dark:hover:text-red-400')}
+            >
+              {isDeleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+              )}
+            </button>
+          </div>
+        );
+      },
     },
   ], [t, userLocale, onEdit, onDelete, isDeletingId]);
 
@@ -325,44 +354,35 @@ export const TimeEntryTable: FC<TimeEntryTableProps> = ({
 
     return (
       <>
-        <td className="px-6 py-4 align-middle">
-          <svg
-            className={clsx('h-5 w-5 text-gray-500 dark:text-gray-400 transition-transform', {
-              'rotate-90': isExpanded,
-            })}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
+        <td className="px-4 py-3 align-middle">
+          <ChevronRight
+            className={cn(
+              'h-4 w-4 text-gray-400 transition-transform duration-200 dark:text-gray-500',
+              isExpanded && 'rotate-90'
+            )}
+            aria-hidden="true"
+          />
         </td>
-        <td className="px-6 py-4 align-middle">
-          <div className="font-medium text-gray-900 dark:text-white">
-            {formatDate(date, userLocale)}
-          </div>
+        <td className="whitespace-nowrap px-4 py-3 align-middle font-medium tabular-nums text-gray-900 dark:text-white">
+          {formatDate(date, userLocale)}
         </td>
-        <td className="px-6 py-4 align-middle">
-          <div className="text-gray-700 dark:text-gray-300">
-            {clientName || '—'}
-          </div>
+        <td className="px-4 py-3 align-middle text-gray-600 dark:text-gray-400">
+          {clientName || '—'}
         </td>
-        <td className="px-6 py-4 align-middle">
-          <div className="font-medium text-gray-900 dark:text-white">
-            {projectName}
-          </div>
+        <td className="px-4 py-3 align-middle font-medium text-gray-900 dark:text-white">
+          {projectName}
         </td>
-        <td className="px-6 py-4 align-middle">
-          <div className="font-semibold text-gray-900 dark:text-white">
+        <td className="whitespace-nowrap px-4 py-3 text-right align-middle">
+          <div className="font-semibold tabular-nums text-gray-900 dark:text-white">
             {totalDuration.toFixed(2)}h
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {groupItems.length} {groupItems.length === 1 ? 'Eintrag' : 'Einträge'}
-          </p>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {t('table.entryCount', { count: groupItems.length })}
+          </div>
         </td>
-        <td className="px-6 py-4 text-right align-middle">
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            {isExpanded ? 'Einklappen' : 'Erweitern'}
+        <td className="px-4 py-3 pr-5 text-right align-middle">
+          <span className="hidden text-xs text-gray-500 sm:inline dark:text-gray-400">
+            {isExpanded ? t('table.collapse') : t('table.expand')}
           </span>
         </td>
       </>

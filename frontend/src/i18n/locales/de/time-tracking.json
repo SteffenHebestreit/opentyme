@@ -18,7 +18,8 @@
     "client": "Kunde",
     "allClients": "Alle Kunden",
     "startDate": "Startdatum",
-    "endDate": "Enddatum"
+    "endDate": "Enddatum",
+    "reset": "Zurücksetzen"
   },
   "timer": {
     "running": "Timer läuft",
@@ -35,7 +36,9 @@
     "selectProject": "Projekt auswählen",
     "subtitle": "Erfassen Sie Arbeit in Echtzeit. Wählen Sie ein Projekt und fügen Sie optional eine kurze Beschreibung hinzu, bevor Sie starten.",
     "activeProject": "Aktives Projekt",
-    "untitledTask": "Unbenannte Aufgabe"
+    "untitledTask": "Unbenannte Aufgabe",
+    "discard": "Timer verwerfen",
+    "ongoing": "läuft"
   },
   "table": {
     "task": "Aufgabe",
@@ -49,7 +52,16 @@
     "start": "Start",
     "end": "Ende",
     "actions": "Aktionen",
-    "active": "Läuft…"
+    "active": "Läuft…",
+    "entryCount_one": "{{count}} Eintrag",
+    "entryCount_other": "{{count}} Einträge",
+    "expand": "Erweitern",
+    "collapse": "Einklappen"
+  },
+  "list": {
+    "title": "Einträge",
+    "count_one": "{{count}} Eintrag",
+    "count_other": "{{count}} Einträge"
   },
   "form": {
     "modal": {
@@ -127,7 +139,12 @@
       "available": "Verfügbar",
       "selected": "Ausgewählt",
       "occupied": "Belegt",
-      "clickToSelect": "Klicken Sie, um Start-/Endzeit auszuwählen"
+      "clickToSelect": "Klicken Sie, um Start-/Endzeit auszuwählen",
+      "untitledEntry": "Zeiteintrag"
+    },
+    "overlap": {
+      "warning_one": "Dieser Zeitraum überschneidet sich mit {{count}} vorhandenen Eintrag: {{list}}",
+      "warning_other": "Dieser Zeitraum überschneidet sich mit {{count}} vorhandenen Einträgen: {{list}}"
     }
   },
   "empty": {
@@ -135,13 +152,15 @@
     "message": "Beginnen Sie mit der Zeiterfassung, indem Sie einen Zeiteintrag erfassen oder den Timer starten. Erfassen Sie abrechenbare Stunden und halten Sie Projekte im Zeitplan."
   },
   "messages": {
-    "created": "Zeiteintrag erfolgreich erstellt",
-    "updated": "Zeiteintrag erfolgreich aktualisiert",
-    "deleted": "Zeiteintrag erfolgreich gelöscht",
-    "timerStarted": "Timer erfolgreich gestartet",
-    "timerStopped": "Timer erfolgreich gestoppt",
-    "timerPaused": "Timer erfolgreich pausiert",
-    "deleteConfirm": "Möchten Sie diesen Zeiteintrag wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+    "created": "Zeiteintrag erfasst",
+    "updated": "Zeiteintrag aktualisiert",
+    "deleted": "Zeiteintrag gelöscht",
+    "timerStarted": "Timer gestartet",
+    "timerStopped": "Timer gestoppt, Eintrag gespeichert",
+    "timerPaused": "Timer pausiert",
+    "deleteConfirm": "Möchten Sie diesen Zeiteintrag wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "deleteTitle": "Zeiteintrag löschen?",
+    "deleteFailed": "Zeiteintrag konnte nicht gelöscht werden"
   },
   "duration": {
     "hours": "{{count}}h",
@@ -161,7 +180,8 @@
       "noData": "Heute noch keine Zeit erfasst",
       "startTracking": "Starten Sie einen Timer oder erfassen Sie einen Eintrag",
       "previousDay": "Vorheriger Tag",
-      "nextDay": "Nächster Tag"
+      "nextDay": "Nächster Tag",
+      "noDataDay": "An diesem Tag wurde keine Zeit erfasst"
     },
     "weeklyHours": {
       "title": "Wochenübersicht",
@@ -187,7 +207,15 @@
       "noGrouping": "Keine Gruppierung",
       "groupByProject": "Nach Projekt gruppieren",
       "groupByTask": "Nach Aufgabe gruppieren",
-      "groupByClient": "Nach Kunde gruppieren"
-    }
+      "groupByClient": "Nach Kunde gruppieren",
+      "toggle": "Diagrammoptionen"
+    },
+    "tooltip": {
+      "project": "Projekt",
+      "task": "Aufgabe",
+      "time": "Zeit"
+    },
+    "unknownProject": "Unbekanntes Projekt",
+    "holiday": "Feiertag"
   }
 }

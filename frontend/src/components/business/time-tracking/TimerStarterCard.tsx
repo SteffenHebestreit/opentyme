@@ -11,18 +11,18 @@
  * - Timer icon visual indicator
  * - Start button with loading state
  * - Error message display
- * - Responsive layout: stacked on mobile, horizontal on desktop
- * - Prominent styling to encourage time tracking
+ * - Responsive layout: fields stack on mobile and sit in one row on wide screens
  * 
  * @module components/business/time-tracking/TimerStarterCard
  */
 
 import { ChangeEvent, FC } from 'react';
-import { TimerIcon } from 'lucide-react';
+import { Play, TimerIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Project, Client } from '../../../api/types';
 import { Button } from '../../common/Button';
-import { Input, CustomSelect } from '../../forms';
+import { CustomSelect } from '../../forms';
+import { fieldClasses, fieldLabelClass } from '../../forms/fieldStyles';
 
 /**
  * Props for the TimerStarterCard component.
@@ -67,10 +67,9 @@ interface TimerStarterCardProps {
  * - **Start button**: Initiates timer creation with selected values
  * 
  * Layout:
- * - **Mobile (< md)**: Vertical stacked layout with full-width elements
- * - **Desktop (≥ md)**: Horizontal layout with inputs in 2-column grid
- * - Timer icon in colored circle for visual prominence
- * - Button aligned to right on desktop
+ * - **Mobile**: fields stacked, full width
+ * - **sm–lg**: two fields per row
+ * - **xl**: all fields and the start button in one row
  * 
  * Interaction Flow:
  * 1. User selects project from dropdown
@@ -95,9 +94,8 @@ interface TimerStarterCardProps {
  * - Error typically cleared when user modifies inputs
  * 
  * Styling:
- * - White card with border and shadow for prominence
- * - Indigo accent color for timer icon and focus states
- * - Responsive padding and spacing
+ * - Standard surface card, bordered fields with a soft focus ring
+ * - Brand-violet icon chip and primary start button
  * - Dark mode support throughout
  * 
  * @component
@@ -201,60 +199,79 @@ export const TimerStarterCard: FC<TimerStarterCardProps> = ({
   }));
 
   return (
-    <div className="flex flex-col justify-between gap-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900 md:flex-row md:items-center">
-      <div className="flex flex-1 items-start gap-4">
-        <span className="mt-1 inline-flex h-10 w-10 flex-none items-center justify-center rounded-full bg-indigo-600 text-white">
-          <TimerIcon className="h-6 w-6" />
+    <section className="surface p-5 sm:p-6" aria-labelledby="timer-starter-title">
+      <div className="flex items-start gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-purple-600 ring-1 ring-inset ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+          <TimerIcon className="h-5 w-5" aria-hidden="true" />
         </span>
-        <div className="w-full">
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white">{t('timer.start')}</h3>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            {t('timer.subtitle')}
-          </p>
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(200px,1fr))]">
-            <CustomSelect
-              label={t('filters.client')}
-              value={clientFilter}
-              onChange={onClientFilterChange}
-              options={clientOptions}
-              placeholder={t('filters.allClients')}
-              size="md"
-            />
-            <CustomSelect
-              label={t('filters.project')}
-              value={projectId}
-              onChange={onProjectChange}
-              options={projectOptions}
-              placeholder={t('timer.selectProject')}
-              size="md"
-            />
-            <Input
-              id="timer-task-name"
-              label={t('form.taskName.label')}
-              type="text"
-              value={taskName}
-              onChange={handleTaskNameChange}
-              placeholder={t('form.taskName.placeholder')}
-              inputSize="md"
-            />
-            <Input
-              id="timer-description"
-              label={t('timer.description')}
-              type="text"
-              value={description}
-              onChange={handleDescriptionChange}
-              placeholder={t('timer.descriptionPlaceholder')}
-              inputSize="md"
-            />
-          </div>
-          {error ? <p className="mt-2 text-sm text-red-500">{error}</p> : null}
+        <div className="min-w-0">
+          <h2 id="timer-starter-title" className="section-title">
+            {t('timer.start')}
+          </h2>
+          <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{t('timer.subtitle')}</p>
         </div>
       </div>
-      <div className="flex flex-none items-center">
-        <Button type="button" onClick={onStart} disabled={isStarting}>
+
+      <div className="mt-5 grid grid-cols-1 items-end gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.4fr)_auto]">
+        <CustomSelect
+          label={t('filters.client')}
+          value={clientFilter}
+          onChange={onClientFilterChange}
+          options={clientOptions}
+          placeholder={t('filters.allClients')}
+          size="md"
+        />
+        <CustomSelect
+          label={t('filters.project')}
+          value={projectId}
+          onChange={onProjectChange}
+          options={projectOptions}
+          placeholder={t('timer.selectProject')}
+          size="md"
+        />
+        <div>
+          <label htmlFor="timer-task-name" className={fieldLabelClass()}>
+            {t('form.taskName.label')}
+          </label>
+          <input
+            id="timer-task-name"
+            type="text"
+            value={taskName}
+            onChange={handleTaskNameChange}
+            placeholder={t('form.taskName.placeholder')}
+            className={fieldClasses({ size: 'md' })}
+          />
+        </div>
+        <div>
+          <label htmlFor="timer-description" className={fieldLabelClass()}>
+            {t('timer.description')}
+          </label>
+          <input
+            id="timer-description"
+            type="text"
+            value={description}
+            onChange={handleDescriptionChange}
+            placeholder={t('timer.descriptionPlaceholder')}
+            className={fieldClasses({ size: 'md' })}
+          />
+        </div>
+        <Button
+          type="button"
+          onClick={onStart}
+          disabled={isStarting}
+          isLoading={isStarting}
+          leftIcon={<Play className="h-4 w-4" />}
+          className="h-10 w-full sm:col-span-2 xl:col-span-1 xl:w-auto"
+        >
           {isStarting ? t('timer.starting') : t('timer.start')}
         </Button>
       </div>
-    </div>
+
+      {error ? (
+        <p className="mt-3 animate-fade-in text-sm font-medium text-red-600 dark:text-red-400" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </section>
   );
 };

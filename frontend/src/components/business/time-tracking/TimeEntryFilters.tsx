@@ -1,7 +1,10 @@
 import { ChangeEvent, FC } from 'react';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Input, CustomSelect } from '../../forms';
+import { CustomSelect } from '../../forms';
+import { fieldClasses } from '../../forms/fieldStyles';
+import { cn } from '../../../lib/cn';
+import { Button } from '../../common/Button';
 import { Project } from '../../../api/types';
 
 /**
@@ -12,7 +15,8 @@ import { Project } from '../../../api/types';
  * - Project filter dropdown
  * - Date range filters (from/to dates)
  * - Search icon in search input
- * - Responsive layout (stacked mobile, grid desktop)
+ * - Compact toolbar that wraps on small screens
+ * - "Reset" button while any filter is set
  * - Dark mode support
  *
  * **Filter Options:**
@@ -113,49 +117,76 @@ export const TimeEntryFilters: FC<TimeEntryFiltersProps> = ({
     })),
   ];
 
+  const hasFilters = Boolean(search || projectId || startDate || endDate);
+
+  const handleReset = () => {
+    onSearchChange('');
+    onProjectChange('');
+    onStartDateChange('');
+    onEndDateChange('');
+  };
+
   return (
-    <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-      <div className="flex w-full flex-1 items-center gap-3">
-        <div className="w-full xl:max-w-sm">
-          <Input
-            id="time-entry-search"
-            type="search"
-            placeholder={t('search')}
-            value={search}
-            onChange={handleSearchChange}
-            leftIcon={<Search className="h-4 w-4" />}
-            inputSize="md"
-            autoComplete="off"
-          />
-        </div>
+    <div className="flex flex-wrap items-center gap-2" role="search">
+      <div className="relative min-w-[14rem] flex-1 basis-full sm:basis-auto">
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+          aria-hidden="true"
+        />
+        <input
+          id="time-entry-search"
+          type="search"
+          placeholder={t('search')}
+          aria-label={t('search')}
+          value={search}
+          onChange={handleSearchChange}
+          autoComplete="off"
+          className={cn(fieldClasses({ size: 'md' }), 'pl-9')}
+        />
       </div>
-      <div className="grid w-full gap-3 md:grid-cols-2 xl:w-auto xl:grid-cols-4">
-        <div>
-          <CustomSelect
-            label={t('filters.project')}
-            value={projectId}
-            onChange={onProjectChange}
-            options={projectOptions}
-            size="sm"
-          />
-        </div>
-        <Input
+      <div className="w-full sm:w-56">
+        <CustomSelect
+          value={projectId}
+          onChange={onProjectChange}
+          options={projectOptions}
+          placeholder={t('filters.allProjects')}
+          size="md"
+        />
+      </div>
+      <div className="flex w-full items-center gap-2 sm:w-auto">
+        <input
           id="time-entry-start-date"
-          label={t('filters.startDate')}
           type="date"
+          aria-label={t('filters.startDate')}
+          title={t('filters.startDate')}
           value={startDate}
           onChange={handleStartDateChange}
-          inputSize="sm"
+          className={cn(fieldClasses({ size: 'md' }), 'min-w-0 flex-1 sm:w-40 sm:flex-none')}
         />
-        <Input
+        <span className="text-sm text-gray-400 dark:text-gray-500" aria-hidden="true">
+          –
+        </span>
+        <input
           id="time-entry-end-date"
-          label={t('filters.endDate')}
           type="date"
+          aria-label={t('filters.endDate')}
+          title={t('filters.endDate')}
           value={endDate}
           onChange={handleEndDateChange}
-          inputSize="sm"
+          className={cn(fieldClasses({ size: 'md' }), 'min-w-0 flex-1 sm:w-40 sm:flex-none')}
         />
       </div>
+      {hasFilters ? (
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={handleReset}
+          leftIcon={<X className="h-4 w-4" />}
+          className="h-10 animate-fade-in"
+        >
+          {t('filters.reset')}
+        </Button>
+      ) : null}
     </div>
   );
 };

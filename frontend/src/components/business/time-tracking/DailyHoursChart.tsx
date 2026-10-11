@@ -27,8 +27,13 @@ import {
   Tooltip,
   Legend,
   ChartOptions,
+  TooltipItem,
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
+import { useChartTheme } from '../../../hooks/ui/useChartTheme';
+import { chartPalette, getChartThemeColors, getDefaultChartOptions } from '../../../utils/chartConfig';
+import { AnimatedNumber } from '../../common/AnimatedNumber';
+import { cn } from '../../../lib/cn';
 
 ChartJS.register(
   CategoryScale,
@@ -58,31 +63,29 @@ function timeToMinutes(time: string): number {
   return hours * 60 + minutes;
 }
 
+/** One worked period drawn on the timeline. */
+interface TimelineSegment {
+  x: [number, number];
+  y: string;
+  projectName: string;
+  taskName: string | null;
+  startTime: string;
+  endTime?: string | null;
+}
+
 /**
- * Gets a consistent color for a project by hashing its name.
+ * Gets a consistent color for a project by hashing its name
+ * (the app's categorical chart palette, so a project keeps its colour).
  */
 function getProjectColor(projectName: string): string {
-  const colors = [
-    '#3b82f6', // blue
-    '#a855f7', // purple
-    '#ec4899', // pink
-    '#6366f1', // indigo
-    '#06b6d4', // cyan
-    '#14b8a6', // teal
-    '#10b981', // green
-    '#84cc16', // lime
-    '#eab308', // yellow
-    '#f97316', // orange
-    '#ef4444', // red
-    '#f43f5e', // rose
-  ];
-  
   let hash = 0;
   for (let i = 0; i < projectName.length; i++) {
     hash = projectName.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return colors[Math.abs(hash) % colors.length];
+  return chartPalette[Math.abs(hash) % chartPalette.length];
 }
+
+const formatHours = (value: number) => `${value.toFixed(2)}h`;
 
 export const DailyHoursChart: FC<DailyHoursChartProps> = ({
   timeEntries,
@@ -91,6 +94,7 @@ export const DailyHoursChart: FC<DailyHoursChartProps> = ({
   onDateChange,
 }) => {
   const { t, i18n } = useTranslation('time-tracking');
+  const theme = useChartTheme();
   
   // Get today's date in Europe/Berlin timezone
   const today = useMemo(() => {
@@ -166,7 +170,7 @@ export const DailyHoursChart: FC<DailyHoursChartProps> = ({
     const projectGroups = new Map<string, TimeEntry[]>();
     
     filteredEntries.forEach(entry => {
-      const projectName = entry.project_name || 'Unknown';
+      const projectName = entry.project_name || t('charts.unknownProject');
       if (!projectGroups.has(projectName)) {
         projectGroups.set(projectName, []);
       }
@@ -198,8 +202,13 @@ export const DailyHoursChart: FC<DailyHoursChartProps> = ({
         label: projectName,
         data,
         backgroundColor: getProjectColor(projectName),
+        // A hairline in the card colour keeps back-to-back entries apart
+        borderColor: getChartThemeColors(theme).surface,
+        borderWidth: 1,
+        borderSkipped: false,
         borderRadius: 4,
         barPercentage: 0.8,
+        maxBarThickness: 32,
       };
     });
     
@@ -207,105 +216,126 @@ export const DailyHoursChart: FC<DailyHoursChartProps> = ({
       labels: ['Today'],
       datasets,
     };
-  }, [filteredEntries]);
+  }, [filteredEntries, t, theme]);
   
-  const options: ChartOptions<'bar'> = {
-    indexAxis: 'y' as const,
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      x: {
-        min: 0,
-        max: 24,
-        ticks: {
-          stepSize: 1,
-          callback: (value) => `${String(value).padStart(2, '0')}:00`,
-          color: '#9ca3af',
-          font: {
-            size: 10,
+  const options = useMemo<ChartOptions<'bar'>>(() => {
+    const colors = getChartThemeColors(theme);
+    const base = getDefaultChartOptions(theme);
+    return {
+      indexAxis: 'y' as const,
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          min: 0,
+          max: 24,
+          border: { display: false },
+          grid: {
+            color: colors.grid,
+            drawTicks: false,
+          },
+          ticks: {
+            stepSize: 1,
+            maxRotation: 0,
+            autoSkipPadding: 12,
+            padding: 8,
+            callback: (value) => `${String(value).padStart(2, '0')}:00`,
+            color: colors.text,
+            font: {
+              size: 11,
+            },
           },
         },
-        grid: {
-          color: '#e5e7eb',
-        },
-      },
-      y: {
-        grid: {
-          display: false,
-        },
-        ticks: {
-          display: false,
-        },
-      },
-    },
-    plugins: {
-      legend: {
-        display: false,
-      },
-      tooltip: {
-        callbacks: {
-          title: () => '',
-          label: (context: any) => {
-            const data = context.raw;
-            const lines = [];
-            if (data.projectName) {
-              lines.push(`Project: ${data.projectName}`);
-            }
-            if (data.taskName) {
-              lines.push(`Task: ${data.taskName}`);
-            }
-            if (data.startTime) {
-              const endTime = data.endTime || 'ongoing';
-              lines.push(`Time: ${data.startTime} - ${endTime}`);
-            }
-            return lines;
+        y: {
+          border: { display: false },
+          grid: {
+            display: false,
+          },
+          ticks: {
+            display: false,
           },
         },
       },
-    },
-  };
+      plugins: {
+        legend: {
+          display: false,
+        },
+        tooltip: {
+          ...base.plugins?.tooltip,
+          mode: 'nearest' as const,
+          intersect: true,
+          callbacks: {
+            title: () => '',
+            label: (context: TooltipItem<'bar'>) => {
+              const data = context.raw as TimelineSegment;
+              const lines = [];
+              if (data.projectName) {
+                lines.push(`${t('charts.tooltip.project')}: ${data.projectName}`);
+              }
+              if (data.taskName) {
+                lines.push(`${t('charts.tooltip.task')}: ${data.taskName}`);
+              }
+              if (data.startTime) {
+                const endTime = data.endTime || t('timer.ongoing');
+                lines.push(`${t('charts.tooltip.time')}: ${data.startTime} - ${endTime}`);
+              }
+              return lines;
+            },
+          },
+        },
+      },
+    };
+  }, [theme, t]);
+
+  const legendProjects = Array.from(new Set(filteredEntries.map(e => e.project_name).filter(Boolean)));
+  const iconButtonClass =
+    'inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 ' +
+    'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white';
   
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+    <section className="surface flex flex-col p-5 sm:p-6" aria-labelledby="daily-hours-title">
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-2">
+          <Clock className="h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+          <h2 id="daily-hours-title" className="section-title truncate">
             {isToday ? t('charts.dailyHours.title') : t('charts.dailyHours.titleDate')}
           </h2>
         </div>
-        <div className="text-right">
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">
-            {totalHours.toFixed(2)}h
+        <div className="shrink-0 text-right">
+          <div className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
+            <AnimatedNumber value={totalHours} format={formatHours} />
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">
+          <div className="text-xs text-gray-500 dark:text-gray-400">
             {isToday ? t('charts.dailyHours.totalToday') : t('charts.dailyHours.totalDay')}
           </div>
         </div>
       </div>
       
       {/* Date navigation */}
-      <div className="mb-4 flex items-center justify-center gap-2">
+      <div className="mb-4 flex items-center justify-center gap-1">
         <button
           type="button"
           onClick={() => navigateDay('prev')}
-          className="rounded-lg p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          className={iconButtonClass}
+          aria-label={t('charts.dailyHours.previousDay')}
           title={t('charts.dailyHours.previousDay')}
         >
-          <ChevronLeft className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+          <ChevronLeft className="h-4 w-4" aria-hidden="true" />
         </button>
         
         <div className="relative">
           <button
             type="button"
             onClick={openDatePicker}
-            className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors cursor-pointer ${
-              isToday 
-                ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' 
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
-            }`}
+            className={cn(
+              'flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium tabular-nums transition-colors',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500',
+              isToday
+                ? 'bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-600/15 hover:bg-purple-100 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20 dark:hover:bg-purple-500/15'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10'
+            )}
           >
-            <Calendar className="h-4 w-4" />
+            <Calendar className="h-4 w-4" aria-hidden="true" />
             {displayDate}
           </button>
           <input
@@ -314,8 +344,9 @@ export const DailyHoursChart: FC<DailyHoursChartProps> = ({
             value={currentDate}
             onChange={(e) => e.target.value && handleDateChange(e.target.value)}
             max={today}
-            className="absolute top-0 left-0 w-0 h-0 opacity-0 pointer-events-none"
+            className="pointer-events-none absolute left-0 top-0 h-0 w-0 opacity-0"
             tabIndex={-1}
+            aria-hidden="true"
           />
         </div>
         
@@ -323,30 +354,36 @@ export const DailyHoursChart: FC<DailyHoursChartProps> = ({
           type="button"
           onClick={() => navigateDay('next')}
           disabled={currentDate >= today}
-          className={`rounded-lg p-1.5 transition-colors ${
-            currentDate >= today
-              ? 'opacity-50 cursor-not-allowed'
-              : 'hover:bg-gray-100 dark:hover:bg-gray-800'
-          }`}
+          className={cn(iconButtonClass, 'disabled:pointer-events-none disabled:opacity-40')}
+          aria-label={t('charts.dailyHours.nextDay')}
           title={t('charts.dailyHours.nextDay')}
         >
-          <ChevronRight className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+          <ChevronRight className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
       
-      <div className="relative" style={{ height: '120px' }}>
+      <div className="relative" style={{ height: '150px' }}>
         <Bar data={chartData} options={options} />
+        {filteredEntries.length === 0 ? (
+          <div className="pointer-events-none absolute inset-x-0 top-0 flex h-[114px] animate-fade-in items-center justify-center">
+            <span className="rounded-md bg-white/90 px-2 py-0.5 text-sm text-gray-500 dark:bg-gray-900/90 dark:text-gray-400">
+              {isToday ? t('charts.dailyHours.noData') : t('charts.dailyHours.noDataDay')}
+            </span>
+          </div>
+        ) : null}
       </div>
       
       {/* Legend */}
-      <div className="mt-4 flex flex-wrap gap-3">
-        {Array.from(new Set(filteredEntries.map(e => e.project_name).filter(Boolean))).map(projectName => (
-          <div key={projectName} className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded" style={{ backgroundColor: getProjectColor(projectName!) }} />
-            <span className="text-xs text-gray-600 dark:text-gray-400">{projectName}</span>
-          </div>
-        ))}
-      </div>
-    </div>
+      {legendProjects.length > 0 ? (
+        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
+          {legendProjects.map(projectName => (
+            <div key={projectName} className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: getProjectColor(projectName!) }} aria-hidden="true" />
+              <span className="text-xs text-gray-600 dark:text-gray-400">{projectName}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
   );
 };

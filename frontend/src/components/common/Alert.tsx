@@ -11,12 +11,14 @@ export type AlertType = 'info' | 'success' | 'warning' | 'error';
  * @property {AlertType} [type='info'] - Tone
  * @property {string} [title] - Bold first line
  * @property {() => void} [onClose] - Shows a dismiss button when given
+ * @property {string} [closeLabel='Dismiss'] - Accessible label of that button (e.g. "Retry" when closing reloads)
  */
 interface AlertProps {
   message: string;
   type?: AlertType;
   title?: string;
   onClose?: () => void;
+  closeLabel?: string;
   className?: string;
 }
 
@@ -61,6 +63,7 @@ export const Alert: React.FC<AlertProps> = ({
   type = 'info',
   title,
   onClose,
+  closeLabel = 'Dismiss',
   className,
 }) => {
   const tone = toneClasses[type];
@@ -81,7 +84,7 @@ export const Alert: React.FC<AlertProps> = ({
         <button
           type="button"
           className="-m-1 rounded-md p-1 opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-current"
-          aria-label="Dismiss"
+          aria-label={closeLabel}
           onClick={onClose}
         >
           <X className="h-4 w-4" aria-hidden="true" />

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Lock, Plus } from 'lucide-react';
 import { useApp } from '../../../store/AppContext';
 import { useProjects } from '../../../hooks/api/useProjects';
 import {
@@ -14,7 +15,11 @@ import {
 import { TimeEntry } from '../../../api/types';
 import { Button } from '../../common/Button';
 import { Alert } from '../../common/Alert';
-import { SkeletonCardList } from '../../common/Skeleton';
+import { PageHeader } from '../../common/PageHeader';
+import { EmptyState } from '../../common/EmptyState';
+import { SkeletonItem } from '../../common/Skeleton';
+import { toast } from '../../../lib/toast';
+import { confirmDialog } from '../../../lib/confirm';
 import { extractErrorMessage } from '../../../utils/error';
 import { TimeEntryFilters } from './TimeEntryFilters';
 import { TimeEntryTable } from './TimeEntryTable';
@@ -42,6 +47,7 @@ function normalizeDate(value: string, endOfDay = false): string | undefined {
 
 export default function TimeEntryList() {
   const { t } = useTranslation('time-tracking');
+  const { t: tCommon } = useTranslation('common');
   const { state } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -53,9 +59,7 @@ export default function TimeEntryList() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [timerError, setTimerError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [stoppingId, setStoppingId] = useState<string | null>(null);
   const [timerProjectId, setTimerProjectId] = useState('');
@@ -276,15 +280,14 @@ export default function TimeEntryList() {
 
   const handleSubmit = async (payload: Parameters<typeof createEntry.mutateAsync>[0]) => {
     setFormError(null);
-    setSuccessMessage(null);
     setTimerError(null);
     try {
       if (modalMode === 'create') {
         await createEntry.mutateAsync(payload);
-        setSuccessMessage(t('messages.created'));
+        toast.success(t('messages.created'));
       } else if (editingEntry) {
         await updateEntry.mutateAsync({ id: editingEntry.id, payload });
-        setSuccessMessage(t('messages.updated'));
+        toast.success(t('messages.updated'));
       }
       closeModal();
     } catch (submitError) {
@@ -293,18 +296,21 @@ export default function TimeEntryList() {
   };
 
   const handleDelete = async (entry: TimeEntry) => {
-    const confirmed = window.confirm(t('messages.deleteConfirm'));
+    const confirmed = await confirmDialog({
+      title: t('messages.deleteTitle'),
+      message: t('messages.deleteConfirm'),
+      tone: 'danger',
+      confirmLabel: t('delete'),
+    });
     if (!confirmed) {
       return;
     }
-    setDeleteError(null);
-    setSuccessMessage(null);
     setDeletingId(entry.id);
     try {
       await deleteEntry.mutateAsync(entry.id);
-      setSuccessMessage(t('messages.deleted'));
+      toast.success(t('messages.deleted'));
     } catch (deleteErr) {
-      setDeleteError(extractErrorMessage(deleteErr));
+      toast.error(t('messages.deleteFailed'), { description: extractErrorMessage(deleteErr) });
     } finally {
       setDeletingId(null);
     }
@@ -316,7 +322,6 @@ export default function TimeEntryList() {
       return;
     }
     setTimerError(null);
-    setSuccessMessage(null);
     try {
       await startTimer.mutateAsync({
         projectId: timerProjectId,
@@ -327,18 +332,17 @@ export default function TimeEntryList() {
       });
       setTimerTaskName('');
       setTimerDescription('');
-      setSuccessMessage(t('messages.timerStarted'));
+      toast.success(t('messages.timerStarted'));
     } catch (startError) {
       setTimerError(extractErrorMessage(startError));
     }
   };
 
   const handlePauseTimer = async () => {
-    setSuccessMessage(null);
     setTimerError(null);
     try {
       await pauseTimer.mutateAsync();
-      setSuccessMessage(t('messages.timerPaused'));
+      toast.success(t('messages.timerPaused'));
     } catch (pauseError) {
       setTimerError(extractErrorMessage(pauseError));
     }
@@ -349,11 +353,10 @@ export default function TimeEntryList() {
       return;
     }
     setStoppingId(entry.id);
-    setSuccessMessage(null);
     setTimerError(null);
     try {
       await stopTimer.mutateAsync(entry.id);
-      setSuccessMessage(t('messages.timerStopped'));
+      toast.success(t('messages.timerStopped'));
     } catch (stopError) {
       setTimerError(extractErrorMessage(stopError));
     } finally {
@@ -378,30 +381,26 @@ export default function TimeEntryList() {
 
   if (!state.isAuthenticated) {
     return (
-      <div className="p-6">
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{t('title')}</h1>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{t('noAuth')}</p>
-        </div>
+      <div className="space-y-6">
+        <PageHeader title={t('title')} />
+        <EmptyState bordered icon={Lock} title={t('noAuth')} />
       </div>
     );
   }
 
+  const isListLoading = isLoading || isLoadingProjects;
+
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">{t('title')}</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {t('subtitle')}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button type="button" onClick={openCreateModal}>
+    <div className="space-y-6">
+      <PageHeader
+        title={t('title')}
+        subtitle={t('subtitle')}
+        actions={
+          <Button type="button" onClick={openCreateModal} leftIcon={<Plus className="h-4 w-4" />}>
             {t('addEntry')}
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       {activeEntry ? (
         <ActiveTimerCard
@@ -412,6 +411,7 @@ export default function TimeEntryList() {
           isPausing={pauseTimer.isPending}
           isStopping={stopTimer.isPending && stoppingId === activeEntry.id}
           isDeleting={deleteEntry.isPending && deletingId === activeEntry.id}
+          error={timerError}
         />
       ) : (
         <TimerStarterCard
@@ -466,46 +466,64 @@ export default function TimeEntryList() {
         monthEnd={chartDateRanges.monthEnd}
       />
 
-      {successMessage ? (
-        <Alert type="success" message={successMessage} onClose={() => setSuccessMessage(null)} />
-      ) : null}
+      <section className="space-y-3" aria-labelledby="time-entries-heading">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 id="time-entries-heading" className="section-title">
+            {t('list.title')}
+          </h2>
+          {!isListLoading && sortedEntries.length > 0 ? (
+            <span className="text-sm tabular-nums text-gray-500 dark:text-gray-400">
+              {t('list.count', { count: sortedEntries.length })}
+            </span>
+          ) : null}
+        </div>
 
-      {deleteError ? (
-        <Alert type="error" message={deleteError} onClose={() => setDeleteError(null)} />
-      ) : null}
+        {isError ? (
+          <Alert
+            type="error"
+            message={extractErrorMessage(error)}
+            onClose={() => void refetch()}
+            closeLabel={tCommon('buttons.refresh')}
+          />
+        ) : null}
 
-      {timerError ? (
-        <Alert type="error" message={timerError} onClose={() => setTimerError(null)} />
-      ) : null}
+        {isProjectError ? (
+          <Alert
+            type="error"
+            message={extractErrorMessage(projectError)}
+            onClose={() => void refetchProjects()}
+            closeLabel={tCommon('buttons.refresh')}
+          />
+        ) : null}
 
-      {isError ? (
-        <Alert
-          type="error"
-          message={extractErrorMessage(error)}
-          onClose={() => void refetch()}
-        />
-      ) : null}
-
-      {isProjectError ? (
-        <Alert
-          type="error"
-          message={extractErrorMessage(projectError)}
-          onClose={() => void refetchProjects()}
-        />
-      ) : null}
-
-      {isLoading || isLoadingProjects ? (
-        <SkeletonCardList count={3} />
-      ) : sortedEntries.length === 0 ? (
-        <TimeEntryEmptyState onCreate={openCreateModal} />
-      ) : (
-        <TimeEntryTable
-          entries={sortedEntries}
-          onEdit={openEditModal}
-          onDelete={handleDelete}
-          isDeletingId={deletingId}
-        />
-      )}
+        {isListLoading ? (
+          <div className="surface overflow-hidden" aria-busy="true">
+            <div className="border-b border-gray-100 bg-gray-50/80 px-5 py-3 dark:border-gray-800 dark:bg-white/[0.02]">
+              <SkeletonItem className="h-3 w-48" />
+            </div>
+            <div className="divide-y divide-gray-100 dark:divide-gray-800/70">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="flex items-center gap-4 px-5 py-3.5">
+                  <SkeletonItem className="h-4 w-4" />
+                  <SkeletonItem className="h-4 w-24" />
+                  <SkeletonItem className="hidden h-4 w-32 sm:block" />
+                  <SkeletonItem className="h-4 flex-1" />
+                  <SkeletonItem className="h-4 w-14" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : sortedEntries.length === 0 ? (
+          <TimeEntryEmptyState onCreate={openCreateModal} />
+        ) : (
+          <TimeEntryTable
+            entries={sortedEntries}
+            onEdit={openEditModal}
+            onDelete={handleDelete}
+            isDeletingId={deletingId}
+          />
+        )}
+      </section>
 
       <TimeEntryFormModal
         open={isModalOpen}

@@ -18,7 +18,8 @@
     "client": "Client",
     "allClients": "All Clients",
     "startDate": "Start Date",
-    "endDate": "End Date"
+    "endDate": "End Date",
+    "reset": "Reset"
   },
   "timer": {
     "running": "Timer running",
@@ -35,7 +36,9 @@
     "selectProject": "Select a project",
     "subtitle": "Track work in real time. Select a project and optionally add a short description before starting.",
     "activeProject": "Active project",
-    "untitledTask": "Untitled task"
+    "untitledTask": "Untitled task",
+    "discard": "Discard timer",
+    "ongoing": "ongoing"
   },
   "table": {
     "task": "Task",
@@ -49,7 +52,16 @@
     "start": "Start",
     "end": "End",
     "actions": "Actions",
-    "active": "In progress…"
+    "active": "In progress…",
+    "entryCount_one": "{{count}} entry",
+    "entryCount_other": "{{count}} entries",
+    "expand": "Expand",
+    "collapse": "Collapse"
+  },
+  "list": {
+    "title": "Entries",
+    "count_one": "{{count}} entry",
+    "count_other": "{{count}} entries"
   },
   "form": {
     "modal": {
@@ -117,6 +129,22 @@
       "validation": {
         "min": "Hourly rate must be zero or higher"
       }
+    },
+    "timeSlotPicker": {
+      "label": "Time slots (15-minute steps)",
+      "show": "Show day schedule",
+      "hide": "Hide day schedule",
+      "selectStart": "Select a start time",
+      "selectEnd": "Select an end time",
+      "available": "Available",
+      "selected": "Selected",
+      "occupied": "Occupied",
+      "clickToSelect": "Click a slot to set the start, then the end",
+      "untitledEntry": "Time entry"
+    },
+    "overlap": {
+      "warning_one": "This time range overlaps {{count}} existing entry: {{list}}",
+      "warning_other": "This time range overlaps {{count}} existing entries: {{list}}"
     }
   },
   "empty": {
@@ -124,13 +152,15 @@
     "message": "Start tracking your work by logging a time entry or starting the timer. Track billable hours and keep projects on schedule."
   },
   "messages": {
-    "created": "Time entry created successfully",
-    "updated": "Time entry updated successfully",
-    "deleted": "Time entry deleted successfully",
-    "timerStarted": "Timer started successfully",
-    "timerStopped": "Timer stopped successfully",
-    "timerPaused": "Timer paused successfully",
-    "deleteConfirm": "Are you sure you want to delete this time entry? This action cannot be undone."
+    "created": "Time entry logged",
+    "updated": "Time entry updated",
+    "deleted": "Time entry deleted",
+    "timerStarted": "Timer started",
+    "timerStopped": "Timer stopped and entry saved",
+    "timerPaused": "Timer paused",
+    "deleteConfirm": "Are you sure you want to delete this time entry? This action cannot be undone.",
+    "deleteTitle": "Delete time entry?",
+    "deleteFailed": "Could not delete the time entry"
   },
   "duration": {
     "hours": "{{count}}h",
@@ -150,7 +180,8 @@
       "noData": "No time logged today",
       "startTracking": "Start a timer or log a time entry",
       "previousDay": "Previous day",
-      "nextDay": "Next day"
+      "nextDay": "Next day",
+      "noDataDay": "No time logged on this day"
     },
     "weeklyHours": {
       "title": "Weekly Overview",
@@ -176,7 +207,15 @@
       "noGrouping": "No grouping",
       "groupByProject": "Group by project",
       "groupByTask": "Group by task",
-      "groupByClient": "Group by client"
-    }
+      "groupByClient": "Group by client",
+      "toggle": "Chart options"
+    },
+    "tooltip": {
+      "project": "Project",
+      "task": "Task",
+      "time": "Time"
+    },
+    "unknownProject": "Unknown project",
+    "holiday": "Holiday"
   }
 }

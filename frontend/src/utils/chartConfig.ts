@@ -54,7 +54,7 @@ export const chartPalette = [
   '#10b981', // emerald
   '#f59e0b', // amber
   '#ec4899', // pink
-  '#6366f1', // indigo
+  '#f97316', // orange (indigo sat too close to violet in stacks)
   '#14b8a6', // teal
   '#ef4444', // red
 ];

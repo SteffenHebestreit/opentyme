@@ -30,7 +30,8 @@ import { Project, TimeEntry, TimeEntryPayload, Client } from '../../../api/types
 import { TimeSlotPicker } from './TimeSlotPicker';
 import { fetchTimeEntries, checkTimeEntryOverlap } from '../../../api/services/timeEntry.service';
 import { getEffectiveRate } from '../../../api/services/project-rate.service';
-import { Calendar } from 'lucide-react';
+import { CalendarClock, ChevronDown, Clock } from 'lucide-react';
+import { cn } from '../../../lib/cn';
 
 /**
  * Props for the TimeEntryFormModal component.
@@ -500,58 +501,62 @@ export const TimeEntryFormModal: FC<TimeEntryFormModalProps> = ({
       open={open}
       onClose={onClose}
       title={mode === 'create' ? t('form.modal.title.create') : t('form.modal.title.edit')}
-      size="lg"
+      icon={<Clock className="h-5 w-5" aria-hidden="true" />}
+      size="md"
       footer={
         <>
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose}>
             {t('cancel')}
           </Button>
-          <Button type="submit" form={formId} disabled={isSubmitting || !hasProjects}>
+          <Button type="submit" form={formId} disabled={isSubmitting || !hasProjects} isLoading={isSubmitting}>
             {isSubmitting ? t('saving') : mode === 'create' ? t('form.modal.submit.create') : t('form.modal.submit.edit')}
           </Button>
         </>
       }
     >
-      <form id={formId} className="space-y-5" onSubmit={handleSubmit(handleFormSubmit)}>
-        {error ? <Alert type="error" message={error} /> : null}
+      <form id={formId} onSubmit={handleSubmit(handleFormSubmit)}>
+        {error ? <Alert type="error" message={error} className="mb-4" /> : null}
         {!hasProjects ? (
           <Alert
             type="warning"
             message={t('form.modal.noProjects')}
+            className="mb-4"
           />
         ) : null}
 
-        <Select
-          label={t('filters.client')}
-          disabled={!hasProjects}
-          value={clientFilter}
-          onChange={(e) => onClientFilterChange(e.target.value)}
-        >
-          <option value="">{t('filters.allClients')}</option>
-          {clients.map((client) => (
-            <option key={client.id} value={client.id}>
-              {client.name}
-            </option>
-          ))}
-        </Select>
+        <div className="grid gap-x-4 sm:grid-cols-2">
+          <Select
+            label={t('filters.client')}
+            disabled={!hasProjects}
+            value={clientFilter}
+            onChange={(e) => onClientFilterChange(e.target.value)}
+          >
+            <option value="">{t('filters.allClients')}</option>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name}
+              </option>
+            ))}
+          </Select>
 
-        <Select
-          label={t('form.project.label')}
-          disabled={!hasProjects}
-          {...register('project_id', { required: t('form.project.required') })}
-          error={errors.project_id?.message}
-        >
-          <option value="">{t('form.project.placeholder')}</option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.client?.name 
-                ? `${project.name} (${project.client.name})`
-                : project.name}
-            </option>
-          ))}
-        </Select>
+          <Select
+            label={t('form.project.label')}
+            disabled={!hasProjects}
+            {...register('project_id', { required: t('form.project.required') })}
+            error={errors.project_id?.message}
+          >
+            <option value="">{t('form.project.placeholder')}</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.client?.name 
+                  ? `${project.name} (${project.client.name})`
+                  : project.name}
+              </option>
+            ))}
+          </Select>
+        </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-x-4 sm:grid-cols-2">
           <Input
             id="time-entry-task"
             label={t('form.taskName.label')}
@@ -576,8 +581,8 @@ export const TimeEntryFormModal: FC<TimeEntryFormModalProps> = ({
           error={errors.description?.message}
         />
 
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-3">
+        <div className="mt-1 border-t border-gray-100 pt-5 dark:border-gray-800">
+          <div className="grid gap-x-4 sm:grid-cols-3">
             <Input
               id="time-entry-date"
               label={t('form.date.label')}
@@ -603,19 +608,24 @@ export const TimeEntryFormModal: FC<TimeEntryFormModalProps> = ({
 
           {/* Toggle for Time Slot Picker */}
           {watchEntryDate && (
-            <div className="flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <button
                 type="button"
                 onClick={() => setShowTimeSlotPicker(!showTimeSlotPicker)}
-                className="flex items-center gap-2 text-sm text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 transition-colors"
+                aria-expanded={showTimeSlotPicker}
+                className="-ml-1 inline-flex items-center gap-2 rounded-md px-1 py-0.5 text-sm font-medium text-purple-600 transition-colors hover:text-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-purple-400 dark:hover:text-purple-300"
               >
-                <Calendar className="h-4 w-4" />
+                <CalendarClock className="h-4 w-4" aria-hidden="true" />
                 {showTimeSlotPicker 
                   ? t('form.timeSlotPicker.hide')
                   : t('form.timeSlotPicker.show')}
+                <ChevronDown
+                  className={cn('h-4 w-4 transition-transform duration-200', showTimeSlotPicker && 'rotate-180')}
+                  aria-hidden="true"
+                />
               </button>
               {showTimeSlotPicker && (
-                <span className="text-xs text-gray-500 dark:text-gray-400">
+                <span className="animate-fade-in text-xs text-gray-500 dark:text-gray-400">
                   {t('form.timeSlotPicker.clickToSelect')}
                 </span>
               )}
@@ -624,64 +634,67 @@ export const TimeEntryFormModal: FC<TimeEntryFormModalProps> = ({
 
           {/* Time Slot Picker */}
           {showTimeSlotPicker && watchEntryDate && (
-            <TimeSlotPicker
-              selectedDate={watchEntryDate}
-              timeEntries={dayTimeEntries}
-              projects={projects}
-              startTime={watchStartTime}
-              endTime={watchEndTime}
-              onStartTimeChange={(time) => setValue('start_time', time)}
-              onEndTimeChange={(time) => setValue('end_time', time)}
-            />
+            <div className="mb-4 animate-fade-up">
+              <TimeSlotPicker
+                selectedDate={watchEntryDate}
+                timeEntries={dayTimeEntries}
+                projects={projects}
+                startTime={watchStartTime}
+                endTime={watchEndTime}
+                onStartTimeChange={(time) => setValue('start_time', time)}
+                onEndTimeChange={(time) => setValue('end_time', time)}
+              />
+            </div>
           )}
 
           {/* Non-blocking overlap warning */}
           {overlapResult?.hasOverlap && (
             <Alert
               type="warning"
+              className="mb-4"
               message={t('form.overlap.warning', {
                 count: overlapResult.overlaps.length,
-                defaultValue:
-                  'This time range overlaps {{count}} existing entry/entries: ' +
-                  overlapResult.overlaps
-                    .map((o) => `${(o.entry_time || '').slice(0, 5)}${o.project_name ? ' · ' + o.project_name : ''}`)
-                    .join(', '),
+                list: overlapResult.overlaps
+                  .map((o) => `${(o.entry_time || '').slice(0, 5)}${o.project_name ? ' · ' + o.project_name : ''}`)
+                  .join(', '),
               })}
             />
           )}
-        </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Input
-            id="time-entry-duration"
-            label={t('form.duration.label')}
-            type="number"
-            min="0.01"
-            step="0.01"
-            placeholder={t('form.duration.placeholder')}
-            {...register('duration_hours', { required: t('form.duration.required') })}
-            error={errors.duration_hours?.message}
-          />
-          <Input
-            id="time-entry-rate"
-            label={t('form.hourlyRate.label')}
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder={t('form.hourlyRate.placeholder')}
-            {...register('hourly_rate', {
-              min: { value: 0, message: t('form.hourlyRate.validation.min') },
-            })}
-            error={errors.hourly_rate?.message}
-          />
-          <label className="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-gray-600 dark:border-gray-400 text-purple-600 focus:ring-2 focus:ring-purple-500 focus:ring-offset-0 bg-transparent"
-              {...register('billable')}
+          <div className="grid gap-x-4 sm:grid-cols-3">
+            <Input
+              id="time-entry-duration"
+              label={t('form.duration.label')}
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder={t('form.duration.placeholder')}
+              className="tabular-nums"
+              {...register('duration_hours', { required: t('form.duration.required') })}
+              error={errors.duration_hours?.message}
             />
-            {t('form.billable.label')}
-          </label>
+            <Input
+              id="time-entry-rate"
+              label={t('form.hourlyRate.label')}
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder={t('form.hourlyRate.placeholder')}
+              className="tabular-nums"
+              {...register('hourly_rate', {
+                min: { value: 0, message: t('form.hourlyRate.validation.min') },
+              })}
+              error={errors.hourly_rate?.message}
+            />
+            <label className="mb-4 flex h-10 cursor-pointer items-center gap-2.5 text-sm font-medium text-gray-700 sm:self-end dark:text-gray-300">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900"
+                {...register('billable')}
+              />
+              {t('form.billable.label')}
+            </label>
+          </div>
         </div>
       </form>
     </Modal>

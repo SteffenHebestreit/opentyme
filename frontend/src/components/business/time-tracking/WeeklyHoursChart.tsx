@@ -13,13 +13,18 @@
  * @module components/business/time-tracking/WeeklyHoursChart
  */
 
-import { FC, useMemo, useState, useEffect } from 'react';
+import { FC, useMemo, useState, useEffect, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TimeEntry, Project } from '../../../api/types';
 import { Calendar, ChevronDown } from 'lucide-react';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ChartOptions, ScriptableScaleContext, TooltipItem } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 import { getChartColorForDate, prefetchHolidays, holidayDateCache } from '../../../utils/holidays-api';
+import { useChartTheme } from '../../../hooks/ui/useChartTheme';
+import { chartColors, chartPalette, getBarChartOptions, getChartThemeColors } from '../../../utils/chartConfig';
+import { AnimatedNumber } from '../../common/AnimatedNumber';
+import { fieldClasses, fieldLabelClass } from '../../forms/fieldStyles';
+import { cn } from '../../../lib/cn';
 
 // Register Chart.js components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
@@ -47,30 +52,20 @@ interface DailyHours {
 type GroupMode = 'none' | 'project' | 'task' | 'client';
 
 /**
- * Gets project color for chart.
+ * Gets project color for chart (the app's categorical chart palette).
  */
 function getProjectChartColor(projectName: string): string {
-  const colors = [
-    'rgb(59, 130, 246)',   // blue
-    'rgb(168, 85, 247)',   // purple
-    'rgb(236, 72, 153)',   // pink
-    'rgb(99, 102, 241)',   // indigo
-    'rgb(6, 182, 212)',    // cyan
-    'rgb(20, 184, 166)',   // teal
-    'rgb(34, 197, 94)',    // green
-    'rgb(163, 230, 53)',   // lime
-    'rgb(234, 179, 8)',    // yellow
-    'rgb(249, 115, 22)',   // orange
-    'rgb(239, 68, 68)',    // red
-    'rgb(244, 63, 94)',    // rose
-  ];
-  
   let hash = 0;
   for (let i = 0; i < projectName.length; i++) {
     hash = projectName.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return colors[Math.abs(hash) % colors.length];
+  return chartPalette[Math.abs(hash) % chartPalette.length];
 }
+
+/** Colour getChartColorForDate() returns for an ordinary working day. */
+const REGULAR_DAY_COLOR = 'rgba(168, 85, 247, 0.8)';
+
+const formatHours = (value: number) => `${value.toFixed(2)}h`;
 
 export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
   timeEntries,
@@ -79,6 +74,8 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
   weekEnd,
 }) => {
   const { t, i18n } = useTranslation('time-tracking');
+  const theme = useChartTheme();
+  const fieldId = useId();
   const [selectedProject, setSelectedProject] = useState<string>('all');
   const [groupMode, setGroupMode] = useState<GroupMode>('none');
   const [showFilters, setShowFilters] = useState(false);
@@ -199,6 +196,14 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
   // Prepare chart data
   const chartData = useMemo(() => {
     const labels = dailyHours.map(day => day.dayName);
+    // Stacked segments are separated by a 2px gap in the card colour
+    const stackedSegmentStyle = {
+      borderWidth: { top: 2, right: 0, bottom: 0, left: 0 },
+      borderColor: getChartThemeColors(theme).surface,
+      borderSkipped: 'start' as const,
+      borderRadius: 0,
+      maxBarThickness: 24,
+    };
     
     if (groupMode === 'none') {
       // Simple bar chart - total hours per day
@@ -208,9 +213,12 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
           {
             label: t('charts.weeklyHours.hoursWorked'),
             data: dailyHours.map(day => day.hours),
-            backgroundColor: 'rgba(168, 85, 247, 0.8)',
-            borderColor: 'rgba(168, 85, 247, 1)',
-            borderWidth: 1,
+            backgroundColor: chartColors.primary,
+            hoverBackgroundColor: chartColors.primaryDark,
+            borderWidth: 0,
+            borderRadius: 4,
+            borderSkipped: 'start' as const,
+            maxBarThickness: 24,
           },
         ],
       };
@@ -226,7 +234,7 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
         label: projectName ?? '',
         data: dailyHours.map(day => day.projectHours[projectName!] || 0),
         backgroundColor: getProjectChartColor(projectName!),
-        borderWidth: 0,
+        ...stackedSegmentStyle,
       }));
       
       return { labels, datasets };
@@ -242,7 +250,7 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
         label: taskName ?? '',
         data: dailyHours.map(day => day.taskHours[taskName!] || 0),
         backgroundColor: getProjectChartColor(taskName! + index),
-        borderWidth: 0,
+        ...stackedSegmentStyle,
       }));
       
       return { labels, datasets };
@@ -258,152 +266,183 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
         label: clientName ?? '',
         data: dailyHours.map(day => day.clientHours[clientName!] || 0),
         backgroundColor: getProjectChartColor(clientName! + index),
-        borderWidth: 0,
+        ...stackedSegmentStyle,
       }));
       
       return { labels, datasets };
     }
     
     return { labels, datasets: [] };
-  }, [dailyHours, groupMode, weekEntries, t, region]);
+  }, [dailyHours, groupMode, weekEntries, t, region, theme]);
   
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: groupMode !== 'none',
-        position: 'bottom' as const,
-      },
-      tooltip: {
-        callbacks: {
-          label: (context: any) => {
-            return `${context.dataset.label}: ${context.parsed.y.toFixed(2)}h`;
-          },
-          footer: (tooltipItems: any) => {
-            const index = tooltipItems[0].dataIndex;
-            if (index < dailyHours.length) {
-              const dateStr = dailyHours[index].date;
-              const holiday = holidayDateCache.get(dateStr);
-              if (holiday) {
-                return `\ud83c\udf89 ${holiday.name}`;
+  const chartOptions = useMemo<ChartOptions<'bar'>>(() => {
+    const base = getBarChartOptions(undefined, false, theme);
+    const colors = getChartThemeColors(theme);
+    const stacked = groupMode !== 'none';
+    return {
+      ...base,
+      maintainAspectRatio: false,
+      plugins: {
+        ...base.plugins,
+        legend: {
+          ...base.plugins?.legend,
+          display: stacked,
+          position: 'bottom' as const,
+        },
+        tooltip: {
+          ...base.plugins?.tooltip,
+          // Stacked views list only the series that have hours that day
+          filter: (item: TooltipItem<'bar'>) => !stacked || (item.parsed.y ?? 0) > 0,
+          callbacks: {
+            label: (context: TooltipItem<'bar'>) => {
+              return `${context.dataset.label}: ${(context.parsed.y ?? 0).toFixed(2)}h`;
+            },
+            footer: (tooltipItems: TooltipItem<'bar'>[]) => {
+              const index = tooltipItems[0]?.dataIndex ?? -1;
+              if (index >= 0 && index < dailyHours.length) {
+                const dateStr = dailyHours[index].date;
+                const holiday = holidayDateCache.get(dateStr);
+                if (holiday) {
+                  return `${t('charts.holiday')}: ${holiday.name}`;
+                }
               }
-            }
-            return '';
+              return '';
+            },
           },
         },
       },
-    },
-    scales: {
-      x: {
-        stacked: groupMode !== 'none',
-        grid: {
-          display: false,
-        },
-        ticks: {
-          color: function(context: any) {
-            const index = context.index;
-            if (index < dailyHours.length) {
-              return getChartColorForDate(dailyHours[index].date, 'DE', region).replace('0.8)', '1)');
-            }
-            return '#6b7280'; // gray-500
+      scales: {
+        x: {
+          ...base.scales?.x,
+          stacked,
+          ticks: {
+            ...base.scales?.x?.ticks,
+            // Weekends and holidays keep their marker colour; ordinary days use the axis colour
+            color: (context: ScriptableScaleContext) => {
+              const index = context.index;
+              if (index < dailyHours.length) {
+                const dayColor = getChartColorForDate(dailyHours[index].date, 'DE', region);
+                return dayColor === REGULAR_DAY_COLOR ? colors.text : dayColor.replace('0.8)', '1)');
+              }
+              return colors.text;
+            },
+            font: {
+              size: 11,
+              weight: 600,
+            },
           },
-          font: {
-            weight: 'bold' as const
-          }
-        }
-      },
-      y: {
-        stacked: groupMode !== 'none',
-        beginAtZero: true,
-        ticks: {
-          callback: (value: any) => `${value}h`,
+        },
+        y: {
+          ...base.scales?.y,
+          stacked,
+          beginAtZero: true,
+          ticks: {
+            ...base.scales?.y?.ticks,
+            callback: (value: string | number) => `${value}h`,
+          },
         },
       },
-    },
-  };
+    };
+  }, [theme, groupMode, dailyHours, region, t]);
   
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Calendar className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+    <section className="surface flex flex-col p-5 sm:p-6" aria-labelledby={`${fieldId}-title`}>
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-2">
+          <Calendar className="h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+          <h2 id={`${fieldId}-title`} className="section-title truncate">
             {t('charts.weeklyHours.title')}
           </h2>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex shrink-0 items-start gap-3">
           <div className="text-right">
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              {totalWeekHours.toFixed(2)}h
+            <div className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
+              <AnimatedNumber value={totalWeekHours} format={formatHours} />
             </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
+            <div className="text-xs text-gray-500 dark:text-gray-400">
               {t('charts.weeklyHours.totalWeek')}
             </div>
           </div>
           <button
             type="button"
             onClick={() => setShowFilters(!showFilters)}
-            className="rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+            aria-expanded={showFilters}
+            aria-controls={`${fieldId}-filters`}
+            aria-label={t('charts.filters.toggle')}
+            title={t('charts.filters.toggle')}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white"
           >
             <ChevronDown
-              className={`h-5 w-5 text-gray-600 transition-transform dark:text-gray-400 ${
-                showFilters ? 'rotate-180' : ''
-              }`}
+              className={cn('h-4 w-4 transition-transform duration-200', showFilters && 'rotate-180')}
+              aria-hidden="true"
             />
           </button>
         </div>
       </div>
       
       {/* Filters */}
-      {showFilters && (
-        <div className="mb-4 flex flex-wrap gap-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-800">
-          <div className="flex-1 min-w-[200px]">
-            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              {t('charts.filters.project')}
-            </label>
-            <select
-              value={selectedProject}
-              onChange={(e) => setSelectedProject(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="all">{t('charts.filters.allProjects')}</option>
-              {projects.map(project => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div className="flex-1 min-w-[200px]">
-            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              {t('charts.filters.grouping')}
-            </label>
-            <select
-              value={groupMode}
-              onChange={(e) => setGroupMode(e.target.value as GroupMode)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="none">{t('charts.filters.noGrouping')}</option>
-              <option value="client">
-                {t('charts.filters.groupByClient')}
-              </option>
-              <option value="project">
-                {t('charts.filters.groupByProject')}
-              </option>
-              <option value="task">
-                {t('charts.filters.groupByTask')}
-              </option>
-            </select>
+      <div
+        id={`${fieldId}-filters`}
+        className="collapsible"
+        data-open={showFilters}
+        // Collapsed options stay mounted (for the animation) but out of the tab order
+        ref={(el) => {
+          if (el) el.inert = !showFilters;
+        }}
+      >
+        <div>
+          <div className="pb-4">
+            <div className="grid grid-cols-1 gap-3 rounded-lg bg-gray-50 p-3 sm:grid-cols-2 dark:bg-white/[0.03]">
+              <div>
+                <label htmlFor={`${fieldId}-project`} className={fieldLabelClass()}>
+                  {t('charts.filters.project')}
+                </label>
+                <select
+                  id={`${fieldId}-project`}
+                  value={selectedProject}
+                  onChange={(e) => setSelectedProject(e.target.value)}
+                  className={cn(fieldClasses({ size: 'sm' }), 'cursor-pointer')}
+                >
+                  <option value="all">{t('charts.filters.allProjects')}</option>
+                  {projects.map(project => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label htmlFor={`${fieldId}-grouping`} className={fieldLabelClass()}>
+                  {t('charts.filters.grouping')}
+                </label>
+                <select
+                  id={`${fieldId}-grouping`}
+                  value={groupMode}
+                  onChange={(e) => setGroupMode(e.target.value as GroupMode)}
+                  className={cn(fieldClasses({ size: 'sm' }), 'cursor-pointer')}
+                >
+                  <option value="none">{t('charts.filters.noGrouping')}</option>
+                  <option value="client">
+                    {t('charts.filters.groupByClient')}
+                  </option>
+                  <option value="project">
+                    {t('charts.filters.groupByProject')}
+                  </option>
+                  <option value="task">
+                    {t('charts.filters.groupByTask')}
+                  </option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
-      )}
+      </div>
       
       {/* Chart */}
       <div className="h-64">
         <Bar data={chartData} options={chartOptions} />
       </div>
-    </div>
+    </section>
   );
 };

@@ -19,6 +19,8 @@ import { FC, useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TimeEntry, Project } from '../../../api/types';
 import { Clock } from 'lucide-react';
+import { cn } from '../../../lib/cn';
+import { chartPalette } from '../../../utils/chartConfig';
 
 /**
  * Represents a 15-minute time slot in the timeline.
@@ -96,20 +98,19 @@ function isSlotOccupied(slot: TimeSlot, entry: TimeEntry): boolean {
 }
 
 /**
- * Gets a color for a project by hashing its ID.
+ * Gets a color for a project by hashing its name — the same categorical
+ * chart palette and hash as the daily hours chart, so a project looks alike in both.
  */
 function getProjectColor(projectId: string, projects: Project[]): string {
   const project = projects.find(p => p.id === projectId);
   if (project) {
-    // Use a hash of the project name to generate consistent colors
     let hash = 0;
     for (let i = 0; i < project.name.length; i++) {
       hash = project.name.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const hue = Math.abs(hash % 360);
-    return `hsl(${hue}, 60%, 50%)`;
+    return chartPalette[Math.abs(hash) % chartPalette.length];
   }
-  return 'hsl(280, 60%, 50%)'; // Default purple
+  return chartPalette[0]; // Brand violet
 }
 
 /**
@@ -196,14 +197,19 @@ export const TimeSlotPicker: FC<TimeSlotPickerProps> = ({
     return slotMin >= startMin && slotMin < endMin;
   };
 
+  const slotLabel = (slot: TimeSlot): string =>
+    slot.isOccupied && slot.entry
+      ? `${slot.entry.task_name || slot.entry.description || t('form.timeSlotPicker.untitledEntry')} (${slot.entry.entry_time} - ${slot.entry.entry_end_time || t('timer.ongoing')})`
+      : slot.time;
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-          <Clock className="h-4 w-4" />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+          <Clock className="h-4 w-4 text-gray-400 dark:text-gray-500" aria-hidden="true" />
           {t('form.timeSlotPicker.label')}
-        </label>
-        <span className="text-xs text-gray-500 dark:text-gray-400">
+        </span>
+        <span className="text-xs text-gray-500 dark:text-gray-400" aria-live="polite">
           {isSelectingEnd 
             ? t('form.timeSlotPicker.selectEnd')
             : t('form.timeSlotPicker.selectStart')}
@@ -212,7 +218,7 @@ export const TimeSlotPicker: FC<TimeSlotPickerProps> = ({
 
       <div 
         ref={timelineRef}
-        className="h-64 overflow-y-auto border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900"
+        className="h-64 overflow-y-auto overscroll-contain rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900"
       >
         <div className="grid grid-cols-[auto_1fr] gap-0">
           {Array.from({ length: 24 }, (_, hour) => {
@@ -221,19 +227,19 @@ export const TimeSlotPicker: FC<TimeSlotPickerProps> = ({
             return (
               <div key={hour} className="contents">
                 {/* Hour label */}
-                <div className="sticky left-0 bg-gray-100 dark:bg-gray-800 px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+                <div className="sticky left-0 border-b border-r border-gray-100 bg-gray-50 px-2.5 py-1 text-xs font-medium tabular-nums text-gray-500 dark:border-gray-800 dark:bg-gray-900/60 dark:text-gray-400">
                   {String(hour).padStart(2, '0')}:00
                 </div>
                 
                 {/* Hour slots */}
-                <div className="grid grid-cols-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="grid grid-cols-4 border-b border-gray-100 dark:border-gray-800">
                   {hourSlots.map((slot) => {
                     const isSelected = isSlotSelected(slot);
                     const bgColor = slot.isOccupied && slot.entry
                       ? getProjectColor(slot.entry.project_id, projects)
                       : isSelected
-                      ? 'bg-purple-200 dark:bg-purple-900'
-                      : 'bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700';
+                      ? 'bg-purple-200 dark:bg-purple-500/40'
+                      : 'bg-white hover:bg-purple-50 dark:bg-gray-900 dark:hover:bg-purple-500/10';
                     
                     return (
                       <button
@@ -241,19 +247,18 @@ export const TimeSlotPicker: FC<TimeSlotPickerProps> = ({
                         type="button"
                         onClick={() => handleSlotClick(slot)}
                         disabled={slot.isOccupied}
-                        className={`
-                          h-8 text-xs border-r border-gray-200 dark:border-gray-700 
-                          transition-colors relative
-                          ${slot.isOccupied ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}
-                        `}
+                        className={cn(
+                          'relative h-8 border-r border-gray-100 text-xs transition-colors last:border-r-0 dark:border-gray-800',
+                          'focus:outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple-500',
+                          slot.isOccupied ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'
+                        )}
                         style={slot.isOccupied && slot.entry ? { backgroundColor: bgColor } : undefined}
-                        title={slot.isOccupied && slot.entry 
-                          ? `${slot.entry.task_name || slot.entry.description || 'Time Entry'} (${slot.entry.entry_time} - ${slot.entry.entry_end_time || 'ongoing'})`
-                          : slot.time
-                        }
+                        title={slotLabel(slot)}
+                        aria-label={slotLabel(slot)}
+                        aria-pressed={slot.isOccupied ? undefined : isSelected}
                       >
                         {!slot.isOccupied && (
-                          <div className={`absolute inset-0 ${bgColor}`} />
+                          <div className={cn('absolute inset-0 transition-colors', bgColor)} />
                         )}
                       </button>
                     );
@@ -266,13 +271,13 @@ export const TimeSlotPicker: FC<TimeSlotPickerProps> = ({
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400 flex-wrap">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600 dark:text-gray-400">
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded" />
+          <span className="h-3 w-3 rounded border border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900" aria-hidden="true" />
           <span>{t('form.timeSlotPicker.available')}</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-purple-200 dark:bg-purple-900 border border-gray-300 dark:border-gray-700 rounded" />
+          <span className="h-3 w-3 rounded bg-purple-200 dark:bg-purple-500/40" aria-hidden="true" />
           <span>{t('form.timeSlotPicker.selected')}</span>
         </div>
         {/* Show actual projects with their colors */}
@@ -281,9 +286,10 @@ export const TimeSlotPicker: FC<TimeSlotPickerProps> = ({
           if (!project) return null;
           return (
             <div key={projectId} className="flex items-center gap-2">
-              <div 
-                className="w-4 h-4 border border-gray-300 dark:border-gray-700 rounded" 
+              <span
+                className="h-3 w-3 rounded"
                 style={{ backgroundColor: getProjectColor(projectId, projects) }}
+                aria-hidden="true"
               />
               <span>{project.name}</span>
             </div>
