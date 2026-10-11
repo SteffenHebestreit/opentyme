@@ -1,38 +1,54 @@
 /** @type {import('tailwindcss').Config} */
 
 /*
- * Design tokens.
+ * Design tokens — "Polarlicht" scheme.
  *
- * `gray` is a slightly cool neutral (zinc-based) and `purple` is the violet brand
- * scale — both replace Tailwind's defaults so every existing `gray-*` / `purple-*`
- * class in the app picks up the refreshed palette without per-file edits.
+ * `gray` is a navy-tinted neutral (replaces Tailwind's default so every `gray-*`
+ * class follows it), `brand` is the cyan brand scale and `violet` the secondary
+ * colour, used sparingly for the running timer and the logo gradient.
+ * Scales are built in OKLCH with even lightness steps: text on 600 and 600 on
+ * white meet WCAG AA; in dark mode use 400 (text) or 400 + gray-950 text (fills).
  */
 const neutral = {
-  50: '#fafafb',
-  100: '#f4f4f6',
-  200: '#e7e7eb',
-  300: '#d5d5dc',
-  400: '#a1a1ac',
-  500: '#71717c',
-  600: '#52525c',
-  700: '#3d3d46',
-  800: '#26262d',
-  900: '#17171c',
-  950: '#0d0d11',
+  50: '#f5f8fc',
+  100: '#eff3f8',
+  200: '#e0e6ed',
+  300: '#cdd4de',
+  400: '#9ba4b0',
+  500: '#67717e',
+  600: '#4c5764',
+  700: '#364150',
+  800: '#1f2b3b',
+  900: '#0c1522',
+  950: '#060d18',
 };
 
 const brand = {
-  50: '#f5f3ff',
-  100: '#ede9fe',
-  200: '#ddd6fe',
-  300: '#c4b5fd',
-  400: '#a78bfa',
-  500: '#8b5cf6',
-  600: '#7c3aed',
-  700: '#6d28d9',
-  800: '#5b21b6',
-  900: '#4c1d95',
-  950: '#2e1065',
+  50: '#eef9fd',
+  100: '#ddf3fb',
+  200: '#bfe7f6',
+  300: '#8bd5ef',
+  400: '#38bae0',
+  500: '#019bbf',
+  600: '#007b98',
+  700: '#03677f',
+  800: '#005368',
+  900: '#014252',
+  950: '#002a36',
+};
+
+const violet = {
+  50: '#f7f5ff',
+  100: '#eeecff',
+  200: '#e0daff',
+  300: '#cabfff',
+  400: '#ac96fe',
+  500: '#9171f1',
+  600: '#7a50de',
+  700: '#6740c0',
+  800: '#53339c',
+  900: '#412a79',
+  950: '#291950',
 };
 
 export default {
@@ -45,16 +61,8 @@ export default {
     extend: {
       colors: {
         gray: neutral,
-        purple: brand,
-        primary: brand,
-        purpleAccent: {
-          500: brand[500],
-          600: brand[600],
-        },
-        pinkAccent: {
-          500: '#ec4899',
-          600: '#db2777',
-        },
+        brand,
+        violet,
       },
       fontFamily: {
         sans: [
@@ -76,7 +84,9 @@ export default {
         soft: '0 1px 2px 0 rgb(15 15 20 / 0.04), 0 1px 3px 0 rgb(15 15 20 / 0.06)',
         lifted: '0 4px 12px -2px rgb(15 15 20 / 0.08), 0 2px 4px -2px rgb(15 15 20 / 0.06)',
         overlay: '0 24px 48px -12px rgb(15 15 20 / 0.25), 0 0 0 1px rgb(15 15 20 / 0.04)',
-        glow: '0 0 0 1px rgb(124 58 237 / 0.25), 0 8px 24px -8px rgb(124 58 237 / 0.45)',
+        glow: '0 0 0 1px rgb(1 155 191 / 0.25), 0 8px 24px -8px rgb(1 155 191 / 0.45)',
+        // Dark mode: a faint cyan light edge along the top of a card
+        edge: 'inset 0 1px 0 0 rgb(56 186 224 / 0.08)',
       },
       transitionTimingFunction: {
         'out-expo': 'cubic-bezier(0.16, 1, 0.3, 1)',
@@ -136,7 +146,7 @@ export default {
           '50%': { opacity: '0.45' },
         },
         highlight: {
-          '0%': { backgroundColor: 'rgb(124 58 237 / 0.14)' },
+          '0%': { backgroundColor: 'rgb(1 155 191 / 0.14)' },
           '100%': { backgroundColor: 'transparent' },
         },
       },

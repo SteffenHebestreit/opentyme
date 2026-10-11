@@ -18,7 +18,7 @@ interface SidebarProps {
 const linkClasses = (active: boolean, collapsed: boolean) =>
   cn(
     'group relative flex items-center gap-3 rounded-lg text-sm font-medium outline-none transition-colors duration-150',
-    'focus-visible:ring-2 focus-visible:ring-purple-500',
+    'focus-visible:ring-2 focus-visible:ring-brand-500',
     collapsed ? 'h-10 w-10 justify-center' : 'h-9 px-2.5',
     active
       ? 'bg-gray-900/[0.05] text-gray-900 dark:bg-white/[0.07] dark:text-white'
@@ -44,7 +44,7 @@ function SidebarLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed
             <span
               aria-hidden="true"
               className={cn(
-                'absolute rounded-full bg-purple-600 animate-fade-in dark:bg-purple-400',
+                'absolute rounded-full bg-brand-600 animate-fade-in dark:bg-brand-400',
                 collapsed ? '-left-3 top-2 h-6 w-[3px]' : '-left-3 top-1.5 h-6 w-[3px]'
               )}
             />
@@ -52,7 +52,7 @@ function SidebarLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed
           <Icon
             className={cn(
               'h-[18px] w-[18px] shrink-0 transition-colors',
-              isActive ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300'
+              isActive ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300'
             )}
             aria-hidden="true"
           />
@@ -78,7 +78,7 @@ export function Sidebar({ collapsed, onToggleCollapsed, onNavigate, className }:
         <Link
           to="/dashboard"
           onClick={onNavigate}
-          className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+          className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           aria-label="OpenTYME"
         >
           <BrandLogo compact={collapsed} />
@@ -135,7 +135,7 @@ export function Sidebar({ collapsed, onToggleCollapsed, onNavigate, className }:
             type="button"
             onClick={onToggleCollapsed}
             className={cn(
-              'mt-2 flex items-center gap-3 rounded-lg text-sm text-gray-400 transition-colors hover:bg-gray-900/[0.04] hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:hover:bg-white/[0.04] dark:hover:text-gray-200',
+              'mt-2 flex items-center gap-3 rounded-lg text-sm text-gray-400 transition-colors hover:bg-gray-900/[0.04] hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-white/[0.04] dark:hover:text-gray-200',
               collapsed ? 'h-10 w-10 justify-center' : 'h-9 w-full px-2.5'
             )}
             aria-label={collapsed ? t('shell.expandSidebar', 'Expand sidebar') : t('shell.collapseSidebar', 'Collapse sidebar')}

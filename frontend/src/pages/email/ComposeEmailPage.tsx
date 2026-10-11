@@ -377,10 +377,10 @@ export default function ComposeEmailPage() {
   const sectionCls = 'surface p-5 sm:p-6';
 
   const checkboxCls =
-    'h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900';
+    'h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900';
 
   const textLinkCls =
-    'inline-flex items-center gap-1.5 rounded text-xs font-medium text-purple-600 transition-colors hover:text-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-purple-400 dark:hover:text-purple-300';
+    'inline-flex items-center gap-1.5 rounded text-xs font-medium text-brand-600 transition-colors hover:text-brand-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-400 dark:hover:text-brand-300';
 
   const allVisibleChecked =
     filteredInvoices.length > 0 && filteredInvoices.every((i) => checkedInvoices.has(i.id));
@@ -452,7 +452,7 @@ export default function ComposeEmailPage() {
                             className={cn(
                               'block w-full rounded-lg px-3 py-2 text-left transition-colors',
                               c.id === selectedClientId
-                                ? 'bg-purple-50 dark:bg-purple-500/10'
+                                ? 'bg-brand-50 dark:bg-brand-500/10'
                                 : 'hover:bg-gray-50 dark:hover:bg-white/5'
                             )}
                           >
@@ -463,7 +463,7 @@ export default function ComposeEmailPage() {
                               <div className="truncate text-xs text-gray-500 dark:text-gray-400">
                                 {invoiceEmail}
                                 {usesBillingEmail && (
-                                  <span className="ml-1 text-purple-600 dark:text-purple-400">
+                                  <span className="ml-1 text-brand-600 dark:text-brand-400">
                                     ({t('compose.invoiceEmail')})
                                   </span>
                                 )}
@@ -625,7 +625,7 @@ export default function ComposeEmailPage() {
                     className={cn(
                       'flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors',
                       checkedInvoices.has(inv.id)
-                        ? 'bg-purple-50/60 dark:bg-purple-500/[0.07]'
+                        ? 'bg-brand-50/60 dark:bg-brand-500/[0.07]'
                         : 'hover:bg-gray-50 dark:hover:bg-white/[0.02]'
                     )}
                   >
@@ -662,7 +662,7 @@ export default function ComposeEmailPage() {
             )}
 
             {checkedInvoices.size > 0 && (
-              <p className="mt-3 text-xs font-medium text-purple-600 dark:text-purple-400">
+              <p className="mt-3 text-xs font-medium text-brand-600 dark:text-brand-400">
                 {t('compose.invoicesSelected', { count: checkedInvoices.size })}
               </p>
             )}
@@ -742,7 +742,7 @@ export default function ComposeEmailPage() {
                               className={cn(
                                 'rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset transition-colors',
                                 active
-                                  ? 'bg-purple-50 text-purple-700 ring-purple-600/25 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/30'
+                                  ? 'bg-brand-50 text-brand-700 ring-brand-600/25 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/30'
                                   : 'bg-white text-gray-600 ring-gray-200 hover:bg-gray-50 hover:text-gray-900 dark:bg-transparent dark:text-gray-400 dark:ring-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-200'
                               )}
                             >
@@ -840,7 +840,7 @@ export default function ComposeEmailPage() {
             )}
 
             {reports.length > 0 && (
-              <p className="mt-3 text-xs font-medium text-purple-600 dark:text-purple-400">
+              <p className="mt-3 text-xs font-medium text-brand-600 dark:text-brand-400">
                 {t('compose.reportsAttached', { count: reports.length })}
               </p>
             )}

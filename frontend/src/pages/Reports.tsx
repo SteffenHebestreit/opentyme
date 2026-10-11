@@ -336,7 +336,7 @@ export default function Reports() {
             value={summary.profit_loss}
             format={formatMoney}
             icon={Scale}
-            variant={summary.profit_loss >= 0 ? 'purple' : 'orange'}
+            variant={summary.profit_loss >= 0 ? 'brand' : 'orange'}
             hint={summary.profit_loss >= 0 ? t('incomeExpense.profit') : t('incomeExpense.loss')}
           />
         </>
@@ -345,7 +345,7 @@ export default function Reports() {
         ? (
           <>
             <StatCard label={t('timeTracking.totalHours')} value={summary.total_hours} format={formatHours} icon={Clock} variant="blue" />
-            <StatCard label={t('timeTracking.billableHours')} value={summary.billable_hours} format={formatHours} icon={Hourglass} variant="purple" />
+            <StatCard label={t('timeTracking.billableHours')} value={summary.billable_hours} format={formatHours} icon={Hourglass} variant="brand" />
             <StatCard label={t('timeTracking.billableValue')} value={summary.billable_value} format={formatMoney} icon={Coins} variant="green" />
           </>
         )
@@ -377,9 +377,9 @@ export default function Reports() {
                 }}
                 className={cn(
                   'surface surface-interactive relative flex h-full flex-col p-5 text-left',
-                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500',
+                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
                   isSelected &&
-                    'border-purple-300 bg-purple-50/40 ring-2 ring-purple-500/70 hover:border-purple-300 dark:border-purple-500/40 dark:bg-purple-500/[0.06] dark:ring-purple-400/50 dark:hover:border-purple-500/40'
+                    'border-brand-300 bg-brand-50/40 ring-2 ring-brand-500/70 hover:border-brand-300 dark:border-brand-500/40 dark:bg-brand-500/[0.06] dark:ring-brand-400/50 dark:hover:border-brand-500/40'
                 )}
               >
                 <div className="flex w-full items-start justify-between gap-3">
@@ -387,14 +387,14 @@ export default function Reports() {
                     className={cn(
                       'flex h-10 w-10 items-center justify-center rounded-lg ring-1 ring-inset transition-colors',
                       isSelected
-                        ? 'bg-purple-600 text-white ring-purple-600 dark:bg-purple-500 dark:ring-purple-500'
-                        : 'bg-purple-50 text-purple-600 ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20'
+                        ? 'bg-brand-600 text-white ring-brand-600 dark:bg-brand-400 dark:text-gray-950 dark:ring-brand-400'
+                        : 'bg-brand-50 text-brand-600 ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20'
                     )}
                   >
                     <Icon className="h-5 w-5" aria-hidden="true" />
                   </span>
                   {isSelected ? (
-                    <CheckCircle2 className="h-5 w-5 animate-scale-in text-purple-600 dark:text-purple-400" aria-hidden="true" />
+                    <CheckCircle2 className="h-5 w-5 animate-scale-in text-brand-600 dark:text-brand-400" aria-hidden="true" />
                   ) : (
                     <span className="h-5 w-5 rounded-full border border-gray-300 dark:border-gray-700" aria-hidden="true" />
                   )}
@@ -439,9 +439,9 @@ export default function Reports() {
                       onClick={() => handleQuickPeriod(period)}
                       className={cn(
                         'rounded-full px-3.5 py-1.5 text-sm font-medium ring-1 ring-inset transition-colors',
-                        'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500',
+                        'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
                         isActive
-                          ? 'bg-purple-600 text-white ring-purple-600 dark:bg-purple-500 dark:ring-purple-500'
+                          ? 'bg-brand-600 text-white ring-brand-600 dark:bg-brand-400 dark:text-gray-950 dark:ring-brand-400'
                           : 'bg-white text-gray-700 ring-gray-200 hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-700 dark:hover:bg-white/[0.04] dark:hover:text-white'
                       )}
                     >
@@ -487,7 +487,7 @@ export default function Reports() {
                   type="checkbox"
                   checked={includeTaxExcluded}
                   onChange={(e) => setIncludeTaxExcluded(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 accent-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900"
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 accent-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
                 />
                 <span className="flex-1">
                   <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">

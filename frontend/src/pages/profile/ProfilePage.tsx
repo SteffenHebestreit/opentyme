@@ -69,7 +69,7 @@ const ProfilePage: React.FC = () => {
         {/* Identity */}
         <div className="surface flex flex-col items-center px-6 py-8 text-center">
           <div
-            className="flex h-20 w-20 items-center justify-center rounded-full bg-purple-50 text-3xl font-semibold text-purple-600 ring-1 ring-inset ring-purple-600/15 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20"
+            className="flex h-20 w-20 items-center justify-center rounded-full bg-brand-50 text-3xl font-semibold text-brand-600 ring-1 ring-inset ring-brand-600/15 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20"
             aria-hidden="true"
           >
             {initial}

@@ -2,7 +2,7 @@ import React, { ReactNode } from 'react';
 
 /**
  * Available badge color variants.
- * @type {('gray' | 'blue' | 'green' | 'yellow' | 'red' | 'purple' | 'pink' | 'indigo' | 'teal' | 'orange' | 'amber' | 'emerald')}
+ * @type {('gray' | 'blue' | 'green' | 'yellow' | 'red' | 'brand' | 'violet' | 'pink' | 'indigo' | 'teal' | 'orange' | 'amber' | 'emerald')}
  */
 export type BadgeVariant = 
   | 'gray' 
@@ -10,7 +10,8 @@ export type BadgeVariant =
   | 'green' 
   | 'yellow' 
   | 'red' 
-  | 'purple' 
+  | 'brand' 
+  | 'violet' 
   | 'pink' 
   | 'indigo' 
   | 'teal' 
@@ -50,7 +51,8 @@ const variantClasses: Record<BadgeVariant, string> = {
   green: 'bg-emerald-50 text-emerald-700 ring-emerald-600/15 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/20',
   yellow: 'bg-amber-50 text-amber-800 ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/20',
   red: 'bg-red-50 text-red-700 ring-red-600/15 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-400/20',
-  purple: 'bg-purple-50 text-purple-700 ring-purple-600/15 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20',
+  brand: 'bg-brand-50 text-brand-700 ring-brand-600/15 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20',
+  violet: 'bg-violet-50 text-violet-700 ring-violet-600/15 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-400/20',
   pink: 'bg-pink-50 text-pink-700 ring-pink-600/15 dark:bg-pink-500/10 dark:text-pink-300 dark:ring-pink-400/20',
   indigo: 'bg-indigo-50 text-indigo-700 ring-indigo-600/15 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-400/20',
   teal: 'bg-teal-50 text-teal-700 ring-teal-600/15 dark:bg-teal-500/10 dark:text-teal-300 dark:ring-teal-400/20',
@@ -99,7 +101,7 @@ const sizeClasses: Record<BadgeSize, string> = {
  * 
  * @example
  * // Large badge
- * <Badge variant="purple" size="lg">Premium</Badge>
+ * <Badge variant="brand" size="lg">Premium</Badge>
  * 
  * @param {BadgeProps} props - Component props
  * @returns {JSX.Element} Badge element

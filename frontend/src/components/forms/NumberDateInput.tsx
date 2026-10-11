@@ -151,7 +151,7 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(({
               type="button"
               onClick={handleDecrement}
               disabled={disabled || (min !== undefined && Number(value) <= Number(min))}
-              className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 
+              className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:text-brand-600 dark:hover:text-brand-400 
                 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -162,7 +162,7 @@ export const NumberInput = forwardRef<HTMLInputElement, NumberInputProps>(({
               type="button"
               onClick={handleIncrement}
               disabled={disabled || (max !== undefined && Number(value) >= Number(max))}
-              className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 
+              className="px-2 py-1 text-gray-600 dark:text-gray-400 hover:text-brand-600 dark:hover:text-brand-400 
                 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -349,7 +349,7 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
     <section className="surface flex flex-col p-5 sm:p-6" aria-labelledby={`${fieldId}-title`}>
       <div className="mb-4 flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-2">
-          <Calendar className="h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+          <Calendar className="h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" aria-hidden="true" />
           <h2 id={`${fieldId}-title`} className="section-title truncate">
             {t('charts.weeklyHours.title')}
           </h2>
@@ -370,7 +370,7 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
             aria-controls={`${fieldId}-filters`}
             aria-label={t('charts.filters.toggle')}
             title={t('charts.filters.toggle')}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white"
           >
             <ChevronDown
               className={cn('h-4 w-4 transition-transform duration-200', showFilters && 'rotate-180')}

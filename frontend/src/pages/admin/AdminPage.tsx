@@ -162,7 +162,7 @@ export default function AdminPage() {
                           aria-current={isActive ? 'page' : undefined}
                           className={cn(
                             'group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                            'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500',
+                            'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
                             isActive
                               ? 'bg-white text-gray-900 shadow-soft ring-1 ring-gray-200 dark:bg-white/[0.06] dark:text-white dark:shadow-none dark:ring-white/10'
                               : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.04] dark:hover:text-gray-100'
@@ -171,14 +171,14 @@ export default function AdminPage() {
                           {isActive && (
                             <span
                               aria-hidden="true"
-                              className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-purple-600 dark:bg-purple-400"
+                              className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-brand-600 dark:bg-brand-400"
                             />
                           )}
                           <Icon
                             className={cn(
                               'h-4 w-4 shrink-0 transition-colors',
                               isActive
-                                ? 'text-purple-600 dark:text-purple-400'
+                                ? 'text-brand-600 dark:text-brand-400'
                                 : 'text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300'
                             )}
                             aria-hidden="true"

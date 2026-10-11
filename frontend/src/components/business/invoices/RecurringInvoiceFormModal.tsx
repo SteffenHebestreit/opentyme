@@ -249,7 +249,7 @@ export const RecurringInvoiceFormModal: FC<Props> = ({
           </div>
           <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
             <div
-              className={cn(itemGrid, 'hidden border-b border-gray-100 bg-gray-50/80 px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-400 sm:grid')}
+              className={cn(itemGrid, 'hidden border-b border-gray-100 bg-gray-50/80 px-3 py-2 font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-gray-500 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-400 sm:grid')}
               aria-hidden="true"
             >
               <div>{t('recurring.form.fields.description')}</div>
@@ -308,7 +308,7 @@ export const RecurringInvoiceFormModal: FC<Props> = ({
         <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-gray-700 dark:text-gray-300">
           <input
             type="checkbox"
-            className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900"
+            className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
             checked={isActive}
             onChange={(e) => setIsActive(e.target.checked)}
           />

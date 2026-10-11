@@ -27,19 +27,19 @@ import { cn } from '../lib/cn';
 
 /** Brand-coloured initial of the "Track Your Money & Effort" tagline (T·Y·M·E). */
 const Initial: React.FC<{ children: string }> = ({ children }) => (
-  <span className="text-purple-600 dark:text-purple-400">{children}</span>
+  <span className="text-brand-600 dark:text-brand-400">{children}</span>
 );
 
 /** Tinted square holding an icon. */
-const IconTile: React.FC<{ icon: LucideIcon; tone?: 'purple' | 'amber' | 'sky' | 'emerald'; className?: string }> = ({
+const IconTile: React.FC<{ icon: LucideIcon; tone?: 'brand' | 'amber' | 'violet' | 'emerald'; className?: string }> = ({
   icon: Icon,
-  tone = 'purple',
+  tone = 'brand',
   className,
 }) => {
   const tones = {
-    purple: 'bg-purple-50 text-purple-600 ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20',
+    brand: 'bg-brand-50 text-brand-600 ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20',
     amber: 'bg-amber-50 text-amber-600 ring-amber-600/15 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/20',
-    sky: 'bg-sky-50 text-sky-600 ring-sky-600/15 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-400/20',
+    violet: 'bg-violet-50 text-violet-600 ring-violet-600/15 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-400/20',
     emerald: 'bg-emerald-50 text-emerald-600 ring-emerald-600/15 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-400/20',
   };
   return (
@@ -80,16 +80,16 @@ const LandingPage: React.FC = () => {
   ];
 
   const expenseCategories = [
-    { label: t('landing.preview.expenses.software'), amount: 850, percentage: 35, color: 'bg-purple-600 dark:bg-purple-500' },
-    { label: t('landing.preview.expenses.office'), amount: 320, percentage: 25, color: 'bg-purple-300 dark:bg-purple-300' },
-    { label: t('landing.preview.expenses.marketing'), amount: 480, percentage: 20, color: 'bg-sky-500' },
+    { label: t('landing.preview.expenses.software'), amount: 850, percentage: 35, color: 'bg-brand-600 dark:bg-brand-500' },
+    { label: t('landing.preview.expenses.office'), amount: 320, percentage: 25, color: 'bg-brand-300 dark:bg-brand-300' },
+    { label: t('landing.preview.expenses.marketing'), amount: 480, percentage: 20, color: 'bg-violet-500' },
     { label: t('landing.preview.expenses.other'), amount: 150, percentage: 20, color: 'bg-gray-400 dark:bg-gray-500' },
   ];
 
-  const quickStats: { value: string; label: string; icon: LucideIcon; tone: 'purple' | 'amber' | 'sky' | 'emerald' }[] = [
-    { value: '12', label: t('landing.preview.stats.activeClients'), icon: Users, tone: 'purple' },
+  const quickStats: { value: string; label: string; icon: LucideIcon; tone: 'brand' | 'amber' | 'violet' | 'emerald' }[] = [
+    { value: '12', label: t('landing.preview.stats.activeClients'), icon: Users, tone: 'brand' },
     { value: '8', label: t('landing.preview.stats.openInvoices'), icon: FileText, tone: 'amber' },
-    { value: '156', label: t('landing.preview.stats.hoursThisMonth'), icon: Clock, tone: 'sky' },
+    { value: '156', label: t('landing.preview.stats.hoursThisMonth'), icon: Clock, tone: 'violet' },
     { value: '98%', label: t('landing.preview.stats.paymentRate'), icon: TrendingUp, tone: 'emerald' },
   ];
 
@@ -112,7 +112,7 @@ const LandingPage: React.FC = () => {
     <div>
       {/* Hero Section */}
       <section className="mx-auto max-w-6xl px-4 pb-20 pt-16 text-center sm:px-6 sm:pt-24">
-        <span className="inline-flex items-center gap-2 rounded-full bg-purple-50 px-3 py-1 text-sm font-medium text-purple-700 ring-1 ring-inset ring-purple-600/15 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+        <span className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700 ring-1 ring-inset ring-brand-600/15 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20">
           <Sparkles className="h-4 w-4" aria-hidden="true" />
           {t('landing.badge')}
         </span>
@@ -154,7 +154,7 @@ const LandingPage: React.FC = () => {
                   +24%
                 </span>
               </div>
-              <div className="h-48 text-purple-600 dark:text-purple-400">
+              <div className="h-48 text-brand-600 dark:text-brand-400">
                 <svg className="h-full w-full" viewBox="0 0 400 200" preserveAspectRatio="none">
                   <defs>
                     <linearGradient id="landingRevenueFill" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -188,7 +188,7 @@ const LandingPage: React.FC = () => {
               <div className="mt-6 grid grid-cols-3 gap-4 border-t border-gray-100 pt-5 dark:border-gray-800">
                 <div>
                   <p className="text-xs text-gray-500 dark:text-gray-400">{t('landing.preview.revenue.thisMonth')}</p>
-                  <p className="mt-1 text-lg font-semibold tabular-nums text-purple-600 sm:text-xl dark:text-purple-400">{money(8420)}</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-brand-600 sm:text-xl dark:text-brand-400">{money(8420)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 dark:text-gray-400">{t('landing.preview.revenue.invoiced')}</p>
@@ -205,16 +205,16 @@ const LandingPage: React.FC = () => {
             <div className="surface p-6">
               <div className="mb-6 flex items-center justify-between gap-4">
                 <h3 className="section-title">{t('landing.preview.time.title')}</h3>
-                <span className="rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-600/15 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+                <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700 ring-1 ring-inset ring-brand-600/15 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20">
                   {t('landing.preview.time.active')}
                 </span>
               </div>
 
               {/* Active Session */}
-              <div className="rounded-lg border border-purple-200 bg-purple-50/60 p-4 dark:border-purple-500/25 dark:bg-purple-500/10">
+              <div className="rounded-lg border border-brand-200 bg-brand-50/60 p-4 dark:border-brand-500/25 dark:bg-brand-500/10">
                 <div className="flex items-center justify-between gap-3">
                   <span className="font-medium text-gray-900 dark:text-white">Website Redesign</span>
-                  <span className="font-mono text-sm font-semibold tabular-nums text-purple-700 dark:text-purple-300">2:34:18</span>
+                  <span className="font-mono text-sm font-semibold tabular-nums text-brand-700 dark:text-brand-300">2:34:18</span>
                 </div>
                 <div className="mt-1.5 flex items-center justify-between gap-3 text-sm text-gray-500 dark:text-gray-400">
                   <span>{t('landing.preview.time.client', { name: 'Acme Corp' })}</span>
@@ -261,7 +261,7 @@ const LandingPage: React.FC = () => {
                       strokeLinecap="round"
                       strokeDasharray="314"
                       strokeDashoffset="79"
-                      className="stroke-purple-600 dark:stroke-purple-400"
+                      className="stroke-brand-600 dark:stroke-brand-400"
                     />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">

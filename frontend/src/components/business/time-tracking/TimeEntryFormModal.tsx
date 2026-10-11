@@ -613,7 +613,7 @@ export const TimeEntryFormModal: FC<TimeEntryFormModalProps> = ({
                 type="button"
                 onClick={() => setShowTimeSlotPicker(!showTimeSlotPicker)}
                 aria-expanded={showTimeSlotPicker}
-                className="-ml-1 inline-flex items-center gap-2 rounded-md px-1 py-0.5 text-sm font-medium text-purple-600 transition-colors hover:text-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-purple-400 dark:hover:text-purple-300"
+                className="-ml-1 inline-flex items-center gap-2 rounded-md px-1 py-0.5 text-sm font-medium text-brand-600 transition-colors hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-400 dark:hover:text-brand-300"
               >
                 <CalendarClock className="h-4 w-4" aria-hidden="true" />
                 {showTimeSlotPicker 
@@ -689,7 +689,7 @@ export const TimeEntryFormModal: FC<TimeEntryFormModalProps> = ({
             <label className="mb-4 flex h-10 cursor-pointer items-center gap-2.5 text-sm font-medium text-gray-700 sm:self-end dark:text-gray-300">
               <input
                 type="checkbox"
-                className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900"
+                className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
                 {...register('billable')}
               />
               {t('form.billable.label')}

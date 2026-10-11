@@ -536,7 +536,7 @@ const DocumentForm: FC<{
               className={clsx(
                 'mb-4 rounded-xl border p-4 transition-colors',
                 rateEnabled
-                  ? 'border-purple-200 bg-purple-50/40 dark:border-purple-500/25 dark:bg-purple-500/[0.04]'
+                  ? 'border-brand-200 bg-brand-50/40 dark:border-brand-500/25 dark:bg-brand-500/[0.04]'
                   : 'border-gray-200 dark:border-gray-800'
               )}
             >
@@ -565,7 +565,7 @@ const DocumentForm: FC<{
               </label>
 
               {rateEnabled ? (
-                <div className="mt-4 animate-fade-up border-t border-purple-100 pt-4 dark:border-purple-500/15">
+                <div className="mt-4 animate-fade-up border-t border-brand-100 pt-4 dark:border-brand-500/15">
                   <div className="grid gap-x-4 sm:grid-cols-2">
                     <Input
                       id="client-document-rate"
@@ -842,9 +842,9 @@ export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
           }}
         >
           {isDraggingOver ? (
-            <div className="pointer-events-none absolute inset-0 z-10 flex animate-fade-in flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-purple-400 bg-purple-50/90 backdrop-blur-[1px] dark:border-purple-400/60 dark:bg-gray-950/85">
-              <UploadCloud className="h-7 w-7 text-purple-500 dark:text-purple-400" aria-hidden="true" />
-              <p className="text-sm font-semibold text-purple-800 dark:text-purple-200">{t('documents.drop.release')}</p>
+            <div className="pointer-events-none absolute inset-0 z-10 flex animate-fade-in flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-brand-400 bg-brand-50/90 backdrop-blur-[1px] dark:border-brand-400/60 dark:bg-gray-950/85">
+              <UploadCloud className="h-7 w-7 text-brand-500 dark:text-brand-400" aria-hidden="true" />
+              <p className="text-sm font-semibold text-brand-800 dark:text-brand-200">{t('documents.drop.release')}</p>
             </div>
           ) : null}
 
@@ -915,7 +915,7 @@ export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
                   <li
                     key={document_.id}
                     className={clsx(
-                      'overflow-hidden rounded-xl border bg-white shadow-soft transition-colors dark:bg-gray-900 dark:shadow-none',
+                      'overflow-hidden rounded-xl border bg-white shadow-soft transition-colors dark:bg-gray-900 dark:shadow-edge',
                       urgent && extendable
                         ? 'border-amber-300/80 dark:border-amber-500/30'
                         : 'border-gray-200 dark:border-gray-800'
@@ -927,7 +927,7 @@ export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
                           'hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset md:flex',
                           urgent && extendable
                             ? 'bg-amber-50 text-amber-600 ring-amber-600/15 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/20'
-                            : 'bg-purple-50 text-purple-600 ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20'
+                            : 'bg-brand-50 text-brand-600 ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20'
                         )}
                       >
                         <FileText className="h-[18px] w-[18px]" aria-hidden="true" />
@@ -1018,7 +1018,7 @@ export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
                       <div className="border-t border-gray-100 bg-gray-50/60 px-4 py-2.5 dark:border-gray-800 dark:bg-white/[0.02]">
                         <button
                           type="button"
-                          className="inline-flex items-center gap-1.5 rounded text-xs font-medium text-gray-600 transition-colors hover:text-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-400 dark:hover:text-purple-300"
+                          className="inline-flex items-center gap-1.5 rounded text-xs font-medium text-gray-600 transition-colors hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-gray-400 dark:hover:text-brand-300"
                           onClick={() => toggleHistory(document_.id)}
                           aria-expanded={expanded}
                         >

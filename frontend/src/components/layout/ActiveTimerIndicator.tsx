@@ -54,21 +54,21 @@ export function ActiveTimerIndicator() {
     <Link
       to="/time-entries"
       className={cn(
-        'group flex h-8 animate-pop-in items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-50 pl-2.5 pr-3 text-sm transition-colors',
-        'hover:border-emerald-500/40 hover:bg-emerald-100/70 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/15',
+        'group flex h-8 animate-pop-in items-center gap-2 rounded-full border border-violet-500/25 bg-violet-50 pl-2.5 pr-3 text-sm transition-colors',
+        'hover:border-violet-500/40 hover:bg-violet-100/70 dark:bg-violet-500/10 dark:hover:bg-violet-500/15',
         onTimePage && 'pointer-events-none'
       )}
       title={t('shell.timerRunning', 'Timer running')}
     >
       <span className="relative flex h-2 w-2" aria-hidden="true">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60 [animation-duration:2s]" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-500 opacity-60 [animation-duration:2s]" />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-violet-500" />
       </span>
-      <span className="font-mono text-[13px] font-medium tabular-nums text-emerald-700 dark:text-emerald-300">
+      <span className="font-mono text-[13px] font-medium tabular-nums text-violet-700 dark:text-violet-300">
         {formatElapsed(start, now)}
       </span>
       {running.project_name && (
-        <span className="hidden max-w-[10rem] truncate text-xs text-emerald-700/80 lg:inline dark:text-emerald-300/80">
+        <span className="hidden max-w-[10rem] truncate text-xs text-violet-700/80 lg:inline dark:text-violet-300/80">
           {running.project_name}
         </span>
       )}

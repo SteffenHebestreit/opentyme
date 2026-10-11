@@ -266,7 +266,7 @@ export default function EmailSettingsPage() {
             href="http://localhost:8025"
             target="_blank"
             rel="noreferrer"
-            className="font-medium text-purple-600 underline-offset-2 hover:underline dark:text-purple-400"
+            className="font-medium text-brand-600 underline-offset-2 hover:underline dark:text-brand-400"
           >
             http://localhost:8025
           </a>

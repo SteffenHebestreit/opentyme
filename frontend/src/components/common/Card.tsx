@@ -26,7 +26,7 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 export const Card: React.FC<CardProps> = ({ children, className, interactive, ...rest }) => (
   <div
     className={cn(
-      'overflow-hidden rounded-xl border border-gray-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-none',
+      'overflow-hidden rounded-xl border border-gray-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-edge',
       interactive && 'surface-interactive',
       className
     )}
@@ -68,7 +68,7 @@ export const CardHeader: React.FC<CardHeaderProps> = ({
     {(title || subtitle) && (
       <div className="min-w-0">
         {title && (
-          <h3 className="truncate text-base font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+          <h3 className="section-label truncate">
             {title}
           </h3>
         )}

@@ -70,17 +70,17 @@ export const FileDropZone: FC<FileDropZoneProps> = ({
             'flex items-center gap-3 rounded-xl border px-4 py-3',
             error
               ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30'
-              : 'border-purple-200 bg-purple-50 dark:border-purple-800/60 dark:bg-purple-900/20'
+              : 'border-brand-200 bg-brand-50 dark:border-brand-800/60 dark:bg-brand-900/20'
           )}
         >
-          <FileText className="h-6 w-6 shrink-0 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+          <FileText className="h-6 w-6 shrink-0 text-brand-600 dark:text-brand-400" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-gray-900 dark:text-white">{file.name}</p>
             <p className="text-xs text-gray-500 dark:text-gray-400">{formatFileSize(file.size, locale)}</p>
           </div>
           <button
             type="button"
-            className="rounded-lg px-2 py-1 text-xs font-medium text-purple-700 hover:bg-purple-100 dark:text-purple-300 dark:hover:bg-purple-900/40"
+            className="rounded-lg px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 dark:text-brand-300 dark:hover:bg-brand-900/40"
             onClick={() => inputRef.current?.click()}
           >
             {changeLabel}
@@ -110,13 +110,13 @@ export const FileDropZone: FC<FileDropZoneProps> = ({
           className={clsx(
             'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors',
             isDragging
-              ? 'border-purple-500 bg-purple-50 dark:border-purple-400 dark:bg-purple-900/30'
+              ? 'border-brand-500 bg-brand-50 dark:border-brand-400 dark:bg-brand-900/30'
               : error
                 ? 'border-red-300 hover:border-red-400 dark:border-red-800'
-                : 'border-gray-300 hover:border-purple-400 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-purple-500 dark:hover:bg-gray-800/50'
+                : 'border-gray-300 hover:border-brand-400 hover:bg-gray-50 dark:border-gray-700 dark:hover:border-brand-500 dark:hover:bg-gray-800/50'
           )}
         >
-          <UploadCloud className="h-8 w-8 text-purple-500 dark:text-purple-400" aria-hidden="true" />
+          <UploadCloud className="h-8 w-8 text-brand-500 dark:text-brand-400" aria-hidden="true" />
           <span className="text-sm font-medium text-gray-900 dark:text-white">{prompt}</span>
           {hint ? <span className="text-xs text-gray-500 dark:text-gray-400">{hint}</span> : null}
         </label>

@@ -81,10 +81,10 @@ interface Schedule {
 }
 
 const checkboxClass =
-  'h-4 w-4 shrink-0 rounded border-gray-300 text-purple-600 accent-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900';
+  'h-4 w-4 shrink-0 rounded border-gray-300 text-brand-600 accent-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900';
 
 const iconButton =
-  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-500';
+  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-gray-500';
 
 const statusVariant: Record<Backup['status'], BadgeVariant> = {
   completed: 'green',
@@ -341,7 +341,7 @@ export default function SystemAdmin() {
   const includeBadges = (item: { includes_database: boolean; includes_storage: boolean; includes_config: boolean }) => (
     <div className="flex flex-wrap gap-1.5">
       {item.includes_database && (
-        <Badge variant="purple" size="sm">
+        <Badge variant="brand" size="sm">
           {t('backups.includes.database')}
         </Badge>
       )}

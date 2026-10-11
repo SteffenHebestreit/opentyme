@@ -30,7 +30,7 @@ import { cn } from '../../../lib/cn';
 /** Small square icon button used for the row actions. */
 const iconButtonClass =
   'inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors ' +
-  'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 disabled:pointer-events-none disabled:opacity-50 ' +
+  'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:pointer-events-none disabled:opacity-50 ' +
   'dark:text-gray-400';
 
 /**

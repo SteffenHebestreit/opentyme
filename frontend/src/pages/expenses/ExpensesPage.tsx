@@ -407,7 +407,7 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
                 </Badge>
               )}
               {expense.is_recurring && (
-                <Badge variant="purple" size="sm" icon={<Repeat className="h-3 w-3" aria-hidden="true" />}>
+                <Badge variant="brand" size="sm" icon={<Repeat className="h-3 w-3" aria-hidden="true" />}>
                   {t('recurring.recurring', 'Recurring')}
                 </Badge>
               )}
@@ -516,7 +516,7 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
             e.stopPropagation();
             openExpense(expense.id);
           }}
-          className="text-purple-700 hover:text-purple-800 dark:text-purple-300 dark:hover:text-purple-200"
+          className="text-brand-700 hover:text-brand-800 dark:text-brand-300 dark:hover:text-brand-200"
         >
           {t('table.view')}
         </Button>
@@ -710,7 +710,7 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
                     value={Number(depreciationSummary.summary.total_assets_under_depreciation) || 0}
                     format={formatCount}
                     icon={Layers}
-                    variant="purple"
+                    variant="brand"
                     hint={t('depreciationSummary.assetsHint')}
                   />
                   <StatCard

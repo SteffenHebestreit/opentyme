@@ -14,7 +14,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       type="button"
       onClick={() => dispatch({ type: 'SET_THEME', payload: dark ? 'light' : 'dark' })}
       className={cn(
-        'relative flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-900/[0.05] hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white',
+        'relative flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-900/[0.05] hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white',
         className
       )}
       aria-label={t('shell.toggleTheme', 'Toggle theme')}

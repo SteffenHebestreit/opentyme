@@ -235,7 +235,7 @@ export function getChartColorForDate(
   }
   
   // Regular weekday
-  return 'rgba(168, 85, 247, 0.8)'; // purple
+  return 'rgba(56, 186, 224, 0.8)'; // brand cyan
 }
 
 /**
@@ -296,7 +296,7 @@ export async function getDayType(
   // Regular weekday
   return {
     type: 'weekday',
-    color: 'rgba(168, 85, 247, 0.8)', // purple (default)
+    color: 'rgba(56, 186, 224, 0.8)', // brand cyan (default)
   };
 }
 

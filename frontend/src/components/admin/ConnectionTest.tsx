@@ -94,7 +94,7 @@ export function ConnectionTest({ run, onPickModel, disabled }: ConnectionTestPro
                     key={model}
                     type="button"
                     onClick={() => onPickModel(model)}
-                    className="rounded-md border border-current/20 bg-white/60 px-2 py-0.5 font-mono text-xs transition-colors hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:bg-black/20 dark:hover:bg-black/40"
+                    className="rounded-md border border-current/20 bg-white/60 px-2 py-0.5 font-mono text-xs transition-colors hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-black/20 dark:hover:bg-black/40"
                   >
                     {model}
                   </button>

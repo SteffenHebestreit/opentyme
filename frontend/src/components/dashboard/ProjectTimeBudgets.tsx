@@ -34,7 +34,7 @@ const BudgetRow: FC<{ budget: ProjectTimeBudget }> = ({ budget }) => {
     ? 'bg-red-500'
     : budget.percentage >= 80
       ? 'bg-amber-500'
-      : 'bg-purple-500 dark:bg-purple-400';
+      : 'bg-brand-500 dark:bg-brand-400';
 
   return (
     <div className="min-w-0 space-y-1.5">

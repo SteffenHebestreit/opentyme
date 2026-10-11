@@ -510,7 +510,7 @@ export const ProjectFormModal: FC<ProjectFormModalProps> = ({
                     <div className="mb-4 sm:pt-7">
                       <button
                         type="button"
-                        className="inline-flex items-center gap-1.5 rounded text-sm font-medium text-purple-600 transition-colors hover:text-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-purple-400 dark:hover:text-purple-300"
+                        className="inline-flex items-center gap-1.5 rounded text-sm font-medium text-brand-600 transition-colors hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-400 dark:hover:text-brand-300"
                         onClick={() => onShowRateHistory(initialProject)}
                       >
                         <History className="h-4 w-4" aria-hidden="true" />
@@ -521,7 +521,7 @@ export const ProjectFormModal: FC<ProjectFormModalProps> = ({
                 </div>
 
                 {rateChanged && initialProject ? (
-                  <div className="mb-4 animate-fade-up rounded-xl border border-purple-200 bg-purple-50/40 p-4 dark:border-purple-500/25 dark:bg-purple-500/[0.04]">
+                  <div className="mb-4 animate-fade-up rounded-xl border border-brand-200 bg-brand-50/40 p-4 dark:border-brand-500/25 dark:bg-brand-500/[0.04]">
                     <div className="mb-4">
                       <p className="text-sm font-semibold text-gray-900 dark:text-white">
                         {t('form.hourlyRate.changeTitle')}

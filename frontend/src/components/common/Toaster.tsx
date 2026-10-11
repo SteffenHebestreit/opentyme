@@ -7,7 +7,7 @@ const toneIcon: Record<ToastTone, { icon: typeof Info; className: string }> = {
   success: { icon: CheckCircle2, className: 'text-emerald-500 dark:text-emerald-400' },
   error: { icon: XCircle, className: 'text-red-500 dark:text-red-400' },
   warning: { icon: AlertTriangle, className: 'text-amber-500 dark:text-amber-400' },
-  info: { icon: Info, className: 'text-purple-500 dark:text-purple-400' },
+  info: { icon: Info, className: 'text-brand-500 dark:text-brand-400' },
 };
 
 /** Renders the toasts raised with `toast.*()`. Mount once, in the app shell. */

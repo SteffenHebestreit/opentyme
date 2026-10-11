@@ -372,8 +372,8 @@ export const ProjectRatesModal: FC<ProjectRatesModalProps> = ({
             <>
               {/* What applies now, and what is already agreed for later */}
               <div className="stagger grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl border border-purple-200/80 bg-purple-50/50 p-4 dark:border-purple-500/20 dark:bg-purple-500/[0.06]">
-                  <p className="eyebrow !text-purple-700 dark:!text-purple-300">
+                <div className="rounded-xl border border-brand-200/80 bg-brand-50/50 p-4 dark:border-brand-500/20 dark:bg-brand-500/[0.06]">
+                  <p className="eyebrow !text-brand-700 dark:!text-brand-300">
                     {t('rates.summary.current')}
                   </p>
                   <p className="mt-1.5 text-2xl font-semibold tabular-nums tracking-tight text-gray-900 dark:text-white">
@@ -436,7 +436,7 @@ export const ProjectRatesModal: FC<ProjectRatesModalProps> = ({
               {/* History as a timeline: scheduled on top, then current, then the past */}
               <div>
                 <h3 className="section-title mb-3">{t('rates.history')}</h3>
-                <ol className="rounded-xl border border-gray-200 bg-white px-4 py-2 shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
+                <ol className="rounded-xl border border-gray-200 bg-white px-4 py-2 shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-edge">
                   {timeline.map((rate, index) => {
                     const isFuture = rate.valid_from > today;
                     const isPast = !rate.is_current && !isFuture;
@@ -465,7 +465,7 @@ export const ProjectRatesModal: FC<ProjectRatesModalProps> = ({
                           className={clsx(
                             'absolute left-0.5 top-[1.625rem] h-[11px] w-[11px] rounded-full ring-4 ring-white dark:ring-gray-900',
                             rate.is_current
-                              ? 'bg-purple-500 dark:bg-purple-400'
+                              ? 'bg-brand-500 dark:bg-brand-400'
                               : isFuture
                                 ? 'bg-sky-500 dark:bg-sky-400'
                                 : 'bg-gray-300 dark:bg-gray-600'
@@ -476,7 +476,7 @@ export const ProjectRatesModal: FC<ProjectRatesModalProps> = ({
                         <div
                           className={clsx(
                             'rounded-lg px-3 py-2 transition-colors',
-                            rate.is_current ? 'bg-purple-50/70 dark:bg-purple-500/[0.07]' : 'hover:bg-gray-50 dark:hover:bg-white/[0.02]'
+                            rate.is_current ? 'bg-brand-50/70 dark:bg-brand-500/[0.07]' : 'hover:bg-gray-50 dark:hover:bg-white/[0.02]'
                           )}
                         >
                           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -504,7 +504,7 @@ export const ProjectRatesModal: FC<ProjectRatesModalProps> = ({
                             ) : null}
 
                             {rate.is_current ? (
-                              <Badge variant="purple" size="sm">
+                              <Badge variant="brand" size="sm">
                                 {t('rates.badge.current')}
                               </Badge>
                             ) : isFuture ? (

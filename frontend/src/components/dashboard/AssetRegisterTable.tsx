@@ -151,7 +151,7 @@ const AssetRegisterTable: React.FC = () => {
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 sm:px-6 dark:border-gray-800">
         <div className="flex min-w-0 items-center gap-2.5">
-          <Package className="h-5 w-5 shrink-0 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+          <Package className="h-5 w-5 shrink-0 text-brand-600 dark:text-brand-400" aria-hidden="true" />
           <h3 className="section-title truncate">{t('depreciation.register.title')}</h3>
         </div>
         <Tabs

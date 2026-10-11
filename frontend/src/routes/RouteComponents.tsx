@@ -24,7 +24,7 @@ export function PluginRoute() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <p className="text-sm font-semibold text-purple-600 dark:text-purple-400">404</p>
+          <p className="text-sm font-semibold text-brand-600 dark:text-brand-400">404</p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
             {t('notFound.title', 'Page not found')}
           </h1>

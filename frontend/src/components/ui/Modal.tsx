@@ -183,7 +183,7 @@ export const Modal: FC<ModalProps> = ({
           <div className="flex shrink-0 items-start justify-between gap-4 border-b border-gray-100 px-6 py-4 dark:border-gray-800">
             <div className="flex min-w-0 items-center gap-3">
               {icon && (
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-purple-600 ring-1 ring-inset ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20">
                   {icon}
                 </span>
               )}
@@ -201,7 +201,7 @@ export const Modal: FC<ModalProps> = ({
             {showCloseButton && (
               <button
                 type="button"
-                className="-mr-2 -mt-1 rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                className="-mr-2 -mt-1 rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-white/5 dark:hover:text-gray-200"
                 aria-label={t('buttons.close', 'Close')}
                 onClick={() => onCloseRef.current()}
               >

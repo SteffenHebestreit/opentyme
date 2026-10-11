@@ -93,7 +93,7 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({
                 // Link
                 <Link
                   to={item.href}
-                  className="flex items-center gap-1 text-gray-600 transition-colors hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400"
+                  className="flex items-center gap-1 text-gray-600 transition-colors hover:text-brand-600 dark:text-gray-400 dark:hover:text-brand-400"
                 >
                   {isFirst && showHome && (
                     <Home className="h-4 w-4" />
@@ -104,7 +104,7 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({
                 // Button
                 <button
                   onClick={item.onClick}
-                  className="flex items-center gap-1 text-gray-600 transition-colors hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400"
+                  className="flex items-center gap-1 text-gray-600 transition-colors hover:text-brand-600 dark:text-gray-400 dark:hover:text-brand-400"
                 >
                   {isFirst && showHome && (
                     <Home className="h-4 w-4" />

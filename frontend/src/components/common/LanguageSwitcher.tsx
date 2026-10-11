@@ -114,7 +114,7 @@ export function LanguageSwitcher() {
                 <span>{language.name}</span>
               </span>
               {currentLanguage.code === language.code && (
-                <Check className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <Check className="w-4 h-4 text-brand-600 dark:text-brand-400" />
               )}
             </button>
           ))}

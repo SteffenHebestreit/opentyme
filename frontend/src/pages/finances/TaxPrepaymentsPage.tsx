@@ -39,7 +39,7 @@ interface TaxPrepaymentsPageProps {
 }
 
 const iconButtonClass =
-  'rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-400 dark:hover:bg-white/5';
+  'rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-gray-400 dark:hover:bg-white/5';
 
 export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepaymentsPageProps = {}) {
   const { t, i18n } = useTranslation('tax-prepayments');
@@ -263,7 +263,7 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
               e.stopPropagation();
               handleEdit(prepayment.id);
             }}
-            className={cn(iconButtonClass, 'hover:text-purple-600 dark:hover:text-purple-300')}
+            className={cn(iconButtonClass, 'hover:text-brand-600 dark:hover:text-brand-300')}
             title={t('actions.edit')}
             aria-label={t('actions.edit')}
           >
@@ -388,7 +388,7 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
                 label={t('summary.totalPrepayments')}
                 value={Number(summary.total_vat) + Number(summary.total_income_tax)}
                 format={(value) => formatCurrency(value)}
-                variant="purple"
+                variant="brand"
                 icon={Wallet}
                 hint={`${summary.count} ${t('summary.transactions')}`}
               />

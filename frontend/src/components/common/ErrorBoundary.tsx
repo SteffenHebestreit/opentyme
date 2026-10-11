@@ -63,7 +63,7 @@ const ErrorBoundary: React.FC = () => {
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center">
         <Link
           to="/dashboard"
-          className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+          className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           aria-label="OpenTYME"
         >
           <BrandLogo />
@@ -78,7 +78,7 @@ const ErrorBoundary: React.FC = () => {
               className={cn(
                 'mx-auto flex h-12 w-12 items-center justify-center rounded-xl ring-1 ring-inset',
                 isClientIssue
-                  ? 'bg-purple-50 text-purple-600 ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20'
+                  ? 'bg-brand-50 text-brand-600 ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20'
                   : 'bg-red-50 text-red-600 ring-red-600/15 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-400/20'
               )}
             >
@@ -87,7 +87,7 @@ const ErrorBoundary: React.FC = () => {
 
             {/* Error Status */}
             {errorStatus && (
-              <p className="mt-5 text-sm font-semibold tabular-nums text-purple-600 dark:text-purple-400">
+              <p className="mt-5 text-sm font-semibold tabular-nums text-brand-600 dark:text-brand-400">
                 {t('routeError.errorCode', { status: errorStatus })}
               </p>
             )}

@@ -5,7 +5,8 @@
 /*
  * OpenTYME design foundation
  *
- * Colour scales live in tailwind.config.js (`gray` = neutral, `purple` = brand violet).
+ * Colour scales live in tailwind.config.js (`gray` = navy neutral, `brand` = cyan,
+ * `violet` = secondary for the running timer and the logo gradient).
  * Theme is driven by the `dark` class on <html> (set by AppContext and, before
  * React mounts, by the inline script in index.html so there is no flash).
  */
@@ -30,17 +31,37 @@
     U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
+/* JetBrains Mono (SIL OFL 1.1, see /fonts/JetBrainsMono-LICENSE.txt) — technical labels */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 800;
+  src: url('/fonts/jetbrains-mono-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 800;
+  src: url('/fonts/jetbrains-mono-latin-ext-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0,
+    U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
 @layer base {
   :root {
-    --app-bg: 250 250 251;
-    --app-fg: 23 23 28;
+    --app-bg: 245 248 252;
+    --app-fg: 12 21 34;
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
     color-scheme: light;
   }
 
   .dark {
-    --app-bg: 13 13 17;
-    --app-fg: 236 236 241;
+    --app-bg: 6 13 24;
+    --app-fg: 233 239 245;
     color-scheme: dark;
   }
 
@@ -59,13 +80,13 @@
   }
 
   ::selection {
-    @apply bg-purple-500/25 text-inherit;
+    @apply bg-brand-500/25 text-inherit;
   }
 
   /* Keyboard focus ring for controls; text fields draw their own (see fieldStyles) */
   /* :where() keeps specificity at 0 so components can restyle or remove the ring */
   :where(:focus-visible:not(input):not(textarea):not(select)) {
-    @apply outline-none ring-2 ring-purple-500/60 ring-offset-2 ring-offset-white dark:ring-offset-gray-950;
+    @apply outline-none ring-2 ring-brand-500/60 ring-offset-2 ring-offset-white dark:ring-offset-gray-950;
   }
 
   /* Native date/time inputs follow the app theme, not the OS theme */
@@ -99,11 +120,11 @@
   /* Native checkboxes/radios in the brand colour (no forms plugin) */
   input[type='checkbox'],
   input[type='radio'] {
-    accent-color: #7c3aed;
+    accent-color: #007b98;
   }
   .dark input[type='checkbox'],
   .dark input[type='radio'] {
-    accent-color: #8b5cf6;
+    accent-color: #38bae0;
   }
 
   select option {
@@ -116,7 +137,7 @@
   /* Scrollbars: thin and quiet */
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgb(161 161 172 / 0.45) transparent;
+    scrollbar-color: rgb(155 164 176 / 0.45) transparent;
   }
   ::-webkit-scrollbar {
     width: 10px;
@@ -126,20 +147,20 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background-color: rgb(161 161 172 / 0.4);
+    background-color: rgb(155 164 176 / 0.4);
     border-radius: 9999px;
     border: 3px solid transparent;
     background-clip: content-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background-color: rgb(161 161 172 / 0.7);
+    background-color: rgb(155 164 176 / 0.7);
   }
 }
 
 @layer components {
   /* ---------- Surfaces ---------- */
   .surface {
-    @apply rounded-xl border border-gray-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-none;
+    @apply rounded-xl border border-gray-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-edge;
   }
   .surface-muted {
     @apply rounded-xl border border-gray-200/70 bg-gray-50 dark:border-gray-800/70 dark:bg-gray-900/50;
@@ -165,13 +186,17 @@
   .section-title {
     @apply text-base font-semibold tracking-tight text-gray-900 dark:text-gray-100;
   }
+  /* Technical labels: monospace capitals, wide tracking */
   .eyebrow {
-    @apply text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400;
+    @apply font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-gray-500 dark:text-gray-400;
+  }
+  .section-label {
+    @apply font-mono text-xs font-semibold uppercase tracking-[0.14em] text-brand-700 dark:text-brand-400;
   }
 
   /* ---------- Buttons (legacy class API, kept for existing markup) ---------- */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-[background-color,box-shadow,transform] duration-150 hover:bg-purple-500 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-[background-color,box-shadow,transform] duration-150 hover:bg-brand-700 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 dark:bg-brand-400 dark:text-gray-950 dark:hover:bg-brand-300;
   }
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-[background-color,border-color,transform] duration-150 hover:bg-gray-50 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800;
@@ -182,14 +207,14 @@
 
   /* ---------- Form controls ---------- */
   .form-control {
-    @apply block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition-[border-color,box-shadow] duration-150 placeholder:text-gray-400 hover:border-gray-400 focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/15 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500 dark:hover:border-gray-600 dark:focus:border-purple-400 dark:focus:ring-purple-400/15;
+    @apply block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm transition-[border-color,box-shadow] duration-150 placeholder:text-gray-400 hover:border-gray-400 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500 dark:hover:border-gray-600 dark:focus:border-brand-400 dark:focus:ring-brand-400/15;
   }
 
   /* Minimal (underline) inputs — kept as a softer variant */
   .form-input-minimal,
   .form-select-minimal,
   .form-textarea-minimal {
-    @apply block w-full border-0 border-b border-gray-300 bg-transparent px-1 py-2 text-sm text-gray-900 placeholder-transparent transition-colors duration-150 focus:border-purple-500 focus:outline-none focus:ring-0 dark:border-gray-700 dark:text-gray-100 dark:focus:border-purple-400;
+    @apply block w-full border-0 border-b border-gray-300 bg-transparent px-1 py-2 text-sm text-gray-900 placeholder-transparent transition-colors duration-150 focus:border-brand-500 focus:outline-none focus:ring-0 dark:border-gray-700 dark:text-gray-100 dark:focus:border-brand-400;
   }
   .form-select-minimal {
     @apply cursor-pointer appearance-none pr-8;
@@ -201,10 +226,10 @@
     @apply pointer-events-none absolute left-1 top-2 text-sm text-gray-500 transition-all duration-150 dark:text-gray-400;
   }
   .form-label-minimal-floating {
-    @apply -translate-y-6 text-xs text-purple-600 dark:text-purple-400;
+    @apply -translate-y-6 text-xs text-brand-600 dark:text-brand-400;
   }
   .form-checkbox-minimal {
-    @apply h-4 w-4 rounded border-gray-300 bg-white text-purple-600 transition-colors focus:ring-2 focus:ring-purple-500/40 focus:ring-offset-0 dark:border-gray-600 dark:bg-gray-900;
+    @apply h-4 w-4 rounded border-gray-300 bg-white text-brand-600 transition-colors focus:ring-2 focus:ring-brand-500/40 focus:ring-offset-0 dark:border-gray-600 dark:bg-gray-900;
   }
 
   /* ---------- Tables ---------- */
@@ -212,7 +237,7 @@
     @apply min-w-full divide-y divide-gray-200 dark:divide-gray-800;
   }
   .table th {
-    @apply bg-gray-50/80 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:bg-gray-900/60 dark:text-gray-400;
+    @apply bg-gray-50/80 px-4 py-3 text-left font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-gray-500 dark:bg-gray-900/60 dark:text-gray-400;
   }
   .table td {
     @apply whitespace-nowrap border-b border-gray-100 px-4 py-3 text-sm text-gray-700 dark:border-gray-800/70 dark:text-gray-300;
@@ -249,7 +274,7 @@
     @apply bg-red-50 text-red-700 ring-red-600/20 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/20;
   }
   .badge-info {
-    @apply bg-purple-50 text-purple-700 ring-purple-600/20 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-500/20;
+    @apply bg-brand-50 text-brand-700 ring-brand-600/20 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-500/20;
   }
 
   /* ---------- Loading ---------- */

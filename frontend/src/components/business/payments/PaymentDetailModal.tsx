@@ -110,7 +110,7 @@ export function PaymentDetailModal({ payment, isOpen, onClose, onNavigateToInvoi
   const typeInfo = getPaymentTypeInfo(payment.payment_type);
 
   const invoiceLinkClass =
-    'inline-flex items-center gap-1.5 rounded font-medium text-purple-600 transition-colors hover:text-purple-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-purple-400 dark:hover:text-purple-300';
+    'inline-flex items-center gap-1.5 rounded font-medium text-brand-600 transition-colors hover:text-brand-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-400 dark:hover:text-brand-300';
 
   return (
     <Modal
@@ -235,7 +235,7 @@ export function PaymentDetailModal({ payment, isOpen, onClose, onNavigateToInvoi
               setExcludeFromTax(e.target.checked);
               if (!isEditing) setIsEditing(true);
             }}
-            className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900"
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
           />
           <span className="flex-1">
             <span className="block text-sm font-medium text-gray-900 dark:text-white">

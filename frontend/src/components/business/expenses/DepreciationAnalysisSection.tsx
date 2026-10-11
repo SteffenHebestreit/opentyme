@@ -151,7 +151,7 @@ export const DepreciationAnalysisSection: React.FC<DepreciationAnalysisSectionPr
         <div className="animate-fade-in overflow-hidden rounded-xl border border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-white/[0.02]">
           <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-purple-600 ring-1 ring-inset ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20">
                 <Sparkles className="h-4 w-4" aria-hidden="true" />
               </span>
               <div className="min-w-0">
@@ -175,8 +175,8 @@ export const DepreciationAnalysisSection: React.FC<DepreciationAnalysisSectionPr
             </Button>
           </div>
           {isAnalyzing && (
-            <div className="relative h-0.5 overflow-hidden bg-purple-100 dark:bg-purple-500/10" aria-hidden="true">
-              <div className="absolute inset-y-0 left-0 w-full origin-left animate-progress-indeterminate bg-purple-500 dark:bg-purple-400" />
+            <div className="relative h-0.5 overflow-hidden bg-brand-100 dark:bg-brand-500/10" aria-hidden="true">
+              <div className="absolute inset-y-0 left-0 w-full origin-left animate-progress-indeterminate bg-brand-500 dark:bg-brand-400" />
             </div>
           )}
         </div>
@@ -257,14 +257,14 @@ export const DepreciationAnalysisSection: React.FC<DepreciationAnalysisSectionPr
               </dl>
 
               {result.suggested_category && (
-                <div className="mt-3 flex items-start gap-2.5 rounded-lg bg-purple-50 px-3 py-2.5 text-sm ring-1 ring-inset ring-purple-600/10 dark:bg-purple-500/10 dark:ring-purple-400/20">
-                  <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-purple-600 dark:text-purple-300" aria-hidden="true" />
+                <div className="mt-3 flex items-start gap-2.5 rounded-lg bg-brand-50 px-3 py-2.5 text-sm ring-1 ring-inset ring-brand-600/10 dark:bg-brand-500/10 dark:ring-brand-400/20">
+                  <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-brand-600 dark:text-brand-300" aria-hidden="true" />
                   <div className="min-w-0">
-                    <p className="font-medium text-purple-800 dark:text-purple-200">
+                    <p className="font-medium text-brand-800 dark:text-brand-200">
                       {t('analysis.suggestedCategory')}: {expenseCategoryLabel(t, result.suggested_category)}
                     </p>
                     {result.category_reasoning && (
-                      <p className="mt-0.5 text-xs text-purple-700/80 dark:text-purple-200/70">
+                      <p className="mt-0.5 text-xs text-brand-700/80 dark:text-brand-200/70">
                         {result.category_reasoning}
                       </p>
                     )}
@@ -339,7 +339,7 @@ export const DepreciationAnalysisSection: React.FC<DepreciationAnalysisSectionPr
                         href={source.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-start gap-1.5 text-purple-700 hover:underline dark:text-purple-300"
+                        className="inline-flex items-start gap-1.5 text-brand-700 hover:underline dark:text-brand-300"
                       >
                         <span>{source.title}</span>
                         <ExternalLink className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />

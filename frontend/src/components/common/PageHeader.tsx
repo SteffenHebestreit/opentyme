@@ -38,7 +38,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
     <div className={cn('mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between', className)}>
       <div className="flex min-w-0 items-start gap-3">
         {Icon && (
-          <span className="mt-0.5 hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600 ring-1 ring-inset ring-purple-600/10 sm:flex dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+          <span className="mt-0.5 hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-600/10 sm:flex dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20">
             <Icon className="h-5 w-5" aria-hidden="true" />
           </span>
         )}

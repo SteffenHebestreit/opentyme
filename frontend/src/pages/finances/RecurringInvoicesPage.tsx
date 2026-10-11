@@ -148,10 +148,10 @@ export default function RecurringInvoicesPage() {
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-edge">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-              <thead className="bg-gray-50/80 text-xs font-medium uppercase tracking-wider text-gray-500 dark:bg-white/[0.02] dark:text-gray-400">
+              <thead className="bg-gray-50/80 font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-gray-500 dark:bg-white/[0.02] dark:text-gray-400">
                 <tr className="text-left">
                   <th className="px-4 py-2.5 first:pl-5">{t('recurring.table.title')}</th>
                   <th className="px-4 py-2.5">{t('recurring.table.client')}</th>

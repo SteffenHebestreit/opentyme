@@ -70,7 +70,7 @@ interface ChartCardProps {
  * <ChartCard 
  *   title="Performance Metrics"
  *   actions={
- *     <button className="text-sm text-purple-600">Export</button>
+ *     <button className="text-sm text-brand-600">Export</button>
  *   }
  * >
  *   <canvas ref={chartRef} />
@@ -94,11 +94,11 @@ export const ChartCard: React.FC<ChartCardProps> = ({
   height = '300px',
 }) => {
   return (
-    <div className={`rounded-xl border border-gray-200 bg-white p-5 shadow-soft sm:p-6 dark:border-gray-800 dark:bg-gray-900 dark:shadow-none ${className}`}>
+    <div className={`rounded-xl border border-gray-200 bg-white p-5 shadow-soft sm:p-6 dark:border-gray-800 dark:bg-gray-900 dark:shadow-edge ${className}`}>
       {/* Header */}
       <div className="mb-4 flex items-start justify-between">
         <div>
-          <h3 className="text-base font-semibold tracking-tight text-gray-900 dark:text-white">
+          <h3 className="section-label">
             {title}
           </h3>
           {subtitle && (

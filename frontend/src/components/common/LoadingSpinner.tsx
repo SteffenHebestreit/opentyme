@@ -36,7 +36,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
     <div className={cn('flex flex-col items-center', fullScreen && 'min-h-[200px] justify-center')}>
       <div
         className={cn(
-          'animate-spin rounded-full border-purple-500/25 border-t-purple-600 dark:border-purple-400/20 dark:border-t-purple-400',
+          'animate-spin rounded-full border-brand-500/25 border-t-brand-600 dark:border-brand-400/20 dark:border-t-brand-400',
           sizeClasses[size],
           className
         )}

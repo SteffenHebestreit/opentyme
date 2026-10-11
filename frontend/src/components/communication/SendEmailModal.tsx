@@ -197,7 +197,7 @@ export function SendEmailModal({
                 type="button"
                 onClick={handlePreviewToggle}
                 aria-expanded={showPreview}
-                className="mb-1.5 inline-flex items-center gap-1.5 rounded text-xs font-medium text-purple-600 transition-colors hover:text-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-purple-400 dark:hover:text-purple-300"
+                className="mb-1.5 inline-flex items-center gap-1.5 rounded text-xs font-medium text-brand-600 transition-colors hover:text-brand-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-400 dark:hover:text-brand-300"
               >
                 {showPreview ? <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}
                 {showPreview ? t('send.hidePreview') : t('send.showPreview')}
@@ -261,7 +261,7 @@ export function SendEmailModal({
                     type="checkbox"
                     checked={checkedAttachments.has(i)}
                     onChange={() => toggleAttachment(i)}
-                    className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900"
+                    className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
                   />
                   <Paperclip className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                   <span className="min-w-0 flex-1 truncate text-sm text-gray-700 dark:text-gray-300">{opt.label}</span>

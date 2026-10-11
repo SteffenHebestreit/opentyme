@@ -28,7 +28,7 @@ interface TrendChartProps {
  * - One column per data point (e.g. Mon–Sun)
  * - Normalized bar heights (0-100% of max value)
  * - Minimum 6% height for visibility of small values
- * - Brand violet bars (sky for the line variant), neutral grid lines
+ * - Brand cyan bars, neutral grid lines
  * - Max value display in header, total sum in footer
  * - Labels below each bar
  * - Light and dark mode; bar heights ease when values change
@@ -100,8 +100,8 @@ export const TrendChart: FC<TrendChartProps> = ({
                   className={cn(
                     'w-full rounded-t-md transition-[height,opacity] duration-700 ease-out-expo hover:opacity-80',
                     variant === 'bar'
-                      ? 'bg-purple-500 dark:bg-purple-400/80'
-                      : 'bg-sky-500 dark:bg-sky-400/80'
+                      ? 'bg-brand-500 dark:bg-brand-400/80'
+                      : 'bg-violet-500 dark:bg-violet-400/80'
                   )}
                   style={{ height: `${Math.max(normalizedValues[index], 6)}%` }}
                   title={`${point.label}: ${point.value.toLocaleString()} ${unit ?? ''}`}

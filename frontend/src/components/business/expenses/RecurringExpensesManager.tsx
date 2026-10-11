@@ -286,10 +286,10 @@ export function RecurringExpensesManager() {
           description={t('recurring.createHint', 'Create a new expense and enable the "Recurring" option')}
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-edge">
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="bg-gray-50/80 text-xs font-medium uppercase tracking-wider text-gray-500 dark:bg-white/[0.02] dark:text-gray-400">
+              <thead className="bg-gray-50/80 font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-gray-500 dark:bg-white/[0.02] dark:text-gray-400">
                 <tr>
                   <th className={thClass}>{t('table.description', 'Description')}</th>
                   <th className={thClass}>{t('recurring.frequency', 'Frequency')}</th>
@@ -338,7 +338,7 @@ export function RecurringExpensesManager() {
                       {formatDate(expense.next_occurrence)}
                     </td>
                     <td className={cn(tdClass, 'text-center')}>
-                      <Badge variant="purple" size="sm">
+                      <Badge variant="brand" size="sm">
                         <span className="tabular-nums">{expense.generated_count || 0}</span>
                       </Badge>
                     </td>
@@ -349,7 +349,7 @@ export function RecurringExpensesManager() {
                       <button
                         type="button"
                         onClick={() => openEditor(expense)}
-                        className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-purple-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-purple-300"
+                        className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-brand-300"
                         title={t('recurring.editRecurrence', 'Edit Recurrence Settings')}
                         aria-label={t('recurring.editRecurrence', 'Edit Recurrence Settings')}
                       >

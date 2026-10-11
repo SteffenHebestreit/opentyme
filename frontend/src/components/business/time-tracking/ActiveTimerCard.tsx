@@ -15,7 +15,7 @@ import { formatDate } from '../../../utils/date';
  * - Start time display
  * - Pause and Stop buttons
  * - Loading states for actions
- * - Quiet "live" styling: pulsing emerald dot, emerald-tinted border
+ * - Quiet "live" styling: pulsing violet dot, violet-tinted border
  * - Dark mode support
  *
  * **Timer Display:**
@@ -136,17 +136,17 @@ export const ActiveTimerCard: FC<ActiveTimerCardProps> = ({ entry, onPause, onSt
 
   return (
     <section
-      className="surface animate-fade-in border-emerald-200 bg-gradient-to-br from-emerald-50/60 via-white to-white p-5 sm:p-6 dark:border-emerald-500/25 dark:from-emerald-500/[0.06] dark:via-gray-900 dark:to-gray-900"
+      className="surface animate-fade-in border-violet-200 bg-gradient-to-br from-violet-50/60 via-white to-white p-5 sm:p-6 dark:border-violet-500/25 dark:from-violet-500/[0.06] dark:via-gray-900 dark:to-gray-900"
       aria-labelledby="active-timer-project"
     >
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="relative flex h-2 w-2" aria-hidden="true">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60 [animation-duration:2s]" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-500 opacity-60 [animation-duration:2s]" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-violet-500" />
             </span>
-            <span className="text-xs font-medium uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+            <span className="font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-violet-700 dark:text-violet-300">
               {t('timer.running')}
             </span>
           </div>

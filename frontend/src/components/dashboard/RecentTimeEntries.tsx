@@ -113,7 +113,7 @@ export const RecentTimeEntries: FC<RecentTimeEntriesProps> = ({ entries }) => {
                     {entry.description || t('recentTimeEntries.noDescription')}
                   </p>
                   <p className="mt-0.5 truncate text-sm text-gray-500 dark:text-gray-400">
-                    <span className="font-medium text-purple-600 dark:text-purple-400">{project}</span>
+                    <span className="font-medium text-brand-600 dark:text-brand-400">{project}</span>
                     <span className="mx-1.5 text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
                     <span>{client}</span>
                   </p>

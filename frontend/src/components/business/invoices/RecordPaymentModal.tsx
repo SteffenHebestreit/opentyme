@@ -295,7 +295,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                         className={cn(
                           'flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors focus:outline-none focus-visible:bg-gray-50 dark:focus-visible:bg-white/[0.04]',
                           selected
-                            ? 'bg-purple-50/70 dark:bg-purple-500/10'
+                            ? 'bg-brand-50/70 dark:bg-brand-500/10'
                             : 'hover:bg-gray-50 dark:hover:bg-white/[0.02]'
                         )}
                       >
@@ -303,7 +303,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                           className={cn(
                             'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
                             selected
-                              ? 'border-purple-600 bg-purple-600 text-white dark:border-purple-500 dark:bg-purple-500'
+                              ? 'border-brand-600 bg-brand-600 text-white dark:border-brand-400 dark:bg-brand-400 dark:text-gray-950'
                               : 'border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-900'
                           )}
                           aria-hidden="true"
@@ -322,7 +322,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                   })}
                 </div>
                 {selectedInvoiceIds.length > 0 && (
-                  <p className="mt-2 animate-fade-in text-sm text-purple-700 dark:text-purple-300">
+                  <p className="mt-2 animate-fade-in text-sm text-brand-700 dark:text-brand-300">
                     {t('recordPayment.selectedTotal', { 
                       count: selectedInvoiceIds.length, 
                       defaultValue: `${selectedInvoiceIds.length} invoice(s) selected` 
@@ -434,7 +434,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             id="record-payment-exclude-from-tax"
             checked={excludeFromTax}
             onChange={(e) => setExcludeFromTax(e.target.checked)}
-            className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900"
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
           />
           <span className="flex-1">
             <span className="block text-sm font-medium text-gray-900 dark:text-white">

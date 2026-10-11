@@ -189,7 +189,7 @@ export default function EmailTemplateBuilder() {
       <button
         type="button"
         onClick={() => navigate('/config/email-templates')}
-        className="mb-4 inline-flex items-center gap-1.5 rounded-lg text-sm font-medium text-gray-500 transition-colors hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-400 dark:hover:text-white"
+        className="mb-4 inline-flex items-center gap-1.5 rounded-lg text-sm font-medium text-gray-500 transition-colors hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-gray-400 dark:hover:text-white"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         {t('builder.back')}
@@ -283,7 +283,7 @@ export default function EmailTemplateBuilder() {
                   type="checkbox"
                   checked={isDefault}
                   onChange={(e) => setIsDefault(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900"
+                  className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
                 />
                 {t('builder.default')}
               </label>
@@ -388,7 +388,7 @@ export default function EmailTemplateBuilder() {
                   onChange={(e) => setMjmlContent(e.target.value)}
                   spellCheck={false}
                   aria-label={t('builder.tabCode')}
-                  className="block h-[600px] w-full resize-y rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 font-mono text-[13px] leading-relaxed text-gray-900 transition-[border-color,box-shadow] focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/15 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 dark:focus:border-purple-400 dark:focus:ring-purple-400/15"
+                  className="block h-[600px] w-full resize-y rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 font-mono text-[13px] leading-relaxed text-gray-900 transition-[border-color,box-shadow] focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100 dark:focus:border-brand-400 dark:focus:ring-brand-400/15"
                 />
               )
             )}

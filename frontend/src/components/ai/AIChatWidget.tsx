@@ -119,9 +119,9 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          'fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-purple-600 text-white shadow-lifted',
-          'transition-[background-color,transform] duration-200 hover:bg-purple-500 active:scale-95',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950',
+          'fixed bottom-6 right-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-brand-600 text-white shadow-lifted',
+          'transition-[background-color,transform] duration-200 hover:bg-brand-500 active:scale-95',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-950',
           open && 'max-sm:hidden'
         )}
         aria-label={

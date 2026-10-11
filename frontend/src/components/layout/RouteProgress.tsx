@@ -28,7 +28,7 @@ export function RouteProgress() {
       )}
       aria-hidden="true"
     >
-      <div className="h-full w-full origin-left animate-progress-indeterminate bg-gradient-to-r from-purple-500 via-purple-400 to-pink-500" />
+      <div className="h-full w-full origin-left animate-progress-indeterminate bg-gradient-to-r from-brand-500 via-brand-400 to-violet-500" />
     </div>
   );
 }

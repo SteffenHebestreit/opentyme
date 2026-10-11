@@ -68,7 +68,7 @@ function Detail({ label, children, className }: { label: string; children: React
 }
 
 const iconButtonClass =
-  'rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white';
+  'rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white';
 
 export function ExpenseDetailModal({
   expenseId,
@@ -411,7 +411,7 @@ export function ExpenseDetailModal({
                         {expense.is_billable && <Badge variant="green">{t('fields.billable')}</Badge>}
                         {expense.is_reimbursable && <Badge variant="blue">{t('fields.isReimbursable')}</Badge>}
                         {expense.is_recurring && (
-                          <Badge variant="purple" icon={<Repeat className="h-3 w-3" aria-hidden="true" />}>
+                          <Badge variant="brand" icon={<Repeat className="h-3 w-3" aria-hidden="true" />}>
                             {t('recurring.recurring', 'Recurring')}
                           </Badge>
                         )}
@@ -532,7 +532,7 @@ export function ExpenseDetailModal({
               <section>
                 <SectionHeading icon={ListChecks} title={t('recurring.generatedExpenses', 'Generated Expenses')}>
                   {!isLoadingGenerated && generatedExpenses.length > 0 && (
-                    <Badge variant="purple" size="sm">
+                    <Badge variant="brand" size="sm">
                       <span className="tabular-nums">{generatedExpenses.length}</span>
                     </Badge>
                   )}
@@ -598,7 +598,7 @@ export function ExpenseDetailModal({
 
               {expense.receipt_url ? (
                 <div className="flex items-center gap-3 rounded-xl border border-gray-200 px-4 py-3 dark:border-gray-800">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-purple-600 ring-1 ring-inset ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20">
                     <FileText className="h-4 w-4" aria-hidden="true" />
                   </span>
                   <div className="min-w-0 flex-1">

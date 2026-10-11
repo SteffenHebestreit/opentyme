@@ -60,7 +60,7 @@ const STICK_TO_BOTTOM_PX = 80;
 const MAX_INPUT_LENGTH = 4000;
 
 const iconButtonClass =
-  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 disabled:pointer-events-none disabled:opacity-40';
+  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:pointer-events-none disabled:opacity-40';
 
 const codeBlockClass =
   'max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-md border border-gray-100 bg-gray-50 p-2 font-mono text-[11px] leading-relaxed text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300';
@@ -102,7 +102,7 @@ const ToolCallStep = memo(function ToolCallStep({ msg, result }: { msg: UIMessag
     <div className="animate-fade-in rounded-lg border border-gray-200 bg-white text-xs dark:border-gray-800 dark:bg-gray-900">
       <button
         type="button"
-        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-gray-600 transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-400 dark:hover:bg-white/[0.03]"
+        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-gray-600 transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-gray-400 dark:hover:bg-white/[0.03]"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
       >
@@ -292,7 +292,7 @@ function ApprovalCard({
                   onClick={() => toggle(a.toolCallId)}
                   title={isRejected ? t('ai.willSkip', 'Will be skipped') : t('ai.willRun', 'Will run')}
                   aria-pressed={!isRejected}
-                  className="flex min-w-0 flex-1 items-start gap-2 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+                  className="flex min-w-0 flex-1 items-start gap-2 rounded text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                 >
                   <span
                     className={cn(
@@ -339,7 +339,7 @@ function ApprovalCard({
                   aria-label={t('ai.editArgs', 'Edit arguments before approving')}
                   aria-pressed={isEditing}
                   className={cn(
-                    'shrink-0 rounded-md p-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 disabled:opacity-30',
+                    'shrink-0 rounded-md p-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-30',
                     isEditing
                       ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
                       : 'text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-200'
@@ -360,7 +360,7 @@ function ApprovalCard({
                     'mt-2 block w-full animate-fade-in rounded-md border bg-gray-50 px-2 py-1.5 font-mono text-[11px] leading-relaxed text-gray-800 transition-[border-color,box-shadow] focus:outline-none focus:ring-4 dark:bg-gray-950 dark:text-gray-200',
                     editInvalid
                       ? 'border-red-400 focus:ring-red-500/15 dark:border-red-500/60'
-                      : 'border-gray-200 focus:border-purple-500 focus:ring-purple-500/15 dark:border-gray-700 dark:focus:border-purple-400'
+                      : 'border-gray-200 focus:border-brand-500 focus:ring-brand-500/15 dark:border-gray-700 dark:focus:border-brand-400'
                   )}
                 />
               )}
@@ -373,7 +373,7 @@ function ApprovalCard({
                     <button
                       type="button"
                       onClick={() => resetEdit(a.toolCallId)}
-                      className="ml-auto inline-flex items-center gap-1 rounded px-1 text-gray-500 hover:text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-400 dark:hover:text-gray-200"
+                      className="ml-auto inline-flex items-center gap-1 rounded px-1 text-gray-500 hover:text-gray-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-gray-400 dark:hover:text-gray-200"
                     >
                       <RotateCcw className="h-3 w-3" aria-hidden="true" />
                       {t('ai.resetEdit', 'Reset')}
@@ -443,7 +443,7 @@ const MessageBubble = memo(function MessageBubble({
         className={cn(
           'max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed',
           isUser
-            ? 'rounded-br-md bg-purple-600 text-white'
+            ? 'rounded-br-md bg-brand-600 text-white'
             : 'rounded-bl-md bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100',
           msg.failed && 'opacity-60'
         )}
@@ -470,7 +470,7 @@ const MessageBubble = memo(function MessageBubble({
             <button
               type="button"
               onClick={() => onRetry(msg.id)}
-              className="inline-flex items-center gap-1 rounded font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+              className="inline-flex items-center gap-1 rounded font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
             >
               <RotateCcw className="h-3 w-3" aria-hidden="true" />
               {t('ai.retry', 'Retry')}
@@ -633,7 +633,7 @@ export default function AIChatPanel({
     <div className="flex h-full flex-col bg-white dark:bg-gray-900">
       {/* Header */}
       <div className="flex shrink-0 items-center gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-purple-600 ring-1 ring-inset ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20">
           <Sparkles className="h-[18px] w-[18px]" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
@@ -642,7 +642,7 @@ export default function AIChatPanel({
             <span
               className={cn(
                 'h-1.5 w-1.5 shrink-0 rounded-full',
-                status === 'thinking' && 'animate-soft-pulse bg-purple-500 dark:bg-purple-400',
+                status === 'thinking' && 'animate-soft-pulse bg-brand-500 dark:bg-brand-400',
                 status === 'listening' && 'animate-soft-pulse bg-red-500',
                 status === 'transcribing' && 'animate-soft-pulse bg-amber-500',
                 status === 'ready' && 'bg-emerald-500'
@@ -697,7 +697,7 @@ export default function AIChatPanel({
                 <button
                   type="button"
                   onClick={onRetryRestore}
-                  className="shrink-0 font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+                  className="shrink-0 font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
                 >
                   {t('ai.retry', 'Retry')}
                 </button>
@@ -706,7 +706,7 @@ export default function AIChatPanel({
           )}
           {messages.length === 0 ? (
             <div className="flex h-full animate-fade-up flex-col items-center justify-center px-4 text-center">
-              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50 text-purple-600 ring-1 ring-inset ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20">
                 <Sparkles className="h-6 w-6" aria-hidden="true" />
               </span>
               <p className="mt-4 text-sm font-semibold text-gray-900 dark:text-white">{t('ai.welcomeTitle')}</p>
@@ -750,7 +750,7 @@ export default function AIChatPanel({
           <button
             type="button"
             onClick={jumpToLatest}
-            className="absolute bottom-3 left-1/2 flex -translate-x-1/2 animate-fade-in items-center gap-1 rounded-full border border-gray-200 bg-white/95 px-3 py-1 text-xs font-medium text-gray-600 shadow-lifted backdrop-blur hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:border-gray-700 dark:bg-gray-900/95 dark:text-gray-300 dark:hover:text-white"
+            className="absolute bottom-3 left-1/2 flex -translate-x-1/2 animate-fade-in items-center gap-1 rounded-full border border-gray-200 bg-white/95 px-3 py-1 text-xs font-medium text-gray-600 shadow-lifted backdrop-blur hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-gray-700 dark:bg-gray-900/95 dark:text-gray-300 dark:hover:text-white"
           >
             <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
             {t('ai.jumpToLatest', 'Latest')}
@@ -774,7 +774,7 @@ export default function AIChatPanel({
                 setSpeechError(null);
                 retry?.();
               }}
-              className="shrink-0 font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+              className="shrink-0 font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
             >
               {t('ai.retry', 'Retry')}
             </button>
@@ -782,7 +782,7 @@ export default function AIChatPanel({
           <button
             type="button"
             onClick={() => (error ? onDismissError?.() : setSpeechError(null))}
-            className="-m-0.5 shrink-0 rounded p-0.5 opacity-70 hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+            className="-m-0.5 shrink-0 rounded p-0.5 opacity-70 hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
             aria-label={t('buttons.close', 'Close')}
           >
             <X className="h-3.5 w-3.5" aria-hidden="true" />
@@ -799,7 +799,7 @@ export default function AIChatPanel({
             'flex items-end gap-1.5 rounded-xl border bg-white p-1.5 shadow-sm transition-[border-color,box-shadow] duration-150 focus-within:ring-4 dark:bg-gray-950/40',
             overLimit
               ? 'border-red-400 focus-within:ring-red-500/15 dark:border-red-500/60'
-              : 'border-gray-300 focus-within:border-purple-500 focus-within:ring-purple-500/15 dark:border-gray-700 dark:focus-within:border-purple-400 dark:focus-within:ring-purple-400/15'
+              : 'border-gray-300 focus-within:border-brand-500 focus-within:ring-brand-500/15 dark:border-gray-700 dark:focus-within:border-brand-400 dark:focus-within:ring-brand-400/15'
           )}
         >
           {/* Mic button — only shown when speech-to-text is configured */}
@@ -815,7 +815,7 @@ export default function AIChatPanel({
                 iconButtonClass,
                 isRecording
                   ? 'bg-red-500 text-white hover:bg-red-600'
-                  : 'text-gray-500 hover:bg-gray-100 hover:text-purple-600 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-purple-400'
+                  : 'text-gray-500 hover:bg-gray-100 hover:text-brand-600 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-brand-400'
               )}
             >
               {micBusy ? (
@@ -862,7 +862,7 @@ export default function AIChatPanel({
               type="button"
               onClick={handleSend}
               disabled={!input.trim() || overLimit}
-              className={cn(iconButtonClass, 'bg-purple-600 text-white hover:bg-purple-500')}
+              className={cn(iconButtonClass, 'bg-brand-600 text-white hover:bg-brand-700')}
               title={t('ai.send')}
               aria-label={t('ai.send')}
             >

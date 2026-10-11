@@ -67,7 +67,7 @@ export const MetricsGrid: FC<MetricsGridProps> = ({ metrics }) => {
         value={metrics.hoursThisWeek}
         format={formatHours}
         icon={Clock3}
-        variant="purple"
+        variant="brand"
       />
       <StatCard
         label={t('metrics.unpaidInvoices')}

@@ -2,6 +2,16 @@
 
 ## Unreleased (since v1.5.0)
 
+### New look — logo and "Polarlicht" colour scheme
+- **New logo:** a ring of four quarter hours, three of them tracked, around a T. It replaces the
+  traced growth curve and stays legible down to a 16 px browser tab (app, favicon and README).
+- **New colours:** cyan as the brand and action colour on navy-tinted surfaces; violet as the
+  second colour for the running timer and the logo gradient. Light and dark mode were tuned
+  together, text contrast meets WCAG AA.
+- Card and section titles, table headers and key-figure labels use monospace capitals
+  (JetBrains Mono, self-hosted), cards in dark mode get a faint light edge, and charts use the
+  new palette.
+
 ### Security — every account only ever sees and changes its own data
 - **Fixed: several endpoints did not check who owns a record.** Invoices, projects, time
   entries, payments, expenses and recurring invoices could be read, changed or deleted by id

@@ -84,7 +84,7 @@ export const PlaceholderHelper: FC<PlaceholderHelperProps> = ({ collapsed = true
         type="button"
         onClick={() => setIsCollapsed(!isCollapsed)}
         aria-expanded={!isCollapsed}
-        className="flex w-full items-center justify-between gap-3 bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple-500 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
+        className="flex w-full items-center justify-between gap-3 bg-gray-50 px-4 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.05]"
       >
         <span>{t('placeholders.title', 'Available Placeholders')}</span>
         <ChevronDown
@@ -126,7 +126,7 @@ export const PlaceholderHelper: FC<PlaceholderHelperProps> = ({ collapsed = true
                       key={index}
                       className="flex items-start gap-3 px-3 py-2 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]"
                     >
-                      <code className="flex-shrink-0 select-all rounded-md bg-purple-50 px-1.5 py-0.5 font-mono text-xs text-purple-700 ring-1 ring-inset ring-purple-600/15 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+                      <code className="flex-shrink-0 select-all rounded-md bg-brand-50 px-1.5 py-0.5 font-mono text-xs text-brand-700 ring-1 ring-inset ring-brand-600/15 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20">
                         {ph.placeholder}
                       </code>
                       <div className="min-w-0 flex-1">

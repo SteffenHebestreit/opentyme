@@ -74,7 +74,7 @@ export function SettingsSection({
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <h3 className="section-title">{title}</h3>
+          <h3 className="section-label">{title}</h3>
           {description && <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{description}</p>}
         </div>
         {action && <div className="flex shrink-0 items-center gap-2">{action}</div>}
@@ -144,9 +144,9 @@ export function SettingsSwitch({
       onClick={() => onChange(!checked)}
       className={cn(
         'relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        checked ? 'bg-purple-600 dark:bg-purple-500' : 'bg-gray-200 dark:bg-gray-700'
+        checked ? 'bg-brand-600 dark:bg-brand-500' : 'bg-gray-200 dark:bg-gray-700'
       )}
     >
       <span
@@ -186,7 +186,7 @@ export function SettingsCheckbox({
         checked={checked}
         onChange={onChange}
         disabled={disabled}
-        className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-purple-600 accent-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900"
+        className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-brand-600 accent-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
       />
       <span className="min-w-0">
         <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">{label}</span>
@@ -203,7 +203,7 @@ export function SettingsCheckbox({
 export function SettingsSaveBar({ status, children }: { status?: ReactNode; children: ReactNode }) {
   return (
     <div className="sticky bottom-4 z-20">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white/90 px-4 py-3 shadow-lifted backdrop-blur-md sm:px-5 dark:border-gray-800 dark:bg-gray-900/90 dark:shadow-none">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white/90 px-4 py-3 shadow-lifted backdrop-blur-md sm:px-5 dark:border-gray-800 dark:bg-gray-900/90 dark:shadow-edge">
         <div className="min-w-0 text-sm text-gray-500 dark:text-gray-400">{status}</div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">{children}</div>
       </div>

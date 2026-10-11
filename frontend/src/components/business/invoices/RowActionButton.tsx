@@ -41,7 +41,7 @@ export const RowActionButton: FC<RowActionButtonProps> = ({ label, onClick, chil
       onClick();
     }}
     className={cn(
-      'inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400',
+      'inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-400',
       toneClasses[tone]
     )}
   >

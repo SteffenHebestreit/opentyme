@@ -110,7 +110,7 @@ function getProjectColor(projectId: string, projects: Project[]): string {
     }
     return chartPalette[Math.abs(hash) % chartPalette.length];
   }
-  return chartPalette[0]; // Brand violet
+  return chartPalette[0]; // Brand cyan
 }
 
 /**
@@ -238,8 +238,8 @@ export const TimeSlotPicker: FC<TimeSlotPickerProps> = ({
                     const bgColor = slot.isOccupied && slot.entry
                       ? getProjectColor(slot.entry.project_id, projects)
                       : isSelected
-                      ? 'bg-purple-200 dark:bg-purple-500/40'
-                      : 'bg-white hover:bg-purple-50 dark:bg-gray-900 dark:hover:bg-purple-500/10';
+                      ? 'bg-brand-200 dark:bg-brand-500/40'
+                      : 'bg-white hover:bg-brand-50 dark:bg-gray-900 dark:hover:bg-brand-500/10';
                     
                     return (
                       <button
@@ -249,7 +249,7 @@ export const TimeSlotPicker: FC<TimeSlotPickerProps> = ({
                         disabled={slot.isOccupied}
                         className={cn(
                           'relative h-8 border-r border-gray-100 text-xs transition-colors last:border-r-0 dark:border-gray-800',
-                          'focus:outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-purple-500',
+                          'focus:outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500',
                           slot.isOccupied ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'
                         )}
                         style={slot.isOccupied && slot.entry ? { backgroundColor: bgColor } : undefined}
@@ -277,7 +277,7 @@ export const TimeSlotPicker: FC<TimeSlotPickerProps> = ({
           <span>{t('form.timeSlotPicker.available')}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded bg-purple-200 dark:bg-purple-500/40" aria-hidden="true" />
+          <span className="h-3 w-3 rounded bg-brand-200 dark:bg-brand-500/40" aria-hidden="true" />
           <span>{t('form.timeSlotPicker.selected')}</span>
         </div>
         {/* Show actual projects with their colors */}

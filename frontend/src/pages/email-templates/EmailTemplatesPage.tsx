@@ -26,10 +26,10 @@ const CATEGORY_BADGE_VARIANTS: Record<string, BadgeVariant> = {
 
 /** Small icon-only row action. */
 const iconButtonClass =
-  'flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-500';
+  'flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-gray-500';
 
 const tableWrapperClass =
-  'overflow-hidden rounded-xl border border-gray-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-none';
+  'overflow-hidden rounded-xl border border-gray-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-edge';
 
 export default function EmailTemplatesPage() {
   const { t } = useTranslation('email-templates');
@@ -122,7 +122,7 @@ export default function EmailTemplatesPage() {
         <div className={tableWrapperClass}>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-100 dark:divide-gray-800">
-              <thead className="bg-gray-50/80 text-xs font-medium uppercase tracking-wider text-gray-500 dark:bg-white/[0.02] dark:text-gray-400">
+              <thead className="bg-gray-50/80 font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-gray-500 dark:bg-white/[0.02] dark:text-gray-400">
                 <tr>
                   {[t('col.name'), t('col.subject'), t('col.category'), t('col.language'), t('col.updated')].map((h) => (
                     <th key={h} scope="col" className="whitespace-nowrap px-4 py-3 text-left font-medium">

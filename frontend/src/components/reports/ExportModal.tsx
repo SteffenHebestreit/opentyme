@@ -145,9 +145,9 @@ export default function ExportModal({ isOpen, onClose, onExport, reportType, ini
                   onClick={() => setFormat(fmt.value)}
                   className={cn(
                     'flex flex-col rounded-lg border p-3.5 text-left transition-[border-color,background-color,box-shadow] duration-150',
-                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500',
+                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
                     isSelected
-                      ? 'border-purple-400 bg-purple-50/60 ring-1 ring-purple-500/60 dark:border-purple-500/50 dark:bg-purple-500/[0.08] dark:ring-purple-400/40'
+                      ? 'border-brand-400 bg-brand-50/60 ring-1 ring-brand-500/60 dark:border-brand-500/50 dark:bg-brand-500/[0.08] dark:ring-brand-400/40'
                       : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700 dark:hover:bg-white/[0.02]'
                   )}
                 >
@@ -155,11 +155,11 @@ export default function ExportModal({ isOpen, onClose, onExport, reportType, ini
                     <Icon
                       className={cn(
                         'h-4 w-4',
-                        isSelected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400 dark:text-gray-500'
+                        isSelected ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400 dark:text-gray-500'
                       )}
                       aria-hidden="true"
                     />
-                    <span className={cn('text-sm font-semibold', isSelected ? 'text-purple-900 dark:text-purple-100' : 'text-gray-900 dark:text-white')}>
+                    <span className={cn('text-sm font-semibold', isSelected ? 'text-brand-900 dark:text-brand-100' : 'text-gray-900 dark:text-white')}>
                       {fmt.label}
                     </span>
                   </span>
@@ -251,7 +251,7 @@ export default function ExportModal({ isOpen, onClose, onExport, reportType, ini
                 type="checkbox"
                 checked={metadata.hidePrices}
                 onChange={(e) => setMetadata({ ...metadata, hidePrices: e.target.checked })}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 accent-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900"
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 accent-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
               />
               <span className="flex-1">
                 <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">

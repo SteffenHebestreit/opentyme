@@ -77,7 +77,7 @@ export const InlineConfirm: FC<{
 /** Loading placeholder shaped like a list table (header row + a few rows). */
 export const TableSkeleton: FC<{ columns: number; rows?: number; label: string }> = ({ columns, rows = 5, label }) => (
   <div
-    className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-none"
+    className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-edge"
     role="status"
     aria-label={label}
   >

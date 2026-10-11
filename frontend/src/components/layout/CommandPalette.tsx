@@ -250,7 +250,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
                     selected ? 'bg-gray-100 text-gray-900 dark:bg-white/[0.06] dark:text-white' : 'text-gray-700 dark:text-gray-300'
                   )}
                 >
-                  <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center', selected ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400')}>
+                  <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center', selected ? 'text-brand-600 dark:text-brand-400' : 'text-gray-400')}>
                     {typeof Icon === 'string' ? <span className="text-sm leading-none">{Icon}</span> : <Icon className="h-4 w-4" aria-hidden="true" />}
                   </span>
                   <span className="flex-1 truncate">{command.label}</span>

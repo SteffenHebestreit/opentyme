@@ -38,14 +38,14 @@ export function SecretField({ id, isSet, change, onChange, placeholder }: Secret
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="shrink-0 rounded-lg px-2.5 py-2 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-purple-300 dark:hover:bg-purple-500/10"
+          className="shrink-0 rounded-lg px-2.5 py-2 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-300 dark:hover:bg-brand-500/10"
         >
           {t('admin.general.secretReplace', 'Replace')}
         </button>
         <button
           type="button"
           onClick={() => onChange(null)}
-          className="shrink-0 rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+          className="shrink-0 rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
           aria-label={t('admin.general.secretRemove', 'Remove stored key')}
           title={t('admin.general.secretRemove', 'Remove stored key')}
         >
@@ -62,7 +62,7 @@ export function SecretField({ id, isSet, change, onChange, placeholder }: Secret
         <button
           type="button"
           onClick={() => onChange(undefined)}
-          className="shrink-0 font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+          className="shrink-0 font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
         >
           {t('admin.general.secretUndo', 'Undo')}
         </button>
@@ -89,7 +89,7 @@ export function SecretField({ id, isSet, change, onChange, placeholder }: Secret
             onChange(undefined);
             setEditing(false);
           }}
-          className="shrink-0 rounded-lg px-2.5 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-300 dark:hover:bg-white/5"
+          className="shrink-0 rounded-lg px-2.5 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-gray-300 dark:hover:bg-white/5"
         >
           {t('admin.general.secretKeep', 'Keep stored')}
         </button>

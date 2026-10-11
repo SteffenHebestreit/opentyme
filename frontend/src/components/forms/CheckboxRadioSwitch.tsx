@@ -70,8 +70,8 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(({
             id={checkboxId}
             type="checkbox"
             className={`w-4 h-4 rounded border-gray-300 dark:border-gray-600 
-              text-purple-600 focus:ring-2 focus:ring-purple-500 focus:ring-offset-0
-              dark:bg-gray-800 dark:checked:bg-purple-600 dark:checked:border-purple-600
+              text-brand-600 focus:ring-2 focus:ring-brand-500 focus:ring-offset-0
+              dark:bg-gray-800 dark:checked:bg-brand-600 dark:checked:border-brand-600
               disabled:opacity-50 disabled:cursor-not-allowed
               ${error ? 'border-red-500' : ''}
               ${className}`}
@@ -176,8 +176,8 @@ export const Radio = forwardRef<HTMLInputElement, RadioProps>(({
             id={radioId}
             type="radio"
             className={`w-4 h-4 border-gray-300 dark:border-gray-600 
-              text-purple-600 focus:ring-2 focus:ring-purple-500 focus:ring-offset-0
-              dark:bg-gray-800 dark:checked:bg-purple-600 dark:checked:border-purple-600
+              text-brand-600 focus:ring-2 focus:ring-brand-500 focus:ring-offset-0
+              dark:bg-gray-800 dark:checked:bg-brand-600 dark:checked:border-brand-600
               disabled:opacity-50 disabled:cursor-not-allowed
               ${className}`}
             disabled={disabled}
@@ -314,8 +314,8 @@ export const Switch = forwardRef<HTMLInputElement, SwitchProps>(({
           onClick={() => !disabled && inputRef.current?.click()}
           disabled={disabled}
           className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent
-            transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2
-            ${isChecked ? 'bg-purple-600' : 'bg-gray-200 dark:bg-gray-700'}
+            transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2
+            ${isChecked ? 'bg-brand-600' : 'bg-gray-200 dark:bg-gray-700'}
             ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
             ${className}`}
         >

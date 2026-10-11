@@ -38,7 +38,7 @@ describe('Button', () => {
   it('renders with primary variant by default', () => {
     render(<Button>Primary</Button>);
     const button = screen.getByRole('button');
-    expect(button.className).toContain('bg-purple-600');
+    expect(button.className).toContain('bg-brand-600');
   });
 
   it('renders with different variants', () => {

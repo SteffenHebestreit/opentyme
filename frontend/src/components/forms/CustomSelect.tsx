@@ -27,7 +27,7 @@ interface CustomSelectProps {
  * Custom select dropdown component with full styling control.
  * 
  * Features:
- * - Fully styled dropdown with purple accents
+ * - Fully styled dropdown with brand accents
  * - Keyboard navigation support
  * - Click outside to close
  * - Transparent background with bottom border only
@@ -167,7 +167,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
           className={clsx(
             fieldClasses({ size, error: !!error }),
             'flex items-center justify-between text-left',
-            isOpen && !error && 'border-purple-500 ring-4 ring-purple-500/15 dark:border-purple-400 dark:ring-purple-400/15',
+            isOpen && !error && 'border-brand-500 ring-4 ring-brand-500/15 dark:border-brand-400 dark:ring-brand-400/15',
             {
               'cursor-not-allowed opacity-60': disabled,
               'cursor-pointer': !disabled,
@@ -224,7 +224,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                     'flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm',
                     'transition-colors duration-100',
                     option.value === value
-                      ? 'font-medium text-purple-700 dark:text-purple-300'
+                      ? 'font-medium text-brand-700 dark:text-brand-300'
                       : 'text-gray-700 dark:text-gray-200',
                     index === highlightedIndex && 'bg-gray-100 dark:bg-white/5'
                   )}

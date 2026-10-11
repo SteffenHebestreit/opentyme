@@ -28,7 +28,7 @@ export function Topbar({ onOpenMenu, onOpenPalette }: TopbarProps) {
         <button
           type="button"
           onClick={onOpenMenu}
-          className="-ml-1.5 flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-900/[0.05] hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 lg:hidden dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
+          className="-ml-1.5 flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-900/[0.05] hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 lg:hidden dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
           aria-label={t('shell.openMenu', 'Open menu')}
         >
           <Menu className="h-5 w-5" aria-hidden="true" />
@@ -47,7 +47,7 @@ export function Topbar({ onOpenMenu, onOpenPalette }: TopbarProps) {
           <button
             type="button"
             onClick={onOpenPalette}
-            className="flex h-9 items-center gap-2 rounded-lg px-2.5 text-sm text-gray-500 transition-colors hover:bg-gray-900/[0.05] hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 md:w-56 md:border md:border-gray-200 md:bg-white/60 md:hover:bg-white dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white md:dark:border-gray-800 md:dark:bg-gray-900/60 md:dark:hover:bg-gray-900"
+            className="flex h-9 items-center gap-2 rounded-lg px-2.5 text-sm text-gray-500 transition-colors hover:bg-gray-900/[0.05] hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 md:w-56 md:border md:border-gray-200 md:bg-white/60 md:hover:bg-white dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white md:dark:border-gray-800 md:dark:bg-gray-900/60 md:dark:hover:bg-gray-900"
             aria-label={t('shell.palette.open', 'Search and quick navigation')}
           >
             <Search className="h-4 w-4 shrink-0" aria-hidden="true" />

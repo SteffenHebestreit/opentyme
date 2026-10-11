@@ -37,7 +37,7 @@ export const DashboardSection: FC<DashboardSectionProps> = ({ title, aside, chil
 export const ViewAllLink: FC<{ to: string; children: ReactNode }> = ({ to, children }) => (
   <Link
     to={to}
-    className="group inline-flex items-center gap-1 rounded-md text-sm font-medium text-purple-600 transition-colors hover:text-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-purple-400 dark:hover:text-purple-300"
+    className="group inline-flex items-center gap-1 rounded-md text-sm font-medium text-brand-600 transition-colors hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-400 dark:hover:text-brand-300"
   >
     {children}
     <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true" />

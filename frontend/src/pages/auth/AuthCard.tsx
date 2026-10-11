@@ -29,7 +29,7 @@ export function AuthCard({ title, subtitle, icon: Icon, children, footer }: Auth
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
           {Icon ? (
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-50 text-purple-600 ring-1 ring-inset ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20">
               <Icon className="h-5 w-5" aria-hidden="true" />
             </span>
           ) : (
@@ -49,4 +49,4 @@ export function AuthCard({ title, subtitle, icon: Icon, children, footer }: Auth
 
 /** Text-style button used for secondary links on the auth pages. */
 export const authLinkClass =
-  'rounded font-medium text-purple-600 transition-colors hover:text-purple-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-purple-400 dark:hover:text-purple-300';
+  'rounded font-medium text-brand-600 transition-colors hover:text-brand-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-400 dark:hover:text-brand-300';

@@ -9,7 +9,8 @@ export type StatCardVariant =
   | 'green'
   | 'yellow'
   | 'red'
-  | 'purple'
+  | 'brand'
+  | 'violet'
   | 'indigo'
   | 'pink'
   | 'teal'
@@ -44,7 +45,8 @@ const statAccentClasses: Record<StatCardVariant, string> = {
   green: 'bg-emerald-50 text-emerald-600 ring-emerald-600/10 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-400/20',
   yellow: 'bg-amber-50 text-amber-600 ring-amber-600/10 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-400/20',
   red: 'bg-red-50 text-red-600 ring-red-600/10 dark:bg-red-500/10 dark:text-red-400 dark:ring-red-400/20',
-  purple: 'bg-purple-50 text-purple-600 ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20',
+  brand: 'bg-brand-50 text-brand-600 ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20',
+  violet: 'bg-violet-50 text-violet-600 ring-violet-600/10 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-400/20',
   indigo: 'bg-indigo-50 text-indigo-600 ring-indigo-600/10 dark:bg-indigo-500/10 dark:text-indigo-400 dark:ring-indigo-400/20',
   pink: 'bg-pink-50 text-pink-600 ring-pink-600/10 dark:bg-pink-500/10 dark:text-pink-400 dark:ring-pink-400/20',
   teal: 'bg-teal-50 text-teal-600 ring-teal-600/10 dark:bg-teal-500/10 dark:text-teal-400 dark:ring-teal-400/20',
@@ -55,7 +57,7 @@ const statAccentClasses: Record<StatCardVariant, string> = {
  * Key-figure tile: label, big value, optional icon, trend and footer.
  *
  * @example
- * <StatCard label="Hours this week" value={32.5} format={(h) => `${h.toFixed(1)} h`} icon={Clock} variant="purple" />
+ * <StatCard label="Hours this week" value={32.5} format={(h) => `${h.toFixed(1)} h`} icon={Clock} variant="brand" />
  */
 export const StatCard: React.FC<StatCardProps> = ({
   label,
@@ -71,12 +73,12 @@ export const StatCard: React.FC<StatCardProps> = ({
   return (
     <div
       className={cn(
-        'rounded-xl border border-gray-200 bg-white p-5 shadow-soft transition-colors dark:border-gray-800 dark:bg-gray-900 dark:shadow-none',
+        'rounded-xl border border-gray-200 bg-white p-5 shadow-soft transition-colors dark:border-gray-800 dark:bg-gray-900 dark:shadow-edge',
         className
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</p>
+        <p className="eyebrow">{label}</p>
         {Icon && (
           <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset', statAccentClasses[variant])}>
             <Icon className="h-4 w-4" aria-hidden="true" />

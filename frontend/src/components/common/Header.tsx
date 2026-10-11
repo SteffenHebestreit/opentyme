@@ -22,7 +22,7 @@ export default function Header() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         <Link
           to={isAuthenticated ? '/dashboard' : '/'}
-          className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+          className="rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
           aria-label="OpenTYME"
         >
           <BrandLogo />
@@ -33,7 +33,7 @@ export default function Header() {
           {isAuthenticated ? (
             <Link
               to="/dashboard"
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-purple-600 px-3.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-purple-500"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-700"
             >
               {t('navigation.dashboard')}
               <ArrowRight className="h-4 w-4" aria-hidden="true" />

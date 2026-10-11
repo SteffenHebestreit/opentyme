@@ -348,7 +348,7 @@ export const GenerateInvoiceModal: FC<GenerateInvoiceModalProps> = ({
                 type="button"
                 onClick={() => setShowPlaceholderHint(!showPlaceholderHint)}
                 aria-expanded={showPlaceholderHint}
-                className="inline-flex items-center gap-1 rounded text-xs font-medium text-purple-600 transition-colors hover:text-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-purple-400 dark:hover:text-purple-300"
+                className="inline-flex items-center gap-1 rounded text-xs font-medium text-brand-600 transition-colors hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-400 dark:hover:text-brand-300"
               >
                 <ChevronRight
                   className={cn('h-3.5 w-3.5 transition-transform duration-200', showPlaceholderHint && 'rotate-90')}
@@ -361,7 +361,7 @@ export const GenerateInvoiceModal: FC<GenerateInvoiceModalProps> = ({
                   <dl className="mt-2 space-y-1 rounded-lg border border-gray-200/70 bg-gray-50 p-3 text-xs dark:border-gray-800/70 dark:bg-white/[0.03]">
                     {AVAILABLE_PLACEHOLDERS.map(({ key, label }) => (
                       <div key={key} className="flex justify-between gap-4">
-                        <dt><code className="font-mono text-purple-700 dark:text-purple-300">{key}</code></dt>
+                        <dt><code className="font-mono text-brand-700 dark:text-brand-300">{key}</code></dt>
                         <dd className="text-right text-gray-600 dark:text-gray-400">{label}</dd>
                       </div>
                     ))}

@@ -96,7 +96,7 @@ export const Tabs: React.FC<TabsProps> = ({
               'absolute transition-[left,width] duration-300 ease-out-expo',
               pills
                 ? 'inset-y-1 rounded-md bg-white shadow-soft dark:bg-white/10'
-                : 'bottom-0 h-0.5 rounded-full bg-purple-600 dark:bg-purple-400'
+                : 'bottom-0 h-0.5 rounded-full bg-brand-600 dark:bg-brand-400'
             )}
             style={{ left: indicator.left, width: indicator.width }}
           />
@@ -112,12 +112,12 @@ export const Tabs: React.FC<TabsProps> = ({
               data-tab-id={tab.id}
               onClick={() => onChange(tab.id)}
               className={cn(
-                'relative z-10 flex shrink-0 items-center gap-2 whitespace-nowrap text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500',
+                'relative z-10 flex shrink-0 items-center gap-2 whitespace-nowrap text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
                 pills ? 'rounded-md px-3 py-1.5' : 'px-0.5 pb-3 pt-2',
                 isActive
                   ? pills
                     ? 'text-gray-900 dark:text-white'
-                    : 'text-purple-700 dark:text-purple-300'
+                    : 'text-brand-700 dark:text-brand-300'
                   : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
               )}
               role="tab"
@@ -133,7 +133,7 @@ export const Tabs: React.FC<TabsProps> = ({
                   className={cn(
                     'inline-flex min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums',
                     isActive
-                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-200'
+                      ? 'bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-200'
                       : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
                   )}
                 >

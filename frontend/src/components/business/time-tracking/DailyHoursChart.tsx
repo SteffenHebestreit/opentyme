@@ -290,13 +290,13 @@ export const DailyHoursChart: FC<DailyHoursChartProps> = ({
   const legendProjects = Array.from(new Set(filteredEntries.map(e => e.project_name).filter(Boolean)));
   const iconButtonClass =
     'inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 ' +
-    'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white';
+    'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white';
   
   return (
     <section className="surface flex flex-col p-5 sm:p-6" aria-labelledby="daily-hours-title">
       <div className="mb-4 flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-2">
-          <Clock className="h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400" aria-hidden="true" />
+          <Clock className="h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" aria-hidden="true" />
           <h2 id="daily-hours-title" className="section-title truncate">
             {isToday ? t('charts.dailyHours.title') : t('charts.dailyHours.titleDate')}
           </h2>
@@ -329,9 +329,9 @@ export const DailyHoursChart: FC<DailyHoursChartProps> = ({
             onClick={openDatePicker}
             className={cn(
               'flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium tabular-nums transition-colors',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
               isToday
-                ? 'bg-purple-50 text-purple-700 ring-1 ring-inset ring-purple-600/15 hover:bg-purple-100 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20 dark:hover:bg-purple-500/15'
+                ? 'bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-600/15 hover:bg-brand-100 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20 dark:hover:bg-brand-500/15'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10'
             )}
           >

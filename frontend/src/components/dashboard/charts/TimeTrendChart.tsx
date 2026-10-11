@@ -2,7 +2,7 @@
  * @fileoverview Time Trend Chart component.
  *
  * Displays a line chart showing time tracking trends over days:
- * - Total hours (violet line with a soft area fill)
+ * - Total hours (brand cyan line with a soft area fill)
  * - Billable hours (emerald line)
  * - Non-billable hours (dashed grey line)
  *

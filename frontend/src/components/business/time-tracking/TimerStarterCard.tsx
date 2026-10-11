@@ -95,7 +95,7 @@ interface TimerStarterCardProps {
  * 
  * Styling:
  * - Standard surface card, bordered fields with a soft focus ring
- * - Brand-violet icon chip and primary start button
+ * - Brand icon chip and primary start button
  * - Dark mode support throughout
  * 
  * @component
@@ -201,7 +201,7 @@ export const TimerStarterCard: FC<TimerStarterCardProps> = ({
   return (
     <section className="surface p-5 sm:p-6" aria-labelledby="timer-starter-title">
       <div className="flex items-start gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-purple-600 ring-1 ring-inset ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20">
           <TimerIcon className="h-5 w-5" aria-hidden="true" />
         </span>
         <div className="min-w-0">

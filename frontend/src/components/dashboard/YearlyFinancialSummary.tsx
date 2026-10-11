@@ -84,8 +84,8 @@ const TaxFigure: FC<{ label: string; value: number; tone?: Tone; accent?: boolea
   <div className="min-w-0">
     <dt
       className={cn(
-        'text-xs font-medium uppercase tracking-wider',
-        accent ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-gray-400'
+        'font-mono text-[11px] font-medium uppercase tracking-[0.1em]',
+        accent ? 'text-brand-600 dark:text-brand-400' : 'text-gray-500 dark:text-gray-400'
       )}
     >
       {label}

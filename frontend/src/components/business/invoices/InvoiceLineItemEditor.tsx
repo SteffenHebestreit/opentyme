@@ -156,7 +156,7 @@ export const InvoiceLineItemEditor: FC<InvoiceLineItemEditorProps> = ({
           {/* Header row - wide screens only */}
           <div
             className={cn(
-              'hidden gap-3 border-b border-gray-100 bg-gray-50/80 px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-400 lg:grid',
+              'hidden gap-3 border-b border-gray-100 bg-gray-50/80 px-3 py-2 font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-gray-500 dark:border-gray-800 dark:bg-white/[0.02] dark:text-gray-400 lg:grid',
               rowGrid
             )}
             aria-hidden="true"

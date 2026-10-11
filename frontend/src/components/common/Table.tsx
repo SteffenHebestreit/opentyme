@@ -243,7 +243,7 @@ export const Table = <T extends { id?: string | number }>({
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-purple-500/25 border-t-purple-600 dark:border-t-purple-400"></div>
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-500/25 border-t-brand-600 dark:border-t-brand-400"></div>
       </div>
     );
   }
@@ -257,10 +257,10 @@ export const Table = <T extends { id?: string | number }>({
   }
 
   return (
-    <div className={clsx('overflow-hidden rounded-xl border border-gray-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-none', className)}>
+    <div className={clsx('overflow-hidden rounded-xl border border-gray-200 bg-white shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-edge', className)}>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-800">
-          <thead className="bg-gray-50/80 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:bg-white/[0.02] dark:text-gray-400">
+          <thead className="bg-gray-50/80 text-left font-mono text-[11px] font-medium uppercase tracking-[0.1em] text-gray-500 dark:bg-white/[0.02] dark:text-gray-400">
             <tr>
               {groupBy && <th className="w-10 px-4 py-2.5"></th>}
               {columns.map((column) => (
@@ -371,7 +371,7 @@ export const Table = <T extends { id?: string | number }>({
               <select
                 value={internalPageSize}
                 onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                className="block h-8 rounded-lg border border-gray-300 bg-white py-1 pl-2.5 pr-8 text-sm focus:border-purple-500 focus:outline-none focus:ring-4 focus:ring-purple-500/15 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                className="block h-8 rounded-lg border border-gray-300 bg-white py-1 pl-2.5 pr-8 text-sm focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
               >
                 {[10, 25, 50, 100].map((size) => (
                   <option key={size} value={size}>

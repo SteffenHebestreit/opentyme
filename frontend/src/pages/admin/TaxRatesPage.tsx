@@ -15,7 +15,7 @@ import { toast } from '../../lib/toast';
 import { confirmDialog } from '../../lib/confirm';
 
 const iconButton =
-  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500';
+  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500';
 
 /**
  * Admin page for managing tax rates.

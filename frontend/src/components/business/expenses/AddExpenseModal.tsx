@@ -47,7 +47,7 @@ interface Notice {
 }
 
 const checkboxClass =
-  'h-4 w-4 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900';
+  'h-4 w-4 shrink-0 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900';
 
 /** Heading of one group of fields in the form. */
 function SectionHeading({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children?: ReactNode }) {
@@ -63,8 +63,8 @@ function SectionHeading({ icon: Icon, title, children }: { icon: LucideIcon; tit
 /** Thin indeterminate bar shown while an AI request runs. */
 function WorkingBar() {
   return (
-    <div className="relative h-0.5 overflow-hidden bg-purple-100 dark:bg-purple-500/10" aria-hidden="true">
-      <div className="absolute inset-y-0 left-0 w-full origin-left animate-progress-indeterminate bg-purple-500 dark:bg-purple-400" />
+    <div className="relative h-0.5 overflow-hidden bg-brand-100 dark:bg-brand-500/10" aria-hidden="true">
+      <div className="absolute inset-y-0 left-0 w-full origin-left animate-progress-indeterminate bg-brand-500 dark:bg-brand-400" />
     </div>
   );
 }
@@ -517,8 +517,8 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
 
   const optionTileClass =
     'flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm font-medium text-gray-700 transition-colors ' +
-    'hover:bg-gray-50 has-[:checked]:border-purple-300 has-[:checked]:bg-purple-50/60 has-[:checked]:text-gray-900 ' +
-    'dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.02] dark:has-[:checked]:border-purple-500/40 dark:has-[:checked]:bg-purple-500/[0.08] dark:has-[:checked]:text-white';
+    'hover:bg-gray-50 has-[:checked]:border-brand-300 has-[:checked]:bg-brand-50/60 has-[:checked]:text-gray-900 ' +
+    'dark:border-gray-800 dark:text-gray-300 dark:hover:bg-white/[0.02] dark:has-[:checked]:border-brand-500/40 dark:has-[:checked]:bg-brand-500/[0.08] dark:has-[:checked]:text-white';
 
   return (
     <Modal
@@ -573,10 +573,10 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
           )}
 
           {receiptFile && isAnalysable(receiptFile) && aiAddonEnabled && (
-            <div className="mt-3 animate-fade-in overflow-hidden rounded-xl border border-purple-200/70 bg-purple-50/50 dark:border-purple-500/20 dark:bg-purple-500/[0.06]">
+            <div className="mt-3 animate-fade-in overflow-hidden rounded-xl border border-brand-200/70 bg-brand-50/50 dark:border-brand-500/20 dark:bg-brand-500/[0.06]">
               <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-start gap-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-purple-600 ring-1 ring-inset ring-purple-600/15 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-brand-600 ring-1 ring-inset ring-brand-600/15 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20">
                     <Sparkles className="h-4 w-4" aria-hidden="true" />
                   </span>
                   <div className="min-w-0">
@@ -725,7 +725,7 @@ export function AddExpenseModal({ isOpen, onClose, onExpenseAdded }: AddExpenseM
             <div className="mt-3 animate-fade-up overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
               <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-start gap-3">
-                  <Calculator className="mt-0.5 h-4 w-4 shrink-0 text-purple-600 dark:text-purple-300" aria-hidden="true" />
+                  <Calculator className="mt-0.5 h-4 w-4 shrink-0 text-brand-600 dark:text-brand-300" aria-hidden="true" />
                   <p className="text-sm text-gray-700 dark:text-gray-300">
                     {analyzeDepreciationDraft.isPending
                       ? t('ai.depreciationRunningHint')

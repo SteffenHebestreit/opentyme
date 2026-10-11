@@ -19,7 +19,7 @@ import { toast } from '../../lib/toast';
 import { confirmDialog } from '../../lib/confirm';
 
 const iconButton =
-  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500';
+  'inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500';
 
 /**
  * Admin page for managing invoice text templates.
@@ -110,7 +110,7 @@ const InvoiceTemplatesPage: React.FC = () => {
       accessorKey: 'category',
       header: t('admin.templates.category'),
       render: (template) => (
-        <Badge variant="purple">{getCategoryLabel(template.category)}</Badge>
+        <Badge variant="brand">{getCategoryLabel(template.category)}</Badge>
       ),
       sortable: true,
     },

@@ -475,7 +475,7 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
               id="zugferd-download"
               checked={enableZugferd}
               onChange={(e) => setEnableZugferd(e.target.checked)}
-              className="h-4 w-4 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900"
+              className="h-4 w-4 shrink-0 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
             />
             {t('detail.enableZugferd')}
           </label>

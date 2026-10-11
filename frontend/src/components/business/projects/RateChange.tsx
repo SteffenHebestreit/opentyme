@@ -153,13 +153,13 @@ export const RateImpactPanel: FC<{
   return (
     <div className="animate-fade-in space-y-3" aria-live="polite">
       {/* Before → after */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-none">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-soft dark:border-gray-800 dark:bg-gray-900 dark:shadow-edge">
         {previous !== null ? (
           <>
             <span className="text-sm tabular-nums text-gray-500 dark:text-gray-400">
               {formatCurrency(previous, currency)}
             </span>
-            <ArrowRight className="h-4 w-4 text-purple-500 dark:text-purple-400" aria-hidden="true" />
+            <ArrowRight className="h-4 w-4 text-brand-500 dark:text-brand-400" aria-hidden="true" />
           </>
         ) : null}
         <span className="text-lg font-semibold tabular-nums text-gray-900 dark:text-white">

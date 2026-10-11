@@ -39,7 +39,7 @@ interface ProgressBarProps {
 }
 
 const variantClasses: Record<ProgressVariant, string> = {
-  primary: 'bg-purple-600 dark:bg-purple-500',
+  primary: 'bg-brand-600 dark:bg-brand-500',
   secondary: 'bg-gray-600 dark:bg-gray-500',
   success: 'bg-green-600',
   warning: 'bg-yellow-500',
@@ -160,7 +160,7 @@ interface CircularProgressProps {
 }
 
 const circularVariantClasses: Record<ProgressVariant, string> = {
-  primary: 'stroke-purple-600',
+  primary: 'stroke-brand-600',
   secondary: 'stroke-gray-600',
   success: 'stroke-green-600',
   warning: 'stroke-yellow-500',

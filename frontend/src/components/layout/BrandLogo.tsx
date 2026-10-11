@@ -25,7 +25,7 @@ export function BrandMark({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-[25%] bg-gradient-to-br from-purple-500 via-purple-600 to-purple-700 text-white shadow-sm shadow-purple-900/20',
+        'flex shrink-0 items-center justify-center rounded-[25%] bg-gradient-to-br from-brand-500 via-[#4a74dc] to-violet-600 text-white shadow-sm shadow-brand-950/20',
         className ?? 'h-8 w-8'
       )}
       aria-hidden="true"
@@ -42,7 +42,7 @@ export function BrandLogo({ className, compact = false }: { className?: string; 
       <BrandMark />
       {!compact && (
         <span className="text-[15px] font-semibold tracking-tight text-gray-900 dark:text-white">
-          Open<span className="text-purple-600 dark:text-purple-400">TYME</span>
+          Open<span className="text-brand-600 dark:text-brand-400">TYME</span>
         </span>
       )}
     </span>

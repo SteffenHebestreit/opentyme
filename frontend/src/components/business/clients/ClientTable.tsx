@@ -172,7 +172,7 @@ export const ClientTable: FC<ClientTableProps> = ({ clients, onEdit, onDelete, o
                 type="button"
                 onClick={() => onOpenDocuments(client)}
                 title={t('documents.expiryHint', { date: formatYmd(client.next_document_expiry, i18n.language) })}
-                className="mt-1.5 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+                className="mt-1.5 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
               >
                 <Badge
                   size="sm"

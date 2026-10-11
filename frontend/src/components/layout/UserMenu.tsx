@@ -60,12 +60,12 @@ export function UserMenu() {
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex h-9 items-center gap-2 rounded-full p-0.5 pr-0.5 transition-colors hover:bg-gray-900/[0.05] focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:hover:bg-white/[0.06]"
+        className="flex h-9 items-center gap-2 rounded-full p-0.5 pr-0.5 transition-colors hover:bg-gray-900/[0.05] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:hover:bg-white/[0.06]"
         aria-label="User menu"
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-xs font-semibold text-white">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-violet-600 text-xs font-semibold text-white">
           {initialsOf(displayName)}
         </span>
       </button>
@@ -136,7 +136,7 @@ export function UserMenu() {
             >
               <span className="w-4 text-center text-[11px] font-semibold uppercase text-gray-400">{code}</span>
               <span className="flex-1">{label}</span>
-              {language === code && <Check className="h-4 w-4 text-purple-600 dark:text-purple-400" aria-hidden="true" />}
+              {language === code && <Check className="h-4 w-4 text-brand-600 dark:text-brand-400" aria-hidden="true" />}
             </button>
           ))}
 

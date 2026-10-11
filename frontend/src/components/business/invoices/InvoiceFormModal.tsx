@@ -88,15 +88,15 @@ const FormSection: FC<{ title?: string; children: ReactNode }> = ({ title, child
 );
 
 /** Checkbox option rendered as a selectable card, tinted while checked. */
-const optionCardClass = (tone: 'purple' | 'amber') =>
+const optionCardClass = (tone: 'brand' | 'amber') =>
   cn(
     'flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 p-4 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/[0.02]',
-    tone === 'purple'
-      ? 'has-[:checked]:border-purple-300 has-[:checked]:bg-purple-50/60 dark:has-[:checked]:border-purple-500/40 dark:has-[:checked]:bg-purple-500/[0.06]'
+    tone === 'brand'
+      ? 'has-[:checked]:border-brand-300 has-[:checked]:bg-brand-50/60 dark:has-[:checked]:border-brand-500/40 dark:has-[:checked]:bg-brand-500/[0.06]'
       : 'has-[:checked]:border-amber-300 has-[:checked]:bg-amber-50/70 dark:has-[:checked]:border-amber-500/30 dark:has-[:checked]:bg-amber-500/[0.06]'
   );
 const checkboxClass =
-  'mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900';
+  'mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900';
 
 function formatDateInput(value: string | null | undefined): string {
   if (!value) return '';
@@ -456,7 +456,7 @@ export const InvoiceFormModal: FC<InvoiceFormModalProps> = ({
                 type="button"
                 onClick={() => setShowPlaceholderHint(!showPlaceholderHint)}
                 aria-expanded={showPlaceholderHint}
-                className="inline-flex items-center gap-1 rounded text-xs font-medium text-purple-600 transition-colors hover:text-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-purple-400 dark:hover:text-purple-300"
+                className="inline-flex items-center gap-1 rounded text-xs font-medium text-brand-600 transition-colors hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-brand-400 dark:hover:text-brand-300"
               >
                 <ChevronRight
                   className={cn('h-3.5 w-3.5 transition-transform duration-200', showPlaceholderHint && 'rotate-90')}
@@ -469,7 +469,7 @@ export const InvoiceFormModal: FC<InvoiceFormModalProps> = ({
                   <dl className="mt-2 space-y-1 rounded-lg border border-gray-200/70 bg-gray-50 p-3 text-xs dark:border-gray-800/70 dark:bg-white/[0.03]">
                     {AVAILABLE_PLACEHOLDERS.map(({ key, label }) => (
                       <div key={key} className="flex justify-between gap-4">
-                        <dt><code className="font-mono text-purple-700 dark:text-purple-300">{key}</code></dt>
+                        <dt><code className="font-mono text-brand-700 dark:text-brand-300">{key}</code></dt>
                         <dd className="text-right text-gray-600 dark:text-gray-400">{label}</dd>
                       </div>
                     ))}
@@ -542,7 +542,7 @@ export const InvoiceFormModal: FC<InvoiceFormModalProps> = ({
         {/* Options */}
         <FormSection title={t('form.sections.options')}>
           <div className="grid gap-3 md:grid-cols-2">
-            <label htmlFor="enable_zugferd" className={optionCardClass('purple')}>
+            <label htmlFor="enable_zugferd" className={optionCardClass('brand')}>
               <input
                 type="checkbox"
                 id="enable_zugferd"

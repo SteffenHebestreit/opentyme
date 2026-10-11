@@ -14,18 +14,18 @@ const baseClasses =
 
 export const buttonVariantClasses: Record<ButtonVariant, string> = {
   primary:
-    'bg-purple-600 text-white shadow-sm shadow-purple-900/10 hover:bg-purple-500 focus-visible:ring-purple-500 ' +
-    'dark:bg-purple-600 dark:hover:bg-purple-500',
+    'bg-brand-600 text-white shadow-sm shadow-brand-900/10 hover:bg-brand-700 focus-visible:ring-brand-500 ' +
+    'dark:bg-brand-400 dark:text-gray-950 dark:shadow-brand-400/10 dark:hover:bg-brand-300',
   secondary:
-    'border border-gray-200 bg-white text-gray-700 shadow-sm hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 focus-visible:ring-purple-500 ' +
+    'border border-gray-200 bg-white text-gray-700 shadow-sm hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 focus-visible:ring-brand-500 ' +
     'dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-800 dark:hover:text-white',
   success: 'bg-emerald-600 text-white shadow-sm hover:bg-emerald-500 focus-visible:ring-emerald-500',
   danger: 'bg-red-600 text-white shadow-sm hover:bg-red-500 focus-visible:ring-red-500',
   outline:
-    'border border-purple-300 bg-transparent text-purple-700 hover:bg-purple-50 focus-visible:ring-purple-500 ' +
-    'dark:border-purple-500/40 dark:text-purple-300 dark:hover:bg-purple-500/10',
+    'border border-brand-300 bg-transparent text-brand-700 hover:bg-brand-50 focus-visible:ring-brand-500 ' +
+    'dark:border-brand-500/40 dark:text-brand-300 dark:hover:bg-brand-500/10',
   ghost:
-    'text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus-visible:ring-purple-500 ' +
+    'text-gray-600 hover:bg-gray-100 hover:text-gray-900 focus-visible:ring-brand-500 ' +
     'dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white',
 };
 

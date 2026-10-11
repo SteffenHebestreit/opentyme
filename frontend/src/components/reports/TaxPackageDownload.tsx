@@ -44,7 +44,7 @@ interface TaxPackageDownloadProps {
 }
 
 const checkboxClass =
-  'h-4 w-4 shrink-0 rounded border-gray-300 text-purple-600 accent-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900';
+  'h-4 w-4 shrink-0 rounded border-gray-300 text-brand-600 accent-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900';
 
 /** One selectable part of the package. */
 function ContentOption({
@@ -198,7 +198,7 @@ export default function TaxPackageDownload({ onClose }: TaxPackageDownloadProps)
 
   const header = (
     <div className="flex items-start gap-3 border-b border-gray-100 px-5 py-4 sm:px-6 dark:border-gray-800">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-purple-600 ring-1 ring-inset ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20">
         <FolderArchive className="h-5 w-5" aria-hidden="true" />
       </span>
       <div className="min-w-0">
@@ -263,9 +263,9 @@ export default function TaxPackageDownload({ onClose }: TaxPackageDownloadProps)
                         onClick={() => setSelectedYear(year)}
                         className={cn(
                           'rounded-full px-4 py-1.5 text-sm font-medium tabular-nums ring-1 ring-inset transition-colors',
-                          'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500',
+                          'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
                           isActive
-                            ? 'bg-purple-600 text-white ring-purple-600 dark:bg-purple-500 dark:ring-purple-500'
+                            ? 'bg-brand-600 text-white ring-brand-600 dark:bg-brand-400 dark:text-gray-950 dark:ring-brand-400'
                             : 'bg-white text-gray-700 ring-gray-200 hover:bg-gray-50 hover:text-gray-900 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-700 dark:hover:bg-white/[0.04] dark:hover:text-white'
                         )}
                       >
@@ -357,7 +357,7 @@ export default function TaxPackageDownload({ onClose }: TaxPackageDownloadProps)
                     />
                     <ContentOption
                       icon={Landmark}
-                      tone="bg-purple-50 text-purple-600 ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20"
+                      tone="bg-brand-50 text-brand-600 ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20"
                       checked={includePrepaymentReceipts}
                       onChange={setIncludePrepaymentReceipts}
                       title={t('taxPackage.prepaymentReceipts')}

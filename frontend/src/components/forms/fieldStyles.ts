@@ -15,8 +15,8 @@ const base =
 
 const states = {
   normal:
-    'border-gray-300 hover:border-gray-400 focus:border-purple-500 focus:ring-purple-500/15 ' +
-    'dark:border-gray-700 dark:hover:border-gray-600 dark:focus:border-purple-400 dark:focus:ring-purple-400/15',
+    'border-gray-300 hover:border-gray-400 focus:border-brand-500 focus:ring-brand-500/15 ' +
+    'dark:border-gray-700 dark:hover:border-gray-600 dark:focus:border-brand-400 dark:focus:ring-brand-400/15',
   error:
     'border-red-400 hover:border-red-500 focus:border-red-500 focus:ring-red-500/15 ' +
     'dark:border-red-500/60 dark:focus:border-red-400 dark:focus:ring-red-400/15',

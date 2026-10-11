@@ -4,7 +4,7 @@
  * Provides default options and theme configuration for Chart.js charts:
  * - Light and dark styling (pass the theme from `useChartTheme()` so charts
  *   restyle when the user switches theme)
- * - Brand-violet accent colours
+ * - Brand-cyan accent colours, violet as the second series
  * - Quiet grid, compact tooltips, short animations
  *
  * @module utils/chartConfig
@@ -21,27 +21,27 @@ Chart.defaults.font.family = FONT_FAMILY;
 Chart.defaults.animation = { duration: 600, easing: 'easeOutQuart' };
 
 /**
- * Color palette for charts (brand violet + accents)
+ * Color palette for charts (brand cyan + accents)
  */
 export const chartColors = {
-  primary: '#8b5cf6',      // brand-500
-  primaryDark: '#7c3aed',  // brand-600
-  secondary: '#ec4899',    // pink-500
+  primary: '#019bbf',      // brand-500
+  primaryDark: '#007b98',  // brand-600
+  secondary: '#9171f1',    // violet-500
   success: '#10b981',      // emerald-500
   danger: '#ef4444',       // red-500
   warning: '#f59e0b',      // amber-500
-  info: '#0ea5e9',         // sky-500
+  info: '#4a74dc',         // blue — kept apart from the cyan brand
   gray: {
-    50: '#fafafb',
-    100: '#f4f4f6',
-    200: '#e7e7eb',
-    300: '#d5d5dc',
-    400: '#a1a1ac',
-    500: '#71717c',
-    600: '#52525c',
-    700: '#3d3d46',
-    800: '#26262d',
-    900: '#17171c',
+    50: '#f5f8fc',
+    100: '#eff3f8',
+    200: '#e0e6ed',
+    300: '#cdd4de',
+    400: '#9ba4b0',
+    500: '#67717e',
+    600: '#4c5764',
+    700: '#364150',
+    800: '#1f2b3b',
+    900: '#0c1522',
   },
 };
 
@@ -49,14 +49,14 @@ export const chartColors = {
  * Categorical palette for multi-series charts, in display order.
  */
 export const chartPalette = [
-  '#8b5cf6', // violet
-  '#0ea5e9', // sky
+  '#019bbf', // cyan (brand)
+  '#9171f1', // violet
   '#10b981', // emerald
   '#f59e0b', // amber
+  '#4a74dc', // blue
   '#ec4899', // pink
-  '#f97316', // orange (indigo sat too close to violet in stacks)
-  '#14b8a6', // teal
-  '#ef4444', // red
+  '#f97316', // orange
+  '#ef4444', // red (teal dropped: too close to the cyan brand)
 ];
 
 /** Theme currently applied to the page (used when no theme is passed). */
@@ -69,28 +69,28 @@ export const currentChartTheme = (): ChartTheme =>
 export const getChartThemeColors = (theme: ChartTheme = currentChartTheme()) =>
   theme === 'dark'
     ? {
-        text: '#a1a1ac',
-        textStrong: '#e7e7eb',
+        text: '#9ba4b0',
+        textStrong: '#e0e6ed',
         grid: 'rgba(255, 255, 255, 0.06)',
-        tooltipBg: 'rgba(23, 23, 28, 0.96)',
-        tooltipBorder: 'rgba(255, 255, 255, 0.08)',
-        tooltipTitle: '#fafafb',
-        tooltipBody: '#d5d5dc',
-        surface: '#17171c',
+        tooltipBg: 'rgba(12, 21, 34, 0.96)',
+        tooltipBorder: 'rgba(56, 186, 224, 0.18)',
+        tooltipTitle: '#f5f8fc',
+        tooltipBody: '#cdd4de',
+        surface: '#0c1522',
       }
     : {
-        text: '#71717c',
-        textStrong: '#26262d',
-        grid: 'rgba(15, 15, 20, 0.06)',
+        text: '#67717e',
+        textStrong: '#1f2b3b',
+        grid: 'rgba(12, 21, 34, 0.06)',
         tooltipBg: 'rgba(255, 255, 255, 0.98)',
-        tooltipBorder: '#e7e7eb',
-        tooltipTitle: '#17171c',
-        tooltipBody: '#52525c',
+        tooltipBorder: '#e0e6ed',
+        tooltipTitle: '#0c1522',
+        tooltipBody: '#4c5764',
         surface: '#ffffff',
       };
 
 /**
- * Translucent fill for an area under a line: `withAlpha('#8b5cf6', 0.15)`.
+ * Translucent fill for an area under a line: `withAlpha('#019bbf', 0.15)`.
  */
 export const withAlpha = (hex: string, alpha: number): string => {
   const value = hex.replace('#', '');

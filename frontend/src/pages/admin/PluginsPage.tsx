@@ -82,7 +82,7 @@ function PluginSettingsForm({ pluginName, schema, initialValues, onSaved }: Plug
                 type="checkbox"
                 checked={!!value}
                 onChange={(e) => set(key, e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 accent-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-900"
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 accent-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-900"
               />
               <div>
                 <span className="text-sm font-medium text-gray-900 dark:text-white">{label}</span>
@@ -222,7 +222,7 @@ function PluginDetailModal({ pluginName, onClose, onToggle, isToggling }: Plugin
 
           <div className="flex flex-wrap gap-2">
             {plugin?.hasBackend && <Badge variant="blue" icon={<Check className="h-3 w-3" />}>{t('admin.plugins.backendApi')}</Badge>}
-            {plugin?.hasFrontend && <Badge variant="purple" icon={<Check className="h-3 w-3" />}>{t('admin.plugins.frontendUi')}</Badge>}
+            {plugin?.hasFrontend && <Badge variant="brand" icon={<Check className="h-3 w-3" />}>{t('admin.plugins.frontendUi')}</Badge>}
             {plugin?.hasSettings && <Badge variant="green" icon={<Check className="h-3 w-3" />}>{t('admin.plugins.userSettings')}</Badge>}
           </div>
 
@@ -307,7 +307,7 @@ const PluginsPage: React.FC = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label={t('admin.plugins.total')} value={data?.total ?? 0} icon={Package} variant="purple" />
+        <StatCard label={t('admin.plugins.total')} value={data?.total ?? 0} icon={Package} variant="brand" />
         <StatCard label={t('admin.plugins.enabled')} value={data?.enabled ?? 0} icon={Power} variant="green" />
         <StatCard
           label={t('admin.plugins.disabled')}
@@ -333,7 +333,7 @@ const PluginsPage: React.FC = () => {
               role="button"
               tabIndex={0}
               aria-label={t('admin.plugins.openDetails', { name: plugin.displayName })}
-              className="surface surface-interactive group flex cursor-pointer flex-col p-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+              className="surface surface-interactive group flex cursor-pointer flex-col p-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
               onClick={() => setSelectedPlugin(plugin.name)}
               onKeyDown={(e) => {
                 if (e.target !== e.currentTarget) return;
@@ -349,7 +349,7 @@ const PluginsPage: React.FC = () => {
                     className={cn(
                       'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset transition-colors',
                       plugin.userEnabled
-                        ? 'bg-purple-50 text-purple-600 ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20'
+                        ? 'bg-brand-50 text-brand-600 ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20'
                         : 'bg-gray-50 text-gray-400 ring-gray-200 dark:bg-white/[0.04] dark:text-gray-500 dark:ring-gray-800'
                     )}
                   >
@@ -377,7 +377,7 @@ const PluginsPage: React.FC = () => {
               <div className="mt-auto flex items-center justify-between gap-3">
                 <div className="flex flex-wrap gap-1.5">
                   {plugin.hasBackend && <Badge variant="blue" size="sm">{t('admin.plugins.backend')}</Badge>}
-                  {plugin.hasFrontend && <Badge variant="purple" size="sm">{t('admin.plugins.frontend')}</Badge>}
+                  {plugin.hasFrontend && <Badge variant="brand" size="sm">{t('admin.plugins.frontend')}</Badge>}
                   {plugin.hasSettings && <Badge variant="green" size="sm">{t('admin.plugins.settings')}</Badge>}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
