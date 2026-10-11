@@ -2,6 +2,42 @@
 
 ## Unreleased (since v1.5.0)
 
+### Frontend — a modern, calmer interface that is always up to date
+- **Numbers update without reloading.** Saving anything — a time entry, a timer, a payment,
+  an invoice, a rate change, an action approved in the AI assistant — refreshes everything
+  derived from it: dashboard totals, analytics charts, project budgets, AfA schedules. Before,
+  only a few lists refreshed and the dashboard needed a hard reload. Other open tabs of the app
+  update too, and coming back to the tab picks up changes made elsewhere. Changed key figures
+  count to their new value and briefly highlight.
+- **New app layout**: a sidebar with icons and a clear active state (collapsible; a drawer on
+  phones), a slim top bar showing the current section, a **running timer visible on every
+  page** (click to jump to it), a quiet indicator while data refreshes, the theme switch and
+  an account menu with profile, settings, appearance (light / dark / system) and language.
+- **Quick navigation with Ctrl/⌘+K**: jump to any page, settings tab or addon, switch theme or
+  language by typing.
+- **One consistent look**: a neutral palette with the violet brand colour (no more purple-pink
+  gradients, glows and pulsing background blobs), self-hosted Inter font, bordered form fields
+  with a clear focus ring, consistent tables, status badges and empty states; icons instead
+  of emoji. Light mode is fully readable everywhere (several dialogs and all charts were
+  styled for dark mode only).
+- **Subtle motion**: pages fade in, card grids appear one after another, dialogs and menus open
+  and close smoothly, tab indicators slide. All of it is switched off when the system asks
+  for reduced motion.
+- **Feedback where it was missing**: short confirmations after saving or deleting, styled
+  confirmation dialogs instead of browser pop-ups, errors that were only logged are shown.
+- Every page got a pass: a dashboard with a clear hierarchy and quick actions; a tracking page
+  built around the timer; grouped client/project forms and a timeline of hourly rates;
+  invoices with a clear detail view and the rare actions in a menu; expenses with drag & drop
+  receipts; a settings area with its own navigation; report types as cards; a calm landing
+  page and sign-in pages; a redesigned AI assistant panel (a sheet on phones).
+- Many strings that were English-only or German-only are now translated in both languages.
+- Fixed: reloading a page (e.g. Zeiterfassung) landed on the dashboard instead of staying there.
+- Fixed: the landing page was unreachable when signed out (it redirected to the login).
+- Fixed: returning to a tab after a while could log you out — an expired session token is now
+  renewed before the first request.
+- Fixed: "Rechnung erstellen" on the dashboard opens the invoice form; recent invoices on the
+  dashboard showed amounts in USD; dates shifted by a day west of UTC on the dashboard.
+
 ### Hourly rates — a change always has a start date
 - **Changing a rate now always asks from when it applies.** Editing the rate on the project
   form used to apply it silently "from today" — wrong for a contract extension starting on
