@@ -22,9 +22,11 @@ router.use(extractKeycloakUser);
  */
 router.get('/:id/rates', projectRateController.listRates);
 router.get('/:id/rates/effective', projectRateController.getEffectiveRate);
+router.get('/:id/rates/impact', projectRateController.getImpact);
 router.post('/:id/rates', projectRateController.addRate);
 router.put('/rates/:rateId', projectRateController.updateRate);
 router.delete('/rates/:rateId', projectRateController.deleteRate);
+router.post('/rates/:rateId/align', projectRateController.alignRate);
 
 /**
  * @openapi

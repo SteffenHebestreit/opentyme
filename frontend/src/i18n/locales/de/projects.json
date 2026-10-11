@@ -36,14 +36,15 @@
     "actions": "Aktionen",
     "start": "Start",
     "due": "Fällig",
-    "rate": "Satz"
+    "rate": "Satz",
+    "nextRate": "ab {{date}}: {{rate}}"
   },
   "rates": {
-    "manage": "Sätze",
+    "manage": "Stundensätze",
     "title": "Stundensätze — {{name}}",
     "titleFallback": "Stundensätze",
     "close": "Schließen",
-    "intro": "Eine Satzänderung bewertet bereits erfasste Arbeit nicht neu — bestehende Zeiteinträge behalten den Satz, mit dem sie gespeichert wurden.",
+    "intro": "Ein Satz gilt ab dem Datum, das Sie wählen – für alle Einträge ab diesem Tag, auch für bereits erfasste. Einträge davor bleiben unverändert, ebenso individuell abweichend bepreiste.",
     "loading": "Satzzeiträume werden geladen…",
     "openEnded": "Unbefristet",
     "perHour": "/Std.",
@@ -59,17 +60,17 @@
       "scheduled": "Geplant"
     },
     "empty": {
-      "title": "Noch keine Satzzeiträume",
-      "message": "Legen Sie unten den ersten Satz an. Danach können Sie Änderungen im Voraus planen, ohne bereits Abgerechnetes anzutasten."
+      "title": "Noch kein Stundensatz hinterlegt",
+      "message": "Legen Sie fest, welcher Satz ab welchem Datum gilt. Spätere Änderungen – etwa bei einer Vertragsverlängerung – planen Sie hier im Voraus."
     },
     "form": {
-      "addTitle": "Satzzeitraum hinzufügen",
-      "editTitle": "Satzzeitraum bearbeiten",
+      "addTitle": "Neuen Stundensatz festlegen",
+      "editTitle": "Satz ab {{date}} bearbeiten",
       "addSubmit": "Satz hinzufügen",
       "saveEdit": "Änderungen speichern",
       "cancelEdit": "Abbrechen",
       "rate": {
-        "label": "Stundensatz",
+        "label": "Neuer Stundensatz",
         "placeholder": "150",
         "required": "Stundensatz ist erforderlich",
         "min": "Stundensatz muss null oder höher sein"
@@ -77,19 +78,85 @@
       "validFrom": {
         "label": "Gültig ab",
         "required": "Startdatum ist erforderlich",
-        "helper": "Ein Datum in der Zukunft plant die Änderung vor."
+        "helper": "Ein Datum in der Zukunft plant die Änderung vor.",
+        "labelRequired": "Gilt ab *",
+        "requiredOnChange": "Bitte wählen Sie, ab wann der neue Satz gilt."
       },
       "note": {
-        "label": "Notiz",
-        "placeholder": "Per E-Mail vereinbart"
-      }
+        "label": "Grund / Notiz (optional)",
+        "placeholder": "z. B. Vertragsverlängerung 2027"
+      },
+      "back": "Zurück",
+      "save": "Satz speichern"
     },
     "messages": {
       "added": "Satzzeitraum hinzugefügt.",
       "updated": "Satzzeitraum aktualisiert.",
       "deleted": "Satzzeitraum gelöscht.",
       "conflict": "Zu diesem Datum beginnt bereits ein Satz. Bearbeiten Sie diesen Zeitraum oder wählen Sie ein anderes Startdatum.",
-      "deleteConfirm": "Satzzeitraum ab {{date}} löschen? Bereits erfasste Zeiteinträge behalten ihren Satz."
+      "deleteConfirm": "Satz ab {{date}} wirklich löschen? Bereits erfasste Zeiten behalten ihren Satz.",
+      "saved": "Satz von {{rate}} ab {{date}} gespeichert.",
+      "repriced_one": "{{count}} bereits erfasster Eintrag wurde auf {{rate}} umgestellt.",
+      "repriced_other": "{{count}} bereits erfasste Einträge wurden auf {{rate}} umgestellt.",
+      "deletedFrom": "Satz ab {{date}} gelöscht.",
+      "aligned_one": "{{count}} Eintrag wurde auf {{rate}} angeglichen.",
+      "aligned_other": "{{count}} Einträge wurden auf {{rate}} angeglichen.",
+      "deleteConfirmFallback": "Satz ab {{date}} wirklich löschen? Einträge in diesem Zeitraum, die {{rate}} haben, fallen auf {{previous}} zurück."
+    },
+    "setNew": "Neuen Satz festlegen",
+    "setFirst": "Ersten Satz festlegen",
+    "history": "Verlauf",
+    "summary": {
+      "current": "Gilt aktuell",
+      "since": "seit {{date}}",
+      "noneYet": "Noch kein Satz in Kraft",
+      "next": "Nächste Änderung",
+      "from": "ab {{date}}",
+      "noneScheduled": "Keine Änderung geplant"
+    },
+    "period": {
+      "range": "{{from}} – {{until}}",
+      "open": "ab {{from}}"
+    },
+    "actions": {
+      "edit": "Satz ab {{date}} bearbeiten",
+      "delete": "Satz ab {{date}} löschen"
+    },
+    "quick": {
+      "label": "Schnellauswahl Startdatum",
+      "today": "Ab heute",
+      "date": "Ab {{date}}"
+    },
+    "impact": {
+      "loading": "Auswirkungen werden berechnet…",
+      "range": "gilt {{from}} – {{until}}",
+      "from": "gilt ab {{from}}",
+      "scheduled": "Wird am {{date}} automatisch wirksam. Bis dahin gilt weiter {{previous}}.",
+      "scheduledNoPrevious": "Wird am {{date}} wirksam.",
+      "endsAt": "Ab {{date}} gilt der bereits vereinbarte nächste Satz.",
+      "replaces": "Ab dem {{date}} ist bereits ein Satz von {{rate}} hinterlegt – er wird durch diesen ersetzt.",
+      "invoicesSince_one": "Für diesen Kunden wurde seit dem {{date}} bereits {{count}} Rechnung gestellt. Prüfen Sie, ob diese Einträge darin abgerechnet sind, bevor Sie sie umstellen.",
+      "invoicesSince_other": "Für diesen Kunden wurden seit dem {{date}} bereits {{count}} Rechnungen gestellt. Prüfen Sie, ob diese Einträge darin abgerechnet sind, bevor Sie sie umstellen.",
+      "noLogged": "In diesem Zeitraum ist noch nichts erfasst – es werden keine bestehenden Zeiten berührt.",
+      "willMove_one": "{{count}} bereits erfasster Eintrag seit dem {{date}} wird auf {{rate}} umgestellt.",
+      "willMove_other": "{{count}} bereits erfasste Einträge seit dem {{date}} werden auf {{rate}} umgestellt.",
+      "willKeep_one": "{{count}} bereits erfasster Eintrag seit dem {{date}} behält seinen bisherigen Satz.",
+      "willKeep_other": "{{count}} bereits erfasste Einträge seit dem {{date}} behalten ihren bisherigen Satz.",
+      "deviating_one": "{{count}} Eintrag mit individuell abweichendem Satz bleibt unverändert.",
+      "deviating_other": "{{count}} Einträge mit individuell abweichendem Satz bleiben unverändert.",
+      "keepExisting": "Bisherigen Satz für bereits erfasste Einträge beibehalten (z. B. weil sie schon abgerechnet sind)"
+    },
+    "systemNotes": {
+      "initial": "Anfangssatz",
+      "migrated": "Anfangssatz (übernommen)",
+      "projectForm": "Im Projekt geändert"
+    },
+    "deviation": {
+      "atRate_one": "{{count}} Eintrag in diesem Zeitraum steht noch auf {{rate}}.",
+      "atRate_other": "{{count}} Einträge in diesem Zeitraum stehen noch auf {{rate}}.",
+      "noRate_one": "{{count}} Eintrag in diesem Zeitraum hat keinen Satz.",
+      "noRate_other": "{{count}} Einträge in diesem Zeitraum haben keinen Satz.",
+      "align": "Auf {{rate}} angleichen"
     }
   },
   "form": {
@@ -126,7 +193,12 @@
       "label": "Stundensatz",
       "placeholder": "75",
       "required": "Stundensatz ist für stündliche Projekte erforderlich",
-      "min": "Stundensatz muss null oder höher sein"
+      "min": "Stundensatz muss null oder höher sein",
+      "helperCreate": "Gilt ab Projektstart. Spätere Änderungen legen Sie mit eigenem Startdatum an.",
+      "helperEdit": "Aktuell gültiger Satz. Wenn Sie ihn ändern, legen Sie fest, ab wann der neue gilt.",
+      "showHistory": "Satzverlauf ansehen",
+      "changeTitle": "Ab wann gilt der neue Stundensatz?",
+      "changeHint": "Bisher {{previous}}. Bis zum gewählten Datum gilt weiter der bisherige Satz."
     },
     "estimatedHours": {
       "label": "Geschätzte Stunden",

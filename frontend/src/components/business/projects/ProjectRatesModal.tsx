@@ -1,146 +1,75 @@
-import { FC, useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+/**
+ * @fileoverview A project's hourly rate as a timeline — what it is now, what is
+ * already agreed for later, and how it got here.
+ *
+ * Two views in one modal:
+ *
+ * - **Overview**: the rate in force today, front and centre, with any scheduled
+ *   change right beside it ("from 01.01.2027: 95,00 € (+11,8 %)"), then the
+ *   history as a timeline — scheduled first, then current, then past.
+ * - **Form**: set a new rate or correct one, with a start date that is always
+ *   an explicit choice and a preview of what saving will do — including, for a
+ *   contract extension signed after the date it takes effect, the entries
+ *   already logged in the new period and an opt-in to move them onto it.
+ *
+ * Save / back live in the modal footer, which never scrolls away.
+ *
+ * Presentational: the parent owns the mutations and the error state.
+ *
+ * @module components/business/projects/ProjectRatesModal
+ */
+
+import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { format, parseISO, subDays } from 'date-fns';
 import clsx from 'clsx';
+import { CalendarClock, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Alert } from '@/components/common/Alert';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/forms';
 import { Modal } from '@/components/ui/Modal';
 import { Project } from '@/api/types';
-import { formatCurrency } from '@/utils/currency';
 import type {
   ProjectRatePayload,
   ProjectRatePeriod,
   ProjectRateUpdatePayload,
+  RateImpact,
+  SavedProjectRate,
 } from '@/api/services/project-rate.service';
+import { formatCurrency } from '@/utils/currency';
+import { addDaysYmd, formatYmd, todayYmd } from '@/utils/date';
+import { EffectiveDateField, RateImpactPanel } from './RateChange';
+import { describeRateNote, formatPercentChange, rateChangePercent } from '@/utils/rates';
 
-/**
- * Modal showing a project's hourly rate as a timeline of periods.
- *
- * **Why a timeline:** a rate is not one number but a sequence of periods. Adding
- * "150 € from 2026-01-01" schedules a raise without re-pricing work that was
- * already logged — time entries keep the rate they were stamped with. The modal
- * says so explicitly, because that is the fear that stops people from editing rates.
- *
- * **Features:**
- * - Table of periods (valid from / valid until / rate / note / actions), oldest first
- * - Badge on the period covering today, distinct styling for future-dated periods
- * - Inline add form, switching into an edit form when a row's Edit is pressed
- * - Empty state inviting the first rate for projects that never had one
- * - Dark mode support
- *
- * Presentational only: the parent owns the mutations plus the error and success state.
- *
- * @component
- * @example
- * <ProjectRatesModal
- *   open={isRatesModalOpen}
- *   project={ratesProject}
- *   rates={rates}
- *   isLoading={isLoadingRates}
- *   onSubmit={handleRateSubmit}
- *   onDelete={handleRateDelete}
- *   onClose={closeRatesModal}
- *   isSubmitting={isSavingRate}
- *   error={rateFormError}
- * />
- */
-
-/**
- * Props for the ProjectRatesModal component.
- *
- * @interface ProjectRatesModalProps
- * @property {boolean} open - Whether the modal is visible
- * @property {Project | null} project - The project whose rate timeline is shown
- * @property {ProjectRatePeriod[]} rates - Rate periods, oldest first
- * @property {boolean} isLoading - Whether the timeline is still loading
- * @property {string | null} [loadError] - Error message for a failed timeline load
- * @property {(payload, rateId?) => Promise<boolean>} onSubmit - Adds a period, or updates the one identified by rateId; resolves true when stored
- * @property {(rate: ProjectRatePeriod) => Promise<void>} onDelete - Removes a period
- * @property {() => void} onClose - Callback when the modal should close
- * @property {boolean} isSubmitting - Whether an add/update is in flight
- * @property {string | null} [deletingRateId] - Id of the period currently being deleted
- * @property {string | null} [error] - Error message for the add/update form
- */
 interface ProjectRatesModalProps {
   open: boolean;
   project: Project | null;
   rates: ProjectRatePeriod[];
   isLoading: boolean;
   loadError?: string | null;
-  onSubmit: (payload: ProjectRatePayload | ProjectRateUpdatePayload, rateId?: string) => Promise<boolean>;
-  onDelete: (rate: ProjectRatePeriod) => Promise<void>;
+  /** Adds a period, or updates the one identified by rateId; resolves to the saved period, or null on failure. */
+  onSubmit: (
+    payload: ProjectRatePayload | ProjectRateUpdatePayload,
+    rateId?: string
+  ) => Promise<SavedProjectRate | null>;
+  /** Removes a period; the modal has already asked for confirmation. Resolves true on success. */
+  onDelete: (rate: ProjectRatePeriod) => Promise<boolean>;
+  /**
+   * Moves a period's entries onto its rate — only those at `fromRate`, so an
+   * individually priced entry is not swept along. Resolves to the number moved.
+   */
+  onAlign: (rate: ProjectRatePeriod, fromRate: number | null) => Promise<number | null>;
+  /** Id of the period whose entries are being aligned. */
+  aligningRateId?: string | null;
   onClose: () => void;
   isSubmitting: boolean;
   deletingRateId?: string | null;
   error?: string | null;
+  onDismissError?: () => void;
 }
 
-/**
- * Internal form values. All strings, converted in the submit handler.
- *
- * @interface FormValues
- */
-interface FormValues {
-  hourly_rate: string;
-  valid_from: string;
-  note: string;
-}
+type View = { kind: 'overview' } | { kind: 'form'; editing: ProjectRatePeriod | null };
 
-/**
- * Unique form ID for linking the submit button to the form.
- *
- * @constant
- */
-const formId = 'project-rate-form';
-
-/**
- * Today as `YYYY-MM-DD` in local time, used both as the add form's default start
- * date and to tell past periods from scheduled ones.
- *
- * @returns {string} Today's date
- */
-function today(): string {
-  return format(new Date(), 'yyyy-MM-dd');
-}
-
-/**
- * Formats a `YYYY-MM-DD` string for display. Parsed with `parseISO` so a
- * date-only value stays on its own day regardless of the viewer's time zone.
- *
- * @param {string | null} value - Date string or null
- * @returns {string} Formatted date, or an em dash when absent
- */
-function formatDay(value: string | null): string {
-  if (!value) {
-    return '—';
-  }
-  try {
-    return format(parseISO(value), 'MMM d, yyyy');
-  } catch (error) {
-    return value;
-  }
-}
-
-/**
- * Renders a period's end. `valid_until` is exclusive (it is the next period's
- * start), so the last day the rate actually applies is the day before.
- *
- * @param {string | null} validUntil - Exclusive end of the period
- * @param {string} openLabel - Label for the open-ended latest period
- * @returns {string} Inclusive last day, or the open-ended label
- */
-function formatPeriodEnd(validUntil: string | null, openLabel: string): string {
-  if (!validUntil) {
-    return openLabel;
-  }
-  try {
-    return format(subDays(parseISO(validUntil), 1), 'MMM d, yyyy');
-  } catch (error) {
-    return validUntil;
-  }
-}
+const FORM_ID = 'project-rate-form';
 
 export const ProjectRatesModal: FC<ProjectRatesModalProps> = ({
   open,
@@ -150,66 +79,173 @@ export const ProjectRatesModal: FC<ProjectRatesModalProps> = ({
   loadError,
   onSubmit,
   onDelete,
+  onAlign,
+  aligningRateId,
   onClose,
   isSubmitting,
   deletingRateId,
   error,
+  onDismissError,
 }) => {
-  const { t } = useTranslation('projects');
-  const [editingRateId, setEditingRateId] = useState<string | null>(null);
+  const { t, i18n } = useTranslation('projects');
+  const lng = i18n.language;
   const currency = project?.currency || 'EUR';
+  const today = todayYmd();
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<FormValues>({
-    defaultValues: { hourly_rate: '', valid_from: today(), note: '' },
-  });
+  const [view, setView] = useState<View>({ kind: 'overview' });
+  const [notice, setNotice] = useState<string | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
 
-  // Reopening the modal for another project must not carry the previous
-  // project's draft (or edit mode) over.
+  // Form state
+  const [rateInput, setRateInput] = useState('');
+  const [validFrom, setValidFrom] = useState('');
+  const [note, setNote] = useState('');
+  const [applyToExisting, setApplyToExisting] = useState(true);
+  const [impact, setImpact] = useState<RateImpact | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Reopening for another project starts fresh.
   useEffect(() => {
     if (open) {
-      setEditingRateId(null);
-      reset({ hourly_rate: '', valid_from: today(), note: '' });
+      setView({ kind: 'overview' });
+      setNotice(null);
+      setConfirmingDeleteId(null);
     }
-  }, [open, project?.id, reset]);
+  }, [open, project?.id]);
 
-  const startEdit = (rate: ProjectRatePeriod) => {
-    setEditingRateId(rate.id);
-    reset({
-      hourly_rate: String(rate.hourly_rate),
-      valid_from: rate.valid_from,
-      note: rate.note ?? '',
+  const sorted = useMemo(() => [...rates].sort((a, b) => a.valid_from.localeCompare(b.valid_from)), [rates]);
+  const current = sorted.find((rate) => rate.is_current) ?? null;
+  const nextScheduled = sorted.find((rate) => rate.valid_from > today) ?? null;
+
+  /** Rate of the period immediately before each one, for the change badge. */
+  const previousById = useMemo(() => {
+    const map = new Map<string, number>();
+    sorted.forEach((rate, index) => {
+      if (index > 0) map.set(rate.id, sorted[index - 1].hourly_rate);
     });
+    return map;
+  }, [sorted]);
+
+  // Scheduled first, then current, then the past newest-first: what is coming
+  // and what applies now matter more than how it used to be.
+  const timeline = useMemo(() => [...sorted].reverse(), [sorted]);
+
+  const openForm = (editing: ProjectRatePeriod | null) => {
+    setFormError(null);
+    setNotice(null);
+    setApplyToExisting(true);
+    setImpact(null);
+    if (editing) {
+      setRateInput(String(editing.hourly_rate));
+      setValidFrom(editing.valid_from);
+      setNote(editing.note ?? '');
+    } else {
+      // No default start date: the day a new rate takes effect is always an
+      // explicit choice (the quick picks make it one click).
+      setRateInput('');
+      setValidFrom('');
+      setNote('');
+    }
+    onDismissError?.();
+    setView({ kind: 'form', editing });
   };
 
-  const cancelEdit = () => {
-    setEditingRateId(null);
-    reset({ hourly_rate: '', valid_from: today(), note: '' });
+  const backToOverview = () => {
+    setFormError(null);
+    onDismissError?.();
+    setView({ kind: 'overview' });
   };
 
-  const handleFormSubmit = async (values: FormValues) => {
-    const note = values.note.trim();
-    const payload: ProjectRatePayload = {
-      hourly_rate: Number(values.hourly_rate),
-      valid_from: values.valid_from,
-      note: note ? note : undefined,
+  const handleImpact = useCallback((next: RateImpact | null) => setImpact(next), []);
+
+  const parsedRate = rateInput.trim() === '' ? null : Number(rateInput.replace(',', '.'));
+  const editing = view.kind === 'form' ? view.editing : null;
+
+  const handleSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (parsedRate === null || Number.isNaN(parsedRate) || parsedRate < 0) {
+      setFormError(t('rates.form.rate.required'));
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(validFrom)) {
+      setFormError(t('rates.form.validFrom.requiredOnChange'));
+      return;
+    }
+    setFormError(null);
+
+    const trimmedNote = note.trim();
+    const payload = {
+      hourly_rate: parsedRate,
+      valid_from: validFrom,
+      note: trimmedNote || undefined,
+      apply_to_existing: applyToExisting,
     };
 
-    const saved = await onSubmit(payload, editingRateId ?? undefined);
+    // A period already starting that day is replaced, not a conflict: the user
+    // said "from this day, this rate", and that is unambiguous.
+    const targetId =
+      editing?.id ??
+      (impact?.existing_period && impact.valid_from === validFrom ? impact.existing_period.id : undefined);
 
-    // The parent reports failures through the `error` prop and keeps the draft
-    // on screen, so the form is only cleared once the period was really stored.
-    if (saved) {
-      setEditingRateId(null);
-      reset({ hourly_rate: '', valid_from: today(), note: '' });
+    const saved = await onSubmit(payload, targetId);
+    if (!saved) return;
+
+    const rateText = formatCurrency(saved.hourly_rate, currency);
+    const parts = [
+      t('rates.messages.saved', { rate: rateText, date: formatYmd(saved.valid_from, lng) }),
+    ];
+    if (saved.repriced_entries) {
+      parts.push(t('rates.messages.repriced', { count: saved.repriced_entries, rate: rateText }));
+    }
+    setNotice(parts.join(' '));
+    setView({ kind: 'overview' });
+  };
+
+  const handleAlign = async (rate: ProjectRatePeriod, fromRate: number | null) => {
+    const moved = await onAlign(rate, fromRate);
+    if (moved !== null) {
+      setNotice(
+        t('rates.messages.aligned', {
+          count: moved,
+          rate: formatCurrency(rate.hourly_rate, currency),
+        })
+      );
     }
   };
 
-  const currentDay = today();
+  const handleConfirmDelete = async (rate: ProjectRatePeriod) => {
+    const deleted = await onDelete(rate);
+    setConfirmingDeleteId(null);
+    if (deleted) {
+      setNotice(t('rates.messages.deletedFrom', { date: formatYmd(rate.valid_from, lng) }));
+    }
+  };
+
+  const footer =
+    view.kind === 'form' ? (
+      <>
+        <Button type="button" variant="outline" onClick={backToOverview} disabled={isSubmitting}>
+          {t('rates.form.back')}
+        </Button>
+        {/* Distinct keys on purpose: the overview's "set new rate" button sits
+            in the same slot. Reusing that DOM node would turn the button being
+            clicked into a submit button mid-click, and the browser would submit
+            the empty form straight away. */}
+        <Button key="rate-form-submit" type="submit" form={FORM_ID} disabled={isSubmitting || !project}>
+          {isSubmitting ? t('saving') : t('rates.form.save')}
+        </Button>
+      </>
+    ) : (
+      <>
+        <Button type="button" variant="outline" onClick={onClose}>
+          {t('rates.close')}
+        </Button>
+        <Button key="rate-open-form" type="button" onClick={() => openForm(null)} disabled={!project}>
+          <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
+          {t('rates.setNew')}
+        </Button>
+      </>
+    );
 
   return (
     <Modal
@@ -217,184 +253,277 @@ export const ProjectRatesModal: FC<ProjectRatesModalProps> = ({
       onClose={onClose}
       title={project ? t('rates.title', { name: project.name }) : t('rates.titleFallback')}
       size="lg"
-      footer={
-        <Button type="button" variant="outline" onClick={onClose}>
-          {t('rates.close')}
-        </Button>
-      }
+      footer={footer}
     >
-      <div className="space-y-5">
-        <p className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-200">
-          {t('rates.intro')}
-        </p>
-
-        {loadError ? <Alert type="error" message={loadError} /> : null}
-
-        {isLoading ? (
-          <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">{t('rates.loading')}</p>
-        ) : rates.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-8 text-center dark:border-gray-700 dark:bg-gray-900/40">
-            <p className="text-sm font-medium text-gray-900 dark:text-white">{t('rates.empty.title')}</p>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t('rates.empty.message')}</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-800">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900/60">
-                  <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    {t('rates.columns.validFrom')}
-                  </th>
-                  <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    {t('rates.columns.validUntil')}
-                  </th>
-                  <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    {t('rates.columns.rate')}
-                  </th>
-                  <th className="px-4 py-3 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    {t('rates.columns.note')}
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    {t('rates.columns.actions')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rates.map((rate) => {
-                  const isFuture = rate.valid_from > currentDay;
-                  const isPast = !rate.is_current && !isFuture;
-                  return (
-                    <tr
-                      key={rate.id}
-                      className={clsx(
-                        'border-b border-gray-100 last:border-b-0 dark:border-gray-800',
-                        rate.is_current && 'bg-purple-50 dark:bg-purple-900/20',
-                        isFuture && 'bg-blue-50 dark:bg-blue-900/20',
-                        rate.id === editingRateId && 'ring-1 ring-inset ring-purple-400 dark:ring-purple-500'
-                      )}
-                    >
-                      <td className="px-4 py-3 align-top">
-                        <span
-                          className={clsx(
-                            'text-sm font-medium',
-                            isPast ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'
-                          )}
-                        >
-                          {formatDay(rate.valid_from)}
-                        </span>
-                        {rate.is_current ? (
-                          <span className="ml-2 inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-800 dark:bg-purple-900/40 dark:text-purple-200">
-                            {t('rates.badge.current')}
-                          </span>
-                        ) : null}
-                        {isFuture ? (
-                          <span className="ml-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
-                            {t('rates.badge.scheduled')}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3 align-top text-sm text-gray-600 dark:text-gray-400">
-                        {formatPeriodEnd(rate.valid_until, t('rates.openEnded'))}
-                      </td>
-                      <td
-                        className={clsx(
-                          'px-4 py-3 align-top text-sm font-medium',
-                          isPast ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'
-                        )}
-                      >
-                        {formatCurrency(rate.hourly_rate, currency)}
-                        <span className="text-gray-500 dark:text-gray-400">{t('rates.perHour')}</span>
-                      </td>
-                      <td className="px-4 py-3 align-top text-sm text-gray-600 dark:text-gray-400">
-                        {rate.note ? rate.note : '—'}
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => startEdit(rate)}
-                            disabled={deletingRateId === rate.id}
-                          >
-                            {t('edit')}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="danger"
-                            onClick={() => void onDelete(rate)}
-                            disabled={deletingRateId === rate.id}
-                          >
-                            {deletingRateId === rate.id ? t('deleting') : t('delete')}
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        <form
-          id={formId}
-          className="rounded-lg border border-gray-200 p-4 dark:border-gray-800"
-          onSubmit={handleSubmit(handleFormSubmit)}
-        >
-          <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
-            {editingRateId ? t('rates.form.editTitle') : t('rates.form.addTitle')}
+      {view.kind === 'form' ? (
+        <form id={FORM_ID} className="space-y-5" onSubmit={handleSave} noValidate>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+            {editing
+              ? t('rates.form.editTitle', { date: formatYmd(editing.valid_from, lng) })
+              : t('rates.form.addTitle')}
           </h3>
 
-          {error ? <Alert type="error" message={error} /> : null}
+          {error || formError ? (
+            <Alert type="error" message={(formError ?? error) as string} onClose={() => { setFormError(null); onDismissError?.(); }} />
+          ) : null}
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Input
               id="project-rate-amount"
               label={t('rates.form.rate.label')}
               type="number"
+              inputMode="decimal"
               min="0"
               step="0.01"
-              placeholder={t('rates.form.rate.placeholder')}
-              {...register('hourly_rate', {
-                required: t('rates.form.rate.required'),
-                min: { value: 0, message: t('rates.form.rate.min') },
-              })}
-              error={errors.hourly_rate?.message}
+              placeholder={current ? String(current.hourly_rate) : t('rates.form.rate.placeholder')}
+              value={rateInput}
+              onChange={(event) => setRateInput(event.target.value)}
+              autoFocus
             />
-            <Input
+            <EffectiveDateField
               id="project-rate-valid-from"
-              label={t('rates.form.validFrom.label')}
-              type="date"
-              {...register('valid_from', { required: t('rates.form.validFrom.required') })}
-              error={errors.valid_from?.message}
-              helperText={t('rates.form.validFrom.helper')}
-            />
-            <Input
-              id="project-rate-note"
-              label={t('rates.form.note.label')}
-              placeholder={t('rates.form.note.placeholder')}
-              {...register('note')}
+              label={t('rates.form.validFrom.labelRequired')}
+              value={validFrom}
+              onChange={(value) => {
+                setValidFrom(value);
+                setFormError(null);
+              }}
             />
           </div>
 
-          <div className="flex justify-end gap-2">
-            {editingRateId ? (
-              <Button type="button" size="sm" variant="outline" onClick={cancelEdit} disabled={isSubmitting}>
-                {t('rates.form.cancelEdit')}
-              </Button>
-            ) : null}
-            <Button type="submit" size="sm" disabled={isSubmitting || !project}>
-              {isSubmitting
-                ? t('saving')
-                : editingRateId
-                  ? t('rates.form.saveEdit')
-                  : t('rates.form.addSubmit')}
-            </Button>
-          </div>
+          <Input
+            id="project-rate-note"
+            label={t('rates.form.note.label')}
+            placeholder={t('rates.form.note.placeholder')}
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+          />
+
+          <RateImpactPanel
+            projectId={project?.id}
+            currency={currency}
+            newRate={parsedRate}
+            validFrom={validFrom}
+            editingPeriodId={editing?.id ?? null}
+            applyToExisting={applyToExisting}
+            onApplyToExistingChange={setApplyToExisting}
+            onImpact={handleImpact}
+          />
         </form>
-      </div>
+      ) : (
+        <div className="space-y-5">
+          {notice ? <Alert type="success" message={notice} onClose={() => setNotice(null)} /> : null}
+          {error ? <Alert type="error" message={error} onClose={onDismissError} /> : null}
+          {loadError ? <Alert type="error" message={loadError} /> : null}
+
+          {isLoading ? (
+            <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">{t('rates.loading')}</p>
+          ) : sorted.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-10 text-center dark:border-gray-700 dark:bg-gray-900/40">
+              <p className="text-sm font-medium text-gray-900 dark:text-white">{t('rates.empty.title')}</p>
+              <p className="mx-auto mt-1 max-w-md text-sm text-gray-500 dark:text-gray-400">{t('rates.empty.message')}</p>
+              <Button type="button" className="mt-4" onClick={() => openForm(null)}>
+                <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
+                {t('rates.setFirst')}
+              </Button>
+            </div>
+          ) : (
+            <>
+              {/* What applies now, and what is already agreed for later */}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 dark:border-purple-800/60 dark:bg-purple-900/20">
+                  <p className="text-xs font-medium uppercase tracking-wide text-purple-700 dark:text-purple-300">
+                    {t('rates.summary.current')}
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                    {current ? formatCurrency(current.hourly_rate, currency) : '—'}
+                    <span className="text-sm font-normal text-gray-500 dark:text-gray-400">{t('rates.perHour')}</span>
+                  </p>
+                  <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                    {current
+                      ? t('rates.summary.since', { date: formatYmd(current.valid_from, lng) })
+                      : t('rates.summary.noneYet')}
+                  </p>
+                </div>
+
+                <div
+                  className={clsx(
+                    'rounded-xl border p-4',
+                    nextScheduled
+                      ? 'border-blue-200 bg-blue-50 dark:border-blue-800/60 dark:bg-blue-900/20'
+                      : 'border-dashed border-gray-300 dark:border-gray-700'
+                  )}
+                >
+                  <p
+                    className={clsx(
+                      'flex items-center gap-1 text-xs font-medium uppercase tracking-wide',
+                      nextScheduled ? 'text-blue-700 dark:text-blue-300' : 'text-gray-500 dark:text-gray-400'
+                    )}
+                  >
+                    <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" />
+                    {t('rates.summary.next')}
+                  </p>
+                  {nextScheduled ? (
+                    <>
+                      <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                        {formatCurrency(nextScheduled.hourly_rate, currency)}
+                        <span className="text-sm font-normal text-gray-500 dark:text-gray-400">{t('rates.perHour')}</span>
+                        {(() => {
+                          const percent = rateChangePercent(current?.hourly_rate ?? null, nextScheduled.hourly_rate);
+                          return percent !== null && Math.abs(percent) >= 0.05 ? (
+                            <span className="ml-2 align-middle text-sm font-medium text-blue-700 dark:text-blue-300">
+                              {formatPercentChange(percent, lng)}
+                            </span>
+                          ) : null;
+                        })()}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                        {t('rates.summary.from', { date: formatYmd(nextScheduled.valid_from, lng) })}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{t('rates.summary.noneScheduled')}</p>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t('rates.intro')}</p>
+
+              {/* History */}
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">{t('rates.history')}</h3>
+                <ol className="divide-y divide-gray-100 rounded-xl border border-gray-200 dark:divide-gray-800 dark:border-gray-800">
+                  {timeline.map((rate) => {
+                    const isFuture = rate.valid_from > today;
+                    const isPast = !rate.is_current && !isFuture;
+                    const previous = previousById.get(rate.id) ?? null;
+                    const percent = rateChangePercent(previous, rate.hourly_rate);
+                    const noteText = describeRateNote(rate.note, t);
+                    const confirming = confirmingDeleteId === rate.id;
+
+                    return (
+                      <li key={rate.id} className={clsx('px-4 py-3', rate.is_current && 'bg-purple-50/60 dark:bg-purple-900/10')}>
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                          <div className="min-w-[11rem]">
+                            <p className={clsx('text-sm font-medium', isPast ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white')}>
+                              {rate.valid_until
+                                ? t('rates.period.range', {
+                                    from: formatYmd(rate.valid_from, lng),
+                                    until: formatYmd(addDaysYmd(rate.valid_until, -1), lng),
+                                  })
+                                : t('rates.period.open', { from: formatYmd(rate.valid_from, lng) })}
+                            </p>
+                            {noteText ? (
+                              <p className="text-xs text-gray-500 dark:text-gray-400">{noteText}</p>
+                            ) : null}
+                          </div>
+
+                          <p className={clsx('text-sm font-semibold', isPast ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white')}>
+                            {formatCurrency(rate.hourly_rate, currency)}
+                            <span className="font-normal text-gray-500 dark:text-gray-400">{t('rates.perHour')}</span>
+                          </p>
+
+                          {percent !== null && Math.abs(percent) >= 0.05 ? (
+                            <span className="text-xs text-gray-500 dark:text-gray-400">{formatPercentChange(percent, lng)}</span>
+                          ) : null}
+
+                          {rate.is_current ? (
+                            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-800 dark:bg-purple-900/40 dark:text-purple-200">
+                              {t('rates.badge.current')}
+                            </span>
+                          ) : isFuture ? (
+                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
+                              {t('rates.badge.scheduled')}
+                            </span>
+                          ) : null}
+
+                          <div className="ml-auto flex items-center gap-1">
+                            <button
+                              type="button"
+                              className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
+                              onClick={() => openForm(rate)}
+                              aria-label={t('rates.actions.edit', { date: formatYmd(rate.valid_from, lng) })}
+                              title={t('edit')}
+                            >
+                              <Pencil className="h-4 w-4" aria-hidden="true" />
+                            </button>
+                            <button
+                              type="button"
+                              className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:text-gray-400 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                              onClick={() => setConfirmingDeleteId(rate.id)}
+                              disabled={deletingRateId === rate.id}
+                              aria-label={t('rates.actions.delete', { date: formatYmd(rate.valid_from, lng) })}
+                              title={t('delete')}
+                            >
+                              <Trash2 className="h-4 w-4" aria-hidden="true" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Entries in this period at a different rate — visible, and
+                            fixable in one click instead of entry by entry. */}
+                        {(rate.deviating ?? []).length > 0 ? (
+                          <div className="mt-2 space-y-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-800/60 dark:bg-amber-900/20">
+                            {(rate.deviating ?? []).map((group) => (
+                              <div key={String(group.rate)} className="flex flex-wrap items-center gap-2">
+                                <p className="flex-1 text-xs text-amber-900 dark:text-amber-100">
+                                  {group.rate === null
+                                    ? t('rates.deviation.noRate', { count: group.count })
+                                    : t('rates.deviation.atRate', {
+                                        count: group.count,
+                                        rate: formatCurrency(group.rate, currency),
+                                      })}
+                                </p>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={aligningRateId === rate.id}
+                                  onClick={() => void handleAlign(rate, group.rate)}
+                                >
+                                  {aligningRateId === rate.id
+                                    ? t('saving')
+                                    : t('rates.deviation.align', { rate: formatCurrency(rate.hourly_rate, currency) })}
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        {confirming ? (
+                          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 dark:border-red-900/60 dark:bg-red-950/30">
+                            <p className="flex-1 text-xs text-red-800 dark:text-red-200">
+                              {previous !== null
+                                ? t('rates.messages.deleteConfirmFallback', {
+                                    date: formatYmd(rate.valid_from, lng),
+                                    rate: formatCurrency(rate.hourly_rate, currency),
+                                    previous: formatCurrency(previous, currency),
+                                  })
+                                : t('rates.messages.deleteConfirm', { date: formatYmd(rate.valid_from, lng) })}
+                            </p>
+                            <Button type="button" size="sm" variant="outline" onClick={() => setConfirmingDeleteId(null)}>
+                              {t('cancel')}
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="danger"
+                              onClick={() => void handleConfirmDelete(rate)}
+                              disabled={deletingRateId === rate.id}
+                            >
+                              {deletingRateId === rate.id ? t('deleting') : t('delete')}
+                            </Button>
+                          </div>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </Modal>
   );
 };

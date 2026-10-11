@@ -98,9 +98,17 @@ export async function createProject(payload: ProjectPayload): Promise<Project> {
  *   end_date: '2024-12-31'
  * });
  */
-export async function updateProject(id: string, payload: ProjectPayload): Promise<Project> {
-  const { data } = await apiClient.put<Project>(`/projects/${id}`, payload);
-  return data;
+export async function updateProject(
+  id: string,
+  payload: ProjectPayload
+): Promise<Project & { repriced_entries?: number }> {
+  // The API wraps the project ({ message, project, repriced_entries }).
+  const { data } = await apiClient.put<{ project?: Project; repriced_entries?: number } & Partial<Project>>(
+    `/projects/${id}`,
+    payload
+  );
+  const project = (data.project ?? data) as Project;
+  return { ...project, repriced_entries: data.repriced_entries ?? 0 };
 }
 
 /**

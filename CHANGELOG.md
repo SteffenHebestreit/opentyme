@@ -2,6 +2,55 @@
 
 ## Unreleased (since v1.5.0)
 
+### Hourly rates — a change always has a start date
+- **Changing a rate now always asks from when it applies.** Editing the rate on the project
+  form used to apply it silently "from today" — wrong for a contract extension starting on
+  the 1st of next month. The project form now asks "Ab wann gilt der neue Stundensatz?" as a
+  required field with one-click picks (today, 1st of next month, 1 January), and the API
+  refuses a rate change without `hourly_rate_valid_from` (`RATE_START_DATE_REQUIRED`) so no
+  other path — including the AI assistant — can skip it.
+- **See what a change does before saving it**: old → new rate with the percentage, when it
+  takes effect, where it ends if a later rate is already agreed, and which entries are already
+  logged in the new period.
+- **A rate valid from a date applies to everything dated from that day — including entries
+  already logged.** Changed on the 10th, valid from the 1st: the entries of the 1st to the 9th
+  move to the new rate. Entries dated before the start date are never touched, and neither are
+  individually priced ones (a goodwill hour at 0 €, a rate set by hand on one entry). Moving them
+  can be switched off per change, e.g. when that work is already invoiced; the form warns when
+  invoices were issued to the client since the start date. The same applies when a period is
+  corrected or deleted: entries that followed it follow the change.
+- The rate history shows entries inside a period that do not carry its rate ("13 entries are
+  still at 80,00 €") and aligns them in one click — only the entries at that rate.
+- The rate dialog leads with what applies now and the next scheduled change, shows the history
+  as a timeline with German dates and percentage steps, and translates the notes the system
+  writes itself. Deleting a period is confirmed inline.
+- Fixed: the dashboard (and any page opened again within a few minutes) kept showing totals
+  from before a change. Pages now reload data that a change marked as outdated; data that has
+  merely aged is still not refetched on every visit.
+- The project list shows a scheduled change next to the current rate ("ab 01.01.2027: 95,00 €")
+  and formats rates and dates in the app's language.
+- Fixed: saving the project form without touching the rate (e.g. renaming) created a new rate
+  period starting today. Fixed: updating a project was not scoped to its owner.
+
+### Client documents — contracts you can see expiring
+- **Every contract shows where it stands**: running, ends in N days (60-day warning), expired,
+  or not yet started — and the ones needing attention sort to the top.
+- **"Verlängern" in one step**: the extension starts the day after the current term ends,
+  "+6/+12 Monate" fill the end date, the previous version stays downloadable — and if the new
+  contract changes the hourly rate, it is set right there for the contract's project, with the
+  same start-date requirement, preview and opt-in for already-logged entries.
+- The client list flags clients with a contract ending soon, and shows how many documents are
+  stored.
+- Upload by drag & drop onto the dialog, the title is taken from the file name, and the save
+  button sits in the footer instead of below the fold. PDFs and images open in a new tab.
+- Calmer cards: one line of metadata instead of an overlapping grid (fixes text running into
+  the next column), version badges only where a document actually has versions, rarely used
+  actions in a "⋯" menu, delete confirmed inline.
+- Fixed: opening the upload or new-rate form submitted it immediately and showed validation
+  errors on an empty form — the opening button's DOM node was reused as the submit button
+  mid-click.
+
+
 ## v1.5.0 (2026-09-09)
 
 ### Projects — hourly rates that change over time

@@ -16,6 +16,9 @@ import {
   projectIdParamSchema,
   projectRateIdSchema,
   effectiveRateQuerySchema,
+  rateImpactQuerySchema,
+  alignRateSchema,
+  deleteRateQuerySchema,
 } from '../../schemas/business/project-rate.schema';
 import { logger } from '../../utils/logger';
 
@@ -80,6 +83,43 @@ export class ProjectRateController {
   };
 
   /**
+   * GET /api/projects/:id/rates/impact?valid_from=YYYY-MM-DD
+   * What a new rate starting on that date would touch, shown before saving.
+   */
+  getImpact = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      const { error: paramError, value: params } = projectIdParamSchema.validate(req.params);
+      if (paramError) {
+        res.status(400).json({ error: 'Validation error', details: paramError.details });
+        return;
+      }
+
+      const { error: queryError, value: query } = rateImpactQuerySchema.validate(req.query);
+      if (queryError) {
+        res.status(400).json({ error: 'Validation error', details: queryError.details });
+        return;
+      }
+
+      const impact = await projectRateService.getImpact(params.id, userId, query.valid_from);
+      if (!impact) {
+        res.status(404).json({ error: 'Not found', message: 'Project not found' });
+        return;
+      }
+
+      res.status(200).json({ data: impact });
+    } catch (error: any) {
+      logger.error('Error computing rate change impact:', error);
+      res.status(500).json({ error: 'Internal server error', message: error.message });
+    }
+  };
+
+  /**
    * POST /api/projects/:id/rates
    * Open a new rate period. A future valid_from is allowed and expected.
    */
@@ -103,7 +143,8 @@ export class ProjectRateController {
         return;
       }
 
-      const rate = await projectRateService.addRate(params.id, userId, body);
+      const { apply_to_existing: applyToExisting, ...rateData } = body;
+      const rate = await projectRateService.addRate(params.id, userId, rateData, { applyToExisting });
       if (!rate) {
         res.status(404).json({ error: 'Not found', message: 'Project not found' });
         return;
@@ -145,7 +186,8 @@ export class ProjectRateController {
         return;
       }
 
-      const rate = await projectRateService.updateRate(params.rateId, userId, body);
+      const { apply_to_existing: applyToExisting, ...rateData } = body;
+      const rate = await projectRateService.updateRate(params.rateId, userId, rateData, { applyToExisting });
       if (!rate) {
         res.status(404).json({ error: 'Not found', message: 'Rate not found' });
         return;
@@ -158,6 +200,43 @@ export class ProjectRateController {
         return;
       }
       logger.error('Error updating project rate:', error);
+      res.status(500).json({ error: 'Internal server error', message: error.message });
+    }
+  };
+
+  /**
+   * POST /api/projects/rates/:rateId/align  { from_rate?: number }
+   * Moves the period's entries onto its rate (only those at from_rate, if given).
+   */
+  alignRate = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+
+      const { error: paramError, value: params } = projectRateIdSchema.validate(req.params);
+      if (paramError) {
+        res.status(400).json({ error: 'Validation error', details: paramError.details });
+        return;
+      }
+
+      const { error: bodyError, value: body } = alignRateSchema.validate(req.body ?? {});
+      if (bodyError) {
+        res.status(400).json({ error: 'Validation error', details: bodyError.details });
+        return;
+      }
+
+      const aligned = await projectRateService.alignPeriodEntries(params.rateId, userId, body.from_rate ?? undefined);
+      if (aligned === null) {
+        res.status(404).json({ error: 'Not found', message: 'Rate not found' });
+        return;
+      }
+
+      res.status(200).json({ data: { repriced_entries: aligned } });
+    } catch (error: any) {
+      logger.error('Error aligning period entries:', error);
       res.status(500).json({ error: 'Internal server error', message: error.message });
     }
   };
@@ -179,7 +258,10 @@ export class ProjectRateController {
         return;
       }
 
-      const deleted = await projectRateService.deleteRate(value.rateId, userId);
+      const { value: query } = deleteRateQuerySchema.validate(req.query);
+      const deleted = await projectRateService.deleteRate(value.rateId, userId, {
+        applyToExisting: query?.apply_to_existing !== false,
+      });
       if (!deleted) {
         res.status(404).json({ error: 'Not found', message: 'Rate not found' });
         return;

@@ -20,7 +20,12 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      refetchOnMount: false, // Don't refetch when component mounts if data exists
+      // Don't refetch just because a page mounts and data exists — EXCEPT when a
+      // mutation explicitly invalidated it. Plain `false` also swallowed those:
+      // invalidateQueries only refetches queries that are on screen, so a page
+      // opened afterwards (e.g. the dashboard after a rate change re-priced time
+      // entries) kept showing its old totals for up to gcTime.
+      refetchOnMount: (query) => query.state.isInvalidated,
       staleTime: 2 * 60 * 1000, // Consider data fresh for 2 minutes (shorter than token expiry)
       gcTime: 5 * 60 * 1000, // Keep unused data in cache for 5 minutes (renamed from cacheTime in v5)
       retry: 1, // Only retry once on failure

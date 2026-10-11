@@ -1,31 +1,40 @@
 /**
- * @fileoverview Client documents modal — the signed contracts and other
- * paperwork stored for a single customer.
+ * @fileoverview Client documents — the contracts and other paperwork signed
+ * with a customer, and where each one stands.
  *
- * Opened from the actions column of {@link ClientTable}; the open/selected state
- * and every mutation live in {@link ClientList}, so this component only reads the
- * document list and renders the interactions.
+ * What a stored contract has to tell you at a glance is whether it is still
+ * running and when it ends, so every card leads with that status, and contracts
+ * that are about to run out are pulled to the top with a one-click "Extend".
  *
- * Features:
- * - Version chains: a document replaced by a newer upload is shown as one entry,
- *   with the current version on top and every superseded version collapsed
- *   underneath, so an old contract reads as history rather than as a duplicate
- * - Upload with metadata (title, type, project, signed/validity dates, notes)
- * - "New version" upload that sends `supersedes_document_id`, leaving the
- *   previous file downloadable
- * - Metadata-only edit, delete with confirmation, filter by project
- * - Authenticated download: the endpoint streams the file behind the Bearer
- *   token, so the file is fetched as a Blob through the shared axios client and
- *   saved via a synthetic `<a download>` click, revoking the object URL after
+ * Extending a contract is usually also when the hourly rate changes, so the
+ * extension form can set the new rate for the contract's project in the same
+ * step — with the date it takes effect, and a preview of what that touches.
+ *
+ * Views (one modal, the save button always in the footer):
+ * - list: documents grouped into version chains, newest version on top
+ * - upload / new version / extend / edit: one form, pre-filled per case
+ *
+ * Opened from {@link ClientTable}; {@link ClientList} owns the mutations.
  *
  * @module components/business/clients/ClientDocumentsModal
  */
 
-import { FC, useMemo, useState } from 'react';
-import { FieldErrors, UseFormRegister, useForm } from 'react-hook-form';
+import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, FileText, History, Pencil, Plus, Trash2 } from 'lucide-react';
-import { Client } from '../../../api/types';
+import clsx from 'clsx';
+import {
+  CalendarClock,
+  Download,
+  ExternalLink,
+  FilePlus2,
+  FileText,
+  History,
+  MoreHorizontal,
+  Pencil,
+  RefreshCw,
+  Trash2,
+} from 'lucide-react';
+import { Client, Project } from '../../../api/types';
 import {
   CLIENT_DOCUMENT_ACCEPT,
   CLIENT_DOCUMENT_TYPES,
@@ -36,40 +45,44 @@ import {
   downloadClientDocument,
   validateClientDocumentFile,
 } from '../../../api/services/client-document.service';
+import type { RateImpact, SavedProjectRate } from '../../../api/services/project-rate.service';
 import { useClientDocuments } from '../../../hooks/api/useClientDocuments';
 import { useProjects } from '../../../hooks/api/useProjects';
 import { Alert } from '../../common/Alert';
 import { Button } from '../../common/Button';
+import { Dropdown } from '../../common/Dropdown';
 import { Input, Select, Textarea } from '../../forms';
+import { FileDropZone } from '../../forms/FileDropZone';
+import { formatFileSize } from '../../../utils/fileSize';
 import { Modal } from '../../ui/Modal';
-import { formatDate } from '../../../utils/date';
+import { EffectiveDateField, RateImpactPanel } from '../projects/RateChange';
+import { addDaysYmd, addMonthsYmd, formatYmd } from '../../../utils/date';
+import { ContractStatus, contractStatus, contractStatusRank, titleFromFilename } from '../../../utils/contractStatus';
 import { extractErrorMessage } from '../../../utils/error';
 
-/**
- * Props for the ClientDocumentsModal component.
- *
- * @interface ClientDocumentsModalProps
- * @property {boolean} open - Whether the modal is visible
- * @property {Client} client - The client whose documents are shown
- * @property {() => void} onClose - Handler for closing the modal
- * @property {(payload: ClientDocumentUploadPayload) => Promise<boolean>} onUpload - Uploads a document; resolves true on success
- * @property {(documentId: string, payload: ClientDocumentUpdatePayload) => Promise<boolean>} onUpdate - Saves metadata; resolves true on success
- * @property {(document: ClientDocument) => Promise<boolean>} onDelete - Deletes a document after confirming; resolves true on success
- * @property {boolean} isUploading - Loading state of the upload mutation
- * @property {boolean} isSaving - Loading state of the update mutation
- * @property {string | null} [deletingId] - ID of the document currently being deleted
- * @property {string | null} [error] - Error message from the owning list
- * @property {string | null} [successMessage] - Success message from the owning list
- * @property {() => void} onDismissError - Dismisses the error alert
- * @property {() => void} onDismissSuccess - Dismisses the success alert
- */
+/** A new rate for the contract's project, set together with the contract. */
+export interface ContractRateChange {
+  projectId: string;
+  hourly_rate: number;
+  valid_from: string;
+  apply_to_existing: boolean;
+  note?: string;
+  /** A period already starting that day, replaced instead of conflicting. */
+  replaceRateId?: string;
+  /** The project's currency, for the confirmation message. */
+  currency?: string;
+}
+
 interface ClientDocumentsModalProps {
   open: boolean;
   client: Client;
   onClose: () => void;
   onUpload: (payload: ClientDocumentUploadPayload) => Promise<boolean>;
   onUpdate: (documentId: string, payload: ClientDocumentUpdatePayload) => Promise<boolean>;
+  /** Deletes a document; the modal has already confirmed inline. */
   onDelete: (document: ClientDocument) => Promise<boolean>;
+  /** Stores a new hourly rate set as part of a contract (extension). */
+  onRateChange: (change: ContractRateChange) => Promise<SavedProjectRate | null>;
   isUploading: boolean;
   isSaving: boolean;
   deletingId?: string | null;
@@ -79,22 +92,6 @@ interface ClientDocumentsModalProps {
   onDismissSuccess: () => void;
 }
 
-/** Metadata fields shared by the upload and the edit form. All values are strings. */
-interface MetadataFormValues {
-  title: string;
-  document_type: ClientDocumentType;
-  project_id: string;
-  signed_at: string;
-  valid_from: string;
-  valid_until: string;
-  notes: string;
-}
-
-/** Upload form values — the metadata plus the picked file. */
-interface UploadFormValues extends MetadataFormValues {
-  file: FileList;
-}
-
 /** One version chain: the newest document plus its superseded predecessors. */
 interface DocumentChain {
   current: ClientDocument;
@@ -102,42 +99,25 @@ interface DocumentChain {
   history: ClientDocument[];
 }
 
-/** Options for the project dropdowns. */
-interface ProjectOption {
-  id: string;
-  name: string;
-}
+type FormMode = 'upload' | 'version' | 'extend' | 'edit';
+type View = { kind: 'list' } | { kind: 'form'; mode: FormMode; source: ClientDocument | null; file: File | null };
 
-const UPLOAD_FORM_ID = 'client-document-upload-form';
-const EDIT_FORM_ID = 'client-document-edit-form';
+const FORM_ID = 'client-document-form';
 
-/**
- * Formats a byte count for display, mirroring the byte formatting used on the
- * system administration screen (contracts routinely exceed the KB range that
- * expense receipts use).
- *
- * @param {number | null | undefined} bytes - Size in bytes
- * @returns {string | null} Human-readable size, or null when unknown
- */
-const formatFileSize = (bytes: number | null | undefined): string | null => {
-  if (!bytes) {
-    return null;
-  }
-  const units = ['Bytes', 'KB', 'MB', 'GB'];
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  return `${(bytes / Math.pow(1024, index)).toFixed(2)} ${units[index]}`;
-};
+/** Document types that have a term worth extending. */
+const EXTENDABLE_TYPES = new Set(['contract', 'amendment', 'order']);
+
+/** Opens in the browser instead of downloading. */
+const isPreviewable = (mimetype: string | null) =>
+  Boolean(mimetype && (mimetype === 'application/pdf' || mimetype.startsWith('image/')));
 
 /**
  * Groups a flat document list into version chains.
  *
- * A document that replaces another carries `supersedes_document_id`; following
- * those links from every root produces one chain per logical document. A chain
- * whose predecessor is filtered out of the current list simply starts at the
- * oldest document still present.
- *
- * @param {ClientDocument[]} documents - The client's documents
- * @returns {DocumentChain[]} Chains, newest current version first
+ * Following `supersedes_document_id` from every root gives one chain per
+ * logical document. Anything not reached that way (a predecessor filtered out,
+ * or legacy branched data) becomes its own chain — showing history oddly is
+ * acceptable, hiding a signed document is not.
  */
 const buildDocumentChains = (documents: ClientDocument[]): DocumentChain[] => {
   const byId = new Map(documents.map((document) => [document.id, document]));
@@ -149,31 +129,21 @@ const buildDocumentChains = (documents: ClientDocument[]): DocumentChain[] => {
   });
 
   const roots = documents.filter(
-    (document) =>
-      !document.supersedes_document_id || !byId.has(document.supersedes_document_id)
+    (document) => !document.supersedes_document_id || !byId.has(document.supersedes_document_id)
   );
 
-  const chains = roots
-    .map((root) => {
-      const ordered: ClientDocument[] = [root];
-      const seen = new Set<string>([root.id]);
-      let next = successors.get(root.id);
-      while (next && !seen.has(next.id)) {
-        ordered.push(next);
-        seen.add(next.id);
-        next = successors.get(next.id);
-      }
-      return {
-        current: ordered[ordered.length - 1],
-        history: ordered.slice(0, -1).reverse(),
-      };
-    });
+  const chains = roots.map((root) => {
+    const ordered: ClientDocument[] = [root];
+    const seen = new Set<string>([root.id]);
+    let next = successors.get(root.id);
+    while (next && !seen.has(next.id)) {
+      ordered.push(next);
+      seen.add(next.id);
+      next = successors.get(next.id);
+    }
+    return { current: ordered[ordered.length - 1], history: ordered.slice(0, -1).reverse() };
+  });
 
-  // `successors` holds one entry per predecessor, so if two documents supersede
-  // the SAME predecessor only one continues the chain — the other is neither a
-  // root nor reachable, and would vanish from the list entirely. Anything left
-  // over becomes its own chain: a branched history is worth showing oddly, but
-  // never worth hiding a signed document.
   const placed = new Set(chains.flatMap((chain) => [chain.current.id, ...chain.history.map((d) => d.id)]));
   documents.forEach((document) => {
     if (!placed.has(document.id)) {
@@ -182,481 +152,449 @@ const buildDocumentChains = (documents: ClientDocument[]): DocumentChain[] => {
     }
   });
 
-  return chains.sort(
-    (a, b) => new Date(b.current.created_at).getTime() - new Date(a.current.created_at).getTime()
+  return chains;
+};
+
+const statusOf = (document: ClientDocument): ContractStatus =>
+  contractStatus(document.valid_from, document.valid_until);
+
+/** Colour-coded term status: running, ends soon, ended, not yet started. */
+const StatusBadge: FC<{ status: ContractStatus; document: ClientDocument }> = ({ status, document }) => {
+  const { t, i18n } = useTranslation('clients');
+  if (!status) return null;
+
+  const styles: Record<NonNullable<ContractStatus>['kind'], string> = {
+    active: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
+    expiring: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+    expired: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+    upcoming: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+  };
+
+  let label: string;
+  switch (status.kind) {
+    case 'expiring':
+      label =
+        status.days === 0
+          ? t('documents.status.expiresToday')
+          : t('documents.status.expiresIn', { count: status.days });
+      break;
+    case 'expired':
+      label = t('documents.status.expired', { date: formatYmd(document.valid_until, i18n.language) });
+      break;
+    case 'upcoming':
+      label = t('documents.status.upcoming', { date: formatYmd(document.valid_from, i18n.language) });
+      break;
+    default:
+      label = t('documents.status.active');
+  }
+
+  return (
+    <span className={clsx('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold', styles[status.kind])}>
+      {status.kind === 'expiring' || status.kind === 'expired' ? (
+        <CalendarClock className="h-3 w-3" aria-hidden="true" />
+      ) : null}
+      {label}
+    </span>
+  );
+};
+
+/** "Vertrag · Website-Relaunch · gültig 01.04.2026 – 31.10.2026 · unterzeichnet 15.03.2026" */
+const DocumentMeta: FC<{ document: ClientDocument }> = ({ document }) => {
+  const { t, i18n } = useTranslation('clients');
+  const lng = i18n.language;
+  const parts: string[] = [
+    t(`documents.types.${document.document_type}`, { defaultValue: document.document_type }),
+    document.project_name ?? t('documents.noProject'),
+  ];
+  if (document.valid_from || document.valid_until) {
+    parts.push(
+      document.valid_from && document.valid_until
+        ? t('documents.term.range', { from: formatYmd(document.valid_from, lng), until: formatYmd(document.valid_until, lng) })
+        : document.valid_from
+          ? t('documents.term.from', { from: formatYmd(document.valid_from, lng) })
+          : t('documents.term.until', { until: formatYmd(document.valid_until, lng) })
+    );
+  }
+  if (document.signed_at) {
+    parts.push(t('documents.term.signed', { date: formatYmd(document.signed_at, lng) }));
+  }
+
+  return (
+    <p className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-gray-600 dark:text-gray-400">
+      {parts.map((part, index) => (
+        <span key={index} className="whitespace-nowrap">
+          {index > 0 ? <span className="mr-2 text-gray-300 dark:text-gray-600">·</span> : null}
+          {part}
+        </span>
+      ))}
+    </p>
   );
 };
 
 /**
- * The metadata fields shared by the upload and edit forms.
- * Rendered inside whichever form owns the `register` function passed in.
+ * The form behind upload, new version, extension and metadata edit.
+ *
+ * Keeps its own state (the file comes from drag & drop as often as from the
+ * picker, which react-hook-form's FileList binding does not cover) and is
+ * submitted by the modal footer through `form={FORM_ID}`.
  */
-const MetadataFields: FC<{
-  register: UseFormRegister<UploadFormValues>;
-  errors: FieldErrors<UploadFormValues>;
-  projects: ProjectOption[];
-  idPrefix: string;
-}> = ({ register, errors, projects, idPrefix }) => {
-  const { t } = useTranslation('clients');
+const DocumentForm: FC<{
+  mode: FormMode;
+  source: ClientDocument | null;
+  initialFile: File | null;
+  projects: Project[];
+  defaultProjectId: string;
+  onUpload: (payload: ClientDocumentUploadPayload) => Promise<boolean>;
+  onUpdate: (documentId: string, payload: ClientDocumentUpdatePayload) => Promise<boolean>;
+  onRateChange: (change: ContractRateChange) => Promise<SavedProjectRate | null>;
+  onDone: () => void;
+  onBusyChange: (busy: boolean) => void;
+}> = ({ mode, source, initialFile, projects, defaultProjectId, onUpload, onUpdate, onRateChange, onDone, onBusyChange }) => {
+  const { t, i18n } = useTranslation('clients');
+  const lng = i18n.language;
+  const needsFile = mode !== 'edit';
+
+  const [file, setFile] = useState<File | null>(initialFile);
+  const [title, setTitle] = useState(() =>
+    source ? source.title : initialFile ? titleFromFilename(initialFile.name) : ''
+  );
+  const [titleTouched, setTitleTouched] = useState(Boolean(source));
+  const [documentType, setDocumentType] = useState<ClientDocumentType>(
+    (source?.document_type as ClientDocumentType) ?? 'contract'
+  );
+  const [projectId, setProjectId] = useState(source?.project_id ?? defaultProjectId);
+  const [signedAt, setSignedAt] = useState(mode === 'edit' ? source?.signed_at?.slice(0, 10) ?? '' : '');
+  const [validFrom, setValidFrom] = useState(() => {
+    if (mode === 'edit') return source?.valid_from?.slice(0, 10) ?? '';
+    // An extension starts the day after the current term ends.
+    if (mode === 'extend' && source?.valid_until) return addDaysYmd(source.valid_until.slice(0, 10), 1);
+    return '';
+  });
+  const [validUntil, setValidUntil] = useState(mode === 'edit' ? source?.valid_until?.slice(0, 10) ?? '' : '');
+  const [notes, setNotes] = useState(mode === 'upload' ? '' : source?.notes ?? '');
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+
+  // Rate change together with the contract.
+  const project = projects.find((candidate) => candidate.id === projectId) ?? null;
+  const projectBillsHourly = Boolean(project && (project.rate_type === 'hourly' || project.hourly_rate != null));
+  const [rateEnabled, setRateEnabled] = useState(false);
+  const [rateInput, setRateInput] = useState('');
+  const [rateValidFrom, setRateValidFrom] = useState('');
+  const [rateDateTouched, setRateDateTouched] = useState(false);
+  const [applyToExisting, setApplyToExisting] = useState(true);
+  const [impact, setImpact] = useState<RateImpact | null>(null);
+  const handleImpact = useCallback((next: RateImpact | null) => setImpact(next), []);
+
+  // Until the user picks a different day, the new rate starts with the contract.
+  useEffect(() => {
+    if (!rateDateTouched) setRateValidFrom(validFrom);
+  }, [validFrom, rateDateTouched]);
+
+  const chooseFile = (picked: File | null) => {
+    setFile(picked);
+    setErrors((current) => ({ ...current, file: undefined }));
+    if (picked && !titleTouched) {
+      setTitle(titleFromFilename(picked.name));
+      setErrors((current) => ({ ...current, title: undefined }));
+    }
+  };
+
+  const parsedRate = rateInput.trim() === '' ? null : Number(rateInput.replace(',', '.'));
+
+  const validate = () => {
+    const next: Record<string, string | undefined> = {};
+    if (needsFile) {
+      if (!file) next.file = t('documents.validation.fileRequired');
+      else {
+        const problem = validateClientDocumentFile(file);
+        if (problem === 'size') next.file = t('documents.validation.fileTooLarge');
+        if (problem === 'type') next.file = t('documents.validation.fileType');
+      }
+    }
+    if (!title.trim()) next.title = t('documents.validation.titleRequired');
+    if (validFrom && validUntil && validUntil < validFrom) next.validUntil = t('documents.validation.untilBeforeFrom');
+    if (rateEnabled && projectBillsHourly) {
+      if (parsedRate === null || Number.isNaN(parsedRate) || parsedRate < 0) next.rate = t('documents.rate.rateRequired');
+      if (!rateValidFrom) next.rateDate = t('documents.rate.dateRequired');
+    }
+    setErrors(next);
+    return Object.values(next).every((value) => !value);
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!validate()) return;
+
+    onBusyChange(true);
+    try {
+      if (mode === 'edit' && source) {
+        const saved = await onUpdate(source.id, {
+          title: title.trim(),
+          document_type: documentType,
+          project_id: projectId || null,
+          signed_at: signedAt || null,
+          valid_from: validFrom || null,
+          valid_until: validUntil || null,
+          notes: notes.trim() || null,
+        });
+        if (saved) onDone();
+        return;
+      }
+
+      const uploaded = await onUpload({
+        file: file as File,
+        title: title.trim(),
+        document_type: documentType,
+        project_id: projectId || undefined,
+        signed_at: signedAt || undefined,
+        valid_from: validFrom || undefined,
+        valid_until: validUntil || undefined,
+        notes: notes.trim() || undefined,
+        supersedes_document_id: mode === 'version' || mode === 'extend' ? source?.id : undefined,
+      });
+      if (!uploaded) return;
+
+      if (rateEnabled && projectBillsHourly && project && parsedRate !== null) {
+        await onRateChange({
+          projectId: project.id,
+          hourly_rate: parsedRate,
+          valid_from: rateValidFrom,
+          apply_to_existing: applyToExisting,
+          note: title.trim(),
+          currency: project.currency || 'EUR',
+          replaceRateId:
+            impact?.existing_period && impact.valid_from === rateValidFrom ? impact.existing_period.id : undefined,
+        });
+      }
+      onDone();
+    } finally {
+      onBusyChange(false);
+    }
+  };
+
+  const heading: Record<FormMode, string> = {
+    upload: t('documents.form.uploadTitle'),
+    version: t('documents.form.versionTitle', { title: source?.title ?? '' }),
+    extend: t('documents.form.extendTitle', { title: source?.title ?? '' }),
+    edit: t('documents.form.editTitle', { title: source?.title ?? '' }),
+  };
 
   return (
-    <>
+    <form id={FORM_ID} className="space-y-5" onSubmit={handleSubmit} noValidate>
+      <h3 className="text-base font-semibold text-gray-900 dark:text-white">{heading[mode]}</h3>
+
+      {(mode === 'version' || mode === 'extend') && source ? (
+        <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-300">
+          {mode === 'extend' && source.valid_until
+            ? t('documents.form.extendHint', { date: formatYmd(source.valid_until, lng), version: source.version })
+            : t('documents.form.versionHint', { version: source.version })}
+        </p>
+      ) : null}
+
+      {needsFile ? (
+        <FileDropZone
+          file={file}
+          onFile={chooseFile}
+          accept={CLIENT_DOCUMENT_ACCEPT}
+          prompt={t('documents.drop.prompt')}
+          hint={t('documents.fields.fileHint')}
+          changeLabel={t('documents.drop.change')}
+          removeLabel={t('documents.drop.remove')}
+          error={errors.file}
+          locale={lng}
+        />
+      ) : null}
+
       <Input
-        id={`${idPrefix}-title`}
+        id="client-document-title"
         label={t('documents.fields.title')}
         placeholder={t('documents.fields.titlePlaceholder')}
         required
-        {...register('title', { required: t('documents.validation.titleRequired') })}
-        error={errors.title?.message}
+        value={title}
+        onChange={(event) => {
+          setTitle(event.target.value);
+          setTitleTouched(true);
+          setErrors((current) => ({ ...current, title: undefined }));
+        }}
+        error={errors.title}
       />
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Select id={`${idPrefix}-type`} label={t('documents.fields.type')} {...register('document_type')}>
+        <Select
+          id="client-document-type"
+          label={t('documents.fields.type')}
+          value={documentType}
+          onChange={(event) => setDocumentType(event.target.value as ClientDocumentType)}
+        >
           {CLIENT_DOCUMENT_TYPES.map((type) => (
             <option key={type} value={type}>
               {t(`documents.types.${type}`)}
             </option>
           ))}
         </Select>
-        <Select id={`${idPrefix}-project`} label={t('documents.fields.project')} {...register('project_id')}>
+        <Select
+          id="client-document-project"
+          label={t('documents.fields.project')}
+          value={projectId}
+          onChange={(event) => {
+            setProjectId(event.target.value);
+            setRateEnabled(false);
+          }}
+        >
           <option value="">{t('documents.noProject')}</option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
+          {projects.map((candidate) => (
+            <option key={candidate.id} value={candidate.id}>
+              {candidate.name}
             </option>
           ))}
         </Select>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Input
-          id={`${idPrefix}-signed-at`}
-          type="date"
-          label={t('documents.fields.signedAt')}
-          {...register('signed_at')}
-        />
-        <Input
-          id={`${idPrefix}-valid-from`}
-          type="date"
-          label={t('documents.fields.validFrom')}
-          {...register('valid_from')}
-        />
-        <Input
-          id={`${idPrefix}-valid-until`}
-          type="date"
-          label={t('documents.fields.validUntil')}
-          {...register('valid_until')}
-        />
-      </div>
+      <fieldset className="space-y-3">
+        <legend className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('documents.form.term')}</legend>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Input
+            id="client-document-valid-from"
+            type="date"
+            label={t('documents.fields.validFrom')}
+            value={validFrom}
+            onChange={(event) => setValidFrom(event.target.value)}
+          />
+          <div>
+            <Input
+              id="client-document-valid-until"
+              type="date"
+              label={t('documents.fields.validUntil')}
+              value={validUntil}
+              onChange={(event) => {
+                setValidUntil(event.target.value);
+                setErrors((current) => ({ ...current, validUntil: undefined }));
+              }}
+              error={errors.validUntil}
+            />
+            {validFrom ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {[6, 12].map((months) => {
+                  const until = addDaysYmd(addMonthsYmd(validFrom, months), -1);
+                  return (
+                    <button
+                      key={months}
+                      type="button"
+                      onClick={() => setValidUntil(until)}
+                      className={clsx(
+                        'rounded-full border px-2.5 py-1 text-xs font-medium',
+                        validUntil === until
+                          ? 'border-purple-500 bg-purple-100 text-purple-800 dark:border-purple-400 dark:bg-purple-900/40 dark:text-purple-200'
+                          : 'border-gray-300 text-gray-600 hover:border-purple-400 dark:border-gray-700 dark:text-gray-300'
+                      )}
+                    >
+                      {t('documents.form.plusMonths', { count: months })}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+          <Input
+            id="client-document-signed-at"
+            type="date"
+            label={t('documents.fields.signedAt')}
+            value={signedAt}
+            onChange={(event) => setSignedAt(event.target.value)}
+          />
+        </div>
+      </fieldset>
 
-      <Textarea
-        id={`${idPrefix}-notes`}
-        label={t('documents.fields.notes')}
-        rows={2}
-        placeholder={t('documents.fields.notesPlaceholder')}
-        {...register('notes')}
-      />
-    </>
-  );
-};
+      {mode !== 'edit' && projectBillsHourly && project ? (
+        <div
+          className={clsx(
+            'rounded-xl border p-4',
+            rateEnabled
+              ? 'border-purple-300 dark:border-purple-700/70'
+              : 'border-gray-200 dark:border-gray-800'
+          )}
+        >
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+              checked={rateEnabled}
+              onChange={(event) => setRateEnabled(event.target.checked)}
+            />
+            <span>
+              <span className="block text-sm font-medium text-gray-900 dark:text-white">
+                {t('documents.rate.toggle', { project: project.name })}
+              </span>
+              <span className="block text-xs text-gray-500 dark:text-gray-400">
+                {project.hourly_rate != null
+                  ? t('documents.rate.current', {
+                      rate: new Intl.NumberFormat(undefined, {
+                        style: 'currency',
+                        currency: project.currency || 'EUR',
+                      }).format(Number(project.hourly_rate)),
+                    })
+                  : t('documents.rate.none')}
+              </span>
+            </span>
+          </label>
 
-/**
- * Upload panel — used both for a brand new document and for uploading a new
- * version of an existing one (in which case `supersedes` is set and its metadata
- * pre-fills the form).
- */
-const UploadPanel: FC<{
-  supersedes: ClientDocument | null;
-  projects: ProjectOption[];
-  isSubmitting: boolean;
-  onCancel: () => void;
-  onSubmit: (payload: ClientDocumentUploadPayload) => Promise<boolean>;
-}> = ({ supersedes, projects, isSubmitting, onCancel, onSubmit }) => {
-  const { t } = useTranslation('clients');
-
-  const {
-    register,
-    handleSubmit,
-    watch,
-    formState: { errors },
-  } = useForm<UploadFormValues>({
-    defaultValues: {
-      title: supersedes?.title ?? '',
-      document_type: (supersedes?.document_type as ClientDocumentType) ?? 'contract',
-      project_id: supersedes?.project_id ?? '',
-      signed_at: '',
-      valid_from: '',
-      valid_until: '',
-      notes: supersedes?.notes ?? '',
-    },
-  });
-
-  const selectedFile = watch('file')?.[0] ?? null;
-  const selectedFileSize = formatFileSize(selectedFile?.size);
-
-  const handleFormSubmit = async (values: UploadFormValues) => {
-    const file = values.file?.[0];
-    if (!file) {
-      return;
-    }
-    const succeeded = await onSubmit({
-      file,
-      title: values.title.trim(),
-      document_type: values.document_type,
-      project_id: values.project_id || undefined,
-      signed_at: values.signed_at || undefined,
-      valid_from: values.valid_from || undefined,
-      valid_until: values.valid_until || undefined,
-      notes: values.notes.trim() || undefined,
-      supersedes_document_id: supersedes?.id,
-    });
-    if (succeeded) {
-      onCancel();
-    }
-  };
-
-  return (
-    <form
-      id={UPLOAD_FORM_ID}
-      className="space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/60"
-      onSubmit={handleSubmit(handleFormSubmit)}
-    >
-      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-        {supersedes ? t('documents.newVersionTitle') : t('documents.uploadTitle')}
-      </h3>
-
-      {supersedes ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800/60 dark:bg-amber-900/20 dark:text-amber-200">
-          <p className="font-medium">
-            {t('documents.newVersionOf', { title: supersedes.title, version: supersedes.version })}
-          </p>
-          <p className="mt-1">{t('documents.newVersionHint')}</p>
+          {rateEnabled ? (
+            <div className="mt-4 space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  id="client-document-rate"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  label={t('documents.rate.newRate')}
+                  value={rateInput}
+                  onChange={(event) => {
+                    setRateInput(event.target.value);
+                    setErrors((current) => ({ ...current, rate: undefined }));
+                  }}
+                  error={errors.rate}
+                />
+                <EffectiveDateField
+                  id="client-document-rate-from"
+                  label={t('documents.rate.validFrom')}
+                  value={rateValidFrom}
+                  onChange={(value) => {
+                    setRateValidFrom(value);
+                    setRateDateTouched(true);
+                    setErrors((current) => ({ ...current, rateDate: undefined }));
+                  }}
+                  error={errors.rateDate}
+                />
+              </div>
+              {rateValidFrom ? (
+                <RateImpactPanel
+                  projectId={project.id}
+                  currency={project.currency || 'EUR'}
+                  newRate={parsedRate}
+                  validFrom={rateValidFrom}
+                  applyToExisting={applyToExisting}
+                  onApplyToExistingChange={setApplyToExisting}
+                  onImpact={handleImpact}
+                />
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
-      <div>
-        <label
-          htmlFor="client-document-file"
-          className={`mb-2 block text-sm font-medium ${
-            errors.file
-              ? 'text-red-500 dark:text-red-400'
-              : 'text-gray-700 dark:text-gray-300'
-          }`}
-        >
-          {t('documents.fields.file')}
-        </label>
-        <input
-          id="client-document-file"
-          type="file"
-          accept={CLIENT_DOCUMENT_ACCEPT}
-          className="block w-full cursor-pointer text-sm text-gray-700 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-purple-600 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-purple-700 dark:text-gray-300 dark:file:bg-purple-500 dark:hover:file:bg-purple-400"
-          {...register('file', {
-            validate: (list) => {
-              const file = list?.[0];
-              if (!file) {
-                return t('documents.validation.fileRequired');
-              }
-              const problem = validateClientDocumentFile(file);
-              if (problem === 'size') {
-                return t('documents.validation.fileTooLarge');
-              }
-              if (problem === 'type') {
-                return t('documents.validation.fileType');
-              }
-              return true;
-            },
-          })}
-        />
-        {errors.file ? (
-          <p className="mt-1 text-xs text-red-500">{errors.file.message}</p>
-        ) : (
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {selectedFile
-              ? `${selectedFile.name}${selectedFileSize ? ` · ${selectedFileSize}` : ''}`
-              : t('documents.fields.fileHint')}
-          </p>
-        )}
-      </div>
-
-      <MetadataFields
-        register={register}
-        errors={errors}
-        projects={projects}
-        idPrefix="client-document-upload"
+      <Textarea
+        id="client-document-notes"
+        label={t('documents.fields.notes')}
+        rows={2}
+        placeholder={t('documents.fields.notesPlaceholder')}
+        value={notes}
+        onChange={(event) => setNotes(event.target.value)}
       />
-
-      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="outline" size="sm" onClick={onCancel}>
-          {t('documents.cancel')}
-        </Button>
-        <Button type="submit" size="sm" disabled={isSubmitting}>
-          {isSubmitting ? t('documents.uploading') : t('documents.upload')}
-        </Button>
-      </div>
     </form>
   );
 };
 
-/**
- * Edit panel — metadata only. The stored file is immutable; replacing it means
- * uploading a new version instead.
- */
-const EditPanel: FC<{
-  document: ClientDocument;
-  projects: ProjectOption[];
-  isSubmitting: boolean;
-  onCancel: () => void;
-  onSubmit: (documentId: string, payload: ClientDocumentUpdatePayload) => Promise<boolean>;
-}> = ({ document, projects, isSubmitting, onCancel, onSubmit }) => {
-  const { t } = useTranslation('clients');
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<UploadFormValues>({
-    defaultValues: {
-      title: document.title,
-      document_type: (document.document_type as ClientDocumentType) ?? 'contract',
-      project_id: document.project_id ?? '',
-      signed_at: document.signed_at ? document.signed_at.slice(0, 10) : '',
-      valid_from: document.valid_from ? document.valid_from.slice(0, 10) : '',
-      valid_until: document.valid_until ? document.valid_until.slice(0, 10) : '',
-      notes: document.notes ?? '',
-    },
-  });
-
-  const handleFormSubmit = async (values: UploadFormValues) => {
-    const succeeded = await onSubmit(document.id, {
-      title: values.title.trim(),
-      document_type: values.document_type,
-      project_id: values.project_id || null,
-      signed_at: values.signed_at || null,
-      valid_from: values.valid_from || null,
-      valid_until: values.valid_until || null,
-      notes: values.notes.trim() || null,
-    });
-    if (succeeded) {
-      onCancel();
-    }
-  };
-
-  return (
-    <form
-      id={EDIT_FORM_ID}
-      className="space-y-4 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/60"
-      onSubmit={handleSubmit(handleFormSubmit)}
-    >
-      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-        {t('documents.editTitle', { title: document.title })}
-      </h3>
-
-      <MetadataFields
-        register={register}
-        errors={errors}
-        projects={projects}
-        idPrefix="client-document-edit"
-      />
-
-      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button type="button" variant="outline" size="sm" onClick={onCancel}>
-          {t('documents.cancel')}
-        </Button>
-        <Button type="submit" size="sm" disabled={isSubmitting}>
-          {isSubmitting ? t('documents.saving') : t('documents.save')}
-        </Button>
-      </div>
-    </form>
-  );
-};
-
-/**
- * A single document row. The current version is rendered as a full card; a
- * superseded version is rendered muted and struck-through inside the history
- * section, so it reads as history rather than as a duplicate.
- */
-const DocumentRow: FC<{
-  document: ClientDocument;
-  variant: 'current' | 'history';
-  isDownloading: boolean;
-  isDeleting: boolean;
-  onDownload: (document: ClientDocument) => void;
-  onNewVersion: (document: ClientDocument) => void;
-  onEdit: (document: ClientDocument) => void;
-  onDelete: (document: ClientDocument) => void;
-}> = ({
-  document,
-  variant,
-  isDownloading,
-  isDeleting,
-  onDownload,
-  onNewVersion,
-  onEdit,
-  onDelete,
-}) => {
-  const { t } = useTranslation('clients');
-  const isCurrent = variant === 'current';
-  const size = formatFileSize(document.file_size);
-
-  return (
-    <div
-      className={
-        isCurrent
-          ? 'flex flex-col gap-3 p-4 md:flex-row md:items-start md:justify-between'
-          : 'flex flex-col gap-2 rounded-lg bg-gray-50 px-3 py-2 md:flex-row md:items-center md:justify-between dark:bg-gray-800/50'
-      }
-    >
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <FileText
-            className={
-              isCurrent
-                ? 'h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400'
-                : 'h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500'
-            }
-            aria-hidden="true"
-          />
-          <span
-            className={
-              isCurrent
-                ? 'font-medium text-gray-900 dark:text-white'
-                : 'text-sm text-gray-500 line-through dark:text-gray-400'
-            }
-          >
-            {document.title}
-          </span>
-          <span
-            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
-              isCurrent
-                ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
-                : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-            }`}
-          >
-            {t('documents.version', { number: document.version })}
-          </span>
-          {isCurrent ? (
-            <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900/30 dark:text-green-300">
-              {t('documents.current')}
-            </span>
-          ) : (
-            <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-              {t('documents.superseded')}
-            </span>
-          )}
-        </div>
-
-        {isCurrent ? (
-          <dl className="mt-2 grid gap-x-6 gap-y-1 text-xs text-gray-600 sm:grid-cols-2 lg:grid-cols-3 dark:text-gray-400">
-            <div className="flex gap-1">
-              <dt className="font-medium">{t('documents.fields.type')}:</dt>
-              <dd>{t(`documents.types.${document.document_type}`, { defaultValue: document.document_type })}</dd>
-            </div>
-            <div className="flex gap-1">
-              <dt className="font-medium">{t('documents.fields.project')}:</dt>
-              <dd>{document.project_name ?? t('documents.noProject')}</dd>
-            </div>
-            <div className="flex gap-1">
-              <dt className="font-medium">{t('documents.fields.signedAt')}:</dt>
-              <dd>{formatDate(document.signed_at)}</dd>
-            </div>
-            <div className="flex gap-1">
-              <dt className="font-medium">{t('documents.fields.validFrom')}:</dt>
-              <dd>{formatDate(document.valid_from)}</dd>
-            </div>
-            <div className="flex gap-1">
-              <dt className="font-medium">{t('documents.fields.validUntil')}:</dt>
-              <dd>{formatDate(document.valid_until)}</dd>
-            </div>
-            <div className="flex gap-1">
-              <dt className="font-medium">{t('documents.fields.file')}:</dt>
-              <dd className="truncate">
-                {document.file_filename ?? '—'}
-                {size ? ` · ${size}` : ''}
-              </dd>
-            </div>
-          </dl>
-        ) : (
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {document.file_filename ?? '—'}
-            {size ? ` · ${size}` : ''}
-          </p>
-        )}
-
-        <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-          {t('documents.uploadedOn', { date: formatDate(document.created_at) })}
-        </p>
-
-        {isCurrent && document.notes ? (
-          <p className="mt-2 whitespace-pre-line text-xs text-gray-600 dark:text-gray-300">
-            {document.notes}
-          </p>
-        ) : null}
-      </div>
-
-      <div className="flex shrink-0 flex-wrap items-center gap-2 md:justify-end">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => onDownload(document)}
-          disabled={isDownloading}
-        >
-          <Download className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-          {isDownloading ? t('documents.downloading') : t('documents.download')}
-        </Button>
-        {isCurrent ? (
-          <>
-            <Button type="button" size="sm" variant="outline" onClick={() => onNewVersion(document)}>
-              <Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-              {t('documents.newVersion')}
-            </Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => onEdit(document)}>
-              <Pencil className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-              {t('documents.edit')}
-            </Button>
-          </>
-        ) : null}
-        <Button
-          type="button"
-          size="sm"
-          variant="danger"
-          onClick={() => onDelete(document)}
-          disabled={isDeleting}
-        >
-          <Trash2 className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-          {isDeleting ? t('documents.deleting') : t('documents.delete')}
-        </Button>
-      </div>
-    </div>
-  );
-};
-
-/**
- * Modal listing and managing a client's stored documents.
- *
- * @component
- * @example
- * {documentsClient ? (
- *   <ClientDocumentsModal
- *     open={isDocumentsModalOpen}
- *     client={documentsClient}
- *     onClose={closeDocumentsModal}
- *     onUpload={handleDocumentUpload}
- *     onUpdate={handleDocumentUpdate}
- *     onDelete={handleDocumentDelete}
- *     isUploading={uploadDocument.isPending}
- *     isSaving={updateDocument.isPending}
- *     deletingId={deletingDocumentId}
- *     error={documentError}
- *     successMessage={documentSuccess}
- *     onDismissError={() => setDocumentError(null)}
- *     onDismissSuccess={() => setDocumentSuccess(null)}
- *   />
- * ) : null}
- *
- * @param {ClientDocumentsModalProps} props - Component props
- * @returns {JSX.Element} The documents modal
- */
 export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
   open,
   client,
@@ -664,6 +602,7 @@ export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
   onUpload,
   onUpdate,
   onDelete,
+  onRateChange,
   isUploading,
   isSaving,
   deletingId,
@@ -672,230 +611,420 @@ export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
   onDismissError,
   onDismissSuccess,
 }) => {
-  const { t } = useTranslation('clients');
+  const { t, i18n } = useTranslation('clients');
+  const lng = i18n.language;
 
   const [projectFilter, setProjectFilter] = useState('');
-  const [panel, setPanel] = useState<
-    | { kind: 'none' }
-    | { kind: 'upload' }
-    | { kind: 'version'; document: ClientDocument }
-    | { kind: 'edit'; document: ClientDocument }
-  >({ kind: 'none' });
+  const [view, setView] = useState<View>({ kind: 'list' });
+  const [busy, setBusy] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [expandedChains, setExpandedChains] = useState<string[]>([]);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
-  const filters = useMemo(
-    () => (projectFilter ? { project_id: projectFilter } : undefined),
-    [projectFilter]
-  );
-
-  const {
-    data: documents,
-    isLoading,
-    isError,
-    error: listError,
-  } = useClientDocuments(client.id, filters, open);
+  const filters = useMemo(() => (projectFilter ? { project_id: projectFilter } : undefined), [projectFilter]);
+  const { data: documents, isLoading, isError, error: listError } = useClientDocuments(client.id, filters, open);
   const { data: projectData } = useProjects({ clientId: client.id });
+  const projects = useMemo<Project[]>(() => projectData ?? [], [projectData]);
 
-  const projects = useMemo<ProjectOption[]>(
-    () => (projectData ?? []).map((project) => ({ id: project.id, name: project.name })),
-    [projectData]
-  );
+  const chains = useMemo(() => {
+    // What needs attention first: expiring, running, upcoming, undated, expired.
+    return buildDocumentChains(documents ?? []).sort((a, b) => {
+      const rank = contractStatusRank(statusOf(a.current)) - contractStatusRank(statusOf(b.current));
+      if (rank !== 0) return rank;
+      return new Date(b.current.created_at).getTime() - new Date(a.current.created_at).getTime();
+    });
+  }, [documents]);
 
-  const chains = useMemo(() => buildDocumentChains(documents ?? []), [documents]);
-
-  const closePanel = () => setPanel({ kind: 'none' });
-
-  const toggleHistory = (chainId: string) => {
-    setExpandedChains((current) =>
-      current.includes(chainId)
-        ? current.filter((id) => id !== chainId)
-        : [...current, chainId]
-    );
+  const openForm = (mode: FormMode, source: ClientDocument | null, file: File | null = null) => {
+    setDownloadError(null);
+    setConfirmingDeleteId(null);
+    onDismissError();
+    onDismissSuccess();
+    setView({ kind: 'form', mode, source, file });
   };
 
-  /**
-   * Downloads a document's file.
-   *
-   * The endpoint requires the Bearer token, so the file cannot be linked to
-   * directly: it is fetched as a Blob through the shared axios client, saved via
-   * a synthetic anchor click, and the object URL is revoked immediately after.
-   */
-  const handleDownload = async (document_: ClientDocument) => {
+  const backToList = () => {
+    onDismissError();
+    setView({ kind: 'list' });
+  };
+
+  /** Fetches the file behind the bearer token as a Blob. */
+  const fetchBlob = async (document_: ClientDocument) => {
     setDownloadError(null);
     setDownloadingId(document_.id);
-    let objectUrl: string | null = null;
     try {
-      const blob = await downloadClientDocument(document_.id);
-      objectUrl = window.URL.createObjectURL(blob);
-      const link = window.document.createElement('a');
-      link.href = objectUrl;
-      link.download = document_.file_filename || document_.title;
-      window.document.body.appendChild(link);
-      link.click();
-      window.document.body.removeChild(link);
+      return await downloadClientDocument(document_.id);
     } catch (downloadErr) {
-      // The request is made with responseType 'blob', so an error body arrives
-      // as a Blob rather than JSON and extractErrorMessage yields noise like
-      // "[object Blob]". The translated message is the useful one here.
+      // The request uses responseType 'blob', so an error body is a Blob and
+      // extractErrorMessage would yield "[object Blob]".
       console.error('Client document download failed', downloadErr);
       setDownloadError(t('documents.downloadError'));
+      return null;
     } finally {
-      if (objectUrl) {
-        window.URL.revokeObjectURL(objectUrl);
-      }
       setDownloadingId(null);
     }
   };
 
-  const handleDelete = async (document_: ClientDocument) => {
-    const succeeded = await onDelete(document_);
-    if (succeeded && panel.kind === 'edit' && panel.document.id === document_.id) {
-      closePanel();
-    }
+  const handleDownload = async (document_: ClientDocument) => {
+    const blob = await fetchBlob(document_);
+    if (!blob) return;
+    const url = window.URL.createObjectURL(blob);
+    const link = window.document.createElement('a');
+    link.href = url;
+    link.download = document_.file_filename || document_.title;
+    window.document.body.appendChild(link);
+    link.click();
+    window.document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
   };
 
-  const listErrorMessage = isError
-    ? extractErrorMessage(listError) || t('documents.loadError')
-    : null;
+  /** Opens a PDF or image in a new tab instead of downloading it. */
+  const handleOpen = async (document_: ClientDocument) => {
+    // Open the tab synchronously, inside the click, or the popup blocker eats it.
+    const tab = window.open('', '_blank');
+    const blob = await fetchBlob(document_);
+    if (!blob) {
+      tab?.close();
+      return;
+    }
+    const url = window.URL.createObjectURL(blob);
+    if (tab) {
+      tab.location.href = url;
+    } else {
+      window.open(url, '_blank');
+    }
+    // Give the viewer time to load before releasing the object URL.
+    window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+  };
+
+  const handleConfirmDelete = async (document_: ClientDocument) => {
+    await onDelete(document_);
+    setConfirmingDeleteId(null);
+  };
+
+  const toggleHistory = (chainId: string) =>
+    setExpandedChains((current) =>
+      current.includes(chainId) ? current.filter((id) => id !== chainId) : [...current, chainId]
+    );
+
+  const listErrorMessage = isError ? extractErrorMessage(listError) || t('documents.loadError') : null;
+
+  const isFormView = view.kind === 'form';
+  const submitLabel = (() => {
+    if (view.kind !== 'form') return '';
+    if (busy || isUploading || isSaving) return view.mode === 'edit' ? t('documents.saving') : t('documents.uploading');
+    switch (view.mode) {
+      case 'extend':
+        return t('documents.form.extendSubmit');
+      case 'edit':
+        return t('documents.save');
+      default:
+        return t('documents.upload');
+    }
+  })();
+
+  const footer = isFormView ? (
+    <>
+      <Button type="button" variant="outline" onClick={backToList} disabled={busy}>
+        {t('documents.form.back')}
+      </Button>
+      {/* Distinct keys: see ProjectRatesModal — reusing the "upload" button's
+          DOM node would submit the empty form during the very click that opens it. */}
+      <Button key="document-form-submit" type="submit" form={FORM_ID} disabled={busy || isUploading || isSaving}>
+        {submitLabel}
+      </Button>
+    </>
+  ) : (
+    <>
+      <Button type="button" variant="outline" onClick={onClose}>
+        {t('documents.close')}
+      </Button>
+      <Button key="document-open-form" type="button" onClick={() => openForm('upload', null)}>
+        <FilePlus2 className="mr-1 h-4 w-4" aria-hidden="true" />
+        {t('documents.upload')}
+      </Button>
+    </>
+  );
+
+  /** Actions shared by the card and the history rows. */
+  const confirmRow = (document_: ClientDocument) =>
+    confirmingDeleteId === document_.id ? (
+      <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 dark:border-red-900/60 dark:bg-red-950/30">
+        <p className="flex-1 text-xs text-red-800 dark:text-red-200">
+          {t('documents.messages.deleteConfirm', { title: document_.title })}
+        </p>
+        <Button type="button" size="sm" variant="outline" onClick={() => setConfirmingDeleteId(null)}>
+          {t('documents.cancel')}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="danger"
+          onClick={() => void handleConfirmDelete(document_)}
+          disabled={deletingId === document_.id}
+        >
+          {deletingId === document_.id ? t('documents.deleting') : t('documents.delete')}
+        </Button>
+      </div>
+    ) : null;
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={t('documents.title', { name: client.name })}
-      size="xl"
-      footer={
-        <Button type="button" variant="outline" onClick={onClose}>
-          {t('documents.close')}
-        </Button>
-      }
-    >
-      <div className="space-y-4">
-        <p className="text-sm text-gray-500 dark:text-gray-400">{t('documents.subtitle')}</p>
+    <Modal open={open} onClose={onClose} title={t('documents.title', { name: client.name })} size="xl" footer={footer}>
+      {view.kind === 'form' ? (
+        <>
+          {error ? <Alert type="error" message={error} onClose={onDismissError} /> : null}
+          <DocumentForm
+            key={`${view.mode}-${view.source?.id ?? 'new'}`}
+            mode={view.mode}
+            source={view.source}
+            initialFile={view.file}
+            projects={projects}
+            defaultProjectId={projectFilter}
+            onUpload={onUpload}
+            onUpdate={onUpdate}
+            onRateChange={onRateChange}
+            onDone={() => setView({ kind: 'list' })}
+            onBusyChange={setBusy}
+          />
+        </>
+      ) : (
+        <div
+          className="relative space-y-4"
+          onDragOver={(event) => {
+            if (event.dataTransfer.types.includes('Files')) {
+              event.preventDefault();
+              setIsDraggingOver(true);
+            }
+          }}
+          onDragLeave={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node)) setIsDraggingOver(false);
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setIsDraggingOver(false);
+            const dropped = event.dataTransfer.files?.[0];
+            if (dropped) openForm('upload', null, dropped);
+          }}
+        >
+          {isDraggingOver ? (
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-purple-500 bg-purple-50/90 dark:bg-purple-950/80">
+              <p className="text-sm font-semibold text-purple-800 dark:text-purple-200">{t('documents.drop.release')}</p>
+            </div>
+          ) : null}
 
-        {error ? <Alert type="error" message={error} onClose={onDismissError} /> : null}
-        {successMessage ? (
-          <Alert type="success" message={successMessage} onClose={onDismissSuccess} />
-        ) : null}
-        {downloadError ? (
-          <Alert type="error" message={downloadError} onClose={() => setDownloadError(null)} />
-        ) : null}
-        {listErrorMessage ? <Alert type="error" message={listErrorMessage} /> : null}
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="w-full sm:max-w-xs">
-            <Select
-              id="client-document-project-filter"
-              label={t('documents.filterProject')}
-              value={projectFilter}
-              onChange={(event) => setProjectFilter(event.target.value)}
-            >
-              <option value="">{t('documents.allProjects')}</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </Select>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-gray-500 dark:text-gray-400">{t('documents.subtitle')}</p>
+            {projects.length > 1 ? (
+              <select
+                aria-label={t('documents.filterProject')}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                value={projectFilter}
+                onChange={(event) => setProjectFilter(event.target.value)}
+              >
+                <option value="">{t('documents.allProjects')}</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            ) : null}
           </div>
-          <Button type="button" size="sm" onClick={() => setPanel({ kind: 'upload' })}>
-            <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-            {t('documents.upload')}
-          </Button>
-        </div>
 
-        {panel.kind === 'upload' || panel.kind === 'version' ? (
-          <UploadPanel
-            key={panel.kind === 'version' ? panel.document.id : 'new'}
-            supersedes={panel.kind === 'version' ? panel.document : null}
-            projects={projects}
-            isSubmitting={isUploading}
-            onCancel={closePanel}
-            onSubmit={onUpload}
-          />
-        ) : null}
+          {successMessage ? <Alert type="success" message={successMessage} onClose={onDismissSuccess} /> : null}
+          {error ? <Alert type="error" message={error} onClose={onDismissError} /> : null}
+          {downloadError ? <Alert type="error" message={downloadError} onClose={() => setDownloadError(null)} /> : null}
+          {listErrorMessage ? <Alert type="error" message={listErrorMessage} /> : null}
 
-        {panel.kind === 'edit' ? (
-          <EditPanel
-            key={panel.document.id}
-            document={panel.document}
-            projects={projects}
-            isSubmitting={isSaving}
-            onCancel={closePanel}
-            onSubmit={onUpdate}
-          />
-        ) : null}
+          {isLoading ? (
+            <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">{t('documents.loading')}</p>
+          ) : chains.length === 0 ? (
+            projectFilter ? (
+              <p className="rounded-xl border border-dashed border-gray-300 py-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                {t('documents.emptyFiltered')}
+              </p>
+            ) : (
+              <FileDropZone
+                file={null}
+                onFile={(picked) => picked && openForm('upload', null, picked)}
+                accept={CLIENT_DOCUMENT_ACCEPT}
+                prompt={t('documents.drop.emptyPrompt')}
+                hint={t('documents.fields.fileHint')}
+                changeLabel={t('documents.drop.change')}
+                removeLabel={t('documents.drop.remove')}
+                locale={lng}
+              />
+            )
+          ) : (
+            <ul className="space-y-3">
+              {chains.map((chain) => {
+                const document_ = chain.current;
+                const status = statusOf(document_);
+                const extendable = EXTENDABLE_TYPES.has(document_.document_type);
+                const urgent = status?.kind === 'expiring' || status?.kind === 'expired';
+                const previewable = isPreviewable(document_.file_mimetype);
+                const expanded = expandedChains.includes(document_.id);
+                const size = formatFileSize(document_.file_size, lng);
 
-        {isLoading ? (
-          <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-            {t('documents.loading')}
-          </p>
-        ) : chains.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-gray-300 py-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
-            {projectFilter ? t('documents.emptyFiltered') : t('documents.empty')}
-          </p>
-        ) : (
-          <ul className="space-y-3">
-            {chains.map((chain) => {
-              const isExpanded = expandedChains.includes(chain.current.id);
-              return (
-                <li
-                  key={chain.current.id}
-                  className="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
-                >
-                  <DocumentRow
-                    document={chain.current}
-                    variant="current"
-                    isDownloading={downloadingId === chain.current.id}
-                    isDeleting={deletingId === chain.current.id}
-                    onDownload={handleDownload}
-                    onNewVersion={(document_) => setPanel({ kind: 'version', document: document_ })}
-                    onEdit={(document_) => setPanel({ kind: 'edit', document: document_ })}
-                    onDelete={handleDelete}
-                  />
-
-                  {chain.history.length > 0 ? (
-                    <div className="border-t border-gray-200 px-4 py-3 dark:border-gray-800">
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 hover:underline dark:text-purple-400"
-                        onClick={() => toggleHistory(chain.current.id)}
-                      >
-                        <History className="h-3.5 w-3.5" aria-hidden="true" />
-                        {isExpanded
-                          ? t('documents.hideHistory')
-                          : t('documents.showHistory', { versions: chain.history.length })}
-                      </button>
-
-                      {isExpanded ? (
-                        <div className="mt-2 space-y-2">
-                          {chain.history.map((historic) => (
-                            <DocumentRow
-                              key={historic.id}
-                              document={historic}
-                              variant="history"
-                              isDownloading={downloadingId === historic.id}
-                              isDeleting={deletingId === historic.id}
-                              onDownload={handleDownload}
-                              onNewVersion={(document_) =>
-                                setPanel({ kind: 'version', document: document_ })
-                              }
-                              onEdit={(document_) => setPanel({ kind: 'edit', document: document_ })}
-                              onDelete={handleDelete}
-                            />
-                          ))}
+                return (
+                  <li
+                    key={document_.id}
+                    className={clsx(
+                      'rounded-xl border bg-white shadow-sm dark:bg-gray-900',
+                      urgent && extendable
+                        ? 'border-amber-300 dark:border-amber-800/70'
+                        : 'border-gray-200 dark:border-gray-800'
+                    )}
+                  >
+                    <div className="flex flex-col gap-3 p-4 md:flex-row md:items-start">
+                      <FileText className="hidden h-5 w-5 shrink-0 text-purple-600 md:mt-0.5 md:block dark:text-purple-400" aria-hidden="true" />
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-gray-900 dark:text-white">{document_.title}</span>
+                          <StatusBadge status={status} document={document_} />
+                          {chain.history.length > 0 ? (
+                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                              {t('documents.version', { number: document_.version })}
+                            </span>
+                          ) : null}
                         </div>
-                      ) : null}
+                        <DocumentMeta document={document_} />
+                        <p className="truncate text-xs text-gray-400 dark:text-gray-500">
+                          {document_.file_filename ?? '—'}
+                          {size ? ` · ${size}` : ''}
+                        </p>
+                        {document_.notes ? (
+                          <p className="whitespace-pre-line text-xs text-gray-600 dark:text-gray-300">{document_.notes}</p>
+                        ) : null}
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-2">
+                        {extendable ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={urgent ? 'primary' : 'outline'}
+                            onClick={() => openForm('extend', document_)}
+                          >
+                            <RefreshCw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                            {t('documents.extend')}
+                          </Button>
+                        ) : null}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void (previewable ? handleOpen(document_) : handleDownload(document_))}
+                          disabled={downloadingId === document_.id}
+                        >
+                          {previewable ? (
+                            <ExternalLink className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                          ) : (
+                            <Download className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                          )}
+                          {downloadingId === document_.id
+                            ? t('documents.downloading')
+                            : previewable
+                              ? t('documents.open')
+                              : t('documents.download')}
+                        </Button>
+                        <Dropdown
+                          align="right"
+                          trigger={
+                            <button
+                              type="button"
+                              className="rounded-lg border border-gray-300 p-1.5 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                              aria-label={t('documents.moreActions', { title: document_.title })}
+                            >
+                              <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                            </button>
+                          }
+                          items={[
+                            ...(previewable
+                              ? [{ label: t('documents.download'), icon: Download, onClick: () => void handleDownload(document_) }]
+                              : []),
+                            { label: t('documents.newVersion'), icon: FilePlus2, onClick: () => openForm('version', document_) },
+                            { label: t('documents.edit'), icon: Pencil, onClick: () => openForm('edit', document_) },
+                            { label: '', onClick: () => undefined, divider: true },
+                            {
+                              label: t('documents.delete'),
+                              icon: Trash2,
+                              danger: true,
+                              onClick: () => setConfirmingDeleteId(document_.id),
+                            },
+                          ]}
+                        />
+                      </div>
                     </div>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+
+                    {confirmRow(document_) ? <div className="px-4 pb-4">{confirmRow(document_)}</div> : null}
+
+                    {chain.history.length > 0 ? (
+                      <div className="border-t border-gray-100 px-4 py-2.5 dark:border-gray-800">
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 hover:underline dark:text-purple-400"
+                          onClick={() => toggleHistory(document_.id)}
+                          aria-expanded={expanded}
+                        >
+                          <History className="h-3.5 w-3.5" aria-hidden="true" />
+                          {expanded
+                            ? t('documents.hideHistory')
+                            : t('documents.history', { count: chain.history.length })}
+                        </button>
+
+                        {expanded ? (
+                          <ul className="mt-2 space-y-1.5">
+                            {chain.history.map((historic) => (
+                              <li key={historic.id} className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-800/50">
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                    {t('documents.version', { number: historic.version })}
+                                  </span>
+                                  <span className="min-w-0 flex-1">
+                                    <DocumentMeta document={historic} />
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="rounded p-1 text-gray-500 hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white"
+                                    onClick={() =>
+                                      void (isPreviewable(historic.file_mimetype) ? handleOpen(historic) : handleDownload(historic))
+                                    }
+                                    aria-label={t('documents.openVersion', { number: historic.version })}
+                                    title={isPreviewable(historic.file_mimetype) ? t('documents.open') : t('documents.download')}
+                                  >
+                                    {isPreviewable(historic.file_mimetype) ? (
+                                      <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                                    ) : (
+                                      <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                                    )}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="rounded p-1 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                                    onClick={() => setConfirmingDeleteId(historic.id)}
+                                    aria-label={t('documents.deleteVersion', { number: historic.version })}
+                                    title={t('documents.delete')}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                  </button>
+                                </div>
+                                {confirmRow(historic)}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
     </Modal>
   );
 };

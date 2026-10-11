@@ -22,6 +22,7 @@ export const queryKeys = {
     list: (projectId: string) => ['projectRates', 'list', projectId] as const,
     detail: (rateId: string) => ['projectRates', 'detail', rateId] as const,
     effective: (projectId: string, date?: string) => ['projectRates', 'effective', projectId, date] as const,
+    impact: (projectId: string, validFrom: string) => ['projectRates', 'impact', projectId, validFrom] as const,
   },
   timeEntries: {
     all: ['timeEntries'] as const,

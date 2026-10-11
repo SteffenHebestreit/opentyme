@@ -12,17 +12,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   addProjectRate,
+  alignProjectRate,
   deleteProjectRate,
   getEffectiveRate,
+  getRateImpact,
   listProjectRates,
   updateProjectRate,
 } from '@/api/services/project-rate.service';
 import type {
   EffectiveProjectRate,
-  ProjectRate,
   ProjectRatePayload,
   ProjectRatePeriod,
   ProjectRateUpdatePayload,
+  RateImpact,
+  SavedProjectRate,
 } from '@/api/services/project-rate.service';
 import { queryKeys } from './queryKeys';
 
@@ -79,11 +82,17 @@ export function useEffectiveProjectRate(projectId: string | undefined, date?: st
  */
 export function useAddProjectRate() {
   const queryClient = useQueryClient();
-  return useMutation<ProjectRate, Error, { projectId: string; payload: ProjectRatePayload }>({
+  return useMutation<SavedProjectRate, Error, { projectId: string; payload: ProjectRatePayload }>({
     mutationFn: ({ projectId, payload }) => addProjectRate(projectId, payload),
-    onSuccess: (_rate, variables) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.projectRates.list(variables.projectId) });
+    onSuccess: (rate) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.projectRates.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+      // Moving logged entries onto the new rate changes them, so neither the
+      // time tracking views nor the dashboard totals may keep the old amounts.
+      if (rate.repriced_entries) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.timeEntries.all });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
+      }
     },
   });
 }
@@ -101,14 +110,18 @@ export function useAddProjectRate() {
 export function useUpdateProjectRate() {
   const queryClient = useQueryClient();
   return useMutation<
-    ProjectRate,
+    SavedProjectRate,
     Error,
     { projectId: string; rateId: string; payload: ProjectRateUpdatePayload }
   >({
     mutationFn: ({ rateId, payload }) => updateProjectRate(rateId, payload),
-    onSuccess: (_rate, variables) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.projectRates.list(variables.projectId) });
+    onSuccess: (rate) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.projectRates.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+      if (rate.repriced_entries) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.timeEntries.all });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
+      }
     },
   });
 }
@@ -128,9 +141,52 @@ export function useDeleteProjectRate() {
   const queryClient = useQueryClient();
   return useMutation<void, Error, { projectId: string; rateId: string }>({
     mutationFn: ({ rateId }) => deleteProjectRate(rateId),
-    onSuccess: (_result, variables) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.projectRates.list(variables.projectId) });
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.projectRates.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+      // Entries of the deleted period fall back to the previous rate.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.timeEntries.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
+    },
+  });
+}
+
+/**
+ * Previews what a rate starting on `validFrom` would touch — the previous rate,
+ * entries already logged in the new period, invoices issued since — so the
+ * form can say what will happen BEFORE the user saves.
+ *
+ * @param {string | undefined} projectId - The project
+ * @param {string | undefined} validFrom - Proposed start, YYYY-MM-DD
+ * @param {boolean} [enabled=true] - Additional gate
+ * @returns {UseQueryResult<RateImpact>} The preview
+ */
+export function useRateImpact(projectId: string | undefined, validFrom: string | undefined, enabled = true) {
+  const isValidDate = Boolean(validFrom && /^\d{4}-\d{2}-\d{2}$/.test(validFrom));
+  return useQuery<RateImpact>({
+    queryKey: queryKeys.projectRates.impact(projectId ?? 'pending', validFrom ?? 'pending'),
+    queryFn: () => getRateImpact(projectId as string, validFrom as string),
+    enabled: Boolean(projectId) && isValidDate && enabled,
+    staleTime: 10_000,
+    placeholderData: (previous) => previous,
+  });
+}
+
+/**
+ * Moves a period's entries onto its rate ("13 entries at 80,00 € — align").
+ *
+ * @example
+ * const align = useAlignProjectRate();
+ * await align.mutateAsync({ projectId, rateId, fromRate: 80 });
+ */
+export function useAlignProjectRate() {
+  const queryClient = useQueryClient();
+  return useMutation<number, Error, { projectId: string; rateId: string; fromRate?: number | null }>({
+    mutationFn: ({ rateId, fromRate }) => alignProjectRate(rateId, fromRate),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.projectRates.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.timeEntries.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
     },
   });
 }

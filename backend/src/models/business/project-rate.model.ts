@@ -34,6 +34,8 @@ export interface ProjectRatePeriod extends ProjectRate {
   valid_until: string | null;
   /** True for the period covering today — the rate new time entries are stamped with. */
   is_current: boolean;
+  /** Entries inside the period priced differently, grouped by the rate they carry. */
+  deviating: { rate: number | null; count: number; hours: number }[];
 }
 
 export interface CreateProjectRateDto {

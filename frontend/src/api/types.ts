@@ -3,6 +3,12 @@ export type ClientStatus = 'active' | 'inactive';
 export interface Client {
   id: string;
   name: string;
+  /** Stored documents (newest version of each), from the client list. */
+  documents_count?: number;
+  /** Contracts ending within 60 days or ended within the last 30. */
+  expiring_documents?: number;
+  /** YYYY-MM-DD of the earliest such end date. */
+  next_document_expiry?: string | null;
   email: string | null;
   phone: string | null;
   address: string | null;
@@ -63,6 +69,10 @@ export interface Project {
   client_name?: string | null;
   total_tracked_hours?: number | null;
   client?: { id: string; name: string } | null;
+  /** Earliest scheduled rate, from the rate timeline (list responses only). */
+  next_rate?: number | string | null;
+  /** YYYY-MM-DD start of {@link next_rate}. */
+  next_rate_from?: string | null;
 }
 
 export interface ProjectPayload {
@@ -76,6 +86,13 @@ export interface ProjectPayload {
   currency?: string | null;
   rate_type?: RateType | null;
   hourly_rate?: number | null;
+  /**
+   * Day (YYYY-MM-DD) from which a CHANGED hourly rate applies. Required by the
+   * API whenever the rate of a project that already has one changes.
+   */
+  hourly_rate_valid_from?: string;
+  /** Opt-in: move entries already logged from that day onto the new rate. */
+  apply_rate_to_existing?: boolean;
   estimated_hours?: number | null;
   recurring_payment?: boolean;
 }

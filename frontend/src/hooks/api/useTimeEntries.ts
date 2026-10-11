@@ -99,6 +99,7 @@ export function useCreateTimeEntry() {
     mutationFn: (payload: TimeEntryPayload) => createTimeEntry(payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.timeEntries.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
       void queryClient.invalidateQueries({ queryKey: ['time-entries-day'] });
     },
   });
@@ -130,6 +131,7 @@ export function useUpdateTimeEntry() {
       updateTimeEntry(id, payload),
     onSuccess: (_entry: TimeEntry, variables: { id: string; payload: Partial<TimeEntryPayload> }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.timeEntries.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
       void queryClient.invalidateQueries({ queryKey: queryKeys.timeEntries.detail(variables.id) });
       void queryClient.invalidateQueries({ queryKey: ['time-entries-day'] });
     },
@@ -157,6 +159,7 @@ export function useDeleteTimeEntry() {
     mutationFn: (id: string) => deleteTimeEntry(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.timeEntries.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
       void queryClient.invalidateQueries({ queryKey: ['time-entries-day'] });
     },
   });
@@ -186,6 +189,7 @@ export function useStartTimer() {
       startTimer(projectId, payload),
     onSuccess: (_response: TimeEntryResponse) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.timeEntries.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
     },
   });
 }
@@ -211,6 +215,7 @@ export function useStopTimer() {
     mutationFn: (timeEntryId?: string) => stopTimer(timeEntryId),
     onSuccess: (_response: TimeEntryResponse) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.timeEntries.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
     },
   });
 }
@@ -235,6 +240,7 @@ export function usePauseTimer() {
     mutationFn: () => pauseTimer(),
     onSuccess: (_response: TimeEntryResponse) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.timeEntries.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
     },
   });
 }

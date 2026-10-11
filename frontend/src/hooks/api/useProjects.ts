@@ -100,9 +100,17 @@ export function useUpdateProject() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: ProjectPayload }) => updateProject(id, payload),
-    onSuccess: (_project: Project, variables: { id: string; payload: ProjectPayload }) => {
+    onSuccess: (project: Project & { repriced_entries?: number }, variables: { id: string; payload: ProjectPayload }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(variables.id) });
+      // A rate change goes through the rate timeline on the server.
+      if (variables.payload.hourly_rate_valid_from) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.projectRates.all });
+      }
+      if (project.repriced_entries) {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.timeEntries.all });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.summary });
+      }
     },
   });
 }

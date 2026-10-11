@@ -38,6 +38,8 @@ export interface ProjectRatePeriod extends ProjectRate {
   valid_until: string | null;
   /** True for the period covering today — the rate new time entries are stamped with. */
   is_current: boolean;
+  /** Entries inside the period priced differently, grouped by the rate they carry. */
+  deviating?: { rate: number | null; count: number; hours: number }[];
 }
 
 /**
@@ -57,7 +59,38 @@ export interface ProjectRatePayload {
   /** `YYYY-MM-DD` */
   valid_from: string;
   note?: string;
+  /**
+   * Entries dated from valid_from that carry the previous rate move to the new
+   * one (default true — that is what "valid from" means). false keeps them,
+   * e.g. when that work is already invoiced.
+   */
+  apply_to_existing?: boolean;
 }
+
+/** What a rate change starting on a given date would touch. */
+export interface RateImpact {
+  valid_from: string;
+  /** The rate that date costs today — the "before" of the change. */
+  previous_rate: number | null;
+  /** Start of the next agreed period, where the new rate would stop; null if open-ended. */
+  period_end: string | null;
+  /** A period already starting that day — saving replaces it rather than conflicting. */
+  existing_period: { id: string; hourly_rate: number } | null;
+  /** Entries already logged inside the new period. */
+  logged: {
+    count: number;
+    hours: number;
+    /** Carry the previous rate — moved onto the new one on save (unless opted out). */
+    following: number;
+    /** Priced individually — never changed. */
+    deviating: number;
+  };
+  /** Sent/paid invoices for this client issued on or after the date. */
+  invoices_since: number;
+}
+
+/** A stored rate, plus how many logged entries were moved onto it. */
+export type SavedProjectRate = ProjectRate & { repriced_entries?: number };
 
 /**
  * Body for correcting an existing rate period. All fields are optional.
@@ -67,6 +100,7 @@ export interface ProjectRateUpdatePayload {
   /** `YYYY-MM-DD` */
   valid_from?: string;
   note?: string;
+  apply_to_existing?: boolean;
 }
 
 /**
@@ -116,8 +150,22 @@ export async function getEffectiveRate(projectId: string, date?: string): Promis
  * @example
  * await addProjectRate('project-uuid', { hourly_rate: 150, valid_from: '2026-01-01' });
  */
-export async function addProjectRate(projectId: string, payload: ProjectRatePayload): Promise<ProjectRate> {
-  const { data } = await apiClient.post<{ data: ProjectRate }>(`/projects/${projectId}/rates`, payload);
+export async function addProjectRate(projectId: string, payload: ProjectRatePayload): Promise<SavedProjectRate> {
+  const { data } = await apiClient.post<{ data: SavedProjectRate }>(`/projects/${projectId}/rates`, payload);
+  return data.data;
+}
+
+/**
+ * Previews what a rate starting on `validFrom` would touch, before saving.
+ *
+ * @param {string} projectId - The project
+ * @param {string} validFrom - Proposed start, YYYY-MM-DD
+ * @returns {Promise<RateImpact>} Previous rate, affected entries, invoices since
+ */
+export async function getRateImpact(projectId: string, validFrom: string): Promise<RateImpact> {
+  const { data } = await apiClient.get<{ data: RateImpact }>(`/projects/${projectId}/rates/impact`, {
+    params: { valid_from: validFrom },
+  });
   return data.data;
 }
 
@@ -136,8 +184,8 @@ export async function addProjectRate(projectId: string, payload: ProjectRatePayl
 export async function updateProjectRate(
   rateId: string,
   payload: ProjectRateUpdatePayload
-): Promise<ProjectRate> {
-  const { data } = await apiClient.put<{ data: ProjectRate }>(`/projects/rates/${rateId}`, payload);
+): Promise<SavedProjectRate> {
+  const { data } = await apiClient.put<{ data: SavedProjectRate }>(`/projects/rates/${rateId}`, payload);
   return data.data;
 }
 
@@ -157,12 +205,27 @@ export async function deleteProjectRate(rateId: string): Promise<void> {
 }
 
 /**
+ * Moves the entries of a period onto its rate — only those at `fromRate`, if given.
+ *
+ * @returns {Promise<number>} How many entries were changed
+ */
+export async function alignProjectRate(rateId: string, fromRate?: number | null): Promise<number> {
+  const { data } = await apiClient.post<{ data: { repriced_entries: number } }>(
+    `/projects/rates/${rateId}/align`,
+    { from_rate: fromRate ?? null }
+  );
+  return data.data.repriced_entries;
+}
+
+/**
  * Project rate service object providing all rate-timeline API operations.
  */
 export const projectRateService = {
   listProjectRates,
   getEffectiveRate,
+  getRateImpact,
   addProjectRate,
   updateProjectRate,
   deleteProjectRate,
+  alignProjectRate,
 };

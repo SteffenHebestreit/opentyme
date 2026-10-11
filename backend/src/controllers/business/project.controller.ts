@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { ProjectService } from '../../services/business/project.service';
+import { ProjectService, toDateOnly } from '../../services/business/project.service';
+import { projectRateService } from '../../services/business/project-rate.service';
 // Joi is already imported in client.controller if we want to keep it central, or import here
 import Joi from 'joi';
 import { logger } from '../../utils/logger';
@@ -120,6 +121,16 @@ const updateProjectSchema = Joi.object({
     Joi.allow(null)
   ).optional(),
   recurring_payment: Joi.boolean().optional(),
+  // Changing an existing hourly rate needs the day it takes effect. Without it
+  // the change silently applied "from today" — wrong for a contract extension
+  // that starts on the 1st of next month.
+  hourly_rate_valid_from: Joi.string()
+    .pattern(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .messages({ 'string.pattern.base': 'hourly_rate_valid_from must be YYYY-MM-DD' }),
+  // Entries dated from that day that follow the timeline move to the new rate
+  // (default). false keeps them — e.g. when that work is already invoiced.
+  apply_rate_to_existing: Joi.boolean().optional(),
 }).min(1); // At least one field must be provided for an update
 // Add similar custom validation for start/end date consistency on updates if needed
 
@@ -291,9 +302,13 @@ export class ProjectController {
         return;
     }
 
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({ message: 'Unauthorized' });
+      return;
+    }
+
     // Joi validation for updates
-    // Note: The custom date logic might need refinement based on how partial updates are handled.
-    // If start_date is being cleared, should end_date also be cleared? etc.
     const { error, value } = updateProjectSchema.validate(req.body);
     if (error) {
       res.status(400).json({ message: 'Validation error', details: error.details });
@@ -301,19 +316,85 @@ export class ProjectController {
     }
 
     try {
-      const updatedProject = await projectService.update(id, value);
-      if (updatedProject) {
-        res.status(200).json({
-          message: 'Project updated successfully',
-          project: updatedProject,
-        });
-      } else {
+      // Scoped by owner: an id from the request alone must never reach another
+      // tenant's project (ProjectService.update itself has no user filter).
+      const existing = await projectService.findByIdForUser(id, userId);
+      if (!existing) {
         res.status(404).json({ message: 'Project not found' });
+        return;
       }
+
+      const {
+        hourly_rate_valid_from: rateValidFrom,
+        apply_rate_to_existing: applyRateToExisting,
+        ...projectFields
+      } = value;
+
+      // The rate is never written by the generic update: the rate timeline is
+      // the source of truth, and a change there always has a start date.
+      const requestedRate =
+        projectFields.hourly_rate === undefined || projectFields.hourly_rate === null
+          ? null
+          : Number(projectFields.hourly_rate);
+      delete projectFields.hourly_rate;
+
+      const currentRate = existing.hourly_rate === null || existing.hourly_rate === undefined
+        ? null
+        : Number(existing.hourly_rate);
+      const rateChanges = requestedRate !== null && requestedRate !== currentRate;
+
+      let validFrom: string | null = null;
+      if (rateChanges) {
+        const hasHistory = (await projectRateService.listRates(id, userId)).length > 0;
+        if ((currentRate !== null || hasHistory) && !rateValidFrom) {
+          res.status(400).json({
+            code: 'RATE_START_DATE_REQUIRED',
+            message:
+              'Changing the hourly rate requires a start date (hourly_rate_valid_from, YYYY-MM-DD). ' +
+              'Work already logged before that date keeps its rate.',
+          });
+          return;
+        }
+        // The very first rate of a project without one starts with the project.
+        validFrom = rateValidFrom ?? toDateOnly(existing.start_date) ?? toDateOnly(new Date());
+      }
+
+      if (Object.keys(projectFields).length > 0) {
+        await projectService.update(id, projectFields);
+      }
+
+      let repricedEntries = 0;
+      if (rateChanges && validFrom) {
+        // A period already starting that day is replaced rather than conflicting.
+        const impact = await projectRateService.getImpact(id, userId, validFrom);
+        const saved = impact?.existing_period
+          ? await projectRateService.updateRate(
+              impact.existing_period.id,
+              userId,
+              { hourly_rate: requestedRate as number },
+              { applyToExisting: applyRateToExisting !== false }
+            )
+          : await projectRateService.addRate(
+              id,
+              userId,
+              { hourly_rate: requestedRate as number, valid_from: validFrom, note: 'Rate changed on project' },
+              { applyToExisting: applyRateToExisting !== false }
+            );
+        repricedEntries = saved?.repriced_entries ?? 0;
+      }
+
+      const updatedProject = await projectService.findByIdForUser(id, userId);
+      res.status(200).json({
+        message: 'Project updated successfully',
+        project: updatedProject,
+        repriced_entries: repricedEntries,
+      });
     } catch (err: any) {
       logger.error('Update project error:', err);
        if(err.message.includes("Invalid client ID specified.")) {
            res.status(400).json({ message: "Validation failed: Invalid 'client_id' provided for update." });
+        } else if (/already starts on that date/.test(err.message)) {
+          res.status(409).json({ message: err.message });
         } else {
             res.status(500).json({ message: err.message || 'Internal server error' });
         }

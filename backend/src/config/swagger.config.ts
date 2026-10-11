@@ -352,8 +352,19 @@ const swaggerDefinition = {
           hourly_rate: {
             type: 'number',
             format: 'decimal',
-            description: 'Hourly rate for this project',
+            description: 'Hourly rate for this project. Changing the rate of a project that already has one REQUIRES hourly_rate_valid_from — ask the user from which day the new rate applies; never assume today.',
             example: 75.00
+          },
+          hourly_rate_valid_from: {
+            type: 'string',
+            format: 'date',
+            description: 'Day (YYYY-MM-DD) from which a changed hourly_rate applies. Required when changing an existing rate. Work logged before that day keeps its rate.',
+            example: '2026-11-01'
+          },
+          apply_rate_to_existing: {
+            type: 'boolean',
+            description: 'Time entries dated on/after hourly_rate_valid_from that carry the previous rate move to the new rate (default true) — "valid from" means exactly that. Individually priced entries are never changed. Set false only when the user explicitly wants already-logged entries kept, e.g. because they are already invoiced.',
+            default: true
           },
           currency: {
             type: 'string',

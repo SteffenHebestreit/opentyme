@@ -354,4 +354,194 @@ describe('ProjectRateService', () => {
       expect(await rateService.getEffectiveRate(project.id, TEST_USER_ID)).toBe(400);
     });
   });
+  describe('changing a rate for a contract extension signed after the fact', () => {
+    async function logEntry(projectId: string, date: string) {
+      return timeEntryService.create({
+        user_id: TEST_USER_ID,
+        project_id: projectId,
+        description: 'logged before the extension was signed',
+        entry_date: date as any,
+        entry_time: '09:00:00',
+        duration_hours: 2,
+        is_billable: true,
+      } as any);
+    }
+
+    it('previews what a backdated rate would touch', async () => {
+      const project = await makeProject();
+      await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 80, valid_from: ymd(-60) });
+      await logEntry(project.id, ymd(-10));
+      await logEntry(project.id, ymd(-5));
+      await logEntry(project.id, ymd(-40)); // before the new period — not affected
+
+      const impact = await rateService.getImpact(project.id, TEST_USER_ID, ymd(-14));
+
+      expect(impact?.previous_rate).toBe(80);
+      expect(impact?.logged.count).toBe(2);
+      expect(impact?.logged.hours).toBe(4);
+      expect(impact?.logged.following).toBe(2);
+      expect(impact?.logged.deviating).toBe(0);
+      expect(impact?.existing_period).toBeNull();
+    });
+
+    it('reports a period already starting that day instead of failing later', async () => {
+      const project = await makeProject();
+      const existing = await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 80, valid_from: ymd(-14) });
+
+      const impact = await rateService.getImpact(project.id, TEST_USER_ID, ymd(-14));
+
+      expect(impact?.existing_period?.id).toBe(existing!.id);
+    });
+
+    it('moves entries dated from the start onto the new rate by default', async () => {
+      // The reported case: rate changed on the 10th, valid from the 1st — the
+      // entries of the 1st to the 9th must follow. "Valid from" means exactly that.
+      const project = await makeProject();
+      await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 80, valid_from: ymd(-60) });
+      const inside = await logEntry(project.id, ymd(-5));
+      const before = await logEntry(project.id, ymd(-30));
+
+      const rate = await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 95, valid_from: ymd(-14) });
+
+      expect(rate?.repriced_entries).toBe(1);
+      expect(parseFloat((await timeEntryService.findById(inside.id))?.hourly_rate as any)).toBe(95);
+      // Dated before the start: untouched.
+      expect(parseFloat((await timeEntryService.findById(before.id))?.hourly_rate as any)).toBe(80);
+    });
+
+    it('keeps logged entries when explicitly told to', async () => {
+      const project = await makeProject();
+      await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 80, valid_from: ymd(-60) });
+      const entry = await logEntry(project.id, ymd(-5));
+
+      await rateService.addRate(
+        project.id,
+        TEST_USER_ID,
+        { hourly_rate: 95, valid_from: ymd(-14) },
+        { applyToExisting: false }
+      );
+
+      expect(parseFloat((await timeEntryService.findById(entry.id))?.hourly_rate as any)).toBe(80);
+    });
+
+    it('never changes an individually priced entry', async () => {
+      const project = await makeProject();
+      await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 80, valid_from: ymd(-60) });
+      const goodwill = await timeEntryService.create({
+        user_id: TEST_USER_ID,
+        project_id: project.id,
+        description: 'goodwill, not charged',
+        entry_date: ymd(-5) as any,
+        entry_time: '09:00:00',
+        duration_hours: 1,
+        is_billable: true,
+        hourly_rate: 0,
+      } as any);
+
+      await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 95, valid_from: ymd(-14) });
+
+      expect(parseFloat((await timeEntryService.findById(goodwill.id))?.hourly_rate as any)).toBe(0);
+    });
+
+    it('moves entries back when the period is deleted', async () => {
+      const project = await makeProject();
+      await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 80, valid_from: ymd(-60) });
+      const raise = await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 95, valid_from: ymd(-14) });
+      const entry = await logEntry(project.id, ymd(-5)); // stamped 95
+
+      await rateService.deleteRate(raise!.id, TEST_USER_ID);
+
+      expect(parseFloat((await timeEntryService.findById(entry.id))?.hourly_rate as any)).toBe(80);
+    });
+
+    it('moves entries when a period rate is corrected', async () => {
+      const project = await makeProject();
+      await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 80, valid_from: ymd(-60) });
+      const raise = await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 95, valid_from: ymd(-14) });
+      const entry = await logEntry(project.id, ymd(-5));
+
+      await rateService.updateRate(raise!.id, TEST_USER_ID, { hourly_rate: 92 });
+
+      expect(parseFloat((await timeEntryService.findById(entry.id))?.hourly_rate as any)).toBe(92);
+    });
+
+    it('aligns a period on request, only entries at the given rate', async () => {
+      const project = await makeProject();
+      await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 80, valid_from: ymd(-60) });
+      const left = await logEntry(project.id, ymd(-5)); // 80
+      const goodwill = await timeEntryService.create({
+        user_id: TEST_USER_ID, project_id: project.id, description: 'goodwill',
+        entry_date: ymd(-4) as any, entry_time: '09:00:00', duration_hours: 1, is_billable: true, hourly_rate: 0,
+      } as any);
+      // Simulates entries left behind by the earlier opt-in behaviour.
+      const raise = await rateService.addRate(
+        project.id, TEST_USER_ID, { hourly_rate: 95, valid_from: ymd(-14) }, { applyToExisting: false }
+      );
+
+      const periods = await rateService.listRates(project.id, TEST_USER_ID);
+      const raised = periods.find((period) => period.id === raise!.id)!;
+      expect(raised.deviating).toEqual(
+        expect.arrayContaining([expect.objectContaining({ rate: 80, count: 1 }), expect.objectContaining({ rate: 0, count: 1 })])
+      );
+
+      const aligned = await rateService.alignPeriodEntries(raise!.id, TEST_USER_ID, 80);
+
+      expect(aligned).toBe(1);
+      expect(parseFloat((await timeEntryService.findById(left.id))?.hourly_rate as any)).toBe(95);
+      expect(parseFloat((await timeEntryService.findById(goodwill.id))?.hourly_rate as any)).toBe(0);
+    });
+
+    it('refuses to align another tenant period', async () => {
+      const project = await makeProject();
+      const rate = await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 80, valid_from: ymd(-60) });
+
+      expect(await rateService.alignPeriodEntries(rate!.id, OTHER_USER_ID)).toBeNull();
+    });
+
+    it('moves logged entries onto the new rate when explicitly asked', async () => {
+      const project = await makeProject();
+      await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 80, valid_from: ymd(-60) });
+      const inside = await logEntry(project.id, ymd(-5));
+      const before = await logEntry(project.id, ymd(-30));
+
+      const rate = await rateService.addRate(
+        project.id,
+        TEST_USER_ID,
+        { hourly_rate: 95, valid_from: ymd(-14) },
+        { applyToExisting: true }
+      );
+
+      expect(rate?.repriced_entries).toBe(1);
+      expect(parseFloat((await timeEntryService.findById(inside.id))?.hourly_rate as any)).toBe(95);
+      // Work before the new period is never touched.
+      expect(parseFloat((await timeEntryService.findById(before.id))?.hourly_rate as any)).toBe(80);
+    });
+
+    it('never reaches into a later agreed period', async () => {
+      const project = await makeProject();
+      await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 80, valid_from: ymd(-60) });
+      await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 120, valid_from: ymd(-3) });
+      const later = await logEntry(project.id, ymd(-1)); // stamped 120
+
+      await rateService.addRate(
+        project.id,
+        TEST_USER_ID,
+        { hourly_rate: 95, valid_from: ymd(-14) },
+        { applyToExisting: true }
+      );
+
+      expect(parseFloat((await timeEntryService.findById(later.id))?.hourly_rate as any)).toBe(120);
+    });
+
+    it('shows the next scheduled rate in the project list', async () => {
+      const project = await makeProject();
+      await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 80, valid_from: ymd(-10) });
+      await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 95, valid_from: ymd(30) });
+
+      const listed = (await projectService.findAll(TEST_USER_ID)).find((p) => p.id === project.id) as any;
+
+      expect(parseFloat(listed.next_rate)).toBe(95);
+      expect(listed.next_rate_from).toBe(ymd(30));
+    });
+  });
 });

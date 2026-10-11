@@ -30,13 +30,22 @@ export const createProjectRateSchema = Joi.object({
   hourly_rate: Joi.number().min(0).max(99999999.99).required(),
   valid_from: isoDate.required(),
   note: Joi.string().max(1000).optional().allow('', null),
+  // Entries dated from valid_from that follow the timeline move to the new rate
+  // — that is what "valid from" means. false keeps them (e.g. already billed).
+  apply_to_existing: Joi.boolean().optional().default(true),
 });
 
 export const updateProjectRateSchema = Joi.object({
   hourly_rate: Joi.number().min(0).max(99999999.99).optional(),
   valid_from: isoDate.optional(),
   note: Joi.string().max(1000).optional().allow('', null),
-}).min(1);
+  apply_to_existing: Joi.boolean().optional().default(true),
+}).or('hourly_rate', 'valid_from', 'note');
+
+/** Query for the "what would this change touch" preview. */
+export const rateImpactQuerySchema = Joi.object({
+  valid_from: isoDate.required(),
+});
 
 /**
  * Query for "what does this project cost on date X" — used by the time-entry
@@ -44,4 +53,14 @@ export const updateProjectRateSchema = Joi.object({
  */
 export const effectiveRateQuerySchema = Joi.object({
   date: isoDate.optional(),
+});
+
+/** Align a period's entries with its rate, optionally only those at one rate. */
+export const alignRateSchema = Joi.object({
+  from_rate: Joi.number().min(0).optional().allow(null),
+});
+
+/** Opt-out when deleting a period: keep entries at the deleted period's rate. */
+export const deleteRateQuerySchema = Joi.object({
+  apply_to_existing: Joi.boolean().optional().default(true),
 });

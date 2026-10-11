@@ -365,4 +365,64 @@ describe('ClientService', () => {
       expect(deleteFileFromPath).not.toHaveBeenCalled();
     });
   });
+  describe('contract expiry summary in the client list', () => {
+    const ymd = (days: number) => {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() + days);
+      return d.toISOString().split('T')[0];
+    };
+
+    beforeAll(async () => {
+      await getDbClient().query(
+        `CREATE TABLE IF NOT EXISTS client_documents (
+           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+           user_id UUID NOT NULL,
+           client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+           project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+           title VARCHAR(255) NOT NULL,
+           document_type VARCHAR(50) NOT NULL DEFAULT 'contract',
+           file_url TEXT, file_filename VARCHAR(255), file_size INTEGER, file_mimetype VARCHAR(100),
+           version INTEGER NOT NULL DEFAULT 1,
+           supersedes_document_id UUID REFERENCES client_documents(id) ON DELETE SET NULL,
+           signed_at DATE, valid_from DATE, valid_until DATE, notes TEXT,
+           created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+         )`
+      );
+    });
+
+    async function insertDocument(clientId: string, fields: Record<string, unknown>) {
+      const result = await getDbClient().query(
+        `INSERT INTO client_documents (user_id, client_id, title, document_type, valid_until, supersedes_document_id)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+        [TEST_USER_ID, clientId, fields.title ?? 'Doc', fields.type ?? 'contract', fields.until ?? null, fields.supersedes ?? null]
+      );
+      return result.rows[0].id as string;
+    }
+
+    it('flags a contract that ends soon', async () => {
+      const client = await clientService.create({ user_id: TEST_USER_ID, name: 'Expiring Client' });
+      await insertDocument(client.id, { until: ymd(20) });
+      await insertDocument(client.id, { type: 'nda' });
+
+      const listed = (await clientService.findAll(TEST_USER_ID)).find((c) => c.id === client.id) as any;
+
+      expect(listed.documents_count).toBe(2);
+      expect(listed.expiring_documents).toBe(1);
+      expect(listed.next_document_expiry).toBe(ymd(20));
+    });
+
+    it('stops flagging once the contract has been extended', async () => {
+      const client = await clientService.create({ user_id: TEST_USER_ID, name: 'Extended Client' });
+      const old = await insertDocument(client.id, { until: ymd(20) });
+      await insertDocument(client.id, { until: ymd(385), supersedes: old });
+
+      const listed = (await clientService.findAll(TEST_USER_ID)).find((c) => c.id === client.id) as any;
+
+      // Only the newest version counts — the superseded contract is history.
+      expect(listed.documents_count).toBe(1);
+      expect(listed.expiring_documents).toBe(0);
+    });
+  });
 });

@@ -97,17 +97,17 @@
   "documents": {
     "action": "Dokumente",
     "title": "Dokumente – {{name}}",
-    "subtitle": "Unterzeichnete Verträge und weitere Unterlagen dieses Kunden.",
+    "subtitle": "Unterzeichnete Verträge und weitere Unterlagen dieses Kunden – Datei einfach hierher ziehen.",
     "close": "Schließen",
     "cancel": "Abbrechen",
     "upload": "Dokument hochladen",
     "uploading": "Wird hochgeladen…",
     "uploadTitle": "Dokument hochladen",
-    "newVersion": "Neue Version",
+    "newVersion": "Neue Fassung hochladen",
     "newVersionTitle": "Neue Version hochladen",
     "newVersionOf": "Neue Version von „{{title}}“ (aktuell Version {{version}})",
     "newVersionHint": "Die bisherige Datei bleibt als historische Version abrufbar.",
-    "edit": "Bearbeiten",
+    "edit": "Angaben bearbeiten",
     "editTitle": "„{{title}}“ bearbeiten",
     "save": "Speichern",
     "saving": "Wird gespeichert…",
@@ -124,12 +124,12 @@
     "superseded": "Ersetzt",
     "version": "Version {{number}}",
     "showHistory": "Frühere Versionen anzeigen ({{versions}})",
-    "hideHistory": "Frühere Versionen ausblenden",
+    "hideHistory": "Frühere Fassungen ausblenden",
     "uploadedOn": "Hochgeladen am {{date}}",
     "unknownSize": "Größe unbekannt",
     "noProject": "Kein Projekt",
     "allProjects": "Alle Projekte",
-    "filterProject": "Projekt",
+    "filterProject": "Nach Projekt filtern",
     "types": {
       "contract": "Vertrag",
       "amendment": "Nachtrag",
@@ -141,7 +141,7 @@
     },
     "fields": {
       "file": "Datei",
-      "fileHint": "PDF, JPEG, PNG, WebP, DOC, DOCX oder ODT – bis zu 25 MB",
+      "fileHint": "PDF, Bild (JPEG, PNG, WebP) oder Word/ODT – bis 25 MB",
       "title": "Titel",
       "titlePlaceholder": "Rahmenvertrag 2026",
       "type": "Dokumentart",
@@ -156,14 +156,75 @@
       "fileRequired": "Bitte wählen Sie eine Datei aus",
       "fileTooLarge": "Die Datei ist größer als 25 MB",
       "fileType": "Es sind nur PDF-, JPEG-, PNG-, WebP-, DOC-, DOCX- und ODT-Dateien erlaubt",
-      "titleRequired": "Ein Titel ist erforderlich"
+      "titleRequired": "Ein Titel ist erforderlich",
+      "untilBeforeFrom": "„Gültig bis“ liegt vor „Gültig ab“."
     },
     "messages": {
-      "uploaded": "Dokument erfolgreich hochgeladen",
-      "versionUploaded": "Neue Version erfolgreich hochgeladen",
-      "updated": "Dokument erfolgreich aktualisiert",
-      "deleted": "Dokument erfolgreich gelöscht",
-      "deleteConfirm": "„{{title}}“ löschen? Die gespeicherte Datei wird endgültig entfernt und kann nicht wiederhergestellt werden."
-    }
+      "uploaded": "Dokument erfolgreich hochgeladen.",
+      "versionUploaded": "Neue Version erfolgreich hochgeladen.",
+      "updated": "Dokument erfolgreich aktualisiert.",
+      "deleted": "Dokument erfolgreich gelöscht.",
+      "deleteConfirm": "„{{title}}“ wirklich löschen? Die Datei wird endgültig entfernt."
+    },
+    "extend": "Verlängern",
+    "open": "Öffnen",
+    "moreActions": "Weitere Aktionen für „{{title}}“",
+    "openVersion": "Version {{number}} öffnen",
+    "deleteVersion": "Version {{number}} löschen",
+    "history_one": "{{count}} frühere Fassung",
+    "history_other": "{{count}} frühere Fassungen",
+    "status": {
+      "active": "Läuft",
+      "expiresToday": "Läuft heute aus",
+      "expiresIn_one": "Läuft in {{count}} Tag aus",
+      "expiresIn_other": "Läuft in {{count}} Tagen aus",
+      "expired": "Abgelaufen am {{date}}",
+      "upcoming": "Beginnt am {{date}}"
+    },
+    "term": {
+      "range": "gültig {{from}} – {{until}}",
+      "from": "gültig ab {{from}}",
+      "until": "gültig bis {{until}}",
+      "signed": "unterzeichnet {{date}}"
+    },
+    "attention": {
+      "expiring_one": "„{{title}}“ läuft in {{count}} Tag aus ({{date}}).",
+      "expiring_other": "„{{title}}“ läuft in {{count}} Tagen aus ({{date}}).",
+      "expired": "„{{title}}“ ist am {{date}} abgelaufen."
+    },
+    "drop": {
+      "prompt": "Datei hierher ziehen oder klicken zum Auswählen",
+      "emptyPrompt": "Ersten Vertrag hierher ziehen oder klicken zum Auswählen",
+      "release": "Loslassen zum Hochladen",
+      "change": "Andere Datei",
+      "remove": "Datei entfernen"
+    },
+    "form": {
+      "uploadTitle": "Dokument hochladen",
+      "versionTitle": "Neue Fassung von „{{title}}“",
+      "versionHint": "Die bisherige Fassung (Version {{version}}) bleibt als frühere Fassung abrufbar.",
+      "extendTitle": "„{{title}}“ verlängern",
+      "extendHint": "Der bisherige Vertrag (Version {{version}}, gültig bis {{date}}) bleibt als frühere Fassung erhalten. Die neue Laufzeit beginnt standardmäßig am Tag danach.",
+      "editTitle": "Angaben zu „{{title}}“ bearbeiten",
+      "term": "Laufzeit",
+      "plusMonths_one": "+{{count}} Monat",
+      "plusMonths_other": "+{{count}} Monate",
+      "back": "Zurück",
+      "extendSubmit": "Verlängerung speichern"
+    },
+    "rate": {
+      "toggle": "Mit diesem Vertrag ändert sich der Stundensatz für „{{project}}“",
+      "current": "Aktuell {{rate}} pro Stunde",
+      "none": "Für dieses Projekt ist noch kein Stundensatz hinterlegt.",
+      "newRate": "Neuer Stundensatz",
+      "validFrom": "Satz gilt ab *",
+      "rateRequired": "Bitte geben Sie den neuen Stundensatz an.",
+      "dateRequired": "Bitte wählen Sie, ab wann der neue Satz gilt.",
+      "saved": "Neuer Stundensatz {{rate}} ab {{date}} gespeichert.",
+      "repriced_one": "{{count}} bereits erfasster Eintrag wurde auf {{rate}} umgestellt.",
+      "repriced_other": "{{count}} bereits erfasste Einträge wurden auf {{rate}} umgestellt.",
+      "failed": "Das Dokument wurde gespeichert, der Stundensatz aber nicht: {{reason}} – bitte im Projekt unter „Stundensätze“ nachtragen."
+    },
+    "expiryHint": "Ein Vertrag läuft am {{date}} aus – jetzt verlängern"
   }
 }

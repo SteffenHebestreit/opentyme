@@ -20,9 +20,18 @@ const db = getDbClient();
  * @param value - Date, 'YYYY-MM-DD' string, or nullish
  * @returns The date-only string, or null
  */
-function toDateOnly(value: any): string | null {
+export function toDateOnly(value: any): string | null {
   if (!value) return null;
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  // pg returns a DATE column as a Date at LOCAL midnight. toISOString() would
+  // convert that to UTC and land on the previous day for any server timezone
+  // east of UTC, so read the local calendar parts instead.
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, '0');
+    const d = String(value.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
   const text = String(value);
   return /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : null;
 }
@@ -158,10 +167,21 @@ export class ProjectService {
 
     const whereClause = `WHERE ${conditions.join(' AND ')}`;
 
+    // next_rate / next_rate_from: the earliest SCHEDULED rate period, so the
+    // project list can show "95,00 € ab 01.01.2027" next to today's rate. A
+    // scheduled raise that nobody can see is one nobody can double-check.
     const queryText = `
       SELECT p.id, p.user_id, p.name, p.description, p.client_id, p.status, p.start_date, p.end_date, 
-             p.hourly_rate, p.budget, p.rate_type, p.estimated_hours, p.currency, p.tags, p.recurring_payment, p.created_at, p.updated_at
+             p.hourly_rate, p.budget, p.rate_type, p.estimated_hours, p.currency, p.tags, p.recurring_payment, p.created_at, p.updated_at,
+             nr.hourly_rate AS next_rate, to_char(nr.valid_from, 'YYYY-MM-DD') AS next_rate_from
       FROM projects p
+      LEFT JOIN LATERAL (
+        SELECT h.hourly_rate, h.valid_from
+        FROM project_rate_history h
+        WHERE h.project_id = p.id AND h.valid_from > CURRENT_DATE
+        ORDER BY h.valid_from ASC
+        LIMIT 1
+      ) nr ON true
       ${whereClause}
       ORDER BY p.created_at DESC
     `;
@@ -337,6 +357,14 @@ export class ProjectService {
       return this.findById(id);
     }
 
+    const previousRateRow = projectData.hourly_rate !== undefined
+      ? await db.query(`SELECT hourly_rate FROM projects WHERE id = $1`, [id])
+      : null;
+    const previousRate =
+      previousRateRow?.rows[0]?.hourly_rate === null || previousRateRow?.rows[0]?.hourly_rate === undefined
+        ? null
+        : Number(previousRateRow.rows[0].hourly_rate);
+
     const queryText = `
       UPDATE projects 
       SET ${setParts.join(', ')}, updated_at = CURRENT_TIMESTAMP 
@@ -348,11 +376,16 @@ export class ProjectService {
         const result = await db.query(queryText, values);
         if (result.rows.length === 0) return null;
 
-        // Editing the rate on the project form means "the rate is this from
-        // today". Writing only projects.hourly_rate would leave the timeline
-        // stale, and new time entries — which are stamped from the timeline —
-        // would silently keep the OLD rate while the UI showed the new one.
-        if (projectData.hourly_rate !== undefined && projectData.hourly_rate !== null) {
+        // Direct service callers (the HTTP path routes rate changes through the
+        // rate timeline with an explicit start date instead) still keep the
+        // timeline in step — but only for an actual CHANGE. Recording on every
+        // call turned a mere rename, which re-sends the unchanged rate, into a
+        // new period starting today.
+        if (
+          projectData.hourly_rate !== undefined &&
+          projectData.hourly_rate !== null &&
+          (previousRate === null || Number(projectData.hourly_rate) !== previousRate)
+        ) {
           await this.recordRatePeriod(
             db,
             result.rows[0].id,

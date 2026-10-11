@@ -36,14 +36,15 @@
     "actions": "Actions",
     "start": "Start",
     "due": "Due",
-    "rate": "Rate"
+    "rate": "Rate",
+    "nextRate": "from {{date}}: {{rate}}"
   },
   "rates": {
-    "manage": "Rates",
+    "manage": "Hourly rates",
     "title": "Hourly rates — {{name}}",
     "titleFallback": "Hourly rates",
     "close": "Close",
-    "intro": "Changing a rate never re-prices work you already logged — existing time entries keep the rate they were saved with.",
+    "intro": "A rate applies from the date you choose — to every entry from that day on, including ones already logged. Entries before it stay as they are, and so do individually priced ones.",
     "loading": "Loading rate periods…",
     "openEnded": "Open-ended",
     "perHour": "/hr",
@@ -59,17 +60,17 @@
       "scheduled": "Scheduled"
     },
     "empty": {
-      "title": "No rate periods yet",
-      "message": "Add the first rate below. From then on you can schedule changes in advance without touching what is already billed."
+      "title": "No hourly rate yet",
+      "message": "Set which rate applies from which date. Later changes — for example a contract extension — can be scheduled here in advance."
     },
     "form": {
-      "addTitle": "Add rate period",
-      "editTitle": "Edit rate period",
+      "addTitle": "Set a new hourly rate",
+      "editTitle": "Edit rate from {{date}}",
       "addSubmit": "Add rate",
       "saveEdit": "Save changes",
       "cancelEdit": "Cancel",
       "rate": {
-        "label": "Hourly rate",
+        "label": "New hourly rate",
         "placeholder": "150",
         "required": "Hourly rate is required",
         "min": "Hourly rate must be zero or higher"
@@ -77,19 +78,85 @@
       "validFrom": {
         "label": "Valid from",
         "required": "Start date is required",
-        "helper": "A future date schedules the change."
+        "helper": "A future date schedules the change.",
+        "labelRequired": "Applies from *",
+        "requiredOnChange": "Please choose from when the new rate applies."
       },
       "note": {
-        "label": "Note",
-        "placeholder": "Agreed by e-mail"
-      }
+        "label": "Reason / note (optional)",
+        "placeholder": "e.g. contract extension 2027"
+      },
+      "back": "Back",
+      "save": "Save rate"
     },
     "messages": {
       "added": "Rate period added.",
       "updated": "Rate period updated.",
       "deleted": "Rate period deleted.",
       "conflict": "A rate already starts on that date. Edit that period instead, or pick another start date.",
-      "deleteConfirm": "Delete the rate period starting {{date}}? Already-logged time entries keep their rate."
+      "deleteConfirm": "Really delete the rate from {{date}}? Time already logged keeps its rate.",
+      "saved": "Rate of {{rate}} from {{date}} saved.",
+      "repriced_one": "{{count}} already logged entry was moved to {{rate}}.",
+      "repriced_other": "{{count}} already logged entries were moved to {{rate}}.",
+      "deletedFrom": "Rate from {{date}} deleted.",
+      "aligned_one": "{{count}} entry was aligned to {{rate}}.",
+      "aligned_other": "{{count}} entries were aligned to {{rate}}.",
+      "deleteConfirmFallback": "Really delete the rate from {{date}}? Entries in this period at {{rate}} fall back to {{previous}}."
+    },
+    "setNew": "Set new rate",
+    "setFirst": "Set first rate",
+    "history": "History",
+    "summary": {
+      "current": "Currently applies",
+      "since": "since {{date}}",
+      "noneYet": "No rate in effect yet",
+      "next": "Next change",
+      "from": "from {{date}}",
+      "noneScheduled": "No change scheduled"
+    },
+    "period": {
+      "range": "{{from}} – {{until}}",
+      "open": "from {{from}}"
+    },
+    "actions": {
+      "edit": "Edit rate from {{date}}",
+      "delete": "Delete rate from {{date}}"
+    },
+    "quick": {
+      "label": "Quick start date",
+      "today": "From today",
+      "date": "From {{date}}"
+    },
+    "impact": {
+      "loading": "Calculating impact…",
+      "range": "applies {{from}} – {{until}}",
+      "from": "applies from {{from}}",
+      "scheduled": "Takes effect automatically on {{date}}. Until then {{previous}} still applies.",
+      "scheduledNoPrevious": "Takes effect on {{date}}.",
+      "endsAt": "From {{date}} the next rate that is already agreed applies.",
+      "replaces": "A rate of {{rate}} already starts on {{date}} — this one replaces it.",
+      "invoicesSince_one": "{{count}} invoice has already been issued to this client since {{date}}. Check whether these entries were billed in it before moving them.",
+      "invoicesSince_other": "{{count}} invoices have already been issued to this client since {{date}}. Check whether these entries were billed in them before moving them.",
+      "noLogged": "Nothing has been logged in this period yet — no existing time is affected.",
+      "willMove_one": "{{count}} entry already logged since {{date}} will be moved to {{rate}}.",
+      "willMove_other": "{{count}} entries already logged since {{date}} will be moved to {{rate}}.",
+      "willKeep_one": "{{count}} entry already logged since {{date}} keeps its current rate.",
+      "willKeep_other": "{{count}} entries already logged since {{date}} keep their current rate.",
+      "deviating_one": "{{count}} individually priced entry stays as it is.",
+      "deviating_other": "{{count}} individually priced entries stay as they are.",
+      "keepExisting": "Keep the current rate for entries already logged (e.g. because they are already invoiced)"
+    },
+    "systemNotes": {
+      "initial": "Initial rate",
+      "migrated": "Initial rate (migrated)",
+      "projectForm": "Changed on the project"
+    },
+    "deviation": {
+      "atRate_one": "{{count}} entry in this period is still at {{rate}}.",
+      "atRate_other": "{{count}} entries in this period are still at {{rate}}.",
+      "noRate_one": "{{count}} entry in this period has no rate.",
+      "noRate_other": "{{count}} entries in this period have no rate.",
+      "align": "Align to {{rate}}"
     }
   },
   "form": {
@@ -126,7 +193,12 @@
       "label": "Hourly rate",
       "placeholder": "75",
       "required": "Hourly rate is required for hourly projects",
-      "min": "Hourly rate must be zero or higher"
+      "min": "Hourly rate must be zero or higher",
+      "helperCreate": "Applies from the project start. Later changes get their own start date.",
+      "helperEdit": "The rate currently in effect. If you change it, you choose from when the new one applies.",
+      "showHistory": "View rate history",
+      "changeTitle": "From when does the new hourly rate apply?",
+      "changeHint": "Previously {{previous}}. The previous rate keeps applying until the chosen date."
     },
     "estimatedHours": {
       "label": "Estimated hours",

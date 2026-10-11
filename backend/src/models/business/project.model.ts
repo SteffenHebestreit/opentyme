@@ -113,6 +113,10 @@ export interface BaseProject {
   start_date: Date | null;
   end_date: Date | null;
   hourly_rate: number | null;
+  /** Earliest scheduled rate (valid_from in the future), from the rate timeline. List queries only. */
+  next_rate?: number | string | null;
+  /** YYYY-MM-DD start of {@link next_rate}. */
+  next_rate_from?: string | null;
   budget: number | null;
   rate_type: RateType | null;
   estimated_hours: number | null;

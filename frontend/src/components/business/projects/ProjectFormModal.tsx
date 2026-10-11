@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo } from 'react';
+import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Alert } from '../../common/Alert';
@@ -6,7 +6,8 @@ import { Button } from '../../common/Button';
 import { Input, CustomSelect, Textarea } from '../../forms';
 import { Modal } from '../../ui/Modal';
 import { Client, Project, ProjectPayload, ProjectStatus, RateType } from '../../../api/types';
-import { CURRENCIES } from '../../../utils/currency';
+import { CURRENCIES, formatCurrency } from '../../../utils/currency';
+import { EffectiveDateField, RateImpactPanel } from './RateChange';
 
 /**
  * Modal form for creating and editing projects.
@@ -110,6 +111,8 @@ interface ProjectFormModalProps {
   onClose: () => void;
   isSubmitting: boolean;
   error?: string | null;
+  /** Opens the project's rate timeline (edit mode). */
+  onShowRateHistory?: (project: Project) => void;
 }
 
 /**
@@ -208,9 +211,18 @@ export const ProjectFormModal: FC<ProjectFormModalProps> = ({
   onClose,
   isSubmitting,
   error,
+  onShowRateHistory,
 }) => {
   const { t } = useTranslation('projects');
   const hasClients = clients.length > 0;
+
+  // A changed rate always needs the day it takes effect — deliberately NOT
+  // pre-filled, so "from today" is a choice the user makes, never a default
+  // that silently re-prices the rest of the month.
+  const [rateValidFrom, setRateValidFrom] = useState('');
+  const [applyRateToExisting, setApplyRateToExisting] = useState(true);
+  const [rateDateError, setRateDateError] = useState<string | undefined>(undefined);
+  const noopImpact = useCallback(() => undefined, []);
 
   const initialValues = useMemo((): FormValues => {
     if (!initialProject) {
@@ -281,10 +293,29 @@ export const ProjectFormModal: FC<ProjectFormModalProps> = ({
   useEffect(() => {
     if (open) {
       reset(initialValues);
+      setRateValidFrom('');
+      setApplyRateToExisting(true);
+      setRateDateError(undefined);
     }
   }, [initialValues, open, reset]);
 
+  const watchedRate = watch('hourly_rate');
+  const previousRate =
+    mode === 'edit' && initialProject?.hourly_rate != null ? Number(initialProject.hourly_rate) : null;
+  const enteredRate = watchedRate === '' || watchedRate == null ? null : Number(watchedRate);
+  const rateChanged =
+    selectedRateType === 'hourly' &&
+    previousRate !== null &&
+    enteredRate !== null &&
+    !Number.isNaN(enteredRate) &&
+    enteredRate !== previousRate;
+
   const handleFormSubmit = async (values: FormValues) => {
+    if (rateChanged && !rateValidFrom) {
+      setRateDateError(t('rates.form.validFrom.requiredOnChange'));
+      return;
+    }
+
     const payload: ProjectPayload = {
       name: values.name.trim(),
       client_id: values.client_id,
@@ -298,6 +329,9 @@ export const ProjectFormModal: FC<ProjectFormModalProps> = ({
       hourly_rate: values.rate_type === 'hourly' && values.hourly_rate ? Number(values.hourly_rate) : null,
       estimated_hours: values.estimated_hours ? Number(values.estimated_hours) : null,
       recurring_payment: values.recurring_payment,
+      ...(rateChanged
+        ? { hourly_rate_valid_from: rateValidFrom, apply_rate_to_existing: applyRateToExisting }
+        : {}),
     };
 
     await onSubmit(payload);
@@ -427,19 +461,74 @@ export const ProjectFormModal: FC<ProjectFormModalProps> = ({
         </div>
 
         {selectedRateType === 'hourly' ? (
-          <Input
-            id="project-hourly-rate"
-            label={t('form.hourlyRate.label')}
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder={t('form.hourlyRate.placeholder')}
-            {...register('hourly_rate', {
-              required: t('form.hourly_rate.required'),
-              min: { value: 0, message: t('form.hourlyRate.min') },
-            })}
-            error={errors.hourly_rate?.message}
-          />
+          <div className="space-y-3">
+            <Input
+              id="project-hourly-rate"
+              label={t('form.hourlyRate.label')}
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder={t('form.hourlyRate.placeholder')}
+              {...register('hourly_rate', {
+                required: t('form.hourlyRate.required'),
+                min: { value: 0, message: t('form.hourlyRate.min') },
+              })}
+              error={errors.hourly_rate?.message}
+              helperText={
+                mode === 'create'
+                  ? t('form.hourlyRate.helperCreate')
+                  : previousRate !== null && !rateChanged
+                    ? t('form.hourlyRate.helperEdit')
+                    : undefined
+              }
+            />
+
+            {mode === 'edit' && initialProject && onShowRateHistory && !rateChanged ? (
+              <button
+                type="button"
+                className="text-xs font-medium text-purple-600 hover:underline dark:text-purple-400"
+                onClick={() => onShowRateHistory(initialProject)}
+              >
+                {t('form.hourlyRate.showHistory')}
+              </button>
+            ) : null}
+
+            {rateChanged && initialProject ? (
+              <div className="space-y-4 rounded-xl border border-purple-300 bg-white p-4 shadow-sm dark:border-purple-700/70 dark:bg-gray-900">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {t('form.hourlyRate.changeTitle')}
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">
+                    {t('form.hourlyRate.changeHint', {
+                      previous: formatCurrency(previousRate as number, initialProject.currency || 'EUR'),
+                    })}
+                  </p>
+                </div>
+                <EffectiveDateField
+                  id="project-rate-change-from"
+                  label={t('rates.form.validFrom.labelRequired')}
+                  value={rateValidFrom}
+                  onChange={(value) => {
+                    setRateValidFrom(value);
+                    setRateDateError(undefined);
+                  }}
+                  error={rateDateError}
+                />
+                {rateValidFrom ? (
+                  <RateImpactPanel
+                    projectId={initialProject.id}
+                    currency={initialProject.currency || 'EUR'}
+                    newRate={enteredRate}
+                    validFrom={rateValidFrom}
+                    applyToExisting={applyRateToExisting}
+                    onApplyToExistingChange={setApplyRateToExisting}
+                    onImpact={noopImpact}
+                  />
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         ) : null}
 
         <div className="flex items-start space-x-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">

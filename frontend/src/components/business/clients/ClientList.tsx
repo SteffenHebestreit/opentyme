@@ -10,7 +10,10 @@ import { SkeletonCardList } from '../../common/Skeleton';
 import { ClientFilters, ClientStatusFilter } from './ClientFilters';
 import { ClientTable } from './ClientTable';
 import { ClientFormModal } from './ClientFormModal';
-import { ClientDocumentsModal } from './ClientDocumentsModal';
+import { ClientDocumentsModal, ContractRateChange } from './ClientDocumentsModal';
+import { useAddProjectRate, useUpdateProjectRate } from '../../../hooks/api/useProjectRates';
+import type { SavedProjectRate } from '../../../api/services/project-rate.service';
+import { formatYmd } from '../../../utils/date';
 import { ClientEmptyState } from './ClientEmptyState';
 import { extractErrorMessage } from '../../../utils/error';
 import {
@@ -25,7 +28,7 @@ import {
 } from '../../../hooks/api/useClientDocuments';
 
 export default function ClientList() {
-  const { t } = useTranslation('clients');
+  const { t, i18n } = useTranslation('clients');
   const { state } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
@@ -55,6 +58,8 @@ export default function ClientList() {
   const updateClient = useUpdateClient();
   const deleteClient = useDeleteClient();
   const uploadDocument = useUploadClientDocument();
+  const addProjectRate = useAddProjectRate();
+  const updateProjectRate = useUpdateProjectRate();
   const updateDocument = useUpdateClientDocument();
   const deleteDocument = useDeleteClientDocument();
 
@@ -185,13 +190,8 @@ export default function ClientList() {
     }
   };
 
+  /** The modal has already asked for confirmation inline. */
   const handleDocumentDelete = async (document: ClientDocument) => {
-    const confirmed = window.confirm(
-      t('documents.messages.deleteConfirm', { title: document.title })
-    );
-    if (!confirmed) {
-      return false;
-    }
     setDocumentError(null);
     setDocumentSuccess(null);
     setDeletingDocumentId(document.id);
@@ -204,6 +204,41 @@ export default function ClientList() {
       return false;
     } finally {
       setDeletingDocumentId(null);
+    }
+  };
+
+  /**
+   * Stores the new hourly rate set while uploading/extending a contract. Goes
+   * through the same rate timeline as the project's rate dialog, so a contract
+   * extension and a manual rate change can never disagree.
+   */
+  const handleContractRateChange = async (change: ContractRateChange): Promise<SavedProjectRate | null> => {
+    const payload = {
+      hourly_rate: change.hourly_rate,
+      valid_from: change.valid_from,
+      note: change.note,
+      apply_to_existing: change.apply_to_existing,
+    };
+    try {
+      const saved = change.replaceRateId
+        ? await updateProjectRate.mutateAsync({ projectId: change.projectId, rateId: change.replaceRateId, payload })
+        : await addProjectRate.mutateAsync({ projectId: change.projectId, payload });
+      const rate = new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: change.currency || 'EUR',
+      }).format(saved.hourly_rate);
+      const parts = [
+        t('documents.rate.saved', { rate, date: formatYmd(saved.valid_from, i18n.language) }),
+      ];
+      if (saved.repriced_entries) {
+        parts.push(t('documents.rate.repriced', { count: saved.repriced_entries, rate }));
+      }
+      setDocumentSuccess((previous) => [previous, ...parts].filter(Boolean).join(' '));
+      return saved;
+    } catch (rateError) {
+      // The document itself is already stored — say exactly what did not happen.
+      setDocumentError(t('documents.rate.failed', { reason: extractErrorMessage(rateError) }));
+      return null;
     }
   };
 
@@ -293,6 +328,7 @@ export default function ClientList() {
           onUpload={handleDocumentUpload}
           onUpdate={handleDocumentUpdate}
           onDelete={handleDocumentDelete}
+          onRateChange={handleContractRateChange}
           isUploading={uploadDocument.isPending}
           isSaving={updateDocument.isPending}
           deletingId={deletingDocumentId}

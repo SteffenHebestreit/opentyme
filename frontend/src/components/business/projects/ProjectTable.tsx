@@ -1,9 +1,9 @@
 import { FC, useMemo } from 'react';
-import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
 import { Project, ProjectStatus } from '../../../api/types';
 import { Button } from '../../common/Button';
-import { getCurrencySymbol } from '../../../utils/currency';
+import { formatCurrency as formatMoney } from '../../../utils/currency';
+import { formatYmd } from '../../../utils/date';
 import clsx from 'clsx';
 import { Table, Column } from '../../common/Table';
 
@@ -46,16 +46,7 @@ const statusClasses: Record<ProjectStatus, string> = {
   completed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200',
 };
 
-const formatDate = (iso: string | null) => {
-  if (!iso) {
-    return '—';
-  }
-  try {
-    return format(new Date(iso), 'MMM d, yyyy');
-  } catch (error) {
-    return iso;
-  }
-};
+const formatDate = (iso: string | null, locale: string) => formatYmd(iso, locale);
 
 const formatCurrency = (value: number | null, currency: string = 'USD') => {
   if (value === null || Number.isNaN(value)) {
@@ -99,7 +90,8 @@ const formatCurrency = (value: number | null, currency: string = 'USD') => {
  * @returns {JSX.Element} Table of projects with actions
  */
 export const ProjectTable: FC<ProjectTableProps> = ({ projects, onEdit, onManageRates, onDelete, isDeletingId }) => {
-  const { t } = useTranslation('projects');
+  const { t, i18n } = useTranslation('projects');
+  const lng = i18n.language;
 
   const columns: Column<Project>[] = useMemo(() => [
     {
@@ -144,8 +136,8 @@ export const ProjectTable: FC<ProjectTableProps> = ({ projects, onEdit, onManage
       header: t('table.timeline'),
       render: (project) => (
         <div className="flex flex-col text-gray-600 dark:text-gray-400">
-          <span>{t('table.start')}: {formatDate(project.start_date)}</span>
-          <span>{t('table.due')}: {formatDate(project.end_date)}</span>
+          <span>{t('table.start')}: {formatDate(project.start_date, lng)}</span>
+          <span>{t('table.due')}: {formatDate(project.end_date, lng)}</span>
         </div>
       ),
       sortable: true,
@@ -158,10 +150,20 @@ export const ProjectTable: FC<ProjectTableProps> = ({ projects, onEdit, onManage
         <div className="flex flex-col text-gray-900 dark:text-gray-100">
           <span className="font-medium">{formatCurrency(project.budget, project.currency || 'USD')}</span>
           <span className="text-xs text-gray-500 dark:text-gray-400">
-            {t('table.rate')}: {project.hourly_rate != null 
-              ? `${getCurrencySymbol(project.currency || 'USD')}${typeof project.hourly_rate === 'string' ? parseFloat(project.hourly_rate).toFixed(2) : project.hourly_rate.toFixed(2)}/hr`
+            {t('table.rate')}:{' '}
+            {project.hourly_rate != null
+              ? `${formatMoney(project.hourly_rate, project.currency || 'EUR')}${t('rates.perHour')}`
               : '—'}
           </span>
+          {/* A scheduled change nobody can see is one nobody double-checks. */}
+          {project.next_rate != null && project.next_rate_from ? (
+            <span className="text-xs text-blue-700 dark:text-blue-300">
+              {t('table.nextRate', {
+                date: formatYmd(project.next_rate_from, lng),
+                rate: formatMoney(project.next_rate, project.currency || 'EUR'),
+              })}
+            </span>
+          ) : null}
         </div>
       ),
       sortable: true,
@@ -211,7 +213,7 @@ export const ProjectTable: FC<ProjectTableProps> = ({ projects, onEdit, onManage
         </div>
       ),
     },
-  ], [t, onEdit, onManageRates, onDelete, isDeletingId]);
+  ], [t, lng, onEdit, onManageRates, onDelete, isDeletingId]);
   
   return <Table data={projects} columns={columns} pageSize={10} />;
 };

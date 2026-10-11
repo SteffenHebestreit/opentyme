@@ -22,7 +22,9 @@
 import { FC, useMemo } from 'react';
 import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
+import { CalendarClock } from 'lucide-react';
 import { Client } from '../../../api/types';
+import { formatYmd } from '../../../utils/date';
 import { Button } from '../../common/Button';
 import { Table, Column } from '../../common/Table';
 
@@ -153,7 +155,7 @@ const formatDate = (isoString: string) => {
  * @returns {JSX.Element} Client table component
  */
 export const ClientTable: FC<ClientTableProps> = ({ clients, onEdit, onDelete, onOpenDocuments, isDeletingId }) => {
-  const { t } = useTranslation('clients');
+  const { t, i18n } = useTranslation('clients');
 
   const columns: Column<Client>[] = useMemo(() => [
     {
@@ -216,9 +218,32 @@ export const ClientTable: FC<ClientTableProps> = ({ clients, onEdit, onDelete, o
             size="sm"
             variant="outline"
             onClick={() => onOpenDocuments(client)}
+            className={
+              client.expiring_documents
+                ? 'border-amber-400 text-amber-800 dark:border-amber-600 dark:text-amber-200'
+                : undefined
+            }
+            title={
+              client.expiring_documents && client.next_document_expiry
+                ? t('documents.expiryHint', { date: formatYmd(client.next_document_expiry, i18n.language) })
+                : undefined
+            }
           >
+            {client.expiring_documents ? (
+              <CalendarClock className="mr-1 h-3.5 w-3.5 text-amber-500" aria-hidden="true" />
+            ) : null}
             {t('documents.action')}
+            {client.documents_count ? (
+              <span className="ml-1.5 rounded-full bg-gray-100 px-1.5 text-xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                {client.documents_count}
+              </span>
+            ) : null}
           </Button>
+          {client.expiring_documents && client.next_document_expiry ? (
+            <span className="sr-only">
+              {t('documents.expiryHint', { date: formatYmd(client.next_document_expiry, i18n.language) })}
+            </span>
+          ) : null}
           <Button
             type="button"
             size="sm"
@@ -239,7 +264,7 @@ export const ClientTable: FC<ClientTableProps> = ({ clients, onEdit, onDelete, o
         </div>
       ),
     },
-  ], [t, onEdit, onDelete, onOpenDocuments, isDeletingId]);
+  ], [t, i18n.language, onEdit, onDelete, onOpenDocuments, isDeletingId]);
   
   return <Table data={clients} columns={columns} pageSize={10} />;
 };

@@ -97,17 +97,17 @@
   "documents": {
     "action": "Documents",
     "title": "Documents – {{name}}",
-    "subtitle": "Signed contracts and other paperwork stored for this client.",
+    "subtitle": "Signed contracts and other paperwork for this client — just drag a file here.",
     "close": "Close",
     "cancel": "Cancel",
     "upload": "Upload document",
     "uploading": "Uploading…",
     "uploadTitle": "Upload document",
-    "newVersion": "New version",
+    "newVersion": "Upload new version",
     "newVersionTitle": "Upload new version",
     "newVersionOf": "New version of “{{title}}” (currently version {{version}})",
     "newVersionHint": "The current file stays available as a historical version.",
-    "edit": "Edit",
+    "edit": "Edit details",
     "editTitle": "Edit “{{title}}”",
     "save": "Save",
     "saving": "Saving…",
@@ -129,7 +129,7 @@
     "unknownSize": "Unknown size",
     "noProject": "No project",
     "allProjects": "All projects",
-    "filterProject": "Project",
+    "filterProject": "Filter by project",
     "types": {
       "contract": "Contract",
       "amendment": "Amendment",
@@ -141,7 +141,7 @@
     },
     "fields": {
       "file": "File",
-      "fileHint": "PDF, JPEG, PNG, WebP, DOC, DOCX or ODT — up to 25 MB",
+      "fileHint": "PDF, image (JPEG, PNG, WebP) or Word/ODT — up to 25 MB",
       "title": "Title",
       "titlePlaceholder": "Framework agreement 2026",
       "type": "Document type",
@@ -156,14 +156,75 @@
       "fileRequired": "Please choose a file to upload",
       "fileTooLarge": "The file is larger than 25 MB",
       "fileType": "Only PDF, JPEG, PNG, WebP, DOC, DOCX and ODT files are allowed",
-      "titleRequired": "A title is required"
+      "titleRequired": "A title is required",
+      "untilBeforeFrom": "“Valid until” is before “Valid from”."
     },
     "messages": {
-      "uploaded": "Document uploaded successfully",
-      "versionUploaded": "New version uploaded successfully",
-      "updated": "Document updated successfully",
-      "deleted": "Document deleted successfully",
-      "deleteConfirm": "Delete “{{title}}”? The stored file is removed permanently and cannot be recovered."
-    }
+      "uploaded": "Document uploaded successfully.",
+      "versionUploaded": "New version uploaded successfully.",
+      "updated": "Document updated successfully.",
+      "deleted": "Document deleted successfully.",
+      "deleteConfirm": "Really delete “{{title}}”? The file is removed permanently."
+    },
+    "extend": "Extend",
+    "open": "Open",
+    "moreActions": "More actions for “{{title}}”",
+    "openVersion": "Open version {{number}}",
+    "deleteVersion": "Delete version {{number}}",
+    "history_one": "{{count}} earlier version",
+    "history_other": "{{count}} earlier versions",
+    "status": {
+      "active": "Running",
+      "expiresToday": "Expires today",
+      "expiresIn_one": "Expires in {{count}} day",
+      "expiresIn_other": "Expires in {{count}} days",
+      "expired": "Expired on {{date}}",
+      "upcoming": "Starts on {{date}}"
+    },
+    "term": {
+      "range": "valid {{from}} – {{until}}",
+      "from": "valid from {{from}}",
+      "until": "valid until {{until}}",
+      "signed": "signed {{date}}"
+    },
+    "attention": {
+      "expiring_one": "“{{title}}” expires in {{count}} day ({{date}}).",
+      "expiring_other": "“{{title}}” expires in {{count}} days ({{date}}).",
+      "expired": "“{{title}}” expired on {{date}}."
+    },
+    "drop": {
+      "prompt": "Drag a file here or click to choose",
+      "emptyPrompt": "Drag the first contract here or click to choose",
+      "release": "Release to upload",
+      "change": "Choose another",
+      "remove": "Remove file"
+    },
+    "form": {
+      "uploadTitle": "Upload document",
+      "versionTitle": "New version of “{{title}}”",
+      "versionHint": "The previous version (version {{version}}) stays available as an earlier version.",
+      "extendTitle": "Extend “{{title}}”",
+      "extendHint": "The current contract (version {{version}}, valid until {{date}}) is kept as an earlier version. The new term starts the day after by default.",
+      "editTitle": "Edit details of “{{title}}”",
+      "term": "Term",
+      "plusMonths_one": "+{{count}} month",
+      "plusMonths_other": "+{{count}} months",
+      "back": "Back",
+      "extendSubmit": "Save extension"
+    },
+    "rate": {
+      "toggle": "This contract changes the hourly rate for “{{project}}”",
+      "current": "Currently {{rate}} per hour",
+      "none": "This project has no hourly rate yet.",
+      "newRate": "New hourly rate",
+      "validFrom": "Rate applies from *",
+      "rateRequired": "Please enter the new hourly rate.",
+      "dateRequired": "Please choose from when the new rate applies.",
+      "saved": "New hourly rate {{rate}} from {{date}} saved.",
+      "repriced_one": "{{count}} already logged entry was moved to {{rate}}.",
+      "repriced_other": "{{count}} already logged entries were moved to {{rate}}.",
+      "failed": "The document was saved, but the hourly rate was not: {{reason}} — please add it under “Hourly rates” on the project."
+    },
+    "expiryHint": "A contract ends on {{date}} — extend it now"
   }
 }

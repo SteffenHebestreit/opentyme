@@ -11,6 +11,7 @@ import {
 } from '../../../hooks/api/useProjects';
 import {
   useAddProjectRate,
+  useAlignProjectRate,
   useDeleteProjectRate,
   useProjectRates,
   useUpdateProjectRate,
@@ -19,6 +20,7 @@ import type {
   ProjectRatePayload,
   ProjectRatePeriod,
   ProjectRateUpdatePayload,
+  SavedProjectRate,
 } from '@/api/services/project-rate.service';
 import { Project } from '../../../api/types';
 import { Button } from '../../common/Button';
@@ -30,6 +32,8 @@ import { ProjectTable } from './ProjectTable';
 import { ProjectFormModal } from './ProjectFormModal';
 import { ProjectRatesModal } from './ProjectRatesModal';
 import { ProjectEmptyState } from './ProjectEmptyState';
+import { formatCurrency } from '@/utils/currency';
+import { formatYmd } from '@/utils/date';
 
 /**
  * A duplicate rate start date comes back as a 409 rather than a server fault,
@@ -44,7 +48,7 @@ const isConflictError = (error: unknown): boolean =>
   (error as { response?: { status?: number } }).response?.status === 409;
 
 export default function ProjectList() {
-  const { t } = useTranslation('projects');
+  const { t, i18n } = useTranslation('projects');
   const { state } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
@@ -98,6 +102,8 @@ export default function ProjectList() {
   const addProjectRate = useAddProjectRate();
   const updateProjectRate = useUpdateProjectRate();
   const deleteProjectRate = useDeleteProjectRate();
+  const alignProjectRate = useAlignProjectRate();
+  const [aligningRateId, setAligningRateId] = useState<string | null>(null);
 
   const projectsWithClientNames = useMemo(() => {
     if (!clients.length) {
@@ -160,8 +166,25 @@ export default function ProjectList() {
         await createProject.mutateAsync(payload);
         setSuccessMessage(t('messages.created'));
       } else if (editingProject) {
-        await updateProject.mutateAsync({ id: editingProject.id, payload });
-        setSuccessMessage(t('messages.updated'));
+        const updated = await updateProject.mutateAsync({ id: editingProject.id, payload });
+        const messages = [t('messages.updated')];
+        if (payload.hourly_rate_valid_from && payload.hourly_rate != null) {
+          messages.push(
+            t('rates.messages.saved', {
+              rate: formatCurrency(payload.hourly_rate, editingProject.currency || 'EUR'),
+              date: formatYmd(payload.hourly_rate_valid_from, i18n.language),
+            })
+          );
+        }
+        if (updated.repriced_entries) {
+          messages.push(
+            t('rates.messages.repriced', {
+              count: updated.repriced_entries,
+              rate: formatCurrency(payload.hourly_rate ?? 0, editingProject.currency || 'EUR'),
+            })
+          );
+        }
+        setSuccessMessage(messages.join(' '));
       }
       closeModal();
     } catch (submitError) {
@@ -187,62 +210,83 @@ export default function ProjectList() {
    * @returns {Promise<boolean>} True when the period was stored, so the modal knows
    * whether it may clear its draft.
    */
+  /**
+   * Stores a rate period, either new or corrected. Success feedback is shown
+   * inside the rates modal, where the user is looking.
+   *
+   * @returns {Promise<SavedProjectRate | null>} The stored period, or null on failure
+   */
   const handleRateSubmit = async (
     payload: ProjectRatePayload | ProjectRateUpdatePayload,
     rateId?: string
-  ): Promise<boolean> => {
+  ): Promise<SavedProjectRate | null> => {
     if (!ratesProject) {
-      return false;
+      return null;
     }
     setRateFormError(null);
-    setSuccessMessage(null);
     setActionError(null);
     try {
       if (rateId) {
-        await updateProjectRate.mutateAsync({
+        return await updateProjectRate.mutateAsync({
           projectId: ratesProject.id,
           rateId,
           payload: payload as ProjectRateUpdatePayload,
         });
-        setSuccessMessage(t('rates.messages.updated'));
-      } else {
-        await addProjectRate.mutateAsync({
-          projectId: ratesProject.id,
-          payload: payload as ProjectRatePayload,
-        });
-        setSuccessMessage(t('rates.messages.added'));
       }
-      return true;
+      return await addProjectRate.mutateAsync({
+        projectId: ratesProject.id,
+        payload: payload as ProjectRatePayload,
+      });
     } catch (submitError) {
       setRateFormError(
         isConflictError(submitError)
           ? t('rates.messages.conflict')
           : extractErrorMessage(submitError)
       );
-      return false;
+      return null;
     }
   };
 
-  const handleRateDelete = async (rate: ProjectRatePeriod) => {
+  /** Removes a period. The modal has already asked for confirmation inline. */
+  const handleRateDelete = async (rate: ProjectRatePeriod): Promise<boolean> => {
     if (!ratesProject) {
-      return;
-    }
-    const confirmed = window.confirm(t('rates.messages.deleteConfirm', { date: rate.valid_from }));
-    if (!confirmed) {
-      return;
+      return false;
     }
     setRateFormError(null);
-    setSuccessMessage(null);
     setActionError(null);
     setDeletingRateId(rate.id);
     try {
       await deleteProjectRate.mutateAsync({ projectId: ratesProject.id, rateId: rate.id });
-      setSuccessMessage(t('rates.messages.deleted'));
+      return true;
     } catch (deleteErr) {
       setRateFormError(extractErrorMessage(deleteErr));
+      return false;
     } finally {
       setDeletingRateId(null);
     }
+  };
+
+  /** Moves a period's entries onto its rate (those at `fromRate` only). */
+  const handleRateAlign = async (rate: ProjectRatePeriod, fromRate: number | null): Promise<number | null> => {
+    if (!ratesProject) {
+      return null;
+    }
+    setRateFormError(null);
+    setAligningRateId(rate.id);
+    try {
+      return await alignProjectRate.mutateAsync({ projectId: ratesProject.id, rateId: rate.id, fromRate });
+    } catch (alignError) {
+      setRateFormError(extractErrorMessage(alignError));
+      return null;
+    } finally {
+      setAligningRateId(null);
+    }
+  };
+
+  /** From the project form: jump to the rate history of the same project. */
+  const showRateHistory = (project: Project) => {
+    closeModal();
+    openRatesModal(project);
   };
 
   const handleDelete = async (project: Project) => {
@@ -354,6 +398,7 @@ export default function ProjectList() {
         onClose={closeModal}
         isSubmitting={createProject.isPending || updateProject.isPending}
         error={formError}
+        onShowRateHistory={showRateHistory}
       />
 
       <ProjectRatesModal
@@ -364,10 +409,13 @@ export default function ProjectList() {
         loadError={isRatesError ? extractErrorMessage(ratesError) : null}
         onSubmit={handleRateSubmit}
         onDelete={handleRateDelete}
+        onAlign={handleRateAlign}
+        aligningRateId={aligningRateId}
         onClose={closeRatesModal}
         isSubmitting={addProjectRate.isPending || updateProjectRate.isPending}
         deletingRateId={deletingRateId}
         error={rateFormError}
+        onDismissError={() => setRateFormError(null)}
       />
     </div>
   );

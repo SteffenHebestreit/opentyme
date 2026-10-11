@@ -133,10 +133,62 @@ export class ClientService {
     
     try {
       const result = await db.query(queryText, values);
-      return result.rows as IClient[];
+      return await this.withDocumentSummary(result.rows as IClient[], userId);
     } catch (error) {
         logger.error('Error fetching all clients:', error);
         throw new Error(`Failed to fetch clients: ${(error as any).message}`);
+    }
+  }
+
+  /**
+   * Adds, per client, how many documents are stored and whether a contract is
+   * about to run out — so the client list can say so without anyone opening
+   * the documents dialog. A contract nobody notices expiring is one nobody
+   * extends in time.
+   *
+   * Only the newest version of each document counts (a superseded contract is
+   * history, not a deadline). "Needs attention" = a contract, amendment or order
+   * whose term ends within 60 days, or ended within the last 30.
+   *
+   * Best-effort: a database without the client_documents table (one the startup
+   * migration has not reached yet) still lists its clients.
+   */
+  private async withDocumentSummary(clients: IClient[], userId: string): Promise<IClient[]> {
+    if (clients.length === 0) return clients;
+    const db = getDbClient();
+    try {
+      const summary = await db.query(
+        `SELECT d.client_id,
+                count(*)::int AS documents_count,
+                count(*) FILTER (
+                  WHERE d.document_type IN ('contract', 'amendment', 'order')
+                    AND d.valid_until BETWEEN CURRENT_DATE - 30 AND CURRENT_DATE + 60
+                )::int AS expiring_documents,
+                to_char(MIN(d.valid_until) FILTER (
+                  WHERE d.document_type IN ('contract', 'amendment', 'order')
+                    AND d.valid_until BETWEEN CURRENT_DATE - 30 AND CURRENT_DATE + 60
+                ), 'YYYY-MM-DD') AS next_document_expiry
+         FROM client_documents d
+         WHERE d.user_id = $1
+           AND NOT EXISTS (
+             SELECT 1 FROM client_documents s WHERE s.supersedes_document_id = d.id
+           )
+         GROUP BY d.client_id`,
+        [userId]
+      );
+      const byClient = new Map(summary.rows.map((row: any) => [row.client_id, row]));
+      return clients.map((client: any) => {
+        const row: any = byClient.get(client.id);
+        return {
+          ...client,
+          documents_count: row?.documents_count ?? 0,
+          expiring_documents: row?.expiring_documents ?? 0,
+          next_document_expiry: row?.next_document_expiry ?? null,
+        };
+      });
+    } catch (error) {
+      logger.error('Error summarising client documents:', error);
+      return clients;
     }
   }
 

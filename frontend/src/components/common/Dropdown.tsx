@@ -187,7 +187,8 @@ export const Dropdown: React.FC<DropdownProps> = ({
                 onClick={() => handleItemClick(item)}
                 disabled={item.disabled}
                 role="menuitem"
-                className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm transition-colors ${
+                type="button"
+                className={`flex w-full items-center gap-3 whitespace-nowrap px-4 py-2 text-left text-sm transition-colors ${
                   item.disabled
                     ? 'cursor-not-allowed opacity-50'
                     : item.danger
