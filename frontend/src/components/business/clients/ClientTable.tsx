@@ -10,8 +10,9 @@
  * - Client name with truncated notes preview
  * - Email and phone contact display
  * - Status badges: green for active, gray for inactive
+ * - Contract expiry chip (amber: ends soon, red: ended) that opens the documents
  * - Created and updated timestamps
- * - Edit and Delete action buttons
+ * - Documents button, icon-only Edit and Delete actions
  * - Loading state during delete operations
  * - Hover effects for better UX
  * - Responsive with horizontal scroll
@@ -20,13 +21,16 @@
  */
 
 import { FC, useMemo } from 'react';
-import { format } from 'date-fns';
 import { useTranslation } from 'react-i18next';
-import { CalendarClock } from 'lucide-react';
+import { CalendarClock, FileText, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { Client } from '../../../api/types';
 import { formatYmd } from '../../../utils/date';
+import { contractStatus } from '../../../utils/contractStatus';
+import { cn } from '../../../lib/cn';
+import { Badge } from '../../common/Badge';
 import { Button } from '../../common/Button';
 import { Table, Column } from '../../common/Table';
+import { iconButtonClass } from '../projects/uiClasses';
 
 /**
  * Props for the ClientTable component.
@@ -47,33 +51,22 @@ interface ClientTableProps {
 }
 
 /**
- * CSS classes for client status badges.
- * Maps status values to Tailwind classes for background and text colors.
+ * Formats an ISO date string for display in the user's language.
  * 
- * @constant
- * @type {Record<Client['status'], string>}
- */
-const statusClasses: Record<Client['status'], string> = {
-  active: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  inactive: 'bg-gray-100 text-gray-700 dark:bg-gray-800/40 dark:text-gray-300',
-};
-
-/**
- * Formats an ISO date string for display.
- * 
- * Converts ISO 8601 date strings to readable format: "MMM d, yyyy"
- * Falls back to original string if parsing fails.
+ * Converts ISO 8601 date strings to a short readable date ("Jan 15, 2024",
+ * "15. Jan. 2024"). Falls back to original string if parsing fails.
  * 
  * @function
  * @param {string} isoString - ISO 8601 date string to format
+ * @param {string} locale - UI language
  * @returns {string} Formatted date string or original string if invalid
  * @example
- * formatDate('2024-01-15T10:30:00Z') // Returns: "Jan 15, 2024"
- * formatDate('invalid') // Returns: "invalid"
+ * formatDate('2024-01-15T10:30:00Z', 'en') // Returns: "Jan 15, 2024"
+ * formatDate('invalid', 'en') // Returns: "invalid"
  */
-const formatDate = (isoString: string) => {
+const formatDate = (isoString: string, locale: string) => {
   try {
-    return format(new Date(isoString), 'MMM d, yyyy');
+    return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(isoString));
   } catch (error) {
     return isoString;
   }
@@ -90,7 +83,7 @@ const formatDate = (isoString: string) => {
  * 2. **Primary Contact**: Email (normal size) + phone (smaller, below)
  * 3. **Status**: Badge indicator (Active in green, Inactive in gray)
  * 4. **Created**: Created date + updated date (smaller, below)
- * 5. **Actions**: Edit (outline) and Delete (danger) buttons
+ * 5. **Actions**: Documents button, Edit and Delete icon buttons
  * 
  * Status Display:
  * - **Active**: Green badge with "Active" text
@@ -112,11 +105,11 @@ const formatDate = (isoString: string) => {
  * Action Buttons:
  * - **Edit**: Opens edit modal with client data
  * - **Delete**: Triggers delete operation with confirmation
- * - Delete button disabled and shows "Deleting…" during operation
+ * - Delete button disabled and shows a spinner during operation
  * - Buttons aligned to the right with gap
  * 
  * Loading States:
- * - Delete button shows "Deleting…" when isDeletingId matches client ID
+ * - Delete button shows a spinner when isDeletingId matches client ID
  * - Button disabled during deletion to prevent double-clicks
  * 
  * Styling:
@@ -162,14 +155,40 @@ export const ClientTable: FC<ClientTableProps> = ({ clients, onEdit, onDelete, o
       key: 'client',
       accessorKey: 'name',
       header: t('table.client'),
-      render: (client) => (
-        <>
-          <div className="font-medium text-gray-900 dark:text-white">{client.name}</div>
-          {client.notes ? (
-            <p className="mt-1 line-clamp-1 text-xs text-gray-500 dark:text-gray-400">{client.notes}</p>
-          ) : null}
-        </>
-      ),
+      render: (client) => {
+        // Contracts ending soon (amber) or just ended (red) — one click from here to extend them.
+        const expiry = client.expiring_documents && client.next_document_expiry
+          ? contractStatus(null, client.next_document_expiry)
+          : null;
+        const expired = expiry?.kind === 'expired';
+        return (
+          <div className="min-w-[12rem]">
+            <div className="font-medium text-gray-900 dark:text-white">{client.name}</div>
+            {client.notes ? (
+              <p className="mt-0.5 line-clamp-1 text-xs text-gray-500 dark:text-gray-400">{client.notes}</p>
+            ) : null}
+            {expiry && client.next_document_expiry ? (
+              <button
+                type="button"
+                onClick={() => onOpenDocuments(client)}
+                title={t('documents.expiryHint', { date: formatYmd(client.next_document_expiry, i18n.language) })}
+                className="mt-1.5 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
+              >
+                <Badge
+                  size="sm"
+                  variant={expired ? 'red' : 'amber'}
+                  icon={<CalendarClock className="h-3 w-3" aria-hidden="true" />}
+                  className="transition-opacity hover:opacity-80"
+                >
+                  {t(expired ? 'documents.chip.expired' : 'documents.chip.expiring', {
+                    date: formatYmd(client.next_document_expiry, i18n.language),
+                  })}
+                </Badge>
+              </button>
+            ) : null}
+          </div>
+        );
+      },
       sortable: true,
     },
     {
@@ -177,9 +196,10 @@ export const ClientTable: FC<ClientTableProps> = ({ clients, onEdit, onDelete, o
       accessorKey: 'email',
       header: t('table.contact'),
       render: (client) => (
-        <div className="flex flex-col gap-1">
-          {client.email && <span className="text-sm">{client.email}</span>}
+        <div className="flex flex-col gap-0.5">
+          {client.email && <span className="text-sm text-gray-700 dark:text-gray-300">{client.email}</span>}
           {client.phone && <span className="text-xs text-gray-500 dark:text-gray-400">{client.phone}</span>}
+          {!client.email && !client.phone ? <span className="text-gray-400 dark:text-gray-500">—</span> : null}
         </div>
       ),
       sortable: true,
@@ -189,9 +209,9 @@ export const ClientTable: FC<ClientTableProps> = ({ clients, onEdit, onDelete, o
       accessorKey: 'status',
       header: t('table.status'),
       render: (client) => (
-        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${statusClasses[client.status]}`}>
+        <Badge variant={client.status === 'active' ? 'green' : 'gray'} dot>
           {client.status === 'active' ? t('status.active') : t('status.inactive')}
-        </span>
+        </Badge>
       ),
       sortable: true,
     },
@@ -200,69 +220,78 @@ export const ClientTable: FC<ClientTableProps> = ({ clients, onEdit, onDelete, o
       accessorKey: 'created_at',
       header: t('table.created'),
       render: (client) => (
-        <div className="flex flex-col">
-          <span>{formatDate(client.created_at)}</span>
-          <span className="text-xs text-gray-400">{t('table.updated')} {formatDate(client.updated_at)}</span>
+        <div className="flex flex-col tabular-nums">
+          <span className="whitespace-nowrap">{formatDate(client.created_at, i18n.language)}</span>
+          <span className="whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
+            {t('table.updated')} {formatDate(client.updated_at, i18n.language)}
+          </span>
         </div>
       ),
       sortable: true,
     },
     {
       key: 'actions',
-      header: t('table.actions'),
+      // Visually hidden; `relative` keeps the sr-only label inside the table's scroll area
+      header: <span className="sr-only">{t('table.actions')}</span>,
+      headerClassName: 'relative',
       align: 'right',
-      render: (client) => (
-        <div className="flex justify-end gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => onOpenDocuments(client)}
-            className={
-              client.expiring_documents
-                ? 'border-amber-400 text-amber-800 dark:border-amber-600 dark:text-amber-200'
-                : undefined
-            }
-            title={
-              client.expiring_documents && client.next_document_expiry
-                ? t('documents.expiryHint', { date: formatYmd(client.next_document_expiry, i18n.language) })
-                : undefined
-            }
-          >
-            {client.expiring_documents ? (
-              <CalendarClock className="mr-1 h-3.5 w-3.5 text-amber-500" aria-hidden="true" />
-            ) : null}
-            {t('documents.action')}
-            {client.documents_count ? (
-              <span className="ml-1.5 rounded-full bg-gray-100 px-1.5 text-xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                {client.documents_count}
-              </span>
-            ) : null}
-          </Button>
-          {client.expiring_documents && client.next_document_expiry ? (
-            <span className="sr-only">
-              {t('documents.expiryHint', { date: formatYmd(client.next_document_expiry, i18n.language) })}
-            </span>
-          ) : null}
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => onEdit(client)}
-          >
-            {t('edit')}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="danger"
-            onClick={() => onDelete(client)}
-            disabled={isDeletingId === client.id}
-          >
-            {isDeletingId === client.id ? t('deleting') : t('delete')}
-          </Button>
-        </div>
-      ),
+      render: (client) => {
+        const deleting = isDeletingId === client.id;
+        return (
+          <div className="flex items-center justify-end gap-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="mr-1"
+              onClick={() => onOpenDocuments(client)}
+              leftIcon={<FileText className="h-3.5 w-3.5" aria-hidden="true" />}
+              title={
+                client.expiring_documents && client.next_document_expiry
+                  ? t('documents.expiryHint', { date: formatYmd(client.next_document_expiry, i18n.language) })
+                  : undefined
+              }
+            >
+              {t('documents.action')}
+              {client.documents_count ? (
+                <span
+                  className={cn(
+                    'rounded-full px-1.5 text-xs font-semibold tabular-nums',
+                    client.expiring_documents
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300'
+                      : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'
+                  )}
+                >
+                  {client.documents_count}
+                </span>
+              ) : null}
+            </Button>
+            <button
+              type="button"
+              className={iconButtonClass()}
+              onClick={() => onEdit(client)}
+              aria-label={t('actions.edit', { name: client.name })}
+              title={t('edit')}
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className={iconButtonClass('danger')}
+              onClick={() => onDelete(client)}
+              disabled={deleting}
+              aria-label={deleting ? t('deleting') : t('actions.delete', { name: client.name })}
+              title={deleting ? t('deleting') : t('delete')}
+            >
+              {deleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+              )}
+            </button>
+          </div>
+        );
+      },
     },
   ], [t, i18n.language, onEdit, onDelete, onOpenDocuments, isDeletingId]);
   

@@ -21,6 +21,7 @@
 import { FC, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { Building2 } from 'lucide-react';
 import { Client, ClientPayload, ClientStatus } from '../../../api/types';
 import { Input } from '../../forms/Input';
 import { Select } from '../../forms/Select';
@@ -28,6 +29,8 @@ import { Textarea } from '../../forms/Textarea';
 import { Button } from '../../common/Button';
 import { Alert } from '../../common/Alert';
 import { Modal } from '../../ui/Modal';
+import { FormSection } from '../projects/uiParts';
+import { checkboxClass, formSectionsClass } from '../projects/uiClasses';
 
 /**
  * Props for the ClientFormModal component.
@@ -295,12 +298,13 @@ export const ClientFormModal: FC<ClientFormModalProps> = ({
       open={open}
       onClose={onClose}
       title={mode === 'create' ? t('addClient') : t('editClient')}
+      icon={<Building2 className="h-4 w-4" aria-hidden="true" />}
       size="md"
       footer={
         <>
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             onClick={onClose}
           >
             {t('cancel')}
@@ -309,177 +313,170 @@ export const ClientFormModal: FC<ClientFormModalProps> = ({
             type="submit"
             form={formId}
             disabled={isSubmitting}
+            isLoading={isSubmitting}
           >
             {isSubmitting ? t('saving') : mode === 'create' ? t('createClient') : t('saveChanges')}
           </Button>
         </>
       }
     >
-      <form id={formId} className="space-y-5" onSubmit={handleSubmit(handleFormSubmit)}>
-        {error ? <Alert type="error" message={error} /> : null}
+      <form id={formId} onSubmit={handleSubmit(handleFormSubmit)}>
+        {error ? <div className="mb-5"><Alert type="error" message={error} /></div> : null}
 
-        <Input
-          id="client-name"
-          label={t('form.name.label')}
-          placeholder={t('form.name.placeholder')}
-          autoFocus
-          required
-          {...register('name', { required: t('form.name.required') })}
-          error={errors.name?.message}
-        />
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            id="client-email"
-            label={t('form.email.label')}
-            type="email"
-            placeholder={t('form.email.placeholder')}
-            {...register('email', {
-              pattern: {
-                value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                message: t('form.email.invalid'),
-              },
-            })}
-            error={errors.email?.message}
-          />
-          <Input
-            id="client-phone"
-            label={t('form.phone.label')}
-            type="tel"
-            placeholder={t('form.phone.placeholder')}
-            {...register('phone')}
-            error={errors.phone?.message}
-          />
-        </div>
-
-        <Input
-          id="billing-email"
-          label={t('form.billing.email', 'Invoice Email')}
-          type="email"
-          placeholder={t('form.email.placeholder')}
-          {...register('billing_email', {
-            pattern: {
-              value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-              message: t('form.email.invalid'),
-            },
-          })}
-          error={errors.billing_email?.message}
-        />
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Textarea
-            label={t('form.address.label')}
-            rows={3}
-            placeholder={t('form.address.placeholder')}
-            {...register('address')}
-            error={errors.address?.message}
-          />
-          <Textarea
-            label={t('form.notes.label')}
-            rows={3}
-            placeholder={t('form.notes.placeholder')}
-            {...register('notes')}
-            error={errors.notes?.message}
-          />
-        </div>
-
-        <div className="border-t border-gray-200 pt-5 dark:border-gray-700">
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={showBillingAddress}
-              onChange={(e) => setShowBillingAddress(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-600 dark:border-gray-400 text-purple-600 focus:ring-2 focus:ring-purple-500 focus:ring-offset-0 bg-transparent"
-            />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {t('form.billing.toggle')}
-            </span>
-          </label>
-        </div>
-
-        {showBillingAddress && (
-          <div className="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
-            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {t('form.billing.title')}
-            </h4>
-
-            <div className="grid gap-4 sm:grid-cols-2">
+        <div className={formSectionsClass}>
+          <FormSection title={t('form.sections.details')}>
+            <div className="grid gap-x-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <Input
+                  id="client-name"
+                  label={t('form.name.label')}
+                  placeholder={t('form.name.placeholder')}
+                  autoFocus
+                  required
+                  {...register('name', { required: t('form.name.required') })}
+                  error={errors.name?.message}
+                />
+              </div>
               <Input
-                id="billing-contact-person"
-                label={t('form.contactPerson.label')}
-                placeholder={t('form.contactPerson.placeholder')}
-                {...register('billing_contact_person')}
+                id="client-email"
+                label={t('form.email.label')}
+                type="email"
+                placeholder={t('form.email.placeholder')}
+                {...register('email', {
+                  pattern: {
+                    value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                    message: t('form.email.invalid'),
+                  },
+                })}
+                error={errors.email?.message}
               />
               <Input
-                id="billing-tax-id"
-                label={t('form.vatNumber.label')}
-                placeholder={t('form.vatNumber.placeholder')}
-                {...register('billing_tax_id')}
-              />
-            </div>
-
-            <div>
-              <Input
-                id="billing-phone"
-                label={t('form.billing.phone')}
+                id="client-phone"
+                label={t('form.phone.label')}
                 type="tel"
                 placeholder={t('form.phone.placeholder')}
-                {...register('billing_phone')}
+                {...register('phone')}
+                error={errors.phone?.message}
+              />
+              <Input
+                id="billing-email"
+                label={t('form.billing.email', 'Invoice Email')}
+                type="email"
+                placeholder={t('form.email.placeholder')}
+                {...register('billing_email', {
+                  pattern: {
+                    value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                    message: t('form.email.invalid'),
+                  },
+                })}
+                error={errors.billing_email?.message}
+              />
+              <Select
+                id="client-status-select"
+                label={t('status.label')}
+                {...register('status', { required: true })}
+                error={errors.status?.message}
+              >
+                {statusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </FormSection>
+
+          <FormSection title={t('form.sections.addressNotes')}>
+            <div className="grid gap-x-4 sm:grid-cols-2">
+              <Textarea
+                label={t('form.address.label')}
+                rows={3}
+                placeholder={t('form.address.placeholder')}
+                {...register('address')}
+                error={errors.address?.message}
+              />
+              <Textarea
+                label={t('form.notes.label')}
+                rows={3}
+                placeholder={t('form.notes.placeholder')}
+                {...register('notes')}
+                error={errors.notes?.message}
               />
             </div>
+          </FormSection>
 
-            <Input
-              id="billing-address"
-              label={t('form.billing.address')}
-              placeholder={t('form.billing.addressPlaceholder')}
-              {...register('billing_address')}
-            />
+          <FormSection title={t('form.sections.billing')}>
+            <label className="mb-4 flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 px-3.5 py-3 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/[0.02]">
+              <input
+                type="checkbox"
+                checked={showBillingAddress}
+                onChange={(e) => setShowBillingAddress(e.target.checked)}
+                className={checkboxClass}
+              />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {t('form.billing.toggle')}
+              </span>
+            </label>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input
-                id="billing-city"
-                label={t('form.city.label')}
-                placeholder={t('form.city.placeholder')}
-                {...register('billing_city')}
-              />
-              <Input
-                id="billing-state"
-                label={t('form.billing.state')}
-                placeholder={t('form.billing.statePlaceholder')}
-                {...register('billing_state')}
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Input
-                id="billing-postal-code"
-                label={t('form.zipCode.label')}
-                placeholder={t('form.zipCode.placeholder')}
-                {...register('billing_postal_code')}
-              />
-              <Input
-                id="billing-country"
-                label={t('form.country.label')}
-                placeholder={t('form.country.placeholder')}
-                {...register('billing_country')}
-              />
-            </div>
-          </div>
-        )}
-
-        <div>
-          <Select
-            id="client-status-select"
-            label={t('status.label')}
-            {...register('status', { required: true })}
-            error={errors.status?.message}
-          >
-            {statusOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
+            {showBillingAddress && (
+              <div className="animate-fade-up">
+                <p className="mb-3 text-sm font-medium text-gray-900 dark:text-white">
+                  {t('form.billing.title')}
+                </p>
+                <div className="grid gap-x-4 sm:grid-cols-2">
+                  <Input
+                    id="billing-contact-person"
+                    label={t('form.contactPerson.label')}
+                    placeholder={t('form.contactPerson.placeholder')}
+                    {...register('billing_contact_person')}
+                  />
+                  <Input
+                    id="billing-tax-id"
+                    label={t('form.vatNumber.label')}
+                    placeholder={t('form.vatNumber.placeholder')}
+                    {...register('billing_tax_id')}
+                  />
+                  <Input
+                    id="billing-phone"
+                    label={t('form.billing.phone')}
+                    type="tel"
+                    placeholder={t('form.phone.placeholder')}
+                    {...register('billing_phone')}
+                  />
+                  <Input
+                    id="billing-address"
+                    label={t('form.billing.address')}
+                    placeholder={t('form.billing.addressPlaceholder')}
+                    {...register('billing_address')}
+                  />
+                  <Input
+                    id="billing-city"
+                    label={t('form.city.label')}
+                    placeholder={t('form.city.placeholder')}
+                    {...register('billing_city')}
+                  />
+                  <Input
+                    id="billing-state"
+                    label={t('form.billing.state')}
+                    placeholder={t('form.billing.statePlaceholder')}
+                    {...register('billing_state')}
+                  />
+                  <Input
+                    id="billing-postal-code"
+                    label={t('form.zipCode.label')}
+                    placeholder={t('form.zipCode.placeholder')}
+                    {...register('billing_postal_code')}
+                  />
+                  <Input
+                    id="billing-country"
+                    label={t('form.country.label')}
+                    placeholder={t('form.country.placeholder')}
+                    {...register('billing_country')}
+                  />
+                </div>
+              </div>
+            )}
+          </FormSection>
         </div>
       </form>
     </Modal>

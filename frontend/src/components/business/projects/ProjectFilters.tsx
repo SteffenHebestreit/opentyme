@@ -1,7 +1,9 @@
 import { FC, ChangeEvent } from 'react';
 import { Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Input, CustomSelect } from '../../forms';
+import { CustomSelect } from '../../forms';
+import { fieldClasses } from '../../forms/fieldStyles';
+import { cn } from '../../../lib/cn';
 import { Client } from '../../../api/types';
 
 /**
@@ -51,7 +53,7 @@ const getStatusOptions = (t: (key: string) => string): Array<{ label: string; va
  * - Search input with magnifying glass icon
  * - Status dropdown (all, not_started, active, on_hold, completed)
  * - Client dropdown with all available clients
- * - Responsive layout (stacked on mobile, row on desktop)
+ * - Compact one-row toolbar (stacked on mobile)
  * - Dark mode support
  * - Controlled component pattern
  * 
@@ -100,38 +102,38 @@ export const ProjectFilters: FC<ProjectFiltersProps> = ({
   const statusOptions = getStatusOptions(t);
 
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-      <div className="flex w-full flex-1 items-center gap-3">
-        <div className="w-full lg:max-w-sm">
-          <Input
-            id="project-search"
-            type="search"
-            placeholder={t('search')}
-            value={search}
-            onChange={handleSearchChange}
-            leftIcon={<Search className="h-4 w-4" />}
-            inputSize="md"
-            autoComplete="off"
-          />
-        </div>
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="relative w-full sm:max-w-sm sm:flex-1">
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+          aria-hidden="true"
+        />
+        <input
+          id="project-search"
+          type="search"
+          aria-label={t('search')}
+          placeholder={t('search')}
+          value={search}
+          onChange={handleSearchChange}
+          autoComplete="off"
+          className={cn(fieldClasses(), 'pl-9')}
+        />
       </div>
-      <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-auto lg:grid-cols-3">
-        <div>
+      <div className="grid w-full grid-cols-1 gap-3 sm:ml-auto sm:flex sm:w-auto sm:items-center">
+        <div role="group" aria-label={t('status.label')} className="sm:w-44">
           <CustomSelect
-            label={t('status.label')}
             value={status}
             onChange={(value) => onStatusChange(value as ProjectStatusFilter)}
             options={statusOptions}
-            size="sm"
+            size="md"
           />
         </div>
-        <div className="sm:col-span-2 lg:col-span-2">
+        <div role="group" aria-label={t('client.label')} className="sm:w-56">
           <CustomSelect
-            label={t('client.label')}
             value={clientId}
             onChange={onClientChange}
             options={clientOptions}
-            size="sm"
+            size="md"
           />
         </div>
       </div>

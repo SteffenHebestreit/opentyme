@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import {
   CalendarClock,
+  ChevronDown,
   Download,
   ExternalLink,
   FilePlus2,
@@ -33,6 +34,7 @@ import {
   Pencil,
   RefreshCw,
   Trash2,
+  UploadCloud,
 } from 'lucide-react';
 import { Client, Project } from '../../../api/types';
 import {
@@ -49,13 +51,19 @@ import type { RateImpact, SavedProjectRate } from '../../../api/services/project
 import { useClientDocuments } from '../../../hooks/api/useClientDocuments';
 import { useProjects } from '../../../hooks/api/useProjects';
 import { Alert } from '../../common/Alert';
+import { Badge, BadgeVariant } from '../../common/Badge';
 import { Button } from '../../common/Button';
 import { Dropdown } from '../../common/Dropdown';
+import { EmptyState } from '../../common/EmptyState';
+import { SkeletonItem } from '../../common/Skeleton';
 import { Input, Select, Textarea } from '../../forms';
 import { FileDropZone } from '../../forms/FileDropZone';
+import { fieldClasses } from '../../forms/fieldStyles';
 import { formatFileSize } from '../../../utils/fileSize';
 import { Modal } from '../../ui/Modal';
 import { EffectiveDateField, RateImpactPanel } from '../projects/RateChange';
+import { FormSection, InlineConfirm } from '../projects/uiParts';
+import { checkboxClass, chipClass, formSectionsClass, iconButtonClass } from '../projects/uiClasses';
 import { addDaysYmd, addMonthsYmd, formatYmd } from '../../../utils/date';
 import { ContractStatus, contractStatus, contractStatusRank, titleFromFilename } from '../../../utils/contractStatus';
 import { extractErrorMessage } from '../../../utils/error';
@@ -163,11 +171,11 @@ const StatusBadge: FC<{ status: ContractStatus; document: ClientDocument }> = ({
   const { t, i18n } = useTranslation('clients');
   if (!status) return null;
 
-  const styles: Record<NonNullable<ContractStatus>['kind'], string> = {
-    active: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
-    expiring: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
-    expired: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
-    upcoming: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+  const variants: Record<NonNullable<ContractStatus>['kind'], BadgeVariant> = {
+    active: 'green',
+    expiring: 'amber',
+    expired: 'red',
+    upcoming: 'blue',
   };
 
   let label: string;
@@ -189,12 +197,17 @@ const StatusBadge: FC<{ status: ContractStatus; document: ClientDocument }> = ({
   }
 
   return (
-    <span className={clsx('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold', styles[status.kind])}>
-      {status.kind === 'expiring' || status.kind === 'expired' ? (
-        <CalendarClock className="h-3 w-3" aria-hidden="true" />
-      ) : null}
+    <Badge
+      variant={variants[status.kind]}
+      dot={status.kind === 'active'}
+      icon={
+        status.kind === 'expiring' || status.kind === 'expired' ? (
+          <CalendarClock className="h-3 w-3" aria-hidden="true" />
+        ) : undefined
+      }
+    >
       {label}
-    </span>
+    </Badge>
   );
 };
 
@@ -220,10 +233,10 @@ const DocumentMeta: FC<{ document: ClientDocument }> = ({ document }) => {
   }
 
   return (
-    <p className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-gray-600 dark:text-gray-400">
+    <p className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-gray-500 dark:text-gray-400">
       {parts.map((part, index) => (
-        <span key={index} className="whitespace-nowrap">
-          {index > 0 ? <span className="mr-2 text-gray-300 dark:text-gray-600">·</span> : null}
+        <span key={index} className="whitespace-nowrap tabular-nums">
+          {index > 0 ? <span className="mr-2 text-gray-300 dark:text-gray-600" aria-hidden="true">·</span> : null}
           {part}
         </span>
       ))}
@@ -380,217 +393,223 @@ const DocumentForm: FC<{
   };
 
   return (
-    <form id={FORM_ID} className="space-y-5" onSubmit={handleSubmit} noValidate>
-      <h3 className="text-base font-semibold text-gray-900 dark:text-white">{heading[mode]}</h3>
-
-      {(mode === 'version' || mode === 'extend') && source ? (
-        <p className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-300">
-          {mode === 'extend' && source.valid_until
-            ? t('documents.form.extendHint', { date: formatYmd(source.valid_until, lng), version: source.version })
-            : t('documents.form.versionHint', { version: source.version })}
-        </p>
-      ) : null}
-
-      {needsFile ? (
-        <FileDropZone
-          file={file}
-          onFile={chooseFile}
-          accept={CLIENT_DOCUMENT_ACCEPT}
-          prompt={t('documents.drop.prompt')}
-          hint={t('documents.fields.fileHint')}
-          changeLabel={t('documents.drop.change')}
-          removeLabel={t('documents.drop.remove')}
-          error={errors.file}
-          locale={lng}
-        />
-      ) : null}
-
-      <Input
-        id="client-document-title"
-        label={t('documents.fields.title')}
-        placeholder={t('documents.fields.titlePlaceholder')}
-        required
-        value={title}
-        onChange={(event) => {
-          setTitle(event.target.value);
-          setTitleTouched(true);
-          setErrors((current) => ({ ...current, title: undefined }));
-        }}
-        error={errors.title}
-      />
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Select
-          id="client-document-type"
-          label={t('documents.fields.type')}
-          value={documentType}
-          onChange={(event) => setDocumentType(event.target.value as ClientDocumentType)}
-        >
-          {CLIENT_DOCUMENT_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {t(`documents.types.${type}`)}
-            </option>
-          ))}
-        </Select>
-        <Select
-          id="client-document-project"
-          label={t('documents.fields.project')}
-          value={projectId}
-          onChange={(event) => {
-            setProjectId(event.target.value);
-            setRateEnabled(false);
-          }}
-        >
-          <option value="">{t('documents.noProject')}</option>
-          {projects.map((candidate) => (
-            <option key={candidate.id} value={candidate.id}>
-              {candidate.name}
-            </option>
-          ))}
-        </Select>
+    <form id={FORM_ID} onSubmit={handleSubmit} noValidate>
+      <div className="mb-5">
+        <h3 className="section-title">{heading[mode]}</h3>
+        {(mode === 'version' || mode === 'extend') && source ? (
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            {mode === 'extend' && source.valid_until
+              ? t('documents.form.extendHint', { date: formatYmd(source.valid_until, lng), version: source.version })
+              : t('documents.form.versionHint', { version: source.version })}
+          </p>
+        ) : null}
       </div>
 
-      <fieldset className="space-y-3">
-        <legend className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('documents.form.term')}</legend>
-        <div className="grid gap-4 sm:grid-cols-3">
+      <div className={formSectionsClass}>
+        {needsFile ? (
+          <FormSection title={t('documents.form.sections.file')}>
+            <div className="mb-4">
+              <FileDropZone
+                file={file}
+                onFile={chooseFile}
+                accept={CLIENT_DOCUMENT_ACCEPT}
+                prompt={t('documents.drop.prompt')}
+                hint={t('documents.fields.fileHint')}
+                changeLabel={t('documents.drop.change')}
+                removeLabel={t('documents.drop.remove')}
+                error={errors.file}
+                locale={lng}
+              />
+            </div>
+          </FormSection>
+        ) : null}
+
+        <FormSection title={t('documents.form.sections.details')}>
           <Input
-            id="client-document-valid-from"
-            type="date"
-            label={t('documents.fields.validFrom')}
-            value={validFrom}
-            onChange={(event) => setValidFrom(event.target.value)}
+            id="client-document-title"
+            label={t('documents.fields.title')}
+            placeholder={t('documents.fields.titlePlaceholder')}
+            required
+            value={title}
+            onChange={(event) => {
+              setTitle(event.target.value);
+              setTitleTouched(true);
+              setErrors((current) => ({ ...current, title: undefined }));
+            }}
+            error={errors.title}
           />
-          <div>
-            <Input
-              id="client-document-valid-until"
-              type="date"
-              label={t('documents.fields.validUntil')}
-              value={validUntil}
+
+          <div className="grid gap-x-4 sm:grid-cols-2">
+            <Select
+              id="client-document-type"
+              label={t('documents.fields.type')}
+              value={documentType}
+              onChange={(event) => setDocumentType(event.target.value as ClientDocumentType)}
+            >
+              {CLIENT_DOCUMENT_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {t(`documents.types.${type}`)}
+                </option>
+              ))}
+            </Select>
+            <Select
+              id="client-document-project"
+              label={t('documents.fields.project')}
+              value={projectId}
               onChange={(event) => {
-                setValidUntil(event.target.value);
-                setErrors((current) => ({ ...current, validUntil: undefined }));
+                setProjectId(event.target.value);
+                setRateEnabled(false);
               }}
-              error={errors.validUntil}
-            />
-            {validFrom ? (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {[6, 12].map((months) => {
-                  const until = addDaysYmd(addMonthsYmd(validFrom, months), -1);
-                  return (
-                    <button
-                      key={months}
-                      type="button"
-                      onClick={() => setValidUntil(until)}
-                      className={clsx(
-                        'rounded-full border px-2.5 py-1 text-xs font-medium',
-                        validUntil === until
-                          ? 'border-purple-500 bg-purple-100 text-purple-800 dark:border-purple-400 dark:bg-purple-900/40 dark:text-purple-200'
-                          : 'border-gray-300 text-gray-600 hover:border-purple-400 dark:border-gray-700 dark:text-gray-300'
-                      )}
-                    >
-                      {t('documents.form.plusMonths', { count: months })}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : null}
+            >
+              <option value="">{t('documents.noProject')}</option>
+              {projects.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name}
+                </option>
+              ))}
+            </Select>
           </div>
-          <Input
-            id="client-document-signed-at"
-            type="date"
-            label={t('documents.fields.signedAt')}
-            value={signedAt}
-            onChange={(event) => setSignedAt(event.target.value)}
+
+          <Textarea
+            id="client-document-notes"
+            label={t('documents.fields.notes')}
+            rows={2}
+            placeholder={t('documents.fields.notesPlaceholder')}
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
           />
-        </div>
-      </fieldset>
+        </FormSection>
 
-      {mode !== 'edit' && projectBillsHourly && project ? (
-        <div
-          className={clsx(
-            'rounded-xl border p-4',
-            rateEnabled
-              ? 'border-purple-300 dark:border-purple-700/70'
-              : 'border-gray-200 dark:border-gray-800'
-          )}
-        >
-          <label className="flex cursor-pointer items-start gap-3">
-            <input
-              type="checkbox"
-              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-              checked={rateEnabled}
-              onChange={(event) => setRateEnabled(event.target.checked)}
+        <FormSection title={t('documents.form.term')}>
+          <div className="grid gap-x-4 sm:grid-cols-3">
+            <Input
+              id="client-document-valid-from"
+              type="date"
+              label={t('documents.fields.validFrom')}
+              value={validFrom}
+              onChange={(event) => setValidFrom(event.target.value)}
             />
-            <span>
-              <span className="block text-sm font-medium text-gray-900 dark:text-white">
-                {t('documents.rate.toggle', { project: project.name })}
-              </span>
-              <span className="block text-xs text-gray-500 dark:text-gray-400">
-                {project.hourly_rate != null
-                  ? t('documents.rate.current', {
-                      rate: new Intl.NumberFormat(undefined, {
-                        style: 'currency',
-                        currency: project.currency || 'EUR',
-                      }).format(Number(project.hourly_rate)),
-                    })
-                  : t('documents.rate.none')}
-              </span>
-            </span>
-          </label>
-
-          {rateEnabled ? (
-            <div className="mt-4 space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Input
-                  id="client-document-rate"
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.01"
-                  label={t('documents.rate.newRate')}
-                  value={rateInput}
-                  onChange={(event) => {
-                    setRateInput(event.target.value);
-                    setErrors((current) => ({ ...current, rate: undefined }));
-                  }}
-                  error={errors.rate}
-                />
-                <EffectiveDateField
-                  id="client-document-rate-from"
-                  label={t('documents.rate.validFrom')}
-                  value={rateValidFrom}
-                  onChange={(value) => {
-                    setRateValidFrom(value);
-                    setRateDateTouched(true);
-                    setErrors((current) => ({ ...current, rateDate: undefined }));
-                  }}
-                  error={errors.rateDate}
-                />
-              </div>
-              {rateValidFrom ? (
-                <RateImpactPanel
-                  projectId={project.id}
-                  currency={project.currency || 'EUR'}
-                  newRate={parsedRate}
-                  validFrom={rateValidFrom}
-                  applyToExisting={applyToExisting}
-                  onApplyToExistingChange={setApplyToExisting}
-                  onImpact={handleImpact}
-                />
+            <div>
+              <Input
+                id="client-document-valid-until"
+                type="date"
+                label={t('documents.fields.validUntil')}
+                value={validUntil}
+                onChange={(event) => {
+                  setValidUntil(event.target.value);
+                  setErrors((current) => ({ ...current, validUntil: undefined }));
+                }}
+                error={errors.validUntil}
+              />
+              {validFrom ? (
+                <div className="-mt-2 mb-4 flex flex-wrap gap-1.5">
+                  {[6, 12].map((months) => {
+                    const until = addDaysYmd(addMonthsYmd(validFrom, months), -1);
+                    return (
+                      <button
+                        key={months}
+                        type="button"
+                        onClick={() => setValidUntil(until)}
+                        className={chipClass(validUntil === until)}
+                        aria-pressed={validUntil === until}
+                      >
+                        {t('documents.form.plusMonths', { count: months })}
+                      </button>
+                    );
+                  })}
+                </div>
               ) : null}
             </div>
-          ) : null}
-        </div>
-      ) : null}
+            <Input
+              id="client-document-signed-at"
+              type="date"
+              label={t('documents.fields.signedAt')}
+              value={signedAt}
+              onChange={(event) => setSignedAt(event.target.value)}
+            />
+          </div>
+        </FormSection>
 
-      <Textarea
-        id="client-document-notes"
-        label={t('documents.fields.notes')}
-        rows={2}
-        placeholder={t('documents.fields.notesPlaceholder')}
-        value={notes}
-        onChange={(event) => setNotes(event.target.value)}
-      />
+        {mode !== 'edit' && projectBillsHourly && project ? (
+          <FormSection>
+            <div
+              className={clsx(
+                'mb-4 rounded-xl border p-4 transition-colors',
+                rateEnabled
+                  ? 'border-purple-200 bg-purple-50/40 dark:border-purple-500/25 dark:bg-purple-500/[0.04]'
+                  : 'border-gray-200 dark:border-gray-800'
+              )}
+            >
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  className={clsx(checkboxClass, 'mt-0.5')}
+                  checked={rateEnabled}
+                  onChange={(event) => setRateEnabled(event.target.checked)}
+                />
+                <span>
+                  <span className="block text-sm font-medium text-gray-900 dark:text-white">
+                    {t('documents.rate.toggle', { project: project.name })}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                    {project.hourly_rate != null
+                      ? t('documents.rate.current', {
+                          rate: new Intl.NumberFormat(undefined, {
+                            style: 'currency',
+                            currency: project.currency || 'EUR',
+                          }).format(Number(project.hourly_rate)),
+                        })
+                      : t('documents.rate.none')}
+                  </span>
+                </span>
+              </label>
+
+              {rateEnabled ? (
+                <div className="mt-4 animate-fade-up border-t border-purple-100 pt-4 dark:border-purple-500/15">
+                  <div className="grid gap-x-4 sm:grid-cols-2">
+                    <Input
+                      id="client-document-rate"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      label={t('documents.rate.newRate')}
+                      value={rateInput}
+                      onChange={(event) => {
+                        setRateInput(event.target.value);
+                        setErrors((current) => ({ ...current, rate: undefined }));
+                      }}
+                      error={errors.rate}
+                    />
+                    <EffectiveDateField
+                      id="client-document-rate-from"
+                      label={t('documents.rate.validFrom')}
+                      value={rateValidFrom}
+                      onChange={(value) => {
+                        setRateValidFrom(value);
+                        setRateDateTouched(true);
+                        setErrors((current) => ({ ...current, rateDate: undefined }));
+                      }}
+                      error={errors.rateDate}
+                    />
+                  </div>
+                  {rateValidFrom ? (
+                    <RateImpactPanel
+                      projectId={project.id}
+                      currency={project.currency || 'EUR'}
+                      newRate={parsedRate}
+                      validFrom={rateValidFrom}
+                      applyToExisting={applyToExisting}
+                      onApplyToExistingChange={setApplyToExisting}
+                      onImpact={handleImpact}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </FormSection>
+        ) : null}
+      </div>
     </form>
   );
 };
@@ -727,22 +746,32 @@ export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
 
   const footer = isFormView ? (
     <>
-      <Button type="button" variant="outline" onClick={backToList} disabled={busy}>
+      <Button type="button" variant="secondary" onClick={backToList} disabled={busy}>
         {t('documents.form.back')}
       </Button>
       {/* Distinct keys: see ProjectRatesModal — reusing the "upload" button's
           DOM node would submit the empty form during the very click that opens it. */}
-      <Button key="document-form-submit" type="submit" form={FORM_ID} disabled={busy || isUploading || isSaving}>
+      <Button
+        key="document-form-submit"
+        type="submit"
+        form={FORM_ID}
+        disabled={busy || isUploading || isSaving}
+        isLoading={busy || isUploading || isSaving}
+      >
         {submitLabel}
       </Button>
     </>
   ) : (
     <>
-      <Button type="button" variant="outline" onClick={onClose}>
+      <Button type="button" variant="secondary" onClick={onClose}>
         {t('documents.close')}
       </Button>
-      <Button key="document-open-form" type="button" onClick={() => openForm('upload', null)}>
-        <FilePlus2 className="mr-1 h-4 w-4" aria-hidden="true" />
+      <Button
+        key="document-open-form"
+        type="button"
+        onClick={() => openForm('upload', null)}
+        leftIcon={<FilePlus2 className="h-4 w-4" aria-hidden="true" />}
+      >
         {t('documents.upload')}
       </Button>
     </>
@@ -751,30 +780,34 @@ export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
   /** Actions shared by the card and the history rows. */
   const confirmRow = (document_: ClientDocument) =>
     confirmingDeleteId === document_.id ? (
-      <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 dark:border-red-900/60 dark:bg-red-950/30">
-        <p className="flex-1 text-xs text-red-800 dark:text-red-200">
-          {t('documents.messages.deleteConfirm', { title: document_.title })}
-        </p>
-        <Button type="button" size="sm" variant="outline" onClick={() => setConfirmingDeleteId(null)}>
-          {t('documents.cancel')}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="danger"
-          onClick={() => void handleConfirmDelete(document_)}
-          disabled={deletingId === document_.id}
-        >
-          {deletingId === document_.id ? t('documents.deleting') : t('documents.delete')}
-        </Button>
-      </div>
+      <InlineConfirm
+        className="mt-3"
+        message={t('documents.messages.deleteConfirm', { title: document_.title })}
+        cancelLabel={t('documents.cancel')}
+        confirmLabel={deletingId === document_.id ? t('documents.deleting') : t('documents.delete')}
+        busy={deletingId === document_.id}
+        onCancel={() => setConfirmingDeleteId(null)}
+        onConfirm={() => void handleConfirmDelete(document_)}
+      />
     ) : null;
 
   return (
-    <Modal open={open} onClose={onClose} title={t('documents.title', { name: client.name })} size="xl" footer={footer}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t('documents.title', { name: client.name })}
+      description={view.kind === 'list' ? t('documents.subtitle') : undefined}
+      icon={<FileText className="h-4 w-4" aria-hidden="true" />}
+      size="xl"
+      footer={footer}
+    >
       {view.kind === 'form' ? (
         <>
-          {error ? <Alert type="error" message={error} onClose={onDismissError} /> : null}
+          {error ? (
+            <div className="mb-5">
+              <Alert type="error" message={error} onClose={onDismissError} />
+            </div>
+          ) : null}
           <DocumentForm
             key={`${view.mode}-${view.source?.id ?? 'new'}`}
             mode={view.mode}
@@ -809,17 +842,17 @@ export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
           }}
         >
           {isDraggingOver ? (
-            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-purple-500 bg-purple-50/90 dark:bg-purple-950/80">
+            <div className="pointer-events-none absolute inset-0 z-10 flex animate-fade-in flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-purple-400 bg-purple-50/90 backdrop-blur-[1px] dark:border-purple-400/60 dark:bg-gray-950/85">
+              <UploadCloud className="h-7 w-7 text-purple-500 dark:text-purple-400" aria-hidden="true" />
               <p className="text-sm font-semibold text-purple-800 dark:text-purple-200">{t('documents.drop.release')}</p>
             </div>
           ) : null}
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-gray-500 dark:text-gray-400">{t('documents.subtitle')}</p>
-            {projects.length > 1 ? (
+          {projects.length > 1 ? (
+            <div className="flex justify-end">
               <select
                 aria-label={t('documents.filterProject')}
-                className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200"
+                className={clsx(fieldClasses({ size: 'sm' }), 'cursor-pointer sm:w-60')}
                 value={projectFilter}
                 onChange={(event) => setProjectFilter(event.target.value)}
               >
@@ -830,8 +863,8 @@ export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
                   </option>
                 ))}
               </select>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
 
           {successMessage ? <Alert type="success" message={successMessage} onClose={onDismissSuccess} /> : null}
           {error ? <Alert type="error" message={error} onClose={onDismissError} /> : null}
@@ -839,12 +872,22 @@ export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
           {listErrorMessage ? <Alert type="error" message={listErrorMessage} /> : null}
 
           {isLoading ? (
-            <p className="py-6 text-center text-sm text-gray-500 dark:text-gray-400">{t('documents.loading')}</p>
+            <div className="space-y-3" role="status" aria-label={t('documents.loading')}>
+              {[0, 1].map((index) => (
+                <div key={index} className="flex gap-3 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+                  <SkeletonItem className="hidden h-9 w-9 rounded-lg md:block" />
+                  <div className="flex-1 space-y-2">
+                    <SkeletonItem className="h-4 w-1/3" />
+                    <SkeletonItem className="h-3 w-2/3" />
+                    <SkeletonItem className="h-3 w-1/4" />
+                  </div>
+                  <SkeletonItem className="h-8 w-24" />
+                </div>
+              ))}
+            </div>
           ) : chains.length === 0 ? (
             projectFilter ? (
-              <p className="rounded-xl border border-dashed border-gray-300 py-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                {t('documents.emptyFiltered')}
-              </p>
+              <EmptyState bordered compact icon={FileText} title={t('documents.emptyFiltered')} />
             ) : (
               <FileDropZone
                 file={null}
@@ -858,7 +901,7 @@ export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
               />
             )
           ) : (
-            <ul className="space-y-3">
+            <ul className="stagger space-y-3">
               {chains.map((chain) => {
                 const document_ = chain.current;
                 const status = statusOf(document_);
@@ -872,22 +915,29 @@ export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
                   <li
                     key={document_.id}
                     className={clsx(
-                      'rounded-xl border bg-white shadow-sm dark:bg-gray-900',
+                      'overflow-hidden rounded-xl border bg-white shadow-soft transition-colors dark:bg-gray-900 dark:shadow-none',
                       urgent && extendable
-                        ? 'border-amber-300 dark:border-amber-800/70'
+                        ? 'border-amber-300/80 dark:border-amber-500/30'
                         : 'border-gray-200 dark:border-gray-800'
                     )}
                   >
                     <div className="flex flex-col gap-3 p-4 md:flex-row md:items-start">
-                      <FileText className="hidden h-5 w-5 shrink-0 text-purple-600 md:mt-0.5 md:block dark:text-purple-400" aria-hidden="true" />
+                      <span
+                        className={clsx(
+                          'hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset md:flex',
+                          urgent && extendable
+                            ? 'bg-amber-50 text-amber-600 ring-amber-600/15 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/20'
+                            : 'bg-purple-50 text-purple-600 ring-purple-600/10 dark:bg-purple-500/10 dark:text-purple-300 dark:ring-purple-400/20'
+                        )}
+                      >
+                        <FileText className="h-[18px] w-[18px]" aria-hidden="true" />
+                      </span>
                       <div className="min-w-0 flex-1 space-y-1.5">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium text-gray-900 dark:text-white">{document_.title}</span>
                           <StatusBadge status={status} document={document_} />
                           {chain.history.length > 0 ? (
-                            <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                              {t('documents.version', { number: document_.version })}
-                            </span>
+                            <Badge size="sm">{t('documents.version', { number: document_.version })}</Badge>
                           ) : null}
                         </div>
                         <DocumentMeta document={document_} />
@@ -896,34 +946,37 @@ export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
                           {size ? ` · ${size}` : ''}
                         </p>
                         {document_.notes ? (
-                          <p className="whitespace-pre-line text-xs text-gray-600 dark:text-gray-300">{document_.notes}</p>
+                          <p className="whitespace-pre-line text-sm text-gray-600 dark:text-gray-300">{document_.notes}</p>
                         ) : null}
                       </div>
 
-                      <div className="flex shrink-0 items-center gap-2">
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
                         {extendable ? (
                           <Button
                             type="button"
                             size="sm"
-                            variant={urgent ? 'primary' : 'outline'}
+                            variant={urgent ? 'primary' : 'secondary'}
                             onClick={() => openForm('extend', document_)}
+                            leftIcon={<RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
                           >
-                            <RefreshCw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
                             {t('documents.extend')}
                           </Button>
                         ) : null}
                         <Button
                           type="button"
                           size="sm"
-                          variant="outline"
+                          variant="secondary"
                           onClick={() => void (previewable ? handleOpen(document_) : handleDownload(document_))}
                           disabled={downloadingId === document_.id}
+                          isLoading={downloadingId === document_.id}
+                          leftIcon={
+                            previewable ? (
+                              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                            ) : (
+                              <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                            )
+                          }
                         >
-                          {previewable ? (
-                            <ExternalLink className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                          ) : (
-                            <Download className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                          )}
                           {downloadingId === document_.id
                             ? t('documents.downloading')
                             : previewable
@@ -935,7 +988,7 @@ export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
                           trigger={
                             <button
                               type="button"
-                              className="rounded-lg border border-gray-300 p-1.5 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                              className={iconButtonClass()}
                               aria-label={t('documents.moreActions', { title: document_.title })}
                             >
                               <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
@@ -959,13 +1012,13 @@ export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
                       </div>
                     </div>
 
-                    {confirmRow(document_) ? <div className="px-4 pb-4">{confirmRow(document_)}</div> : null}
+                    {confirmRow(document_) ? <div className="-mt-3 px-4 pb-4">{confirmRow(document_)}</div> : null}
 
                     {chain.history.length > 0 ? (
-                      <div className="border-t border-gray-100 px-4 py-2.5 dark:border-gray-800">
+                      <div className="border-t border-gray-100 bg-gray-50/60 px-4 py-2.5 dark:border-gray-800 dark:bg-white/[0.02]">
                         <button
                           type="button"
-                          className="inline-flex items-center gap-1 text-xs font-medium text-purple-600 hover:underline dark:text-purple-400"
+                          className="inline-flex items-center gap-1.5 rounded text-xs font-medium text-gray-600 transition-colors hover:text-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-gray-400 dark:hover:text-purple-300"
                           onClick={() => toggleHistory(document_.id)}
                           aria-expanded={expanded}
                         >
@@ -973,12 +1026,19 @@ export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
                           {expanded
                             ? t('documents.hideHistory')
                             : t('documents.history', { count: chain.history.length })}
+                          <ChevronDown
+                            className={clsx('h-3.5 w-3.5 transition-transform duration-200', expanded && 'rotate-180')}
+                            aria-hidden="true"
+                          />
                         </button>
 
                         {expanded ? (
-                          <ul className="mt-2 space-y-1.5">
+                          <ul className="mt-2 animate-fade-in space-y-1.5">
                             {chain.history.map((historic) => (
-                              <li key={historic.id} className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-800/50">
+                              <li
+                                key={historic.id}
+                                className="rounded-lg border border-gray-200/70 bg-white px-3 py-2 dark:border-gray-800 dark:bg-gray-900"
+                              >
                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                                   <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
                                     {t('documents.version', { number: historic.version })}
@@ -986,30 +1046,32 @@ export const ClientDocumentsModal: FC<ClientDocumentsModalProps> = ({
                                   <span className="min-w-0 flex-1">
                                     <DocumentMeta document={historic} />
                                   </span>
-                                  <button
-                                    type="button"
-                                    className="rounded p-1 text-gray-500 hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-gray-700 dark:hover:text-white"
-                                    onClick={() =>
-                                      void (isPreviewable(historic.file_mimetype) ? handleOpen(historic) : handleDownload(historic))
-                                    }
-                                    aria-label={t('documents.openVersion', { number: historic.version })}
-                                    title={isPreviewable(historic.file_mimetype) ? t('documents.open') : t('documents.download')}
-                                  >
-                                    {isPreviewable(historic.file_mimetype) ? (
-                                      <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                                    ) : (
-                                      <Download className="h-3.5 w-3.5" aria-hidden="true" />
-                                    )}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="rounded p-1 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
-                                    onClick={() => setConfirmingDeleteId(historic.id)}
-                                    aria-label={t('documents.deleteVersion', { number: historic.version })}
-                                    title={t('documents.delete')}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                                  </button>
+                                  <div className="flex items-center gap-0.5">
+                                    <button
+                                      type="button"
+                                      className={iconButtonClass('default', 'sm')}
+                                      onClick={() =>
+                                        void (isPreviewable(historic.file_mimetype) ? handleOpen(historic) : handleDownload(historic))
+                                      }
+                                      aria-label={t('documents.openVersion', { number: historic.version })}
+                                      title={isPreviewable(historic.file_mimetype) ? t('documents.open') : t('documents.download')}
+                                    >
+                                      {isPreviewable(historic.file_mimetype) ? (
+                                        <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                                      ) : (
+                                        <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                                      )}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={iconButtonClass('danger', 'sm')}
+                                      onClick={() => setConfirmingDeleteId(historic.id)}
+                                      aria-label={t('documents.deleteVersion', { number: historic.version })}
+                                      title={t('documents.delete')}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                    </button>
+                                  </div>
                                 </div>
                                 {confirmRow(historic)}
                               </li>

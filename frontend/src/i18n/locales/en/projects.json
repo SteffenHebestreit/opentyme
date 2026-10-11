@@ -10,8 +10,13 @@
   "edit": "Edit",
   "delete": "Delete",
   "deleting": "Deleting…",
+  "actions": {
+    "edit": "Edit {{name}}",
+    "delete": "Delete {{name}}"
+  },
   "search": "Search projects by name or client",
   "noAuth": "Please log in to view project information.",
+  "loading": "Loading projects…",
   "status": {
     "label": "Status",
     "all": "All statuses",
@@ -160,6 +165,11 @@
     }
   },
   "form": {
+    "sections": {
+      "general": "General",
+      "timeline": "Timeline & effort",
+      "billing": "Budget & billing"
+    },
     "name": {
       "label": "Project name",
       "placeholder": "Website redesign",
@@ -212,9 +222,13 @@
   },
   "empty": {
     "title": "No projects yet",
-    "message": "Start tracking your work by creating a project. Attach clients, manage budgets, and monitor progress all in one place."
+    "message": "Start tracking your work by creating a project. Attach clients, manage budgets, and monitor progress all in one place.",
+    "filteredTitle": "No matching projects",
+    "filteredMessage": "No project matches this search, status or client. Try something else or clear the filters.",
+    "clearFilters": "Clear filters"
   },
   "messages": {
+    "deleteTitle": "Delete project?",
     "created": "Project created successfully.",
     "updated": "Project updated successfully.",
     "deleted": "Project deleted successfully.",

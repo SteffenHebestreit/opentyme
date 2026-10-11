@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { FolderKanban, Plus } from 'lucide-react';
 import { useApp } from '../../../store/AppContext';
 import { useClients } from '../../../hooks/api/useClients';
 import {
@@ -25,13 +26,17 @@ import type {
 import { Project } from '../../../api/types';
 import { Button } from '../../common/Button';
 import { Alert } from '../../common/Alert';
-import { SkeletonCardList } from '../../common/Skeleton';
+import { PageHeader } from '../../common/PageHeader';
+import { EmptyState } from '../../common/EmptyState';
+import { toast } from '../../../lib/toast';
+import { confirmDialog } from '../../../lib/confirm';
 import { extractErrorMessage } from '../../../utils/error';
 import { ProjectFilters, ProjectStatusFilter } from './ProjectFilters';
 import { ProjectTable } from './ProjectTable';
 import { ProjectFormModal } from './ProjectFormModal';
 import { ProjectRatesModal } from './ProjectRatesModal';
 import { ProjectEmptyState } from './ProjectEmptyState';
+import { TableSkeleton } from './uiParts';
 import { formatCurrency } from '@/utils/currency';
 import { formatYmd } from '@/utils/date';
 
@@ -60,7 +65,6 @@ export default function ProjectList() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [ratesProject, setRatesProject] = useState<Project | null>(null);
   const [isRatesModalOpen, setIsRatesModalOpen] = useState(false);
@@ -159,15 +163,14 @@ export default function ProjectList() {
 
   const handleSubmit = async (payload: Parameters<typeof createProject.mutateAsync>[0]) => {
     setFormError(null);
-    setSuccessMessage(null);
     setActionError(null);
     try {
       if (modalMode === 'create') {
         await createProject.mutateAsync(payload);
-        setSuccessMessage(t('messages.created'));
+        toast.success(t('messages.created'));
       } else if (editingProject) {
         const updated = await updateProject.mutateAsync({ id: editingProject.id, payload });
-        const messages = [t('messages.updated')];
+        const messages: string[] = [];
         if (payload.hourly_rate_valid_from && payload.hourly_rate != null) {
           messages.push(
             t('rates.messages.saved', {
@@ -184,7 +187,8 @@ export default function ProjectList() {
             })
           );
         }
-        setSuccessMessage(messages.join(' '));
+        // The rate details can be long — keep the title short and put them underneath.
+        toast.success(t('messages.updated'), messages.length ? { description: messages.join(' '), duration: 6500 } : undefined);
       }
       closeModal();
     } catch (submitError) {
@@ -290,18 +294,21 @@ export default function ProjectList() {
   };
 
   const handleDelete = async (project: Project) => {
-    const confirmed = window.confirm(
-      t('messages.deleteConfirm', { name: project.name })
-    );
+    const confirmed = await confirmDialog({
+      title: t('messages.deleteTitle'),
+      message: t('messages.deleteConfirm', { name: project.name }),
+      tone: 'danger',
+      confirmLabel: t('delete'),
+      cancelLabel: t('cancel'),
+    });
     if (!confirmed) {
       return;
     }
-    setSuccessMessage(null);
     setActionError(null);
     setDeletingId(project.id);
     try {
       await deleteProject.mutateAsync(project.id);
-      setSuccessMessage(t('messages.deleted'));
+      toast.success(t('messages.deleted'));
     } catch (deleteErr) {
       setActionError(extractErrorMessage(deleteErr));
     } finally {
@@ -309,34 +316,34 @@ export default function ProjectList() {
     }
   };
 
+  const isFiltered = searchTerm.trim() !== '' || statusFilter !== 'all' || clientFilter !== '';
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setClientFilter('');
+  };
+
   if (!state.isAuthenticated) {
     return (
-      <div className="p-6">
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{t('title')}</h1>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-            {t('noAuth')}
-          </p>
-        </div>
+      <div className="space-y-6">
+        <PageHeader title={t('title')} />
+        <EmptyState icon={FolderKanban} title={t('noAuth')} bordered />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">{t('title')}</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {t('subtitle')}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button type="button" onClick={openCreateModal}>
+    <div className="space-y-6">
+      <PageHeader
+        title={t('title')}
+        subtitle={t('subtitle')}
+        icon={FolderKanban}
+        actions={
+          <Button type="button" onClick={openCreateModal} leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}>
             {t('addProject')}
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <ProjectFilters
         search={searchTerm}
@@ -347,10 +354,6 @@ export default function ProjectList() {
         onStatusChange={setStatusFilter}
         onClientChange={setClientFilter}
       />
-
-      {successMessage ? (
-        <Alert type="success" message={successMessage} onClose={() => setSuccessMessage(null)} />
-      ) : null}
 
       {actionError ? (
         <Alert type="error" message={actionError} onClose={() => setActionError(null)} />
@@ -376,9 +379,9 @@ export default function ProjectList() {
       ) : null}
 
       {isLoading || isLoadingClients ? (
-        <SkeletonCardList count={3} />
+        <TableSkeleton columns={6} label={t('loading')} />
       ) : projects.length === 0 ? (
-        <ProjectEmptyState onCreate={openCreateModal} />
+        <ProjectEmptyState onCreate={openCreateModal} onClearFilters={isFiltered ? clearFilters : undefined} />
       ) : (
         <ProjectTable
           projects={projectsWithClientNames}

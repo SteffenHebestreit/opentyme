@@ -1,6 +1,7 @@
 import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { FolderKanban, History } from 'lucide-react';
 import { Alert } from '../../common/Alert';
 import { Button } from '../../common/Button';
 import { Input, CustomSelect, Textarea } from '../../forms';
@@ -8,6 +9,8 @@ import { Modal } from '../../ui/Modal';
 import { Client, Project, ProjectPayload, ProjectStatus, RateType } from '../../../api/types';
 import { CURRENCIES, formatCurrency } from '../../../utils/currency';
 import { EffectiveDateField, RateImpactPanel } from './RateChange';
+import { FormSection } from './uiParts';
+import { checkboxClass, formSectionsClass } from './uiClasses';
 
 /**
  * Modal form for creating and editing projects.
@@ -342,211 +345,239 @@ export const ProjectFormModal: FC<ProjectFormModalProps> = ({
       open={open}
       onClose={onClose}
       title={mode === 'create' ? t('addProject') : t('editProject')}
+      icon={<FolderKanban className="h-4 w-4" aria-hidden="true" />}
       size="lg"
       footer={
         <>
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="secondary" onClick={onClose}>
             {t('cancel')}
           </Button>
-          <Button type="submit" form={formId} disabled={isSubmitting || !hasClients}>
+          <Button type="submit" form={formId} disabled={isSubmitting || !hasClients} isLoading={isSubmitting}>
             {isSubmitting ? t('saving') : mode === 'create' ? t('createProject') : t('saveChanges')}
           </Button>
         </>
       }
     >
-      <form id={formId} className="space-y-5" onSubmit={handleSubmit(handleFormSubmit)}>
-        {error ? <Alert type="error" message={error} /> : null}
-        {!hasClients ? (
-          <Alert
-            type="warning"
-            message={t('client.noClients')}
-          />
+      <form id={formId} onSubmit={handleSubmit(handleFormSubmit)}>
+        {error || !hasClients ? (
+          <div className="mb-5 space-y-3">
+            {error ? <Alert type="error" message={error} /> : null}
+            {!hasClients ? (
+              <Alert
+                type="warning"
+                message={t('client.noClients')}
+              />
+            ) : null}
+          </div>
         ) : null}
 
-        <Input
-          id="project-name"
-          label={t('form.name.label')}
-          placeholder={t('form.name.placeholder')}
-          autoFocus
-          required
-          {...register('name', { required: t('form.name.required') })}
-          error={errors.name?.message}
-        />
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <CustomSelect
-            label={t('client.label')}
-            value={selectedClientId}
-            onChange={(value) => setValue('client_id', value)}
-            options={clientOptions}
-            disabled={!hasClients}
-            required
-            error={errors.client_id?.message}
-            size="md"
-          />
-          <CustomSelect
-            label={t('status.label')}
-            value={selectedStatus}
-            onChange={(value) => setValue('status', value as ProjectStatus)}
-            options={statusOptions}
-            required
-            size="md"
-          />
-        </div>
-
-        <Textarea
-          id="project-description"
-          label={t('form.description.label')}
-          rows={3}
-          placeholder={t('form.description.placeholder')}
-          {...register('description')}
-        />
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            id="project-start-date"
-            label={t('form.startDate.label')}
-            type="date"
-            {...register('start_date')}
-            error={errors.start_date?.message}
-          />
-          <Input
-            id="project-end-date"
-            label={t('form.dueDate.label')}
-            type="date"
-            {...register('end_date')}
-            error={errors.end_date?.message}
-          />
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-4">
-          <Input
-            id="project-budget"
-            label={t('form.budget.label')}
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder={t('form.budget.placeholder')}
-            {...register('budget', {
-              min: { value: 0, message: t('form.budget.min') },
-            })}
-            error={errors.budget?.message}
-          />
-          <CustomSelect
-            label={t('form.currency.label')}
-            value={selectedCurrency}
-            onChange={(value) => setValue('currency', value)}
-            options={currencyOptions}
-            size="md"
-          />
-          <CustomSelect
-            label={t('form.rateType.label')}
-            value={selectedRateType}
-            onChange={(value) => setValue('rate_type', value as RateType | '')}
-            options={rateTypeSelectOptions}
-            size="md"
-          />
-          <Input
-            id="project-estimated-hours"
-            label={t('form.estimatedHours.label')}
-            type="number"
-            min="0"
-            step="0.1"
-            placeholder={t('form.estimatedHours.placeholder')}
-            {...register('estimated_hours', {
-              min: { value: 0, message: t('form.estimatedHours.min') },
-            })}
-            error={errors.estimated_hours?.message}
-          />
-        </div>
-
-        {selectedRateType === 'hourly' ? (
-          <div className="space-y-3">
+        <div className={formSectionsClass}>
+          <FormSection title={t('form.sections.general')}>
             <Input
-              id="project-hourly-rate"
-              label={t('form.hourlyRate.label')}
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder={t('form.hourlyRate.placeholder')}
-              {...register('hourly_rate', {
-                required: t('form.hourlyRate.required'),
-                min: { value: 0, message: t('form.hourlyRate.min') },
-              })}
-              error={errors.hourly_rate?.message}
-              helperText={
-                mode === 'create'
-                  ? t('form.hourlyRate.helperCreate')
-                  : previousRate !== null && !rateChanged
-                    ? t('form.hourlyRate.helperEdit')
-                    : undefined
-              }
+              id="project-name"
+              label={t('form.name.label')}
+              placeholder={t('form.name.placeholder')}
+              autoFocus
+              required
+              {...register('name', { required: t('form.name.required') })}
+              error={errors.name?.message}
             />
 
-            {mode === 'edit' && initialProject && onShowRateHistory && !rateChanged ? (
-              <button
-                type="button"
-                className="text-xs font-medium text-purple-600 hover:underline dark:text-purple-400"
-                onClick={() => onShowRateHistory(initialProject)}
-              >
-                {t('form.hourlyRate.showHistory')}
-              </button>
-            ) : null}
-
-            {rateChanged && initialProject ? (
-              <div className="space-y-4 rounded-xl border border-purple-300 bg-white p-4 shadow-sm dark:border-purple-700/70 dark:bg-gray-900">
-                <div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {t('form.hourlyRate.changeTitle')}
-                  </p>
-                  <p className="mt-0.5 text-xs text-gray-600 dark:text-gray-400">
-                    {t('form.hourlyRate.changeHint', {
-                      previous: formatCurrency(previousRate as number, initialProject.currency || 'EUR'),
-                    })}
-                  </p>
-                </div>
-                <EffectiveDateField
-                  id="project-rate-change-from"
-                  label={t('rates.form.validFrom.labelRequired')}
-                  value={rateValidFrom}
-                  onChange={(value) => {
-                    setRateValidFrom(value);
-                    setRateDateError(undefined);
-                  }}
-                  error={rateDateError}
+            <div className="grid gap-x-4 sm:grid-cols-2">
+              <div className="mb-4">
+                <CustomSelect
+                  label={t('client.label')}
+                  value={selectedClientId}
+                  onChange={(value) => setValue('client_id', value)}
+                  options={clientOptions}
+                  disabled={!hasClients}
+                  required
+                  error={errors.client_id?.message}
+                  size="md"
                 />
-                {rateValidFrom ? (
-                  <RateImpactPanel
-                    projectId={initialProject.id}
-                    currency={initialProject.currency || 'EUR'}
-                    newRate={enteredRate}
-                    validFrom={rateValidFrom}
-                    applyToExisting={applyRateToExisting}
-                    onApplyToExistingChange={setApplyRateToExisting}
-                    onImpact={noopImpact}
+              </div>
+              <div className="mb-4">
+                <CustomSelect
+                  label={t('status.label')}
+                  value={selectedStatus}
+                  onChange={(value) => setValue('status', value as ProjectStatus)}
+                  options={statusOptions}
+                  required
+                  size="md"
+                />
+              </div>
+            </div>
+
+            <Textarea
+              id="project-description"
+              label={t('form.description.label')}
+              rows={3}
+              placeholder={t('form.description.placeholder')}
+              {...register('description')}
+            />
+          </FormSection>
+
+          <FormSection title={t('form.sections.timeline')}>
+            <div className="grid gap-x-4 sm:grid-cols-3">
+              <Input
+                id="project-start-date"
+                label={t('form.startDate.label')}
+                type="date"
+                {...register('start_date')}
+                error={errors.start_date?.message}
+              />
+              <Input
+                id="project-end-date"
+                label={t('form.dueDate.label')}
+                type="date"
+                {...register('end_date')}
+                error={errors.end_date?.message}
+              />
+              <Input
+                id="project-estimated-hours"
+                label={t('form.estimatedHours.label')}
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder={t('form.estimatedHours.placeholder')}
+                {...register('estimated_hours', {
+                  min: { value: 0, message: t('form.estimatedHours.min') },
+                })}
+                error={errors.estimated_hours?.message}
+              />
+            </div>
+          </FormSection>
+
+          <FormSection title={t('form.sections.billing')}>
+            <div className="grid gap-x-4 sm:grid-cols-3">
+              <div className="mb-4">
+                <CustomSelect
+                  label={t('form.rateType.label')}
+                  value={selectedRateType}
+                  onChange={(value) => setValue('rate_type', value as RateType | '')}
+                  options={rateTypeSelectOptions}
+                  size="md"
+                />
+              </div>
+              <Input
+                id="project-budget"
+                label={t('form.budget.label')}
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder={t('form.budget.placeholder')}
+                {...register('budget', {
+                  min: { value: 0, message: t('form.budget.min') },
+                })}
+                error={errors.budget?.message}
+              />
+              <div className="mb-4">
+                <CustomSelect
+                  label={t('form.currency.label')}
+                  value={selectedCurrency}
+                  onChange={(value) => setValue('currency', value)}
+                  options={currencyOptions}
+                  size="md"
+                />
+              </div>
+            </div>
+
+            {selectedRateType === 'hourly' ? (
+              <div className="animate-fade-up">
+                <div className="grid gap-x-4 sm:grid-cols-2">
+                  <Input
+                    id="project-hourly-rate"
+                    label={t('form.hourlyRate.label')}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder={t('form.hourlyRate.placeholder')}
+                    {...register('hourly_rate', {
+                      required: t('form.hourlyRate.required'),
+                      min: { value: 0, message: t('form.hourlyRate.min') },
+                    })}
+                    error={errors.hourly_rate?.message}
+                    helperText={
+                      mode === 'create'
+                        ? t('form.hourlyRate.helperCreate')
+                        : previousRate !== null && !rateChanged
+                          ? t('form.hourlyRate.helperEdit')
+                          : undefined
+                    }
                   />
+
+                  {mode === 'edit' && initialProject && onShowRateHistory && !rateChanged ? (
+                    <div className="mb-4 sm:pt-7">
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1.5 rounded text-sm font-medium text-purple-600 transition-colors hover:text-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:text-purple-400 dark:hover:text-purple-300"
+                        onClick={() => onShowRateHistory(initialProject)}
+                      >
+                        <History className="h-4 w-4" aria-hidden="true" />
+                        {t('form.hourlyRate.showHistory')}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+
+                {rateChanged && initialProject ? (
+                  <div className="mb-4 animate-fade-up rounded-xl border border-purple-200 bg-purple-50/40 p-4 dark:border-purple-500/25 dark:bg-purple-500/[0.04]">
+                    <div className="mb-4">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {t('form.hourlyRate.changeTitle')}
+                      </p>
+                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                        {t('form.hourlyRate.changeHint', {
+                          previous: formatCurrency(previousRate as number, initialProject.currency || 'EUR'),
+                        })}
+                      </p>
+                    </div>
+                    <div className="grid gap-x-4 sm:grid-cols-2">
+                      <EffectiveDateField
+                        id="project-rate-change-from"
+                        label={t('rates.form.validFrom.labelRequired')}
+                        value={rateValidFrom}
+                        onChange={(value) => {
+                          setRateValidFrom(value);
+                          setRateDateError(undefined);
+                        }}
+                        error={rateDateError}
+                      />
+                    </div>
+                    {rateValidFrom ? (
+                      <RateImpactPanel
+                        projectId={initialProject.id}
+                        currency={initialProject.currency || 'EUR'}
+                        newRate={enteredRate}
+                        validFrom={rateValidFrom}
+                        applyToExisting={applyRateToExisting}
+                        onApplyToExistingChange={setApplyRateToExisting}
+                        onImpact={noopImpact}
+                      />
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             ) : null}
-          </div>
-        ) : null}
 
-        <div className="flex items-start space-x-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-          <input
-            type="checkbox"
-            id="recurring_payment"
-            checked={watch('recurring_payment')}
-            onChange={(e) => setValue('recurring_payment', e.target.checked)}
-            className="mt-1 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-          />
-          <div className="flex-1">
-            <label htmlFor="recurring_payment" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
-              {t('form.recurringPayment.label')}
-            </label>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-              {t('form.recurringPayment.description')}
-            </p>
-          </div>
+            <div className="mb-4 flex items-start gap-3 rounded-xl border border-gray-200 bg-gray-50/60 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
+              <input
+                type="checkbox"
+                id="recurring_payment"
+                checked={watch('recurring_payment')}
+                onChange={(e) => setValue('recurring_payment', e.target.checked)}
+                className={`${checkboxClass} mt-0.5`}
+              />
+              <div className="flex-1">
+                <label htmlFor="recurring_payment" className="cursor-pointer text-sm font-medium text-gray-900 dark:text-white">
+                  {t('form.recurringPayment.label')}
+                </label>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {t('form.recurringPayment.description')}
+                </p>
+              </div>
+            </div>
+          </FormSection>
         </div>
       </form>
     </Modal>

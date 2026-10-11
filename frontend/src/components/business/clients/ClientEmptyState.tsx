@@ -1,16 +1,17 @@
 import { FC } from 'react';
-import { Users } from 'lucide-react';
+import { Plus, SearchX, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../../common/Button';
+import { EmptyState } from '../../common/EmptyState';
 
 /**
  * Empty state component for the clients list.
  *
  * **Features:**
  * - Centered layout with dashed border
- * - Users icon in indigo circle
  * - Descriptive message about adding clients
  * - Call-to-action button
+ * - When filters hide every client: says so and offers to clear them
  * - Dark mode support
  *
  * **Usage:**
@@ -36,28 +37,43 @@ import { Button } from '../../common/Button';
  *
  * @interface ClientEmptyStateProps
  * @property {() => void} onCreate - Callback when create button is clicked
+ * @property {() => void} [onClearFilters] - Given while filters are active; the list is then empty because of them
  */
 interface ClientEmptyStateProps {
   onCreate: () => void;
+  onClearFilters?: () => void;
 }
 
-export const ClientEmptyState: FC<ClientEmptyStateProps> = ({ onCreate }) => {
+export const ClientEmptyState: FC<ClientEmptyStateProps> = ({ onCreate, onClearFilters }) => {
   const { t } = useTranslation('clients');
-  
+
+  if (onClearFilters) {
+    return (
+      <EmptyState
+        bordered
+        icon={SearchX}
+        title={t('empty.filteredTitle')}
+        description={t('empty.filteredMessage')}
+        action={
+          <Button type="button" variant="secondary" onClick={onClearFilters}>
+            {t('empty.clearFilters')}
+          </Button>
+        }
+      />
+    );
+  }
+
   return (
-    <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center shadow-sm dark:border-gray-700 dark:bg-gray-900">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-50 text-indigo-500 dark:bg-indigo-500/10">
-        <Users className="h-8 w-8" />
-      </div>
-      <div className="space-y-2">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t('empty.title')}</h3>
-        <p className="max-w-md text-sm text-gray-500 dark:text-gray-400">
-          {t('empty.message')}
-        </p>
-      </div>
-      <Button type="button" onClick={onCreate}>
-        {t('addClient')}
-      </Button>
-    </div>
+    <EmptyState
+      bordered
+      icon={Users}
+      title={t('empty.title')}
+      description={t('empty.message')}
+      action={
+        <Button type="button" onClick={onCreate} leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}>
+          {t('addClient')}
+        </Button>
+      }
+    />
   );
 };

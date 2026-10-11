@@ -10,7 +10,12 @@
   "edit": "Bearbeiten",
   "delete": "Löschen",
   "deleting": "Wird gelöscht…",
+  "actions": {
+    "edit": "{{name}} bearbeiten",
+    "delete": "{{name}} löschen"
+  },
   "noAuth": "Bitte authentifizieren Sie sich, um Kunden anzuzeigen",
+  "loading": "Kunden werden geladen…",
   "search": "Kunden nach Name oder E-Mail durchsuchen…",
   "status": {
     "label": "Status",
@@ -27,6 +32,11 @@
     "actions": "Aktionen"
   },
   "form": {
+    "sections": {
+      "details": "Kundendaten",
+      "addressNotes": "Adresse & Notizen",
+      "billing": "Rechnungsstellung"
+    },
     "name": {
       "label": "Name",
       "placeholder": "Acme Corporation",
@@ -86,9 +96,13 @@
   },
   "empty": {
     "title": "Noch keine Kunden",
-    "message": "Beginnen Sie mit dem Aufbau Ihres Kundenstamms, indem Sie Ihren ersten Kunden hinzufügen. Verfolgen Sie deren Projekte, Kontaktinformationen und Geschäftsdetails."
+    "message": "Beginnen Sie mit dem Aufbau Ihres Kundenstamms, indem Sie Ihren ersten Kunden hinzufügen. Verfolgen Sie deren Projekte, Kontaktinformationen und Geschäftsdetails.",
+    "filteredTitle": "Keine passenden Kunden",
+    "filteredMessage": "Kein Kunde passt zu dieser Suche oder diesem Status. Versuchen Sie etwas anderes oder setzen Sie die Filter zurück.",
+    "clearFilters": "Filter zurücksetzen"
   },
   "messages": {
+    "deleteTitle": "Kunde löschen?",
     "created": "Kunde erfolgreich erstellt",
     "updated": "Kunde erfolgreich aktualisiert",
     "deleted": "Kunde erfolgreich gelöscht",
@@ -200,6 +214,10 @@
       "remove": "Datei entfernen"
     },
     "form": {
+      "sections": {
+        "file": "Datei",
+        "details": "Angaben"
+      },
       "uploadTitle": "Dokument hochladen",
       "versionTitle": "Neue Fassung von „{{title}}“",
       "versionHint": "Die bisherige Fassung (Version {{version}}) bleibt als frühere Fassung abrufbar.",
@@ -225,6 +243,10 @@
       "repriced_other": "{{count}} bereits erfasste Einträge wurden auf {{rate}} umgestellt.",
       "failed": "Das Dokument wurde gespeichert, der Stundensatz aber nicht: {{reason}} – bitte im Projekt unter „Stundensätze“ nachtragen."
     },
-    "expiryHint": "Ein Vertrag läuft am {{date}} aus – jetzt verlängern"
+    "expiryHint": "Ein Vertrag läuft am {{date}} aus – jetzt verlängern",
+    "chip": {
+      "expiring": "Vertrag endet am {{date}}",
+      "expired": "Vertrag endete am {{date}}"
+    }
   }
 }

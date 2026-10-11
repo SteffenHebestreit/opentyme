@@ -1,11 +1,13 @@
 import { FC, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { CalendarClock, Coins, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { Project, ProjectStatus } from '../../../api/types';
+import { Badge, BadgeVariant } from '../../common/Badge';
 import { Button } from '../../common/Button';
 import { formatCurrency as formatMoney } from '../../../utils/currency';
 import { formatYmd } from '../../../utils/date';
-import clsx from 'clsx';
 import { Table, Column } from '../../common/Table';
+import { iconButtonClass } from './uiClasses';
 
 /**
  * Props for the ProjectTable component.
@@ -39,11 +41,11 @@ const getStatusLabel = (t: (key: string) => string, status: ProjectStatus): stri
   return labels[status];
 };
 
-const statusClasses: Record<ProjectStatus, string> = {
-  not_started: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200',
-  active: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200',
-  on_hold: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200',
-  completed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200',
+const statusVariants: Record<ProjectStatus, BadgeVariant> = {
+  not_started: 'gray',
+  active: 'green',
+  on_hold: 'amber',
+  completed: 'blue',
 };
 
 const formatDate = (iso: string | null, locale: string) => formatYmd(iso, locale);
@@ -64,12 +66,12 @@ const formatCurrency = (value: number | null, currency: string = 'USD') => {
  * 
  * Features:
  * - 7 columns: Project (name + description), Client, Status, Timeline (start/end dates), Budget, Tracked hours, Actions
- * - Color-coded status badges (not_started: yellow, active: green, on_hold: orange, completed: blue)
+ * - Color-coded status badges (not_started: gray, active: green, on_hold: amber, completed: blue)
  * - Currency formatting for budget
  * - Date formatting (MMM d, yyyy)
  * - Hover effects on rows
- * - Edit, Rates (date-effective hourly rate timeline) and Delete action buttons
- * - Loading state for delete button (shows "Deleting..." when isDeletingId matches)
+ * - Rates (date-effective hourly rate timeline) button, icon-only Edit and Delete actions
+ * - Loading state for delete button (spinner when isDeletingId matches)
  * - Dark mode support
  * - Responsive horizontal scroll
  * 
@@ -99,12 +101,12 @@ export const ProjectTable: FC<ProjectTableProps> = ({ projects, onEdit, onManage
       accessorKey: 'name',
       header: t('table.project'),
       render: (project) => (
-        <>
+        <div className="min-w-[12rem] max-w-md">
           <div className="font-medium text-gray-900 dark:text-white">{project.name}</div>
           {project.description ? (
-            <p className="mt-1 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">{project.description}</p>
+            <p className="mt-0.5 line-clamp-2 text-xs text-gray-500 dark:text-gray-400">{project.description}</p>
           ) : null}
-        </>
+        </div>
       ),
       sortable: true,
     },
@@ -113,8 +115,8 @@ export const ProjectTable: FC<ProjectTableProps> = ({ projects, onEdit, onManage
       accessorKey: 'client_name',
       header: t('table.client'),
       render: (project) => (
-        <div className="text-gray-700 dark:text-gray-300">
-          {project.client_name ?? '—'}
+        <div className="min-w-[8rem] max-w-[14rem] text-gray-700 dark:text-gray-300">
+          {project.client_name ?? <span className="text-gray-400 dark:text-gray-500">—</span>}
         </div>
       ),
       sortable: true,
@@ -124,9 +126,9 @@ export const ProjectTable: FC<ProjectTableProps> = ({ projects, onEdit, onManage
       accessorKey: 'status',
       header: t('table.status'),
       render: (project) => (
-        <span className={clsx('inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold', statusClasses[project.status])}>
+        <Badge variant={statusVariants[project.status]} dot>
           {getStatusLabel(t, project.status)}
-        </span>
+        </Badge>
       ),
       sortable: true,
     },
@@ -135,10 +137,12 @@ export const ProjectTable: FC<ProjectTableProps> = ({ projects, onEdit, onManage
       accessorKey: 'start_date',
       header: t('table.timeline'),
       render: (project) => (
-        <div className="flex flex-col text-gray-600 dark:text-gray-400">
-          <span>{t('table.start')}: {formatDate(project.start_date, lng)}</span>
-          <span>{t('table.due')}: {formatDate(project.end_date, lng)}</span>
-        </div>
+        <dl className="grid grid-cols-[auto_auto] justify-start gap-x-2 text-xs tabular-nums">
+          <dt className="text-gray-500 dark:text-gray-400">{t('table.start')}</dt>
+          <dd className="text-gray-700 dark:text-gray-300">{formatDate(project.start_date, lng)}</dd>
+          <dt className="text-gray-500 dark:text-gray-400">{t('table.due')}</dt>
+          <dd className="text-gray-700 dark:text-gray-300">{formatDate(project.end_date, lng)}</dd>
+        </dl>
       ),
       sortable: true,
     },
@@ -146,10 +150,13 @@ export const ProjectTable: FC<ProjectTableProps> = ({ projects, onEdit, onManage
       key: 'budget',
       accessorKey: 'budget',
       header: t('table.budget'),
+      align: 'right',
       render: (project) => (
-        <div className="flex flex-col text-gray-900 dark:text-gray-100">
-          <span className="font-medium">{formatCurrency(project.budget, project.currency || 'USD')}</span>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
+        <div className="flex flex-col items-end tabular-nums">
+          <span className="font-medium text-gray-900 dark:text-white">
+            {formatCurrency(project.budget, project.currency || 'USD')}
+          </span>
+          <span className="whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
             {t('table.rate')}:{' '}
             {project.hourly_rate != null
               ? `${formatMoney(project.hourly_rate, project.currency || 'EUR')}${t('rates.perHour')}`
@@ -157,12 +164,17 @@ export const ProjectTable: FC<ProjectTableProps> = ({ projects, onEdit, onManage
           </span>
           {/* A scheduled change nobody can see is one nobody double-checks. */}
           {project.next_rate != null && project.next_rate_from ? (
-            <span className="text-xs text-blue-700 dark:text-blue-300">
+            <Badge
+              size="sm"
+              variant="blue"
+              className="mt-1"
+              icon={<CalendarClock className="h-3 w-3" aria-hidden="true" />}
+            >
               {t('table.nextRate', {
                 date: formatYmd(project.next_rate_from, lng),
                 rate: formatMoney(project.next_rate, project.currency || 'EUR'),
               })}
-            </span>
+            </Badge>
           ) : null}
         </div>
       ),
@@ -172,46 +184,63 @@ export const ProjectTable: FC<ProjectTableProps> = ({ projects, onEdit, onManage
       key: 'trackedHours',
       accessorKey: 'total_tracked_hours',
       header: t('table.trackedHours'),
+      headerClassName: 'whitespace-nowrap',
+      align: 'right',
       render: (project) => (
-        <div className="text-gray-700 dark:text-gray-300">
-          {project.total_tracked_hours != null ? `${project.total_tracked_hours.toFixed(1)}h` : '—'}
+        <div className="whitespace-nowrap tabular-nums text-gray-700 dark:text-gray-300">
+          {project.total_tracked_hours != null
+            ? `${new Intl.NumberFormat(lng, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(project.total_tracked_hours)} h`
+            : '—'}
         </div>
       ),
       sortable: true,
     },
     {
       key: 'actions',
-      header: t('table.actions'),
+      // Visually hidden; `relative` keeps the sr-only label inside the table's scroll area
+      header: <span className="sr-only">{t('table.actions')}</span>,
+      headerClassName: 'relative',
       align: 'right',
-      render: (project) => (
-        <div className="flex justify-end gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => onEdit(project)}
-          >
-            {t('edit')}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => onManageRates(project)}
-          >
-            {t('rates.manage')}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="danger"
-            onClick={() => onDelete(project)}
-            disabled={isDeletingId === project.id}
-          >
-            {isDeletingId === project.id ? t('deleting') : t('delete')}
-          </Button>
-        </div>
-      ),
+      render: (project) => {
+        const deleting = isDeletingId === project.id;
+        return (
+          <div className="flex items-center justify-end gap-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="mr-1"
+              onClick={() => onManageRates(project)}
+              leftIcon={<Coins className="h-3.5 w-3.5" aria-hidden="true" />}
+            >
+              {t('rates.manage')}
+            </Button>
+            <button
+              type="button"
+              className={iconButtonClass()}
+              onClick={() => onEdit(project)}
+              aria-label={t('actions.edit', { name: project.name })}
+              title={t('edit')}
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className={iconButtonClass('danger')}
+              onClick={() => onDelete(project)}
+              disabled={deleting}
+              aria-label={deleting ? t('deleting') : t('actions.delete', { name: project.name })}
+              title={deleting ? t('deleting') : t('delete')}
+            >
+              {deleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+              )}
+            </button>
+          </div>
+        );
+      },
     },
   ], [t, lng, onEdit, onManageRates, onDelete, isDeletingId]);
   

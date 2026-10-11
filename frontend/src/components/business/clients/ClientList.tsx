@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { Plus, Users } from 'lucide-react';
 import { useApp } from '../../../store/AppContext';
 import { useClients, useCreateClient, useDeleteClient, useUpdateClient } from '../../../hooks/api/useClients';
 import { Client } from '../../../api/types';
 import { Button } from '../../common/Button';
 import { Alert } from '../../common/Alert';
-import { SkeletonCardList } from '../../common/Skeleton';
+import { PageHeader } from '../../common/PageHeader';
+import { EmptyState } from '../../common/EmptyState';
+import { toast } from '../../../lib/toast';
+import { confirmDialog } from '../../../lib/confirm';
+import { TableSkeleton } from '../projects/uiParts';
 import { ClientFilters, ClientStatusFilter } from './ClientFilters';
 import { ClientTable } from './ClientTable';
 import { ClientFormModal } from './ClientFormModal';
@@ -38,7 +43,6 @@ export default function ClientList() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [documentsClient, setDocumentsClient] = useState<Client | null>(null);
@@ -109,14 +113,13 @@ export default function ClientList() {
 
   const handleSubmit = async (payload: Parameters<typeof createClient.mutateAsync>[0]) => {
     setFormError(null);
-    setSuccessMessage(null);
     try {
       if (modalMode === 'create') {
         await createClient.mutateAsync(payload);
-        setSuccessMessage(t('messages.created'));
+        toast.success(t('messages.created'));
       } else if (editingClient) {
         await updateClient.mutateAsync({ id: editingClient.id, payload });
-        setSuccessMessage(t('messages.updated'));
+        toast.success(t('messages.updated'));
       }
       closeModal();
     } catch (submitError) {
@@ -125,16 +128,21 @@ export default function ClientList() {
   };
 
   const handleDelete = async (client: Client) => {
-    const confirmed = window.confirm(t('messages.deleteConfirm', { name: client.name }));
+    const confirmed = await confirmDialog({
+      title: t('messages.deleteTitle'),
+      message: t('messages.deleteConfirm', { name: client.name }),
+      tone: 'danger',
+      confirmLabel: t('delete'),
+      cancelLabel: t('cancel'),
+    });
     if (!confirmed) {
       return;
     }
     setDeleteError(null);
-    setSuccessMessage(null);
     setDeletingId(client.id);
     try {
       await deleteClient.mutateAsync(client.id);
-      setSuccessMessage(t('messages.deleted'));
+      toast.success(t('messages.deleted'));
     } catch (deleteErr) {
       setDeleteError(extractErrorMessage(deleteErr));
     } finally {
@@ -242,32 +250,33 @@ export default function ClientList() {
     }
   };
 
+  const isFiltered = searchTerm.trim() !== '' || statusFilter !== 'all';
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+  };
+
   if (!state.isAuthenticated) {
     return (
-      <div className="p-6">
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{t('title')}</h1>
-          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{t('noAuth')}</p>
-        </div>
+      <div className="space-y-6">
+        <PageHeader title={t('title')} />
+        <EmptyState icon={Users} title={t('noAuth')} bordered />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">{t('title')}</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {t('subtitle')}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button type="button" onClick={openCreateModal}>
+    <div className="space-y-6">
+      <PageHeader
+        title={t('title')}
+        subtitle={t('subtitle')}
+        icon={Users}
+        actions={
+          <Button type="button" onClick={openCreateModal} leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}>
             {t('addClient')}
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <ClientFilters
         search={searchTerm}
@@ -275,10 +284,6 @@ export default function ClientList() {
         onSearchChange={setSearchTerm}
         onStatusChange={setStatusFilter}
       />
-
-      {successMessage ? (
-        <Alert type="success" message={successMessage} onClose={() => setSuccessMessage(null)} />
-      ) : null}
 
       {deleteError ? (
         <Alert type="error" message={deleteError} onClose={() => setDeleteError(null)} />
@@ -296,9 +301,9 @@ export default function ClientList() {
       ) : null}
 
       {isLoading ? (
-        <SkeletonCardList count={3} />
+        <TableSkeleton columns={5} label={t('loading')} />
       ) : clients.length === 0 ? (
-        <ClientEmptyState onCreate={openCreateModal} />
+        <ClientEmptyState onCreate={openCreateModal} onClearFilters={isFiltered ? clearFilters : undefined} />
       ) : (
         <ClientTable 
           key={`${statusFilter}-${debouncedSearch}`}

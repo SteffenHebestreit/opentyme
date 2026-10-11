@@ -10,8 +10,13 @@
   "edit": "Bearbeiten",
   "delete": "Löschen",
   "deleting": "Wird gelöscht…",
+  "actions": {
+    "edit": "{{name}} bearbeiten",
+    "delete": "{{name}} löschen"
+  },
   "search": "Projekte nach Name oder Kunde durchsuchen",
   "noAuth": "Bitte melden Sie sich an, um Projektinformationen anzuzeigen.",
+  "loading": "Projekte werden geladen…",
   "status": {
     "label": "Status",
     "all": "Alle Status",
@@ -160,6 +165,11 @@
     }
   },
   "form": {
+    "sections": {
+      "general": "Allgemein",
+      "timeline": "Zeitraum & Aufwand",
+      "billing": "Budget & Abrechnung"
+    },
     "name": {
       "label": "Projektname",
       "placeholder": "Website-Redesign",
@@ -212,9 +222,13 @@
   },
   "empty": {
     "title": "Noch keine Projekte",
-    "message": "Beginnen Sie mit der Verfolgung Ihrer Arbeit, indem Sie ein Projekt erstellen. Weisen Sie Kunden zu, verwalten Sie Budgets und überwachen Sie den Fortschritt an einem Ort."
+    "message": "Beginnen Sie mit der Verfolgung Ihrer Arbeit, indem Sie ein Projekt erstellen. Weisen Sie Kunden zu, verwalten Sie Budgets und überwachen Sie den Fortschritt an einem Ort.",
+    "filteredTitle": "Keine passenden Projekte",
+    "filteredMessage": "Kein Projekt passt zu dieser Suche, diesem Status oder Kunden. Versuchen Sie etwas anderes oder setzen Sie die Filter zurück.",
+    "clearFilters": "Filter zurücksetzen"
   },
   "messages": {
+    "deleteTitle": "Projekt löschen?",
     "created": "Projekt erfolgreich erstellt.",
     "updated": "Projekt erfolgreich aktualisiert.",
     "deleted": "Projekt erfolgreich gelöscht.",

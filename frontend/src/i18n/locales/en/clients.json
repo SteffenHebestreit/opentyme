@@ -10,7 +10,12 @@
   "edit": "Edit",
   "delete": "Delete",
   "deleting": "Deleting…",
+  "actions": {
+    "edit": "Edit {{name}}",
+    "delete": "Delete {{name}}"
+  },
   "noAuth": "Please authenticate to view clients",
+  "loading": "Loading clients…",
   "search": "Search clients by name or email…",
   "status": {
     "label": "Status",
@@ -27,6 +32,11 @@
     "actions": "Actions"
   },
   "form": {
+    "sections": {
+      "details": "Client details",
+      "addressNotes": "Address & notes",
+      "billing": "Billing"
+    },
     "name": {
       "label": "Name",
       "placeholder": "Acme Corporation",
@@ -86,9 +96,13 @@
   },
   "empty": {
     "title": "No clients yet",
-    "message": "Start building your client base by adding your first client. Track their projects, contact info, and business details."
+    "message": "Start building your client base by adding your first client. Track their projects, contact info, and business details.",
+    "filteredTitle": "No matching clients",
+    "filteredMessage": "No client matches this search or status. Try something else or clear the filters.",
+    "clearFilters": "Clear filters"
   },
   "messages": {
+    "deleteTitle": "Delete client?",
     "created": "Client created successfully",
     "updated": "Client updated successfully",
     "deleted": "Client deleted successfully",
@@ -200,6 +214,10 @@
       "remove": "Remove file"
     },
     "form": {
+      "sections": {
+        "file": "File",
+        "details": "Details"
+      },
       "uploadTitle": "Upload document",
       "versionTitle": "New version of “{{title}}”",
       "versionHint": "The previous version (version {{version}}) stays available as an earlier version.",
@@ -225,6 +243,10 @@
       "repriced_other": "{{count}} already logged entries were moved to {{rate}}.",
       "failed": "The document was saved, but the hourly rate was not: {{reason}} — please add it under “Hourly rates” on the project."
     },
-    "expiryHint": "A contract ends on {{date}} — extend it now"
+    "expiryHint": "A contract ends on {{date}} — extend it now",
+    "chip": {
+      "expiring": "Contract ends {{date}}",
+      "expired": "Contract ended {{date}}"
+    }
   }
 }
