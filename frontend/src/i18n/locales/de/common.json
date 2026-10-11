@@ -193,7 +193,9 @@
     "rejectAll": "Alle ablehnen",
     "approvalHint": "Eintrag antippen, um ihn zu überspringen.",
     "editArgs": "Argumente vor der Genehmigung bearbeiten",
-    "invalidJson": "Kein gültiges JSON-Objekt"
+    "invalidJson": "Kein gültiges JSON-Objekt",
+    "ready": "Bereit zu helfen",
+    "toolDone": "Abgeschlossen"
   },
   "shell": {
     "mainNavigation": "Hauptnavigation",
@@ -211,6 +213,18 @@
     "syncing": "Daten werden aktualisiert…",
     "openMenu": "Menü öffnen",
     "closeMenu": "Menü schließen",
-    "skipToContent": "Zum Inhalt springen"
+    "skipToContent": "Zum Inhalt springen",
+    "palette": {
+      "pages": "Seiten",
+      "actions": "Aktionen",
+      "themeLight": "Helles Farbschema verwenden",
+      "themeDark": "Dunkles Farbschema verwenden",
+      "themeSystem": "Farbschema des Systems verwenden",
+      "title": "Schnellnavigation",
+      "placeholder": "Seite suchen oder Aktion ausführen…",
+      "empty": "Nichts gefunden",
+      "open": "Suche und Schnellnavigation",
+      "trigger": "Springen zu…"
+    }
   }
 }

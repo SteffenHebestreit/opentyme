@@ -37,13 +37,16 @@ const renderAt = (path: string, children: React.ReactNode = <div>Page Content</d
   const router = createMemoryRouter([{ path: '*', element: <Layout>{children}</Layout> }], {
     initialEntries: [path],
   });
-  return render(
-    <QueryClientProvider client={new QueryClient()}>
-      <AppProvider>
-        <RouterProvider router={router} />
-      </AppProvider>
-    </QueryClientProvider>
-  );
+  return {
+    router,
+    ...render(
+      <QueryClientProvider client={new QueryClient()}>
+        <AppProvider>
+          <RouterProvider router={router} />
+        </AppProvider>
+      </QueryClientProvider>
+    ),
+  };
 };
 
 describe('Layout', () => {
@@ -132,6 +135,20 @@ describe('Layout', () => {
       await user.click(screen.getByRole('button', { name: /collapse sidebar/i }));
       expect(screen.getByRole('button', { name: /expand sidebar/i })).toBeInTheDocument();
       expect(localStorage.getItem('sidebar-collapsed')).toBe('1');
+    });
+
+    it('opens the command palette with Ctrl+K and navigates to the chosen page', async () => {
+      const user = userEvent.setup();
+      const { router } = renderAt('/dashboard');
+      // jsdom has no fetch Request, which data-router navigation needs — assert the call instead
+      const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(undefined);
+      await user.keyboard('{Control>}k{/Control}');
+      const palette = await screen.findByRole('dialog', { name: /quick navigation/i });
+      await user.type(within(palette).getByRole('combobox'), 'proj');
+      const options = within(palette).getAllByRole('option');
+      expect(options[0]).toHaveTextContent('Projects');
+      await user.keyboard('{Enter}');
+      expect(navigate).toHaveBeenCalledWith('/projects', expect.anything());
     });
 
     it('opens the account menu with profile, settings and logout', async () => {

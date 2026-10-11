@@ -62,7 +62,8 @@
     @apply bg-purple-500/25 text-inherit;
   }
 
-  :focus-visible {
+  /* Keyboard focus ring for controls; text fields draw their own (see fieldStyles) */
+  :focus-visible:not(input):not(textarea):not(select) {
     @apply outline-none ring-2 ring-purple-500/60 ring-offset-2 ring-offset-white dark:ring-offset-gray-950;
   }
 

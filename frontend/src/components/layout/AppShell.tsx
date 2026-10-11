@@ -6,6 +6,7 @@ import { cn } from '../../lib/cn';
 import { usePresence } from '../../hooks/ui/usePresence';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
+import { CommandPalette, useCommandPaletteShortcut } from './CommandPalette';
 
 const COLLAPSE_KEY = 'sidebar-collapsed';
 
@@ -27,6 +28,10 @@ export function AppShell({ children, overlay }: { children: ReactNode; overlay?:
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawer = usePresence(drawerOpen, 200);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const openPalette = useCallback(() => setPaletteOpen(true), []);
+  const closePalette = useCallback(() => setPaletteOpen(false), []);
+  useCommandPaletteShortcut(openPalette);
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((value) => {
@@ -99,7 +104,7 @@ export function AppShell({ children, overlay }: { children: ReactNode; overlay?:
       )}
 
       <div className={cn('flex min-h-screen flex-col transition-[padding] duration-300 ease-out-expo', collapsed ? 'lg:pl-[68px]' : 'lg:pl-60')}>
-        <Topbar onOpenMenu={() => setDrawerOpen(true)} />
+        <Topbar onOpenMenu={() => setDrawerOpen(true)} onOpenPalette={openPalette} />
         <main id="main-content" className="flex-1 focus:outline-none" tabIndex={-1}>
           <div key={sectionKey} className="mx-auto w-full max-w-[1600px] animate-page-in px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
             {children}
@@ -107,6 +112,7 @@ export function AppShell({ children, overlay }: { children: ReactNode; overlay?:
         </main>
       </div>
 
+      <CommandPalette open={paletteOpen} onClose={closePalette} />
       {overlay}
     </div>
   );

@@ -193,7 +193,9 @@
     "rejectAll": "Reject all",
     "approvalHint": "Tap an item to toggle whether it runs.",
     "editArgs": "Edit arguments before approving",
-    "invalidJson": "Not a valid JSON object"
+    "invalidJson": "Not a valid JSON object",
+    "ready": "Ready to help",
+    "toolDone": "Completed"
   },
   "shell": {
     "mainNavigation": "Main navigation",
@@ -211,6 +213,18 @@
     "syncing": "Updating data…",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
-    "skipToContent": "Skip to content"
+    "skipToContent": "Skip to content",
+    "palette": {
+      "pages": "Pages",
+      "actions": "Actions",
+      "themeLight": "Switch to light theme",
+      "themeDark": "Switch to dark theme",
+      "themeSystem": "Use system theme",
+      "title": "Quick navigation",
+      "placeholder": "Go to page or run an action…",
+      "empty": "Nothing found",
+      "open": "Search and quick navigation",
+      "trigger": "Jump to…"
+    }
   }
 }

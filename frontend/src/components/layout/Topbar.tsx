@@ -1,6 +1,6 @@
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Menu } from 'lucide-react';
+import { Menu, Search } from 'lucide-react';
 import { findNavItem } from './navigation';
 import { ThemeToggle } from './ThemeToggle';
 import { UserMenu } from './UserMenu';
@@ -10,10 +10,13 @@ import { BrandMark } from './BrandLogo';
 
 interface TopbarProps {
   onOpenMenu: () => void;
+  onOpenPalette: () => void;
 }
 
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+
 /** Sticky bar above the page: current section, running timer, sync state, theme, account. */
-export function Topbar({ onOpenMenu }: TopbarProps) {
+export function Topbar({ onOpenMenu, onOpenPalette }: TopbarProps) {
   const { t } = useTranslation('common');
   const { pathname } = useLocation();
   const section = findNavItem(pathname);
@@ -41,6 +44,18 @@ export function Topbar({ onOpenMenu }: TopbarProps) {
 
         <div className="ml-auto flex items-center gap-1">
           <ActiveTimerIndicator />
+          <button
+            type="button"
+            onClick={onOpenPalette}
+            className="flex h-9 items-center gap-2 rounded-lg px-2.5 text-sm text-gray-500 transition-colors hover:bg-gray-900/[0.05] hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 md:w-56 md:border md:border-gray-200 md:bg-white/60 md:hover:bg-white dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white md:dark:border-gray-800 md:dark:bg-gray-900/60 md:dark:hover:bg-gray-900"
+            aria-label={t('shell.palette.open', 'Search and quick navigation')}
+          >
+            <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="hidden flex-1 text-left md:inline">{t('shell.palette.trigger', 'Jump to…')}</span>
+            <kbd className="hidden rounded border border-gray-200 px-1 font-sans text-[10px] font-medium text-gray-400 md:inline dark:border-gray-700">
+              {isMac ? '⌘K' : 'Ctrl K'}
+            </kbd>
+          </button>
           <SyncIndicator />
           <ThemeToggle />
           <div className="ml-1">
