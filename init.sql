@@ -607,7 +607,8 @@ CREATE TABLE public.invoice_items (
     amount numeric(12,2),
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     total_price numeric(12,2),
-    rate_type character varying(10) DEFAULT 'hourly'::character varying
+    rate_type character varying(10) DEFAULT 'hourly'::character varying,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 

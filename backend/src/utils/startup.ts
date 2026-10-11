@@ -316,6 +316,13 @@ async function ensureSchemaUpgrades(): Promise<void> {
     // so follow-up turns keep their context and the prompt prefix stays stable.
     await db.query(`ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS metadata JSONB`);
 
+    // invoice_items has a set_timestamp BEFORE UPDATE trigger but never had the
+    // column it sets, so every UPDATE on it failed — including the ON DELETE SET NULL
+    // when a time entry that appears on an invoice is deleted (→ 500).
+    await db.query(
+      `ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP`
+    );
+
     // VAT number belonging to the separate billing address. Distinct from
     // clients.tax_id, which is the client entity's own tax ID.
     await db.query(
