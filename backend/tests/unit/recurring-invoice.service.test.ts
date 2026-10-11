@@ -121,7 +121,7 @@ describe('RecurringInvoiceService', () => {
       const ids = await service.generateForSchedule(schedule);
       expect(ids).toHaveLength(1);
 
-      const invoice = await invoiceService.findById(ids[0]);
+      const invoice = await invoiceService.findById(ids[0], TEST_USER_ID);
       expect(invoice).not.toBeNull();
       expect(invoice!.status).toBe('draft');
       expect(Number(invoice!.total_amount)).toBe(1200); // 1000 + 2*100

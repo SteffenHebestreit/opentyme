@@ -7,6 +7,7 @@ import {
 } from '../../models/business/time-entry.model';
 import { logger } from '../../utils/logger';
 import { projectRateService } from './project-rate.service';
+import { isUuid, ownsRow } from '../ownership.service';
 
 const db = getDbClient();
 
@@ -41,6 +42,16 @@ export class TimeEntryService {
    */
   async create(timeEntryData: CreateTimeEntryDto): Promise<ITimeEntry> {
     const db = getDbClient();
+
+    // The project must be the entry owner's own. The foreign key alone would
+    // accept another tenant's project, whose name every listing of the entry
+    // (and of invoices generated from it) then shows.
+    if (
+      timeEntryData.project_id &&
+      !(await ownsRow('projects', timeEntryData.project_id, timeEntryData.user_id))
+    ) {
+      throw new Error("Invalid 'project_id' specified.");
+    }
 
     // Stamp the rate that was effective on the day the work happened, so a
     // later rate change cannot re-price this entry. Only when the caller did
@@ -150,8 +161,8 @@ export class TimeEntryService {
              p.id as project_id_temp, p.name as project_name,
              c.name as client_name
       FROM time_entries te
-      LEFT JOIN projects p ON te.project_id = p.id
-      LEFT JOIN clients c ON p.client_id = c.id
+      LEFT JOIN projects p ON te.project_id = p.id AND p.user_id = te.user_id
+      LEFT JOIN clients c ON p.client_id = c.id AND c.user_id = te.user_id
     `;
     const values: any[] = [];
     const conditions: string[] = [];
@@ -208,31 +219,34 @@ export class TimeEntryService {
   }
 
   /**
-   * Retrieves a single time entry by its ID.
-   * Returns the time entry with associated project details if found.
+   * Retrieves a single time entry by its ID, scoped to its owner.
+   * Returns the time entry with associated project details if found. An entry
+   * of another user (or a malformed id) reads as "not found".
    * 
    * @async
    * @param {string} id - The UUID of the time entry to retrieve
+   * @param {string} userId - The UUID of the user who must own the entry
    * @returns {Promise<ITimeEntry | null>} The time entry with project details, or null if not found
    * @throws {Error} If the query fails
    * 
    * @example
-   * const entry = await timeEntryService.findById('entry-uuid');
+   * const entry = await timeEntryService.findById('entry-uuid', userId);
    * if (entry) {
    *   console.log(`Duration: ${entry.duration_hours}h on ${entry.project?.name}`);
    * }
    */
-  async findById(id: string): Promise<ITimeEntry | null> {
+  async findById(id: string, userId: string): Promise<ITimeEntry | null> {
+    if (!isUuid(id)) return null;
     const db = getDbClient();
     const queryText = `
       SELECT te.id, te.user_id, te.project_id, te.description, te.task_name, 
              te.entry_date, te.entry_time, te.date_start,
              te.duration_hours, te.is_billable, te.category, te.tags, te.hourly_rate,
              te.created_at, te.updated_at
-      FROM time_entries te WHERE id = $1
+      FROM time_entries te WHERE te.id = $1 AND te.user_id = $2
     `;
     try {
-      const result = await db.query(queryText, [id]);
+      const result = await db.query(queryText, [id, userId]);
       if (result.rows.length === 0) return null;
       return this.getTimeEntryWithDetails(result.rows[0]);
     } catch (error) {
@@ -242,33 +256,42 @@ export class TimeEntryService {
   }
 
   /**
-   * Updates an existing time entry with partial data.
+   * Updates an existing time entry with partial data, scoped to its owner.
    * Only provided fields will be updated; undefined fields are ignored.
-   * Returns null if the time entry is not found.
+   * Returns null if the time entry is not found or belongs to another user.
+   *
+   * The owner itself (`user_id`) is never changed here: an entry cannot be
+   * handed to another user.
    * 
    * @async
    * @param {string} id - The UUID of the time entry to update
+   * @param {string} userId - The UUID of the user who must own the entry
    * @param {UpdateTimeEntryDto} timeEntryData - The partial time entry data to update
    * @returns {Promise<ITimeEntry | null>} The updated time entry with project details, or null if not found
-   * @throws {Error} If project_id or user_id is invalid (foreign key violation)
+   * @throws {Error} "Invalid 'project_id' specified." if project_id is not one of the user's projects
    * @throws {Error} If the update operation fails
    * 
    * @example
-   * const updated = await timeEntryService.update('entry-uuid', {
+   * const updated = await timeEntryService.update('entry-uuid', userId, {
    *   description: 'Updated description',
    *   is_billable: false
    * });
    */
-  async update(id: string, timeEntryData: UpdateTimeEntryDto): Promise<ITimeEntry | null> {
+  async update(id: string, userId: string, timeEntryData: UpdateTimeEntryDto): Promise<ITimeEntry | null> {
+    if (!isUuid(id)) return null;
     const db = getDbClient();
     const setParts = [];
     const values: any[] = [];
     let paramIndex = 1;
 
-    if (timeEntryData.user_id !== undefined) {
-      setParts.push(`user_id = $${paramIndex++}`);
-      values.push(timeEntryData.user_id);
+    if (
+      timeEntryData.project_id !== undefined &&
+      timeEntryData.project_id !== null &&
+      !(await ownsRow('projects', timeEntryData.project_id, userId))
+    ) {
+      throw new Error("Invalid 'project_id' specified.");
     }
+
     if (timeEntryData.project_id !== undefined) {
       setParts.push(`project_id = $${paramIndex++}`);
       values.push(timeEntryData.project_id);
@@ -323,17 +346,17 @@ export class TimeEntryService {
     }
 
     if (setParts.length === 0) {
-      return this.findById(id); // No changes, return existing
+      return this.findById(id, userId); // No changes, return existing
     }
 
     const queryText = `
       UPDATE time_entries 
       SET ${setParts.join(', ')}, updated_at = CURRENT_TIMESTAMP 
-      WHERE id = $${paramIndex} 
+      WHERE id = $${paramIndex} AND user_id = $${paramIndex + 1}
       RETURNING id, user_id, project_id, description, task_name, entry_date, entry_time, entry_end_time,
                 duration_hours, is_billable, category, tags, hourly_rate, created_at, updated_at, date_start
     `;
-    values.push(id);
+    values.push(id, userId);
 
     try {
       const result = await db.query(queryText, values);
@@ -363,6 +386,7 @@ export class TimeEntryService {
    * if (deleted) console.log('Time entry deleted successfully');
    */
   async delete(id: string, userId: string): Promise<boolean> {
+    if (!isUuid(id)) return false;
     const db = getDbClient();
     const queryText = `DELETE FROM time_entries WHERE id = $1 AND user_id = $2`;
     try {
@@ -404,7 +428,7 @@ export class TimeEntryService {
              te.duration_hours, te.task_name, te.description,
              p.name AS project_name
       FROM time_entries te
-      LEFT JOIN projects p ON te.project_id = p.id
+      LEFT JOIN projects p ON te.project_id = p.id AND p.user_id = te.user_id
       WHERE te.user_id = $1
         AND te.entry_date = $2::date
         AND te.duration_hours > 0
@@ -450,8 +474,9 @@ export class TimeEntryService {
       return timeEntryRow;
     }
     
-    const projectQueryText = `SELECT id, name FROM projects WHERE id = $1`;
-    const projectResult = await db.query(projectQueryText, [timeEntryRow.project_id]);
+    // Owner-scoped: only the entry owner's own project is ever attached.
+    const projectQueryText = `SELECT id, name FROM projects WHERE id = $1 AND user_id = $2`;
+    const projectResult = await db.query(projectQueryText, [timeEntryRow.project_id, timeEntryRow.user_id]);
     
     let projectDetails;
     if (projectResult.rows.length > 0) {

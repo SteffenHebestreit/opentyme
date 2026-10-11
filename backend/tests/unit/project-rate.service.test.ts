@@ -124,7 +124,7 @@ describe('ProjectRateService', () => {
       const project = await makeProject();
       await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 175, valid_from: ymd(-1) });
 
-      const reloaded = await projectService.findById(project.id);
+      const reloaded = await projectService.findById(project.id, TEST_USER_ID);
       expect(parseFloat(reloaded?.hourly_rate as any)).toBe(175);
     });
 
@@ -133,7 +133,7 @@ describe('ProjectRateService', () => {
       await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 100, valid_from: ymd(-30) });
       await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 500, valid_from: ymd(60) });
 
-      const reloaded = await projectService.findById(project.id);
+      const reloaded = await projectService.findById(project.id, TEST_USER_ID);
       expect(parseFloat(reloaded?.hourly_rate as any)).toBe(100);
     });
 
@@ -190,7 +190,7 @@ describe('ProjectRateService', () => {
       const updated = await rateService.updateRate(rate!.id, TEST_USER_ID, { hourly_rate: 133 });
       expect(updated?.hourly_rate).toBe(133);
 
-      const reloaded = await projectService.findById(project.id);
+      const reloaded = await projectService.findById(project.id, TEST_USER_ID);
       expect(parseFloat(reloaded?.hourly_rate as any)).toBe(133);
     });
 
@@ -273,7 +273,7 @@ describe('ProjectRateService', () => {
 
       await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 250, valid_from: ymd(0) });
 
-      const reloaded = await timeEntryService.findById(entry.id);
+      const reloaded = await timeEntryService.findById(entry.id, TEST_USER_ID);
       expect(parseFloat(reloaded?.hourly_rate as any)).toBe(100);
     });
 
@@ -328,7 +328,7 @@ describe('ProjectRateService', () => {
 
     it('opens a new period when the rate is edited on the project', async () => {
       const project = await makeProject(100);
-      await projectService.update(project.id, { hourly_rate: 180 });
+      await projectService.update(project.id, TEST_USER_ID, { hourly_rate: 180 });
 
       expect(await rateService.getEffectiveRate(project.id, TEST_USER_ID)).toBe(180);
     });
@@ -347,9 +347,9 @@ describe('ProjectRateService', () => {
         is_billable: true,
       } as any);
 
-      await projectService.update(project.id, { hourly_rate: 400 });
+      await projectService.update(project.id, TEST_USER_ID, { hourly_rate: 400 });
 
-      const reloaded = await timeEntryService.findById(entry.id);
+      const reloaded = await timeEntryService.findById(entry.id, TEST_USER_ID);
       expect(parseFloat(reloaded?.hourly_rate as any)).toBe(100);
       expect(await rateService.getEffectiveRate(project.id, TEST_USER_ID)).toBe(400);
     });
@@ -404,9 +404,9 @@ describe('ProjectRateService', () => {
       const rate = await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 95, valid_from: ymd(-14) });
 
       expect(rate?.repriced_entries).toBe(1);
-      expect(parseFloat((await timeEntryService.findById(inside.id))?.hourly_rate as any)).toBe(95);
+      expect(parseFloat((await timeEntryService.findById(inside.id, TEST_USER_ID))?.hourly_rate as any)).toBe(95);
       // Dated before the start: untouched.
-      expect(parseFloat((await timeEntryService.findById(before.id))?.hourly_rate as any)).toBe(80);
+      expect(parseFloat((await timeEntryService.findById(before.id, TEST_USER_ID))?.hourly_rate as any)).toBe(80);
     });
 
     it('keeps logged entries when explicitly told to', async () => {
@@ -421,7 +421,7 @@ describe('ProjectRateService', () => {
         { applyToExisting: false }
       );
 
-      expect(parseFloat((await timeEntryService.findById(entry.id))?.hourly_rate as any)).toBe(80);
+      expect(parseFloat((await timeEntryService.findById(entry.id, TEST_USER_ID))?.hourly_rate as any)).toBe(80);
     });
 
     it('never changes an individually priced entry', async () => {
@@ -440,7 +440,7 @@ describe('ProjectRateService', () => {
 
       await rateService.addRate(project.id, TEST_USER_ID, { hourly_rate: 95, valid_from: ymd(-14) });
 
-      expect(parseFloat((await timeEntryService.findById(goodwill.id))?.hourly_rate as any)).toBe(0);
+      expect(parseFloat((await timeEntryService.findById(goodwill.id, TEST_USER_ID))?.hourly_rate as any)).toBe(0);
     });
 
     it('moves entries back when the period is deleted', async () => {
@@ -451,7 +451,7 @@ describe('ProjectRateService', () => {
 
       await rateService.deleteRate(raise!.id, TEST_USER_ID);
 
-      expect(parseFloat((await timeEntryService.findById(entry.id))?.hourly_rate as any)).toBe(80);
+      expect(parseFloat((await timeEntryService.findById(entry.id, TEST_USER_ID))?.hourly_rate as any)).toBe(80);
     });
 
     it('moves entries when a period rate is corrected', async () => {
@@ -462,7 +462,7 @@ describe('ProjectRateService', () => {
 
       await rateService.updateRate(raise!.id, TEST_USER_ID, { hourly_rate: 92 });
 
-      expect(parseFloat((await timeEntryService.findById(entry.id))?.hourly_rate as any)).toBe(92);
+      expect(parseFloat((await timeEntryService.findById(entry.id, TEST_USER_ID))?.hourly_rate as any)).toBe(92);
     });
 
     it('aligns a period on request, only entries at the given rate', async () => {
@@ -487,8 +487,8 @@ describe('ProjectRateService', () => {
       const aligned = await rateService.alignPeriodEntries(raise!.id, TEST_USER_ID, 80);
 
       expect(aligned).toBe(1);
-      expect(parseFloat((await timeEntryService.findById(left.id))?.hourly_rate as any)).toBe(95);
-      expect(parseFloat((await timeEntryService.findById(goodwill.id))?.hourly_rate as any)).toBe(0);
+      expect(parseFloat((await timeEntryService.findById(left.id, TEST_USER_ID))?.hourly_rate as any)).toBe(95);
+      expect(parseFloat((await timeEntryService.findById(goodwill.id, TEST_USER_ID))?.hourly_rate as any)).toBe(0);
     });
 
     it('refuses to align another tenant period', async () => {
@@ -512,9 +512,9 @@ describe('ProjectRateService', () => {
       );
 
       expect(rate?.repriced_entries).toBe(1);
-      expect(parseFloat((await timeEntryService.findById(inside.id))?.hourly_rate as any)).toBe(95);
+      expect(parseFloat((await timeEntryService.findById(inside.id, TEST_USER_ID))?.hourly_rate as any)).toBe(95);
       // Work before the new period is never touched.
-      expect(parseFloat((await timeEntryService.findById(before.id))?.hourly_rate as any)).toBe(80);
+      expect(parseFloat((await timeEntryService.findById(before.id, TEST_USER_ID))?.hourly_rate as any)).toBe(80);
     });
 
     it('never reaches into a later agreed period', async () => {
@@ -530,7 +530,7 @@ describe('ProjectRateService', () => {
         { applyToExisting: true }
       );
 
-      expect(parseFloat((await timeEntryService.findById(later.id))?.hourly_rate as any)).toBe(120);
+      expect(parseFloat((await timeEntryService.findById(later.id, TEST_USER_ID))?.hourly_rate as any)).toBe(120);
     });
 
     it('shows the next scheduled rate in the project list', async () => {

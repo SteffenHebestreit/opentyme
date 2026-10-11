@@ -121,8 +121,9 @@ describe('TimeEntryController timer flow', () => {
 
     await controller.stopTimer(req, res);
 
-    expect(updateSpy).toHaveBeenCalledWith('older-active', expect.any(Object));
-    expect(updateSpy).toHaveBeenCalledWith('newer-active', expect.any(Object));
+    // Every update is scoped to the caller
+    expect(updateSpy).toHaveBeenCalledWith('older-active', 'user-1', expect.any(Object));
+    expect(updateSpy).toHaveBeenCalledWith('newer-active', 'user-1', expect.any(Object));
     expect(updateSpy).toHaveBeenCalledTimes(2);
     expect(res.status).toHaveBeenCalledWith(200);
   });

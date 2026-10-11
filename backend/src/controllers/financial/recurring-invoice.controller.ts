@@ -11,6 +11,7 @@ import { Request, Response } from 'express';
 import Joi from 'joi';
 import { recurringInvoiceService } from '../../services/financial/recurring-invoice.service';
 import { logger } from '../../utils/logger';
+import { ForeignReferenceError, invalidReferenceBody } from '../../services/ownership.service';
 
 const lineItemSchema = Joi.object({
   description: Joi.string().max(500).required(),
@@ -100,6 +101,10 @@ export class RecurringInvoiceController {
       const created = await recurringInvoiceService.create({ ...value, user_id: userId });
       res.status(201).json({ message: 'Recurring invoice created', recurring_invoice: created });
     } catch (err: any) {
+      if (err instanceof ForeignReferenceError) {
+        res.status(400).json(invalidReferenceBody(err));
+        return;
+      }
       logger.error('Create recurring invoice error:', err);
       if (err.code === '23503') {
         res.status(400).json({ message: 'Invalid client or project reference' });
@@ -127,6 +132,10 @@ export class RecurringInvoiceController {
       if (!updated) { res.status(404).json({ message: 'Recurring invoice not found' }); return; }
       res.status(200).json({ message: 'Recurring invoice updated', recurring_invoice: updated });
     } catch (err: any) {
+      if (err instanceof ForeignReferenceError) {
+        res.status(400).json(invalidReferenceBody(err));
+        return;
+      }
       logger.error('Update recurring invoice error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
@@ -163,6 +172,10 @@ export class RecurringInvoiceController {
         invoice_ids: ids,
       });
     } catch (err: any) {
+      if (err instanceof ForeignReferenceError) {
+        res.status(400).json(invalidReferenceBody(err));
+        return;
+      }
       logger.error('Generate recurring invoice error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }

@@ -179,7 +179,7 @@ export async function sendEmail(req: Request, res: Response): Promise<void> {
                 c.name AS client_name, c.email AS client_email,
                 c.billing_email AS client_billing_email, c.address AS client_address
          FROM invoices i
-         LEFT JOIN clients c ON c.id = i.client_id
+         LEFT JOIN clients c ON c.id = i.client_id AND c.user_id = i.user_id
          WHERE i.id = $1 AND i.user_id = $2`,
         [firstInvoiceId, userId]
       );

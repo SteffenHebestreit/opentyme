@@ -59,13 +59,13 @@ describe('InvoiceService', () => {
   describe('findById', () => {
     it('should return an invoice if found', async () => {
       const newInvoice = await invoiceService.create({ user_id: TEST_USER_ID, client_id: testClient.id, issue_date: new Date(), due_date: new Date() });
-      const foundInvoice = await invoiceService.findById(newInvoice.id);
+      const foundInvoice = await invoiceService.findById(newInvoice.id, TEST_USER_ID);
       expect(foundInvoice).toBeDefined();
       expect(foundInvoice?.id).toBe(newInvoice.id);
     });
 
     it('should return null if invoice not found', async () => {
-      const foundInvoice = await invoiceService.findById('00000000-0000-0000-0000-000000000000');
+      const foundInvoice = await invoiceService.findById('00000000-0000-0000-0000-000000000000', TEST_USER_ID);
       expect(foundInvoice).toBeNull();
     });
   });
@@ -74,7 +74,7 @@ describe('InvoiceService', () => {
     it('should update an invoice', async () => {
       const newInvoice = await invoiceService.create({ user_id: TEST_USER_ID, client_id: testClient.id, issue_date: new Date(), due_date: new Date(), status: 'draft' });
       const updatedData = { status: 'sent' as const };
-      const updatedInvoice = await invoiceService.update(newInvoice.id, updatedData);
+      const updatedInvoice = await invoiceService.update(newInvoice.id, TEST_USER_ID, updatedData);
 
       expect(updatedInvoice).toBeDefined();
       expect(updatedInvoice?.status).toBe('sent');
@@ -84,15 +84,15 @@ describe('InvoiceService', () => {
   describe('delete', () => {
     it('should delete an invoice and return true', async () => {
       const newInvoice = await invoiceService.create({ user_id: TEST_USER_ID, client_id: testClient.id, issue_date: new Date(), due_date: new Date() });
-      const result = await invoiceService.delete(newInvoice.id);
+      const result = await invoiceService.delete(newInvoice.id, TEST_USER_ID);
       expect(result).toBe(true);
 
-      const foundInvoice = await invoiceService.findById(newInvoice.id);
+      const foundInvoice = await invoiceService.findById(newInvoice.id, TEST_USER_ID);
       expect(foundInvoice).toBeNull();
     });
 
     it('should return false if invoice to delete is not found', async () => {
-      const result = await invoiceService.delete('00000000-0000-0000-0000-000000000000');
+      const result = await invoiceService.delete('00000000-0000-0000-0000-000000000000', TEST_USER_ID);
       expect(result).toBe(false);
     });
   });
@@ -106,13 +106,13 @@ describe('InvoiceService', () => {
         due_date: new Date(),
       });
 
-      await invoiceService.addLineItems(newInvoice.id, [
+      await invoiceService.addLineItems(newInvoice.id, TEST_USER_ID, [
         { description: 'Item 1', quantity: 2, unit_price: 50, total_price: 100 } as any,
         { description: 'Item 2', quantity: 1, unit_price: 75, total_price: 75 } as any,
       ]);
 
       // Re-fetch the invoice to see calculated totals
-      const updatedInvoice = await invoiceService.findById(newInvoice.id);
+      const updatedInvoice = await invoiceService.findById(newInvoice.id, TEST_USER_ID);
       expect(updatedInvoice).toBeDefined();
       expect(parseFloat(updatedInvoice?.sub_total as any)).toBe(175); // 100 + 75
       expect(parseFloat(updatedInvoice?.total_amount as any)).toBe(175); // No tax in this example
@@ -126,11 +126,11 @@ describe('InvoiceService', () => {
         due_date: new Date(),
       });
 
-      await invoiceService.addLineItems(newInvoice.id, [
+      await invoiceService.addLineItems(newInvoice.id, TEST_USER_ID, [
         { description: 'Single Item', quantity: 5, unit_price: 20, total_price: 100 } as any,
       ]);
 
-      const updatedInvoice = await invoiceService.findById(newInvoice.id);
+      const updatedInvoice = await invoiceService.findById(newInvoice.id, TEST_USER_ID);
       expect(parseFloat(updatedInvoice?.sub_total as any)).toBe(100);
     });
 
@@ -142,11 +142,11 @@ describe('InvoiceService', () => {
         due_date: new Date(),
       });
 
-      await invoiceService.addLineItems(newInvoice.id, [
+      await invoiceService.addLineItems(newInvoice.id, TEST_USER_ID, [
         { description: 'Hourly Work', quantity: 2.5, unit_price: 85.50, total_price: 213.75 } as any,
       ]);
 
-      const updatedInvoice = await invoiceService.findById(newInvoice.id);
+      const updatedInvoice = await invoiceService.findById(newInvoice.id, TEST_USER_ID);
       expect(parseFloat(updatedInvoice?.sub_total as any)).toBeCloseTo(213.75, 2);
     });
   });
@@ -161,7 +161,7 @@ describe('InvoiceService', () => {
         status: 'draft',
       });
 
-      const updatedInvoice = await invoiceService.update(newInvoice.id, { status: 'sent' });
+      const updatedInvoice = await invoiceService.update(newInvoice.id, TEST_USER_ID, { status: 'sent' });
       expect(updatedInvoice?.status).toBe('sent');
     });
 
@@ -174,7 +174,7 @@ describe('InvoiceService', () => {
         status: 'sent',
       });
 
-      const updatedInvoice = await invoiceService.update(newInvoice.id, { status: 'paid' });
+      const updatedInvoice = await invoiceService.update(newInvoice.id, TEST_USER_ID, { status: 'paid' });
       expect(updatedInvoice?.status).toBe('paid');
     });
 
@@ -187,7 +187,7 @@ describe('InvoiceService', () => {
         status: 'sent',
       });
 
-      const updatedInvoice = await invoiceService.update(newInvoice.id, { status: 'overdue' });
+      const updatedInvoice = await invoiceService.update(newInvoice.id, TEST_USER_ID, { status: 'overdue' });
       expect(updatedInvoice?.status).toBe('overdue');
     });
   });
@@ -214,7 +214,7 @@ describe('InvoiceService', () => {
 
       expect(newInvoice.project_id).toBe(project.id);
 
-      const foundInvoice = await invoiceService.findById(newInvoice.id);
+      const foundInvoice = await invoiceService.findById(newInvoice.id, TEST_USER_ID);
       expect(foundInvoice?.project_id).toBe(project.id);
     });
   });
@@ -252,7 +252,7 @@ describe('InvoiceService', () => {
         currency: 'USD',
       });
 
-      const updatedInvoice = await invoiceService.update(newInvoice.id, { currency: 'GBP' });
+      const updatedInvoice = await invoiceService.update(newInvoice.id, TEST_USER_ID, { currency: 'GBP' });
       expect(updatedInvoice?.currency).toBe('GBP');
     });
   });
@@ -278,7 +278,7 @@ describe('InvoiceService', () => {
         due_date: new Date(),
       });
 
-      const updatedInvoice = await invoiceService.update(newInvoice.id, {
+      const updatedInvoice = await invoiceService.update(newInvoice.id, TEST_USER_ID, {
         notes: 'Updated notes - Please pay promptly',
       });
 
@@ -296,7 +296,7 @@ describe('InvoiceService', () => {
       });
 
       const newIssueDate = new Date('2024-02-01');
-      const updatedInvoice = await invoiceService.update(newInvoice.id, {
+      const updatedInvoice = await invoiceService.update(newInvoice.id, TEST_USER_ID, {
         issue_date: newIssueDate,
       });
 
@@ -312,7 +312,7 @@ describe('InvoiceService', () => {
       });
 
       const newDueDate = new Date('2024-02-28');
-      const updatedInvoice = await invoiceService.update(newInvoice.id, {
+      const updatedInvoice = await invoiceService.update(newInvoice.id, TEST_USER_ID, {
         due_date: newDueDate,
       });
 
@@ -330,17 +330,17 @@ describe('InvoiceService', () => {
       });
 
       // Add initial items
-      await invoiceService.addLineItems(newInvoice.id, [
+      await invoiceService.addLineItems(newInvoice.id, TEST_USER_ID, [
         { description: 'Original Item', quantity: 1, unit_price: 100, total_price: 100 } as any,
       ]);
 
       // Replace with new items
-      await invoiceService.replaceLineItems(newInvoice.id, [
+      await invoiceService.replaceLineItems(newInvoice.id, TEST_USER_ID, [
         { description: 'Replacement Item 1', quantity: 2, unit_price: 50, total_price: 100 } as any,
         { description: 'Replacement Item 2', quantity: 3, unit_price: 25, total_price: 75 } as any,
       ]);
 
-      const updatedInvoice = await invoiceService.findById(newInvoice.id);
+      const updatedInvoice = await invoiceService.findById(newInvoice.id, TEST_USER_ID);
       expect(parseFloat(updatedInvoice?.sub_total as any)).toBe(175); // 100 + 75
     });
   });
@@ -366,11 +366,11 @@ describe('InvoiceService', () => {
         due_date: new Date(),
       });
 
-      await invoiceService.addLineItems(newInvoice.id, [
+      await invoiceService.addLineItems(newInvoice.id, TEST_USER_ID, [
         { description: 'Taxable Item', quantity: 1, unit_price: 100, total_price: 100 } as any,
       ]);
 
-      const updatedInvoice = await invoiceService.findById(newInvoice.id);
+      const updatedInvoice = await invoiceService.findById(newInvoice.id, TEST_USER_ID);
       expect(parseFloat(updatedInvoice?.sub_total as any)).toBe(100);
       // Without tax rate, total should equal subtotal
       expect(parseFloat(updatedInvoice?.total_amount as any)).toBeGreaterThanOrEqual(100);
@@ -398,7 +398,7 @@ describe('InvoiceService', () => {
         due_date: new Date(),
       });
 
-      const updatedInvoice = await invoiceService.update(newInvoice.id, {
+      const updatedInvoice = await invoiceService.update(newInvoice.id, TEST_USER_ID, {
         footer_text: 'Updated bank details',
       });
 
@@ -440,7 +440,7 @@ describe('InvoiceService', () => {
         delivery_date: '10.2024',
       });
 
-      const foundInvoice = await invoiceService.findById(newInvoice.id);
+      const foundInvoice = await invoiceService.findById(newInvoice.id, TEST_USER_ID);
       expect(foundInvoice?.delivery_date).toBe('10.2024');
     });
   });
@@ -455,14 +455,14 @@ describe('InvoiceService', () => {
         notes: 'Original notes',
       });
 
-      const updated = await invoiceService.update(newInvoice.id, {});
+      const updated = await invoiceService.update(newInvoice.id, TEST_USER_ID, {});
 
       expect(updated?.id).toBe(newInvoice.id);
       expect(updated?.notes).toBe('Original notes');
     });
 
     it('should return null when updating non-existent invoice', async () => {
-      const updated = await invoiceService.update('00000000-0000-0000-0000-000000000000', {
+      const updated = await invoiceService.update('00000000-0000-0000-0000-000000000000', TEST_USER_ID, {
         notes: 'Does not exist',
       });
 
@@ -480,7 +480,7 @@ describe('InvoiceService', () => {
         status: 'draft',
       });
 
-      const updatedInvoice = await invoiceService.update(newInvoice.id, { status: 'cancelled' });
+      const updatedInvoice = await invoiceService.update(newInvoice.id, TEST_USER_ID, { status: 'cancelled' });
       expect(updatedInvoice?.status).toBe('cancelled');
     });
   });
@@ -516,8 +516,8 @@ describe('InvoiceService', () => {
         { description: 'Item 3', quantity: 5, unit_price: 20 } as InvoiceItem,
       ];
 
-      await invoiceService.addLineItems(invoice.id, items);
-      const updatedInvoice = await invoiceService.findById(invoice.id);
+      await invoiceService.addLineItems(invoice.id, TEST_USER_ID, items);
+      const updatedInvoice = await invoiceService.findById(invoice.id, TEST_USER_ID);
 
       // Total should be 100 + 100 + 100 = 300
       expect(Number(updatedInvoice?.total_amount)).toBe(300);
@@ -531,11 +531,11 @@ describe('InvoiceService', () => {
         due_date: new Date(),
       });
 
-      await invoiceService.addLineItems(invoice.id, [
+      await invoiceService.addLineItems(invoice.id, TEST_USER_ID, [
         { description: 'Service', quantity: 3, unit_price: 75 } as InvoiceItem,
       ]);
 
-      const updatedInvoice = await invoiceService.findById(invoice.id);
+      const updatedInvoice = await invoiceService.findById(invoice.id, TEST_USER_ID);
       expect(Number(updatedInvoice?.total_amount)).toBe(225); // 3 * 75
     });
   });
@@ -570,11 +570,11 @@ describe('InvoiceService', () => {
       });
 
       // Add item without tax (no tax_rate_id)
-      await invoiceService.addLineItems(invoice.id, [
+      await invoiceService.addLineItems(invoice.id, TEST_USER_ID, [
         { description: 'Service', quantity: 1, unit_price: 100 } as InvoiceItem,
       ]);
 
-      const updatedInvoice = await invoiceService.findById(invoice.id);
+      const updatedInvoice = await invoiceService.findById(invoice.id, TEST_USER_ID);
       expect(Number(updatedInvoice?.sub_total)).toBe(100);
       expect(Number(updatedInvoice?.total_amount)).toBe(100);
     });

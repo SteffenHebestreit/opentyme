@@ -357,7 +357,7 @@ router.get('/:id', invoiceController.findById.bind(invoiceController));
 
 /**
  * @openapi
- * /api/invoices/:id:
+ * /api/invoices/{id}:
  *   put:
  *     tags:
  *       - Invoices

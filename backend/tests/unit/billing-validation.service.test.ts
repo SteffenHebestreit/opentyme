@@ -34,7 +34,7 @@ describe('BillingValidationService', () => {
       });
 
       // Add line items to set a total
-      await invoiceService.addLineItems(invoice.id, [
+      await invoiceService.addLineItems(invoice.id, TEST_USER_ID, [
         { description: 'Service', quantity: 1, unit_price: 100, total_price: 100 } as any,
       ]);
 
@@ -65,7 +65,7 @@ describe('BillingValidationService', () => {
         due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
 
-      await invoiceService.addLineItems(invoice.id, [
+      await invoiceService.addLineItems(invoice.id, TEST_USER_ID, [
         { description: 'Service', quantity: 1, unit_price: 200, total_price: 200 } as any,
       ]);
 
@@ -95,7 +95,7 @@ describe('BillingValidationService', () => {
         due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
 
-      await invoiceService.addLineItems(invoice.id, [
+      await invoiceService.addLineItems(invoice.id, TEST_USER_ID, [
         { description: 'Service', quantity: 1, unit_price: 100, total_price: 100 } as any,
       ]);
 
@@ -125,7 +125,7 @@ describe('BillingValidationService', () => {
         due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
 
-      await invoiceService.addLineItems(invoice.id, [
+      await invoiceService.addLineItems(invoice.id, TEST_USER_ID, [
         { description: 'Service', quantity: 1, unit_price: 100, total_price: 100 } as any,
       ]);
 
@@ -153,7 +153,7 @@ describe('BillingValidationService', () => {
         due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
 
-      await invoiceService.addLineItems(invoice.id, [
+      await invoiceService.addLineItems(invoice.id, TEST_USER_ID, [
         { description: 'Service', quantity: 1, unit_price: 100, total_price: 100 } as any,
       ]);
 
@@ -189,7 +189,7 @@ describe('BillingValidationService', () => {
         due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
 
-      await invoiceService.addLineItems(invoice.id, [
+      await invoiceService.addLineItems(invoice.id, TEST_USER_ID, [
         { description: 'Service', quantity: 1, unit_price: 300, total_price: 300 } as any,
       ]);
 
@@ -227,7 +227,7 @@ describe('BillingValidationService', () => {
         due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
 
-      await invoiceService.addLineItems(invoice.id, [
+      await invoiceService.addLineItems(invoice.id, TEST_USER_ID, [
         { description: 'Service', quantity: 1, unit_price: 100, total_price: 100 } as any,
       ]);
 
@@ -246,7 +246,7 @@ describe('BillingValidationService', () => {
         due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
 
-      await invoiceService.addLineItems(invoice.id, [
+      await invoiceService.addLineItems(invoice.id, TEST_USER_ID, [
         { description: 'Service', quantity: 1, unit_price: 100, total_price: 100 } as any,
       ]);
 
@@ -266,7 +266,7 @@ describe('BillingValidationService', () => {
         due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
 
-      await invoiceService.addLineItems(invoice.id, [
+      await invoiceService.addLineItems(invoice.id, TEST_USER_ID, [
         { description: 'Service', quantity: 1, unit_price: 100, total_price: 100 } as any,
       ]);
 
@@ -286,7 +286,7 @@ describe('BillingValidationService', () => {
         due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
 
-      await invoiceService.addLineItems(invoice.id, [
+      await invoiceService.addLineItems(invoice.id, TEST_USER_ID, [
         { description: 'Service', quantity: 1, unit_price: 100, total_price: 100 } as any,
       ]);
 
@@ -310,7 +310,7 @@ describe('BillingValidationService', () => {
         due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
 
-      await invoiceService.addLineItems(invoice.id, [
+      await invoiceService.addLineItems(invoice.id, TEST_USER_ID, [
         { description: 'Service', quantity: 1, unit_price: 500, total_price: 500 } as any,
       ]);
 
@@ -363,7 +363,7 @@ describe('BillingValidationService', () => {
         due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
 
-      await invoiceService.addLineItems(invoice.id, [
+      await invoiceService.addLineItems(invoice.id, TEST_USER_ID, [
         { description: 'Service', quantity: 1, unit_price: 500, total_price: 500 } as any,
       ]);
 
@@ -421,7 +421,7 @@ describe('BillingValidationService', () => {
         due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
 
-      await invoiceService.addLineItems(invoice.id, [
+      await invoiceService.addLineItems(invoice.id, TEST_USER_ID, [
         { description: 'Service', quantity: 1, unit_price: 300, total_price: 300 } as any,
       ]);
 
@@ -470,7 +470,7 @@ describe('BillingValidationService', () => {
         due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
 
-      await invoiceService.addLineItems(invoice.id, [
+      await invoiceService.addLineItems(invoice.id, TEST_USER_ID, [
         { description: 'Service', quantity: 1, unit_price: 100, total_price: 100 } as any,
       ]);
 
@@ -489,7 +489,7 @@ describe('BillingValidationService', () => {
         due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
 
-      await invoiceService.addLineItems(invoice.id, [
+      await invoiceService.addLineItems(invoice.id, TEST_USER_ID, [
         { description: 'Service', quantity: 1, unit_price: 200, total_price: 200 } as any,
       ]);
 

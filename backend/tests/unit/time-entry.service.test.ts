@@ -173,14 +173,14 @@ describe('TimeEntryService', () => {
         description: 'Find me'
       });
 
-      const foundEntry = await timeEntryService.findById(newEntry.id);
+      const foundEntry = await timeEntryService.findById(newEntry.id, TEST_USER_ID);
       expect(foundEntry).toBeDefined();
       expect(foundEntry?.id).toBe(newEntry.id);
       expect(foundEntry?.description).toBe('Find me');
     });
 
     it('should return null for non-existent ID', async () => {
-      const foundEntry = await timeEntryService.findById('00000000-0000-0000-0000-000000000000');
+      const foundEntry = await timeEntryService.findById('00000000-0000-0000-0000-000000000000', TEST_USER_ID);
       expect(foundEntry).toBeNull();
     });
   });
@@ -196,7 +196,7 @@ describe('TimeEntryService', () => {
         description: 'Original' 
       });
       
-      const updatedEntry = await timeEntryService.update(newEntry.id, { description: 'Updated description' });
+      const updatedEntry = await timeEntryService.update(newEntry.id, TEST_USER_ID, { description: 'Updated description' });
 
       expect(updatedEntry).toBeDefined();
       expect(updatedEntry?.description).toBe('Updated description');
@@ -212,7 +212,7 @@ describe('TimeEntryService', () => {
         is_billable: true
       });
       
-      const updatedEntry = await timeEntryService.update(newEntry.id, { 
+      const updatedEntry = await timeEntryService.update(newEntry.id, TEST_USER_ID, { 
         duration_hours: 2.5,
         is_billable: false,
         category: 'meeting'
@@ -233,14 +233,14 @@ describe('TimeEntryService', () => {
         duration_hours: 1
       });
       
-      const updatedEntry = await timeEntryService.update(newEntry.id, {});
+      const updatedEntry = await timeEntryService.update(newEntry.id, TEST_USER_ID, {});
 
       expect(updatedEntry).toBeDefined();
       expect(updatedEntry?.id).toBe(newEntry.id);
     });
 
     it('should return null for non-existent ID', async () => {
-      const updatedEntry = await timeEntryService.update('00000000-0000-0000-0000-000000000000', { 
+      const updatedEntry = await timeEntryService.update('00000000-0000-0000-0000-000000000000', TEST_USER_ID, { 
         description: 'Updated' 
       });
 
@@ -261,7 +261,7 @@ describe('TimeEntryService', () => {
       const result = await timeEntryService.delete(newEntry.id, TEST_USER_ID);
       expect(result).toBe(true);
 
-      const foundEntry = await timeEntryService.findById(newEntry.id);
+      const foundEntry = await timeEntryService.findById(newEntry.id, TEST_USER_ID);
       expect(foundEntry).toBeNull();
     });
 
@@ -281,7 +281,7 @@ describe('TimeEntryService', () => {
         duration_hours: 1,
       });
       
-      const updated = await timeEntryService.update(newEntry.id, { task_name: 'New Task' });
+      const updated = await timeEntryService.update(newEntry.id, TEST_USER_ID, { task_name: 'New Task' });
       expect(updated?.task_name).toBe('New Task');
     });
 
@@ -294,7 +294,7 @@ describe('TimeEntryService', () => {
         duration_hours: 1,
       });
       
-      const updated = await timeEntryService.update(newEntry.id, { entry_time: '14:30' });
+      const updated = await timeEntryService.update(newEntry.id, TEST_USER_ID, { entry_time: '14:30' });
       expect(updated?.entry_time).toMatch(/^14:30/);
     });
 
@@ -307,7 +307,7 @@ describe('TimeEntryService', () => {
         duration_hours: 2,
       });
       
-      const updated = await timeEntryService.update(newEntry.id, { entry_end_time: '12:00' });
+      const updated = await timeEntryService.update(newEntry.id, TEST_USER_ID, { entry_end_time: '12:00' });
       expect(updated?.entry_end_time).toMatch(/^12:00/);
     });
 
@@ -321,7 +321,7 @@ describe('TimeEntryService', () => {
         tags: ['original'],
       });
       
-      const updated = await timeEntryService.update(newEntry.id, { tags: ['updated', 'new-tag'] });
+      const updated = await timeEntryService.update(newEntry.id, TEST_USER_ID, { tags: ['updated', 'new-tag'] });
       expect(updated?.tags).toContain('updated');
       expect(updated?.tags).toContain('new-tag');
     });
@@ -336,7 +336,7 @@ describe('TimeEntryService', () => {
         hourly_rate: 50.00,
       });
       
-      const updated = await timeEntryService.update(newEntry.id, { hourly_rate: 75.00 });
+      const updated = await timeEntryService.update(newEntry.id, TEST_USER_ID, { hourly_rate: 75.00 });
       expect(parseFloat(updated?.hourly_rate as any)).toBe(75.00);
     });
 
@@ -350,7 +350,7 @@ describe('TimeEntryService', () => {
       });
       
       const newDate = new Date('2024-06-15');
-      const updated = await timeEntryService.update(newEntry.id, { entry_date: newDate });
+      const updated = await timeEntryService.update(newEntry.id, TEST_USER_ID, { entry_date: newDate });
       expect(new Date(updated!.entry_date).toISOString().split('T')[0]).toBe('2024-06-15');
     });
 
@@ -363,7 +363,7 @@ describe('TimeEntryService', () => {
         duration_hours: 1,
       });
       
-      const updated = await timeEntryService.update(newEntry.id, { project_id: secondProject.id });
+      const updated = await timeEntryService.update(newEntry.id, TEST_USER_ID, { project_id: secondProject.id });
       expect(updated?.project_id).toBe(secondProject.id);
     });
 
@@ -377,7 +377,7 @@ describe('TimeEntryService', () => {
       });
       
       await expect(
-        timeEntryService.update(newEntry.id, { project_id: '00000000-0000-0000-0000-000000000000' })
+        timeEntryService.update(newEntry.id, TEST_USER_ID, { project_id: '00000000-0000-0000-0000-000000000000' })
       ).rejects.toThrow();
     });
   });
@@ -450,7 +450,7 @@ describe('TimeEntryService', () => {
       const result = await timeEntryService.delete(newEntry.id, TEST_USER_ID);
       expect(result).toBe(true);
       
-      const foundEntry = await timeEntryService.findById(newEntry.id);
+      const foundEntry = await timeEntryService.findById(newEntry.id, TEST_USER_ID);
       expect(foundEntry).toBeNull();
     });
 
@@ -501,7 +501,7 @@ describe('TimeEntryService', () => {
         hourly_rate: 50,
       });
       
-      const updated = await timeEntryService.update(newEntry.id, { hourly_rate: 75 });
+      const updated = await timeEntryService.update(newEntry.id, TEST_USER_ID, { hourly_rate: 75 });
       expect(Number(updated?.hourly_rate)).toBe(75);
     });
   });
@@ -533,7 +533,7 @@ describe('TimeEntryService', () => {
         tags: ['old-tag'],
       });
       
-      const updated = await timeEntryService.update(newEntry.id, { tags: ['new-tag', 'another-tag'] });
+      const updated = await timeEntryService.update(newEntry.id, TEST_USER_ID, { tags: ['new-tag', 'another-tag'] });
       expect(updated?.tags).toContain('new-tag');
       expect(updated?.tags).toContain('another-tag');
     });
@@ -548,7 +548,7 @@ describe('TimeEntryService', () => {
         tags: ['tag-to-remove'],
       });
       
-      const updated = await timeEntryService.update(newEntry.id, { tags: [] });
+      const updated = await timeEntryService.update(newEntry.id, TEST_USER_ID, { tags: [] });
       expect(updated?.tags).toEqual([]);
     });
   });

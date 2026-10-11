@@ -12,6 +12,7 @@ import {
   expenseFilterSchema,
 } from '../../../schemas/business/expense.schema';
 import { logger } from '../../../utils/logger';
+import { ForeignReferenceError, invalidReferenceBody } from '../../../services/ownership.service';
 
 export class ExpenseCrudController {
   private expenseService: ExpenseService;
@@ -44,6 +45,10 @@ export class ExpenseCrudController {
 
       res.status(201).json(expense);
     } catch (error: any) {
+      if (error instanceof ForeignReferenceError) {
+        res.status(400).json(invalidReferenceBody(error));
+        return;
+      }
       logger.error('Create expense error:', error);
       res.status(500).json({ error: 'Internal server error', message: error.message });
     }
@@ -160,6 +165,10 @@ export class ExpenseCrudController {
 
       res.status(200).json(expense);
     } catch (error: any) {
+      if (error instanceof ForeignReferenceError) {
+        res.status(400).json(invalidReferenceBody(error));
+        return;
+      }
       logger.error('Update expense error:', error);
       if (error.message.includes('not found') || error.message.includes('unauthorized')) {
         res.status(404).json({ error: 'Not found', message: error.message });

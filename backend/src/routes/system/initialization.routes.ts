@@ -16,7 +16,7 @@ import {
   getUserInitializationStatus,
   getInitializationStats,
 } from '../../controllers/system/initialization.controller';
-import { authenticateToken } from '../../middleware/auth.middleware';
+import { authenticateKeycloak, extractKeycloakUser, requireAdmin } from '../../middleware/auth/keycloak.middleware';
 
 const router = Router();
 
@@ -24,7 +24,8 @@ const router = Router();
  * All routes require authentication
  * Admin-only routes should add additional role check
  */
-router.use(authenticateToken);
+// Initialising storage for arbitrary users and listing user status is an admin task
+router.use(authenticateKeycloak, extractKeycloakUser, requireAdmin);
 
 /**
  * Initialize all existing Keycloak users

@@ -166,7 +166,7 @@ export class AnalyticsService {
         COALESCE(SUM(te.duration_hours), 0) AS logged_hours,
         COALESCE(SUM(CASE WHEN te.is_billable THEN te.duration_hours ELSE 0 END), 0) AS billable_hours
       FROM projects p
-      LEFT JOIN clients c ON p.client_id = c.id
+      LEFT JOIN clients c ON p.client_id = c.id AND c.user_id = p.user_id
       LEFT JOIN time_entries te ON te.project_id = p.id AND te.user_id = $1
       WHERE p.user_id = $1
         AND p.status IN ('active', 'completed', 'on_hold')
@@ -494,7 +494,7 @@ export class AnalyticsService {
           END
         ), 0) AS revenue_tax
       FROM payments p
-      LEFT JOIN invoices i ON p.invoice_id = i.id
+      LEFT JOIN invoices i ON p.invoice_id = i.id AND i.user_id = p.user_id
       WHERE p.user_id = $1
         AND p.payment_type = 'payment'
         AND p.payment_date >= $2

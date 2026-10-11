@@ -14,6 +14,7 @@
 import { getDbClient } from '../../utils/database';
 import { ExpenseDepreciationService } from './expense-depreciation.service';
 import { logger } from '../../utils/logger';
+import { ForeignReferenceError, isUuid, ownsRow } from '../ownership.service';
 import {
   Expense,
   ExpenseWithProject,
@@ -37,6 +38,21 @@ export class ExpenseService {
   }
 
   /**
+   * An expense may only be booked on one of the user's own projects. The
+   * foreign key alone would accept another tenant's project, whose name (and
+   * client name) every read of the expense then shows.
+   *
+   * @param {string | null | undefined} projectId - Referenced project, if any
+   * @param {string} userId - Owner of the expense
+   * @throws {ForeignReferenceError} When the project is not the user's
+   */
+  private async assertProjectOwned(projectId: string | null | undefined, userId: string): Promise<void> {
+    if (projectId && !(await ownsRow('projects', projectId, userId))) {
+      throw new ForeignReferenceError('project_id');
+    }
+  }
+
+  /**
    * Ensure receipts upload directory exists
    */
   private async ensureUploadsDir(): Promise<void> {
@@ -55,6 +71,7 @@ export class ExpenseService {
    * @returns {Promise<Expense>} Created expense
    */
   async createExpense(userId: string, data: CreateExpenseData): Promise<Expense> {
+    await this.assertProjectOwned(data.project_id, userId);
     const client = await this.db.connect();
     
     try {
@@ -276,14 +293,16 @@ export class ExpenseService {
    * @returns {Promise<ExpenseWithProject | null>} Expense with project details or null
    */
   async getExpenseById(id: string, userId: string): Promise<ExpenseWithProject | null> {
+    // A malformed id is "not found", not a database error
+    if (!isUuid(id)) return null;
     const query = `
       SELECT 
         e.*,
         p.name AS project_name,
         c.name AS client_name
       FROM expenses e
-      LEFT JOIN projects p ON e.project_id = p.id
-      LEFT JOIN clients c ON p.client_id = c.id
+      LEFT JOIN projects p ON e.project_id = p.id AND p.user_id = e.user_id
+      LEFT JOIN clients c ON p.client_id = c.id AND c.user_id = e.user_id
       WHERE e.id = $1 AND e.user_id = $2
     `;
 
@@ -372,8 +391,8 @@ export class ExpenseService {
         p.name AS project_name,
         c.name AS client_name
       FROM expenses e
-      LEFT JOIN projects p ON e.project_id = p.id
-      LEFT JOIN clients c ON p.client_id = c.id
+      LEFT JOIN projects p ON e.project_id = p.id AND p.user_id = e.user_id
+      LEFT JOIN clients c ON p.client_id = c.id AND c.user_id = e.user_id
       ${whereClause}
       ORDER BY e.${sortBy} ${sortOrder.toUpperCase()}
     `;
@@ -401,6 +420,8 @@ export class ExpenseService {
    * @returns {Promise<Expense>} Updated expense
    */
   async updateExpense(id: string, userId: string, data: UpdateExpenseData): Promise<Expense> {
+    if (!isUuid(id)) throw new Error('Expense not found or unauthorized');
+    await this.assertProjectOwned(data.project_id, userId);
     const client = await this.db.connect();
     
     try {
@@ -1005,8 +1026,8 @@ export class ExpenseService {
         p.name AS project_name,
         c.name AS client_name
       FROM expenses e
-      LEFT JOIN projects p ON e.project_id = p.id
-      LEFT JOIN clients c ON p.client_id = c.id
+      LEFT JOIN projects p ON e.project_id = p.id AND p.user_id = e.user_id
+      LEFT JOIN clients c ON p.client_id = c.id AND c.user_id = e.user_id
       WHERE e.parent_expense_id = $1 AND e.user_id = $2
       ORDER BY e.expense_date DESC
     `;

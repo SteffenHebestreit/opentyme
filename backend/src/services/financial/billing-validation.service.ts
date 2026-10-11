@@ -38,10 +38,12 @@ export interface BillingValidationResult {
  * @interface BillingValidationConfig
  * @property {number} [threshold] - Acceptable variance in EUR/USD (default: 1.50)
  * @property {boolean} [strict] - If true, reject payments causing overbilling (default: false)
+ * @property {string} [userId] - When set, only an invoice of this user is found (HTTP callers always pass it)
  */
 export interface BillingValidationConfig {
   threshold?: number;
   strict?: boolean;
+  userId?: string;
 }
 
 /**
@@ -77,13 +79,15 @@ export class BillingValidationService {
     const threshold = config.threshold ?? this.defaultThreshold;
 
     try {
-      // Fetch invoice details
-      const invoiceQuery = `
-        SELECT id, total_amount, currency
-        FROM invoices
-        WHERE id = $1
-      `;
-      const invoiceResult = await this.db.query(invoiceQuery, [invoiceId]);
+      // Fetch invoice details (owner-scoped when a user is given: another
+      // user's invoice reads as not found)
+      const invoiceQuery = config.userId
+        ? `SELECT id, total_amount, currency FROM invoices WHERE id = $1 AND user_id = $2`
+        : `SELECT id, total_amount, currency FROM invoices WHERE id = $1`;
+      const invoiceResult = await this.db.query(
+        invoiceQuery,
+        config.userId ? [invoiceId, config.userId] : [invoiceId]
+      );
 
       if (invoiceResult.rows.length === 0) {
         throw new Error(`Invoice with ID ${invoiceId} not found`);

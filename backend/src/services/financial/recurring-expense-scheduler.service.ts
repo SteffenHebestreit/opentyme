@@ -46,8 +46,12 @@ class RecurringExpenseSchedulerService {
   /**
    * Process all active recurring expenses
    * Generates new expense entries for recurring expenses that are due
+   *
+   * @param {string} [userId] - Only process this user's templates (manual
+   *   trigger from the API). The nightly cron run passes nothing and processes
+   *   every user.
    */
-  public async processRecurringExpenses(): Promise<void> {
+  public async processRecurringExpenses(userId?: string): Promise<void> {
     const client = await pool.connect();
     
     try {
@@ -63,10 +67,11 @@ class RecurringExpenseSchedulerService {
           AND next_occurrence <= CURRENT_DATE
           AND (recurrence_end_date IS NULL OR recurrence_end_date >= CURRENT_DATE)
           AND parent_expense_id IS NULL  -- Only process parent templates, not generated expenses
+          ${userId ? 'AND user_id = $1' : ''}
         ORDER BY next_occurrence ASC
       `;
 
-      const result = await client.query(query);
+      const result = await client.query(query, userId ? [userId] : []);
       const recurringExpenses = result.rows;
 
       logger.info(`[RecurringExpenseScheduler] Found ${recurringExpenses.length} recurring expenses to process`);
@@ -227,10 +232,12 @@ class RecurringExpenseSchedulerService {
 
   /**
    * Manually trigger recurring expense processing (for testing or manual runs)
+   *
+   * @param {string} [userId] - Restrict the run to this user's templates
    */
-  public async triggerManually(): Promise<void> {
+  public async triggerManually(userId?: string): Promise<void> {
     logger.info('[RecurringExpenseScheduler] Manual trigger initiated');
-    await this.processRecurringExpenses();
+    await this.processRecurringExpenses(userId);
   }
 }
 

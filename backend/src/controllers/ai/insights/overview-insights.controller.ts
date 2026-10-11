@@ -127,7 +127,7 @@ export async function getProjectOverview(req: Request, res: Response): Promise<v
     const [projRes, hoursRes, invRes, expRes] = await Promise.all([
       db.query(
         `SELECT p.id, p.name, p.status, p.hourly_rate, p.budget, p.estimated_hours, c.name AS client_name
-         FROM projects p LEFT JOIN clients c ON c.id = p.client_id
+         FROM projects p LEFT JOIN clients c ON c.id = p.client_id AND c.user_id = p.user_id
          WHERE p.id = $1 AND p.user_id = $2`,
         [project_id, uid]
       ),

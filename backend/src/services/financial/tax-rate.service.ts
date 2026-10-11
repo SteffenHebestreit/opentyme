@@ -5,6 +5,7 @@ import {
   TaxRate
 } from '../../models/financial/tax-rate.model';
 import { logger } from '../../utils/logger';
+import { ownsRow } from '../ownership.service';
 
 const db = getDbClient();
 
@@ -202,6 +203,12 @@ export class TaxRateService {
     const db = getDbClient();
     
     try {
+      // Another user's (or an unknown) tax rate reads as not found — checked
+      // first, so targeting a foreign id cannot clear the caller's own default.
+      if (!(await ownsRow('tax_rates', id, userId))) {
+        return null;
+      }
+
       // If setting as default, unset other defaults first
       if (taxRateData.is_default === true) {
         await db.query(
@@ -305,10 +312,16 @@ export class TaxRateService {
     const db = getDbClient();
     
     try {
-      // Check if this tax rate is used by any invoices
+      // Another user's (or an unknown) tax rate reads as not found — checked
+      // before the usage check, which would otherwise reveal that the id exists.
+      if (!(await ownsRow('tax_rates', id, userId))) {
+        return false;
+      }
+
+      // Check if this tax rate is used by any of the user's invoices
       const usageCheck = await db.query(
-        'SELECT COUNT(*) as count FROM invoices WHERE tax_rate_id = $1',
-        [id]
+        'SELECT COUNT(*) as count FROM invoices WHERE tax_rate_id = $1 AND user_id = $2',
+        [id, userId]
       );
       
       if (parseInt(usageCheck.rows[0].count) > 0) {

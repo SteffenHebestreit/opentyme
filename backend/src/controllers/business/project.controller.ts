@@ -170,11 +170,17 @@ export class ProjectController {
       return;
     }
 
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({ message: 'Authentication required' });
+      return;
+    }
+
     try {
       // Inject user_id from authenticated user
       const projectData = {
         ...value,
-        user_id: (req as any).user?.id
+        user_id: userId
       };
       logger.debug('[DEBUG] Creating project with user_id:', projectData.user_id);
       
@@ -267,8 +273,15 @@ export class ProjectController {
         return;
     }
 
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({ message: 'Authentication required' });
+      return;
+    }
+
     try {
-      const project = await projectService.findById(id);
+      // Owner-scoped: another user's project reads as not found
+      const project = await projectService.findById(id, userId);
       if (project) {
         res.status(200).json(project);
       } else {
@@ -317,8 +330,8 @@ export class ProjectController {
 
     try {
       // Scoped by owner: an id from the request alone must never reach another
-      // tenant's project (ProjectService.update itself has no user filter).
-      const existing = await projectService.findByIdForUser(id, userId);
+      // tenant's project.
+      const existing = await projectService.findById(id, userId);
       if (!existing) {
         res.status(404).json({ message: 'Project not found' });
         return;
@@ -360,7 +373,7 @@ export class ProjectController {
       }
 
       if (Object.keys(projectFields).length > 0) {
-        await projectService.update(id, projectFields);
+        await projectService.update(id, userId, projectFields);
       }
 
       let repricedEntries = 0;
@@ -383,7 +396,7 @@ export class ProjectController {
         repricedEntries = saved?.repriced_entries ?? 0;
       }
 
-      const updatedProject = await projectService.findByIdForUser(id, userId);
+      const updatedProject = await projectService.findById(id, userId);
       res.status(200).json({
         message: 'Project updated successfully',
         project: updatedProject,
@@ -422,8 +435,14 @@ export class ProjectController {
         return;
     }
 
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({ message: 'Authentication required' });
+      return;
+    }
+
     try {
-      const deleted = await projectService.delete(id);
+      const deleted = await projectService.delete(id, userId);
       if (deleted) {
         res.status(200).json({ message: 'Project deleted successfully' });
       } else {

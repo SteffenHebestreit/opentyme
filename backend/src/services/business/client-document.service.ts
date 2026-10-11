@@ -297,7 +297,7 @@ export class ClientDocumentService {
       SELECT d.*, c.name AS client_name, p.name AS project_name
       FROM client_documents d
       JOIN clients c ON c.id = d.client_id
-      LEFT JOIN projects p ON p.id = d.project_id
+      LEFT JOIN projects p ON p.id = d.project_id AND p.user_id = c.user_id
       WHERE ${conditions.join(' AND ')}
       ORDER BY d.created_at DESC
     `;
@@ -321,7 +321,7 @@ export class ClientDocumentService {
       SELECT d.*, c.name AS client_name, p.name AS project_name
       FROM client_documents d
       JOIN clients c ON c.id = d.client_id
-      LEFT JOIN projects p ON p.id = d.project_id
+      LEFT JOIN projects p ON p.id = d.project_id AND p.user_id = c.user_id
       WHERE d.id = $1 AND c.user_id = $2
     `;
 

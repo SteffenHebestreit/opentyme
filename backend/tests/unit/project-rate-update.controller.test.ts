@@ -113,7 +113,7 @@ describe('ProjectController.update — hourly rate changes need a start date', (
     const res = await put(project.id, { name: 'Hijacked' }, '99999999-9999-4999-8999-999999999999');
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect((await projectService.findById(project.id))?.name).toBe('Rate Update Project');
+    expect((await projectService.findById(project.id, TEST_USER_ID))?.name).toBe('Rate Update Project');
   });
   it('moves entries dated from the start date when the rate is changed on the project form', async () => {
     // The reported case, through the exact path it took: the project form.
@@ -138,8 +138,8 @@ describe('ProjectController.update — hourly rate changes need a start date', (
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json.mock.calls[0][0].repriced_entries).toBe(4);
     for (const entry of entries) {
-      expect(parseFloat((await timeEntryService.findById(entry.id))?.hourly_rate as any)).toBe(85);
+      expect(parseFloat((await timeEntryService.findById(entry.id, TEST_USER_ID))?.hourly_rate as any)).toBe(85);
     }
-    expect(parseFloat((await timeEntryService.findById(earlier.id))?.hourly_rate as any)).toBe(80);
+    expect(parseFloat((await timeEntryService.findById(earlier.id, TEST_USER_ID))?.hourly_rate as any)).toBe(80);
   });
 });

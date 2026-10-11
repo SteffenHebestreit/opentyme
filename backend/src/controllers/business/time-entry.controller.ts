@@ -75,6 +75,8 @@ const createTimeEntrySchema = Joi.object({
  * @constant {Joi.ObjectSchema}
  */
 const updateTimeEntrySchema = Joi.object({
+  // Accepted for backward compatibility but IGNORED: an entry always stays
+  // with the authenticated user and can never be handed to someone else.
   user_id: Joi.string().guid({ version: 'uuidv4' }).optional(),
   project_id: Joi.string().guid({ version: 'uuidv4' }).optional(),
   task_name: Joi.string().max(255).optional().allow(''),
@@ -132,11 +134,17 @@ export class TimeEntryController {
       return;
     }
 
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({ message: 'Authentication required' });
+      return;
+    }
+
     try {
       // New simplified model: entry_date + entry_time + entry_end_time + duration_hours
       const transformedData: any = {
         project_id: value.project_id,
-        user_id: (req as any).user?.id, // Inject user_id from authenticated user
+        user_id: userId, // Inject user_id from authenticated user (never from the body)
         task_name: value.task_name,
         description: value.description || '', // Default to empty string (NOT NULL constraint)
         category: value.category,
@@ -293,8 +301,15 @@ export class TimeEntryController {
         return;
     }
 
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({ message: 'Authentication required' });
+      return;
+    }
+
     try {
-      const timeEntry = await timeEntryService.findById(id);
+      // Owner-scoped: another user's entry reads as not found
+      const timeEntry = await timeEntryService.findById(id, userId);
       if (timeEntry) {
         // Calculate end_time for legacy compatibility
         let endTime = null;
@@ -361,6 +376,12 @@ export class TimeEntryController {
         return;
     }
 
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({ message: 'Authentication required' });
+      return;
+    }
+
     // Joi validation for updates
     const { error, value } = updateTimeEntrySchema.validate(req.body);
     if (error) {
@@ -373,7 +394,8 @@ export class TimeEntryController {
       const transformedData: any = {};
 
       if (value.project_id) transformedData.project_id = value.project_id;
-      if (value.user_id) transformedData.user_id = value.user_id;
+      // value.user_id is deliberately ignored: re-assigning an entry to another
+      // user would hand them (and take from the caller) a piece of billing data.
       if (value.task_name !== undefined) transformedData.task_name = value.task_name;
       if (value.description !== undefined) transformedData.description = value.description;
       if (value.category !== undefined) transformedData.category = value.category;
@@ -395,7 +417,7 @@ export class TimeEntryController {
       if (value.hourly_rate !== undefined) transformedData.hourly_rate = value.hourly_rate;
       if (value.tags !== undefined) transformedData.tags = value.tags;
 
-      const updatedTimeEntry = await timeEntryService.update(id, transformedData);
+      const updatedTimeEntry = await timeEntryService.update(id, userId, transformedData);
       if (updatedTimeEntry) {
         res.status(200).json({
           message: 'Time entry updated successfully',
@@ -546,11 +568,10 @@ export class TimeEntryController {
           return;
         }
 
-      // Confirm the project belongs to the caller before using it. Note
-      // projectService.findById has NO user_id filter, so it alone would let a
-      // timer be started against another tenant's project and stamped with
-      // their rate. getEffectiveRate is owner-scoped, hence the explicit check.
-      const ownsProject = await projectService.findByIdForUser(project_id, userId);
+      // Confirm the project belongs to the caller before using it, so a timer
+      // can never be started against another tenant's project and stamped
+      // with their rate.
+      const ownsProject = await projectService.findById(project_id, userId);
       if (!ownsProject) {
         res.status(400).json({ message: 'Invalid project_id specified.' });
         return;
@@ -636,7 +657,7 @@ export class TimeEntryController {
               date_start: startTime,
             };
 
-            return timeEntryService.update(entry.id, updateData);
+            return timeEntryService.update(entry.id, userId, updateData);
           })
         );
 

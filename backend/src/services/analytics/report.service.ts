@@ -451,8 +451,8 @@ export class ReportService {
         proj.name AS project_name,
         c.name AS client_name
       FROM payments pay
-      LEFT JOIN projects proj ON pay.project_id = proj.id
-      LEFT JOIN clients c ON proj.client_id = c.id
+      LEFT JOIN projects proj ON pay.project_id = proj.id AND proj.user_id = pay.user_id
+      LEFT JOIN clients c ON proj.client_id = c.id AND c.user_id = pay.user_id
       WHERE pay.user_id = $1
         AND pay.payment_date >= $2
         AND pay.payment_date <= $3
@@ -507,9 +507,9 @@ export class ReportService {
         pay.payment_date,
         pay.transaction_id
       FROM invoices i
-      LEFT JOIN clients c ON i.client_id = c.id
-      LEFT JOIN projects p ON i.project_id = p.id
-      LEFT JOIN payments pay ON pay.invoice_id = i.id AND pay.payment_type = 'payment' AND (pay.exclude_from_tax = false OR pay.exclude_from_tax IS NULL OR ${!excludeTaxExcluded})
+      LEFT JOIN clients c ON i.client_id = c.id AND c.user_id = i.user_id
+      LEFT JOIN projects p ON i.project_id = p.id AND p.user_id = i.user_id
+      LEFT JOIN payments pay ON pay.invoice_id = i.id AND pay.user_id = i.user_id AND pay.payment_type = 'payment' AND (pay.exclude_from_tax = false OR pay.exclude_from_tax IS NULL OR ${!excludeTaxExcluded})
       WHERE i.user_id = $1
         AND i.issue_date >= $2
         AND i.issue_date <= $3
@@ -711,8 +711,10 @@ export class ReportService {
           ELSE 0
         END AS days_overdue
       FROM invoices i
-      JOIN clients c ON i.client_id = c.id
-      LEFT JOIN payments p ON p.invoice_id = i.id
+      -- LEFT + owner check: every invoice still counts (client_id is NOT NULL),
+      -- but only the owner's own client name is ever shown
+      LEFT JOIN clients c ON i.client_id = c.id AND c.user_id = i.user_id
+      LEFT JOIN payments p ON p.invoice_id = i.id AND p.user_id = i.user_id
       WHERE i.user_id = $1
         AND i.issue_date >= $2
         AND i.issue_date <= $3
@@ -821,7 +823,7 @@ export class ReportService {
         e.is_billable,
         CASE WHEN e.receipt_url IS NOT NULL THEN true ELSE false END AS has_receipt
       FROM expenses e
-      LEFT JOIN projects p ON e.project_id = p.id
+      LEFT JOIN projects p ON e.project_id = p.id AND p.user_id = e.user_id
       WHERE e.user_id = $1
         AND e.expense_date >= $2
         AND e.expense_date <= $3
@@ -918,8 +920,9 @@ export class ReportService {
     const query = `
       SELECT 
         te.entry_date AS date,
-        p.name AS project_name,
-        c.name AS client_name,
+        -- Names only from the owner's own project/client (rows stay included)
+        CASE WHEN p.user_id = te.user_id THEN p.name END AS project_name,
+        CASE WHEN c.user_id = te.user_id THEN c.name END AS client_name,
         te.task_name,
         te.description,
         te.duration_hours AS hours,

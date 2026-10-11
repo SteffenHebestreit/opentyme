@@ -277,8 +277,8 @@ export class TaxPackageService {
         c.name as client_name,
         p.name as project_name
       FROM invoices i
-      LEFT JOIN clients c ON i.client_id = c.id
-      LEFT JOIN projects p ON i.project_id = p.id
+      LEFT JOIN clients c ON i.client_id = c.id AND c.user_id = i.user_id
+      LEFT JOIN projects p ON i.project_id = p.id AND p.user_id = i.user_id
       WHERE i.user_id = $1
         AND i.issue_date >= $2
         AND i.issue_date <= $3
@@ -303,7 +303,7 @@ export class TaxPackageService {
         e.status,
         p.name as project_name
       FROM expenses e
-      LEFT JOIN projects p ON e.project_id = p.id
+      LEFT JOIN projects p ON e.project_id = p.id AND p.user_id = e.user_id
       WHERE e.user_id = $1
         AND e.expense_date >= $2
         AND e.expense_date <= $3
@@ -327,8 +327,8 @@ export class TaxPackageService {
         i.invoice_number,
         c.name as client_name
       FROM payments p
-      LEFT JOIN invoices i ON p.invoice_id = i.id
-      LEFT JOIN clients c ON i.client_id = c.id
+      LEFT JOIN invoices i ON p.invoice_id = i.id AND i.user_id = p.user_id
+      LEFT JOIN clients c ON i.client_id = c.id AND c.user_id = p.user_id
       WHERE p.user_id = $1
         AND p.payment_date >= $2
         AND p.payment_date <= $3

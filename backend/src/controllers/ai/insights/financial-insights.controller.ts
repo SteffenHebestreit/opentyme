@@ -66,7 +66,7 @@ export async function getRevenueSummary(req: Request, res: Response): Promise<vo
            COALESCE(SUM(CASE WHEN i.status = 'paid' THEN i.total_amount ELSE 0 END), 0) AS paid,
            COALESCE(SUM(CASE WHEN i.status IN ('sent','overdue') THEN i.total_amount ELSE 0 END), 0) AS outstanding
          FROM invoices i
-         JOIN clients c ON c.id = i.client_id
+         JOIN clients c ON c.id = i.client_id AND c.user_id = i.user_id
          WHERE i.user_id = $1 ${where}
          GROUP BY c.id, c.name
          ORDER BY total DESC`,

@@ -178,7 +178,16 @@ export class ExpenseWorkflowController {
         return;
       }
 
-      const { expenseId } = req.params;
+      // The route is /:id/generated; `expenseId` is kept as a fallback for any
+      // older registration that used that name.
+      const expenseId = req.params.id ?? req.params.expenseId;
+
+      // Another user's template reads as not found (not as "no children")
+      const parent = await this.expenseService.getExpenseById(expenseId, userId);
+      if (!parent) {
+        res.status(404).json({ error: 'Not found', message: 'Expense not found' });
+        return;
+      }
 
       // Get all expenses generated from this parent
       const expenses = await this.expenseService.getExpensesByParent(expenseId, userId);
@@ -202,9 +211,11 @@ export class ExpenseWorkflowController {
         return;
       }
 
-      // Import and trigger the scheduler
+      // Import and trigger the scheduler — for the caller's own templates only.
+      // Unscoped, any user could run (and back-fill) every tenant's recurring
+      // expenses.
       const recurringExpenseScheduler = (await import('../../../services/financial/recurring-expense-scheduler.service')).default;
-      await recurringExpenseScheduler.triggerManually();
+      await recurringExpenseScheduler.triggerManually(userId);
 
       res.status(200).json({
         success: true,

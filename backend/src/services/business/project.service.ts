@@ -7,6 +7,7 @@ import {
 } from '../../models/business/project.model';
 import { BaseClient } from '../../models/business/client.model'; // Explicitly import BaseClient
 import { logger } from '../../utils/logger';
+import { isUuid, ownsRow } from '../ownership.service';
 
 const db = getDbClient();
 
@@ -67,6 +68,12 @@ export class ProjectService {
    */
   async create(projectData: CreateProjectDto): Promise<IProject> {
     const db = getDbClient();
+    // The client must be the project owner's own. The foreign key alone would
+    // accept another tenant's client, whose details every read of the project
+    // then returns.
+    if (projectData.client_id && !(await ownsRow('clients', projectData.client_id, projectData.user_id))) {
+      throw new Error('Invalid client ID specified.');
+    }
     const queryText = `
       INSERT INTO projects (user_id, name, description, client_id, status, start_date, end_date, hourly_rate, currency, budget, rate_type, estimated_hours, recurring_payment, tags)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) 
@@ -204,29 +211,32 @@ export class ProjectService {
   }
 
   /**
-   * Retrieves a single project by its ID.
-   * Returns the project with full client details if found.
+   * Retrieves a single project by its ID, scoped to its owner.
+   * Returns the project with full client details if found. A project of
+   * another user (or a malformed id) reads as "not found".
    * 
    * @async
    * @param {string} id - The UUID of the project to retrieve
+   * @param {string} userId - The UUID of the user who must own the project
    * @returns {Promise<IProject | null>} The project with client details, or null if not found
    * @throws {Error} If the query fails
    * 
    * @example
-   * const project = await projectService.findById('project-uuid');
+   * const project = await projectService.findById('project-uuid', userId);
    * if (project) {
    *   console.log(`Project: ${project.name}, Client: ${project.client?.name}`);
    * }
    */
-  async findById(id: string): Promise<IProject | null> {
+  async findById(id: string, userId: string): Promise<IProject | null> {
+    if (!isUuid(id)) return null;
     const db = getDbClient();
     const queryText = `
       SELECT p.id, p.user_id, p.name, p.description, p.client_id, p.status, p.start_date, p.end_date, 
              p.hourly_rate, p.budget, p.rate_type, p.estimated_hours, p.currency, p.tags, p.recurring_payment, p.created_at, p.updated_at
-      FROM projects p WHERE id = $1
+      FROM projects p WHERE p.id = $1 AND p.user_id = $2
     `;
     try {
-      const result = await db.query(queryText, [id]);
+      const result = await db.query(queryText, [id, userId]);
       if (result.rows.length === 0) return null;
       return this.getProjectWithClient(result.rows[0]);
     } catch (error) {
@@ -280,10 +290,8 @@ export class ProjectService {
   /**
    * Fetches a project only if it belongs to the given user.
    *
-   * {@link findById} deliberately kept its original unscoped behaviour so
-   * existing callers are unaffected, but anything that acts on a project id
-   * taken from a request must use this instead — otherwise a caller can pass
-   * another tenant's project id and act on their data.
+   * Kept for existing callers; {@link findById} is owner-scoped as well now
+   * and this simply delegates to it.
    *
    * @async
    * @param {string} id - The UUID of the project
@@ -296,42 +304,38 @@ export class ProjectService {
    * if (!project) return res.status(404).json({ error: 'Not found' });
    */
   async findByIdForUser(id: string, userId: string): Promise<IProject | null> {
-    const db = getDbClient();
-    const queryText = `
-      SELECT p.id, p.user_id, p.name, p.description, p.client_id, p.status, p.start_date, p.end_date,
-             p.hourly_rate, p.budget, p.rate_type, p.estimated_hours, p.currency, p.tags, p.recurring_payment, p.created_at, p.updated_at
-      FROM projects p WHERE p.id = $1 AND p.user_id = $2
-    `;
-    try {
-      const result = await db.query(queryText, [id, userId]);
-      if (result.rows.length === 0) return null;
-      return this.getProjectWithClient(result.rows[0]);
-    } catch (error) {
-      logger.error('Error fetching project by ID for user:', error);
-      throw new Error(`Failed to fetch project: ${(error as any).message}`);
-    }
+    return this.findById(id, userId);
   }
 
   /**
-   * Updates an existing project with partial data.
+   * Updates an existing project with partial data, scoped to its owner.
    * Only provided fields will be updated; undefined fields are ignored.
-   * Returns null if the project is not found.
+   * Returns null if the project is not found or belongs to another user.
    * 
    * @async
    * @param {string} id - The UUID of the project to update
+   * @param {string} userId - The UUID of the user who must own the project
    * @param {UpdateProjectDto} projectData - The partial project data to update
    * @returns {Promise<IProject | null>} The updated project with client details, or null if not found
-   * @throws {Error} If client_id is invalid (foreign key violation)
+   * @throws {Error} 'Invalid client ID specified.' if client_id is not one of the user's clients
    * @throws {Error} If the update operation fails
    * 
    * @example
-   * const updated = await projectService.update('project-uuid', {
+   * const updated = await projectService.update('project-uuid', userId, {
    *   status: 'completed',
    *   end_date: '2024-12-31'
    * });
    */
-  async update(id: string, projectData: UpdateProjectDto): Promise<IProject | null> {
+  async update(id: string, userId: string, projectData: UpdateProjectDto): Promise<IProject | null> {
+    if (!isUuid(id)) return null;
     const db = getDbClient();
+    if (
+      projectData.client_id !== undefined &&
+      projectData.client_id !== null &&
+      !(await ownsRow('clients', projectData.client_id as string, userId))
+    ) {
+      throw new Error('Invalid client ID specified.');
+    }
     const setParts = [];
     const values: any[] = [];
     let paramIndex = 1;
@@ -354,11 +358,11 @@ export class ProjectService {
     if (projectData.recurring_payment !== undefined) { setParts.push(`recurring_payment = $${paramIndex++}`); values.push(projectData.recurring_payment); }
 
     if (setParts.length === 0) {
-      return this.findById(id);
+      return this.findById(id, userId);
     }
 
     const previousRateRow = projectData.hourly_rate !== undefined
-      ? await db.query(`SELECT hourly_rate FROM projects WHERE id = $1`, [id])
+      ? await db.query(`SELECT hourly_rate FROM projects WHERE id = $1 AND user_id = $2`, [id, userId])
       : null;
     const previousRate =
       previousRateRow?.rows[0]?.hourly_rate === null || previousRateRow?.rows[0]?.hourly_rate === undefined
@@ -368,9 +372,9 @@ export class ProjectService {
     const queryText = `
       UPDATE projects 
       SET ${setParts.join(', ')}, updated_at = CURRENT_TIMESTAMP 
-      WHERE id = $${paramIndex} RETURNING id, user_id, name, description, client_id, status, start_date, end_date, hourly_rate, budget, rate_type, estimated_hours, currency, tags, recurring_payment, created_at, updated_at
+      WHERE id = $${paramIndex} AND user_id = $${paramIndex + 1} RETURNING id, user_id, name, description, client_id, status, start_date, end_date, hourly_rate, budget, rate_type, estimated_hours, currency, tags, recurring_payment, created_at, updated_at
     `;
-    values.push(id);
+    values.push(id, userId);
 
     try {
         const result = await db.query(queryText, values);
@@ -407,28 +411,25 @@ export class ProjectService {
   }
 
   /**
-   * Deletes a project from the database.
-   * Warning: This may fail if there are associated time entries or invoices due to foreign key constraints.
+   * Deletes a project from the database, scoped to its owner.
+   * Warning: time entries of the project are removed with it (ON DELETE CASCADE).
    * 
    * @async
    * @param {string} id - The UUID of the project to delete
-   * @returns {Promise<boolean>} True if the project was deleted, false if not found
-   * @throws {Error} If the project has associated time entries or invoices
+   * @param {string} userId - The UUID of the user who must own the project
+   * @returns {Promise<boolean>} True if the project was deleted, false if not found or not the user's
    * @throws {Error} If the deletion fails
    * 
    * @example
-   * try {
-   *   const deleted = await projectService.delete('project-uuid');
-   *   if (deleted) console.log('Project deleted');
-   * } catch (error) {
-   *   console.error('Cannot delete project with time entries');
-   * }
+   * const deleted = await projectService.delete('project-uuid', userId);
+   * if (deleted) console.log('Project deleted');
    */
-  async delete(id: string): Promise<boolean> {
+  async delete(id: string, userId: string): Promise<boolean> {
+    if (!isUuid(id)) return false;
     const db = getDbClient();
-    const queryText = `DELETE FROM projects WHERE id = $1`;
+    const queryText = `DELETE FROM projects WHERE id = $1 AND user_id = $2`;
     try {
-      const result = await db.query(queryText, [id]);
+      const result = await db.query(queryText, [id, userId]);
       return (result.rowCount ?? 0) > 0;
     } catch (error) {
         logger.error('Error deleting project:', error);
@@ -459,8 +460,9 @@ export class ProjectService {
       };
     }
     
-    const clientQueryText = `SELECT id, name, email, phone, address, notes, status, created_at, updated_at FROM clients WHERE id = $1`;
-    const clientResult = await db.query(clientQueryText, [projectRow.client_id]);
+    // Owner-scoped: only the project owner's own client is ever attached.
+    const clientQueryText = `SELECT id, name, email, phone, address, notes, status, created_at, updated_at FROM clients WHERE id = $1 AND user_id = $2`;
+    const clientResult = await db.query(clientQueryText, [projectRow.client_id, projectRow.user_id]);
     
     let clientDetails;
     if (clientResult.rows.length > 0) {

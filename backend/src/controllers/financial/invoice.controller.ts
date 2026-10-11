@@ -5,6 +5,24 @@ import { getDbClient } from '../../utils/database'; // Import the DB client util
 import { InvoicePdfController } from './invoice-pdf.controller';
 import { logger } from '../../utils/logger';
 import { processPlaceholders, PlaceholderContext, getAvailablePlaceholders } from '../../utils/placeholder';
+import { ForeignReferenceError, invalidReferenceBody, isUuid, ownsRow } from '../../services/ownership.service';
+
+/**
+ * The authenticated user's id, or null after answering 401.
+ * Every invoice is owner-scoped, so no handler may run without one.
+ *
+ * @param {Request} req - Express request
+ * @param {Response} res - Express response (receives the 401)
+ * @returns {string | null} The user id, or null when the request was answered
+ */
+function requireUserId(req: Request, res: Response): string | null {
+  const userId = (req as any).user?.id;
+  if (!userId) {
+    res.status(401).json({ message: 'Authentication required' });
+    return null;
+  }
+  return userId;
+}
 
 // Joi Validation Schemas
 import {
@@ -130,29 +148,18 @@ export class InvoiceController {
    * Response: 201 { message: "Invoice created successfully", invoice: {...} }
    */
   async create(req: Request, res: Response) {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     try {
       const validatedBody = req.body; // Joi schema will validate all required fields
-      const userId = (req as any).user?.id;
 
-      // Fetch client and project data for placeholder context
-      let clientData: any = null;
-      let projectData: any = null;
-
-      if (validatedBody.client_id) {
-        const clientResult = await this.db.query(
-          'SELECT id, name, email, phone FROM clients WHERE id = $1',
-          [validatedBody.client_id]
-        );
-        clientData = clientResult.rows[0];
-      }
-
-      if (validatedBody.project_id) {
-        const projectResult = await this.db.query(
-          'SELECT id, name FROM projects WHERE id = $1',
-          [validatedBody.project_id]
-        );
-        projectData = projectResult.rows[0];
-      }
+      // Fetch client and project data for placeholder context (owner-scoped)
+      const { clientData, projectData } = await this.loadPlaceholderParties(
+        validatedBody.client_id,
+        validatedBody.project_id,
+        userId
+      );
 
       // Get user's preferred language from request or default to 'en'
       const userLanguage = (req as any).user?.language || 'en';
@@ -197,9 +204,51 @@ export class InvoiceController {
         invoice,
       });
     } catch (err: any) {
+      if (err instanceof ForeignReferenceError) {
+        res.status(400).json(invalidReferenceBody(err));
+        return;
+      }
       logger.error('Create invoice error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
+  }
+
+  /**
+   * Loads the client and project an invoice text may reference through
+   * placeholders — only when they belong to the user. A foreign id yields
+   * nothing here and is rejected by the service afterwards.
+   *
+   * @private
+   * @param {string | null | undefined} clientId - Client to load
+   * @param {string | null | undefined} projectId - Project to load
+   * @param {string} userId - The authenticated user
+   * @returns {Promise<{ clientData: any; projectData: any }>} Rows or null
+   */
+  private async loadPlaceholderParties(
+    clientId: string | null | undefined,
+    projectId: string | null | undefined,
+    userId: string
+  ): Promise<{ clientData: any; projectData: any }> {
+    let clientData: any = null;
+    let projectData: any = null;
+
+    if (isUuid(clientId)) {
+      const clientResult = await this.db.query(
+        'SELECT id, name, email, phone FROM clients WHERE id = $1 AND user_id = $2',
+        [clientId, userId]
+      );
+      clientData = clientResult.rows[0] ?? null;
+    }
+
+    if (isUuid(projectId)) {
+      const projectResult = await this.db.query(
+        'SELECT id, name FROM projects WHERE id = $1 AND user_id = $2',
+        [projectId, userId]
+      );
+      projectData = projectResult.rows[0] ?? null;
+    }
+
+    return { clientData, projectData };
   }
 
   /**
@@ -252,9 +301,11 @@ export class InvoiceController {
         res.status(400).json({ message: 'Invalid Invoice ID.', details: error.details[0].message });
         return;
     }
-    
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     try {
-      const invoice = await this.invoiceService.findById(req.params.id);
+      const invoice = await this.invoiceService.findById(req.params.id, userId);
       if (invoice) {
         res.status(200).json(invoice);
       } else {
@@ -289,39 +340,24 @@ export class InvoiceController {
         res.status(400).json({ message: 'Invalid Invoice ID.', details: error.details[0].message });
         return;
     }
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     try {
       const validatedBody = req.body; // Joi schema will validate all required fields
 
-      // Fetch current invoice to get context data
-      const currentInvoice = await this.invoiceService.findById(req.params.id);
+      // Fetch current invoice to get context data (owner-scoped: another
+      // user's invoice reads as not found)
+      const currentInvoice = await this.invoiceService.findById(req.params.id, userId);
       if (!currentInvoice) {
         res.status(404).json({ message: 'Invoice not found' });
         return;
       }
 
-      // Fetch client and project data if they exist
-      let clientData: any = null;
-      let projectData: any = null;
-
+      // Fetch client and project data if they exist (owner-scoped)
       const clientId = validatedBody.client_id || currentInvoice.client_id;
       const projectId = validatedBody.project_id || currentInvoice.project_id;
-
-      if (clientId) {
-        const clientResult = await this.db.query(
-          'SELECT id, name, email, phone FROM clients WHERE id = $1',
-          [clientId]
-        );
-        clientData = clientResult.rows[0];
-      }
-
-      if (projectId) {
-        const projectResult = await this.db.query(
-          'SELECT id, name FROM projects WHERE id = $1',
-          [projectId]
-        );
-        projectData = projectResult.rows[0];
-      }
+      const { clientData, projectData } = await this.loadPlaceholderParties(clientId, projectId, userId);
 
       // Get user's preferred language
       const userLanguage = (req as any).user?.language || 'en';
@@ -372,7 +408,7 @@ export class InvoiceController {
         updateData[key as keyof typeof updateData] === undefined && delete updateData[key as keyof typeof updateData]
       );
 
-      const updatedInvoice = await this.invoiceService.update(req.params.id, updateData);
+      const updatedInvoice = await this.invoiceService.update(req.params.id, userId, updateData);
       if (updatedInvoice) {
         res.status(200).json({
           message: 'Invoice updated successfully',
@@ -382,6 +418,10 @@ export class InvoiceController {
         res.status(404).json({ message: 'Invoice not found' });
       }
     } catch (err: any) {
+      if (err instanceof ForeignReferenceError) {
+        res.status(400).json(invalidReferenceBody(err));
+        return;
+      }
       logger.error('Update invoice error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
@@ -407,11 +447,13 @@ export class InvoiceController {
         res.status(400).json({ message: 'Invalid Invoice ID.', details: error.details[0].message });
         return;
     }
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     try {
-      // Get current invoice to check status
-      const currentInvoice = await this.invoiceService.findById(req.params.id);
-      
+      // Get current invoice to check status (owner-scoped)
+      const currentInvoice = await this.invoiceService.findById(req.params.id, userId);
+
       if (!currentInvoice) {
         res.status(404).json({ message: 'Invoice not found' });
         return;
@@ -423,8 +465,8 @@ export class InvoiceController {
       }
 
       // Update status to cancelled
-      const cancelledInvoice = await this.invoiceService.update(req.params.id, { status: 'cancelled' });
-      
+      const cancelledInvoice = await this.invoiceService.update(req.params.id, userId, { status: 'cancelled' });
+
       res.status(200).json({
         message: 'Invoice cancelled successfully',
         invoice: cancelledInvoice,
@@ -456,10 +498,12 @@ export class InvoiceController {
       res.status(400).json({ message: 'Invalid Invoice ID.', details: error.details[0].message });
       return;
     }
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     try {
-      // Fetch current invoice with all data
-      const currentInvoice = await this.invoiceService.findById(req.params.id);
+      // Fetch current invoice with all data (owner-scoped)
+      const currentInvoice = await this.invoiceService.findById(req.params.id, userId);
       
       if (!currentInvoice) {
         res.status(404).json({ message: 'Invoice not found' });
@@ -523,14 +567,14 @@ export class InvoiceController {
         }
       }
 
-      // Add the invoice ID as the last parameter
-      updateValues.push(req.params.id);
+      // Add the invoice ID and owner as the last parameters
+      updateValues.push(req.params.id, userId);
 
       // Update invoice with correction data and any changed fields
       const correctedInvoice = await this.db.query(
-        `UPDATE invoices 
+        `UPDATE invoices
          SET ${updateParts.join(', ')}
-         WHERE id = $${paramIndex}
+         WHERE id = $${paramIndex} AND user_id = $${paramIndex + 1}
          RETURNING *`,
         updateValues
       );
@@ -560,7 +604,7 @@ export class InvoiceController {
       }
 
       // Fetch the updated invoice with all relations
-      const updatedInvoice = await this.invoiceService.findById(req.params.id);
+      const updatedInvoice = await this.invoiceService.findById(req.params.id, userId);
 
       res.status(200).json({
         message: 'Invoice correction created successfully',
@@ -594,9 +638,11 @@ export class InvoiceController {
         res.status(400).json({ message: 'Invalid Invoice ID.', details: error.details[0].message });
         return;
     }
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     try {
-      const deleted = await this.invoiceService.delete(req.params.id);
+      const deleted = await this.invoiceService.delete(req.params.id, userId);
       if (deleted) {
         res.status(200).json({ message: 'Invoice deleted successfully' });
       } else {
@@ -631,6 +677,8 @@ export class InvoiceController {
         res.status(400).json({ message: 'Invalid Invoice ID.', details: error.details[0].message });
         return;
     }
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     try {
       // Body validation is done by Joi schema
@@ -642,16 +690,24 @@ export class InvoiceController {
         return;
       }
 
-      await this.invoiceService.addLineItems(req.params.id, items);
-      
+      const added = await this.invoiceService.addLineItems(req.params.id, userId, items);
+      if (!added) {
+        res.status(404).json({ message: 'Invoice not found' });
+        return;
+      }
+
       // Fetch updated invoice with line items
-      const updatedInvoice = await this.invoiceService.findById(req.params.id);
-      
+      const updatedInvoice = await this.invoiceService.findById(req.params.id, userId);
+
       res.status(200).json({
         message: 'Line items added successfully',
         invoice: updatedInvoice,
       });
     } catch (err: any) {
+      if (err instanceof ForeignReferenceError) {
+        res.status(400).json(invalidReferenceBody(err));
+        return;
+      }
       logger.error('Add line items error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
@@ -677,6 +733,8 @@ export class InvoiceController {
       res.status(400).json({ message: 'Invalid Invoice ID.', details: error.details[0].message });
       return;
     }
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     try {
       const validatedBody = req.body;
@@ -687,16 +745,24 @@ export class InvoiceController {
         return;
       }
 
-      await this.invoiceService.replaceLineItems(req.params.id, items);
+      const replaced = await this.invoiceService.replaceLineItems(req.params.id, userId, items);
+      if (!replaced) {
+        res.status(404).json({ message: 'Invoice not found' });
+        return;
+      }
 
       // Fetch updated invoice with line items
-      const updatedInvoice = await this.invoiceService.findById(req.params.id);
+      const updatedInvoice = await this.invoiceService.findById(req.params.id, userId);
 
       res.status(200).json({
         message: 'Line items replaced successfully',
         invoice: updatedInvoice,
       });
     } catch (err: any) {
+      if (err instanceof ForeignReferenceError) {
+        res.status(400).json(invalidReferenceBody(err));
+        return;
+      }
       logger.error('Replace line items error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
@@ -740,17 +806,28 @@ export class InvoiceController {
       terms_template_id
     } = validatedBody; // Destructure from validated body
 
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     try {
       // Determine client_id for the invoice
       let finalClientId = client_id; // Use destructured value
       const projectIdForQuery = project_id; // Use destructured value
+
+      // An explicit client must be the caller's own — checked before the draft
+      // invoice is created, so a foreign id cannot leave an invoice behind that
+      // points at another tenant's client.
+      if (client_id && !(await ownsRow('clients', client_id, userId))) {
+        res.status(404).json({ message: 'Client not found or you do not have access.' });
+        return;
+      }
 
       // Resolve project currency: project → user settings → 'EUR'
       let resolvedCurrency = 'EUR';
 
       if (project_id) {
         const projectQuery = `SELECT client_id, currency FROM projects WHERE id = $1 AND user_id = $2`;
-        const projectResult = await this.db.query(projectQuery, [project_id, (req as any).user?.id]);
+        const projectResult = await this.db.query(projectQuery, [project_id, userId]);
 
         if (projectResult.rows.length === 0) {
           res.status(404).json({ message: 'Project not found or you do not have access.' });
@@ -779,7 +856,7 @@ export class InvoiceController {
 
       // Create a new invoice with customization fields
       const invoiceData = {
-        user_id: (req as any).user?.id,
+        user_id: userId,
         client_id: finalClientId,
         project_id: projectIdForQuery, // Store the specific project if provided, null otherwise
         issue_date: new Date(), // Invoice is issued today
@@ -814,10 +891,10 @@ export class InvoiceController {
           p.hourly_rate as project_rate,
           COALESCE(te.hourly_rate, p.hourly_rate, 0) as effective_rate
         FROM time_entries te
-        INNER JOIN projects p ON te.project_id = p.id
+        INNER JOIN projects p ON te.project_id = p.id AND p.user_id = te.user_id
         WHERE te.user_id = $1 AND te.is_billable = true
       `;
-      const queryValues: (string | Date | number | null)[] = [(req as any).user?.id];
+      const queryValues: (string | Date | number | null)[] = [userId];
       
       // Filter by client_id through the projects table
       if (finalClientId) {
@@ -860,8 +937,8 @@ export class InvoiceController {
       
       // Update the invoice with the calculated delivery_date
       await this.db.query(
-        'UPDATE invoices SET delivery_date = $1 WHERE id = $2',
-        [deliveryDate, invoice.id]
+        'UPDATE invoices SET delivery_date = $1 WHERE id = $2 AND user_id = $3',
+        [deliveryDate, invoice.id, userId]
       );
 
       // Group time entries by project and sum hours
@@ -951,9 +1028,9 @@ export class InvoiceController {
       });
 
       // Add these line items to the created invoice
-      await this.invoiceService.addLineItems(invoice.id, lineItems);
+      await this.invoiceService.addLineItems(invoice.id, userId, lineItems);
       
-      const updatedInvoice = await this.invoiceService.findById(invoice.id); // Fetch with calculated totals
+      const updatedInvoice = await this.invoiceService.findById(invoice.id, userId); // Fetch with calculated totals
       
       res.status(201).json({
         message: 'Invoice generated from time entries successfully',
@@ -961,6 +1038,10 @@ export class InvoiceController {
       });
 
     } catch (err: any) {
+      if (err instanceof ForeignReferenceError) {
+        res.status(400).json(invalidReferenceBody(err));
+        return;
+      }
       logger.error('Generate invoice from time entries error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
     }
@@ -993,18 +1074,17 @@ export class InvoiceController {
   async getBillingHistory(req: Request, res: Response) {
     // Params validation is done by Joi schema
     const { client_id } = req.params; // Destructure from validated params
-    
-    // Ensure user has access to this client
-    const validateClient = await this.db.query(
-      `SELECT c.id FROM clients c WHERE c.id = $1 AND c.user_id = $2`,
-      [client_id, (req as any).user?.id]
-    );
-    if (validateClient.rows.length === 0) {
-        res.status(404).json({ message: 'Client not found or no access.' });
-        return;
-    }
+    const userId = requireUserId(req, res);
+    if (!userId) return;
 
     try {
+      // Ensure user has access to this client (a malformed id is "not found",
+      // not a database error)
+      if (!(await ownsRow('clients', client_id, userId))) {
+        res.status(404).json({ message: 'Client not found or no access.' });
+        return;
+      }
+
       // Calculate amount_paid using both direct invoice_id (legacy) and the
       // payment_invoices junction table (new system), so all payment records
       // are included regardless of which linking method was used.
@@ -1049,11 +1129,11 @@ export class InvoiceController {
               ))
           ), 0)) AS outstanding_balance
         FROM invoices i
-        WHERE i.client_id = $1 AND i.status != 'draft'
+        WHERE i.client_id = $1 AND i.user_id = $2 AND i.status != 'draft'
         ORDER BY i.issue_date DESC, i.created_at DESC
       `;
 
-      const result = await this.db.query(queryText, [client_id]);
+      const result = await this.db.query(queryText, [client_id, userId]);
       res.status(200).json(result.rows);
     } catch (err: any) {
       logger.error('Get billing history error:', err);
@@ -1095,8 +1175,8 @@ export class InvoiceController {
                c.name as client_name,
                p.name as project_name
         FROM invoices i
-        LEFT JOIN clients c ON i.client_id = c.id
-        LEFT JOIN projects p ON i.project_id = p.id
+        LEFT JOIN clients c ON i.client_id = c.id AND c.user_id = i.user_id
+        LEFT JOIN projects p ON i.project_id = p.id AND p.user_id = i.user_id
         WHERE i.invoice_number = $1 AND i.user_id = $2
       `;
 
@@ -1157,11 +1237,21 @@ export class InvoiceController {
    * }
    */
   async getBillingStatus(req: Request, res: Response) {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     try {
       const { id } = req.params;
       const threshold = req.query.threshold ? parseFloat(req.query.threshold as string) : undefined;
 
-      const validationResult = await this.billingValidationService.validateInvoice(id, { threshold });
+      // Another user's invoice reads as not found (and must not reveal its
+      // total or payment state).
+      if (!(await this.invoiceService.isOwnedBy(id, userId))) {
+        res.status(404).json({ message: 'Invoice not found' });
+        return;
+      }
+
+      const validationResult = await this.billingValidationService.validateInvoice(id, { threshold, userId });
 
       res.status(200).json(validationResult);
     } catch (err: any) {
@@ -1194,6 +1284,9 @@ export class InvoiceController {
    * }
    */
   async validateProposedPayment(req: Request, res: Response) {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
     try {
       const { id } = req.params;
       const { amount, threshold, strict } = req.body;
@@ -1203,10 +1296,15 @@ export class InvoiceController {
         return;
       }
 
+      if (!(await this.invoiceService.isOwnedBy(id, userId))) {
+        res.status(404).json({ message: 'Invoice not found' });
+        return;
+      }
+
       const validationResult = await this.billingValidationService.validateProposedPayment(
         id,
         parseFloat(amount),
-        { threshold, strict }
+        { threshold, strict, userId }
       );
 
       res.status(200).json(validationResult);

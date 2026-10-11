@@ -93,7 +93,7 @@ class InvoiceReminderSchedulerService {
              i.currency,
              (CURRENT_DATE - i.due_date) AS days_overdue
            FROM invoices i
-           LEFT JOIN clients c ON i.client_id = c.id
+           LEFT JOIN clients c ON i.client_id = c.id AND c.user_id = i.user_id
            WHERE i.user_id = $1
              AND i.due_date < CURRENT_DATE
              AND i.status IN ('sent', 'partially_paid', 'overdue')

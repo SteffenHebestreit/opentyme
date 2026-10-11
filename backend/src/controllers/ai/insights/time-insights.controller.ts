@@ -41,9 +41,10 @@ export async function getTimeSummary(req: Request, res: Response): Promise<void>
     if (project_id) { params.push(project_id); filters.push(`te.project_id = $${params.length}`); }
     if (is_billable !== undefined) { params.push(is_billable === 'true'); filters.push(`te.is_billable = $${params.length}`); }
 
-    // client_id join
+    // client_id join — as a bind parameter (the guard above already proved it is the user's)
+    if (client_id) params.push(client_id);
     const clientJoin = client_id
-      ? `JOIN projects pr ON pr.id = te.project_id AND pr.client_id = '${client_id.replace(/'/g, '')}'`
+      ? `JOIN projects pr ON pr.id = te.project_id AND pr.user_id = $1 AND pr.client_id = $${params.length}`
       : '';
 
     const where = filters.length ? 'AND ' + filters.join(' AND ') : '';
@@ -70,13 +71,13 @@ export async function getTimeSummary(req: Request, res: Response): Promise<void>
          COALESCE(SUM(CASE WHEN te.is_billable THEN te.duration_hours ELSE 0 END), 0) AS billable_hours,
          COALESCE(SUM(CASE WHEN te.is_billable THEN te.duration_hours * COALESCE(te.hourly_rate, 0) ELSE 0 END), 0) AS billable_value
        FROM time_entries te
-       JOIN projects p ON p.id = te.project_id
-       LEFT JOIN clients c ON c.id = p.client_id
-       ${clientJoin ? 'JOIN projects pr ON pr.id = te.project_id AND pr.client_id = $' + (params.length + 1) : ''}
+       JOIN projects p ON p.id = te.project_id AND p.user_id = te.user_id
+       LEFT JOIN clients c ON c.id = p.client_id AND c.user_id = p.user_id
+       ${clientJoin}
        WHERE te.user_id = $1 ${where}
        GROUP BY p.id, p.name, c.name
        ORDER BY total_hours DESC`,
-      client_id ? [...params, client_id] : params
+      params
     );
 
     const row = summary.rows[0];

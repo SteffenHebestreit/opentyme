@@ -109,8 +109,8 @@ export class InvoicePdfController {
                c.billing_address, c.billing_city, c.billing_state, c.billing_postal_code, c.billing_country,
                p.name as project_name
         FROM invoices i
-        LEFT JOIN clients c ON i.client_id = c.id
-        LEFT JOIN projects p ON i.project_id = p.id
+        LEFT JOIN clients c ON i.client_id = c.id AND c.user_id = i.user_id
+        LEFT JOIN projects p ON i.project_id = p.id AND p.user_id = i.user_id
         WHERE i.id = $1 AND i.user_id = $2
       `;
       
@@ -239,23 +239,23 @@ export class InvoicePdfController {
         SUM(ii.quantity * ii.unit_price) as line_total,
         COALESCE(ii.rate_type, 'hourly') as rate_type
       FROM invoice_items ii
-      LEFT JOIN time_entries te ON ii.time_entry_id = te.id
-      LEFT JOIN projects p ON te.project_id = p.id
+      LEFT JOIN time_entries te ON ii.time_entry_id = te.id AND te.user_id = $2
+      LEFT JOIN projects p ON te.project_id = p.id AND p.user_id = $2
       WHERE ii.invoice_id = $1
       GROUP BY COALESCE(p.name, ii.description), ii.unit_price, ii.rate_type
       ORDER BY MIN(ii.created_at)
-    `;      const itemsResult = await this.db.query(itemsQuery, [id]);
+    `;      const itemsResult = await this.db.query(itemsQuery, [id, userId]);
       const lineItems = itemsResult.rows;
 
       // Fetch payments
       const paymentsQuery = `
         SELECT amount, payment_method, payment_date, transaction_id
         FROM payments
-        WHERE invoice_id = $1
+        WHERE invoice_id = $1 AND user_id = $2
         ORDER BY payment_date
       `;
       
-      const paymentsResult = await this.db.query(paymentsQuery, [id]);
+      const paymentsResult = await this.db.query(paymentsQuery, [id, userId]);
       const payments = paymentsResult.rows;
 
       // Create PDF document with A4 size
@@ -1171,8 +1171,8 @@ export class InvoicePdfController {
                c.billing_address, c.billing_city, c.billing_state, c.billing_postal_code, c.billing_country,
                p.name as project_name
         FROM invoices i
-        LEFT JOIN clients c ON i.client_id = c.id
-        LEFT JOIN projects p ON i.project_id = p.id
+        LEFT JOIN clients c ON i.client_id = c.id AND c.user_id = i.user_id
+        LEFT JOIN projects p ON i.project_id = p.id AND p.user_id = i.user_id
         WHERE i.id = $1 AND i.user_id = $2
       `;
       
@@ -1194,13 +1194,13 @@ export class InvoicePdfController {
           SUM(ii.quantity * ii.unit_price) as line_total,
           COALESCE(ii.rate_type, 'hourly') as rate_type
         FROM invoice_items ii
-        LEFT JOIN time_entries te ON ii.time_entry_id = te.id
-        LEFT JOIN projects p ON te.project_id = p.id
+        LEFT JOIN time_entries te ON ii.time_entry_id = te.id AND te.user_id = $2
+        LEFT JOIN projects p ON te.project_id = p.id AND p.user_id = $2
         WHERE ii.invoice_id = $1
         GROUP BY COALESCE(p.name, ii.description), ii.unit_price, ii.rate_type
         ORDER BY MIN(ii.created_at)
       `;
-      const itemsResult = await this.db.query(itemsQuery, [id]);
+      const itemsResult = await this.db.query(itemsQuery, [id, userId]);
       const lineItems = itemsResult.rows;
 
       // Create PDF document
@@ -1483,8 +1483,8 @@ export class InvoicePdfController {
                c.billing_address, c.billing_city, c.billing_state, c.billing_postal_code, c.billing_country,
                p.name as project_name
         FROM invoices i
-        LEFT JOIN clients c ON i.client_id = c.id
-        LEFT JOIN projects p ON i.project_id = p.id
+        LEFT JOIN clients c ON i.client_id = c.id AND c.user_id = i.user_id
+        LEFT JOIN projects p ON i.project_id = p.id AND p.user_id = i.user_id
         WHERE i.id = $1 AND i.user_id = $2
       `;
       
@@ -1506,13 +1506,13 @@ export class InvoicePdfController {
           SUM(ii.quantity * ii.unit_price) as line_total,
           COALESCE(ii.rate_type, 'hourly') as rate_type
         FROM invoice_items ii
-        LEFT JOIN time_entries te ON ii.time_entry_id = te.id
-        LEFT JOIN projects p ON te.project_id = p.id
+        LEFT JOIN time_entries te ON ii.time_entry_id = te.id AND te.user_id = $2
+        LEFT JOIN projects p ON te.project_id = p.id AND p.user_id = $2
         WHERE ii.invoice_id = $1
         GROUP BY COALESCE(p.name, ii.description), ii.unit_price, ii.rate_type
         ORDER BY MIN(ii.created_at)
       `;
-      const itemsResult = await this.db.query(itemsQuery, [id]);
+      const itemsResult = await this.db.query(itemsQuery, [id, userId]);
       const lineItems = itemsResult.rows;
 
       // Create PDF document

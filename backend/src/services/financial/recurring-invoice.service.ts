@@ -11,6 +11,7 @@
 import { getDbClient } from '../../utils/database';
 import { logger } from '../../utils/logger';
 import { InvoiceService } from './invoice.service';
+import { assertOwnedReferences } from '../ownership.service';
 import {
   CreateRecurringInvoiceDto,
   UpdateRecurringInvoiceDto,
@@ -99,6 +100,7 @@ export class RecurringInvoiceService {
    * the first occurrence at or after today so no historical invoices are generated.
    */
   async create(data: CreateRecurringInvoiceDto): Promise<RecurringInvoice> {
+    await this.assertReferencesOwned(data, data.user_id);
     const nextOccurrence = calculateInitialNextOccurrence(data.start_date, data.frequency);
 
     const query = `
@@ -136,8 +138,8 @@ export class RecurringInvoiceService {
     const query = `
       SELECT ri.*, c.name AS client_name, p.name AS project_name
       FROM recurring_invoices ri
-      LEFT JOIN clients c ON ri.client_id = c.id
-      LEFT JOIN projects p ON ri.project_id = p.id
+      LEFT JOIN clients c ON ri.client_id = c.id AND c.user_id = ri.user_id
+      LEFT JOIN projects p ON ri.project_id = p.id AND p.user_id = ri.user_id
       WHERE ri.user_id = $1
       ORDER BY ri.created_at DESC
     `;
@@ -145,13 +147,35 @@ export class RecurringInvoiceService {
     return result.rows.map(mapRow);
   }
 
+  /**
+   * Client, project and tax rate of a schedule must be the owner's own. A
+   * foreign key only proves they exist; without this a schedule could point at
+   * another tenant's client, whose name the list then shows and whose id every
+   * generated invoice would carry.
+   *
+   * @throws {ForeignReferenceError} When a referenced row is not the user's
+   */
+  private async assertReferencesOwned(
+    data: Partial<CreateRecurringInvoiceDto>,
+    userId: string
+  ): Promise<void> {
+    await assertOwnedReferences(
+      [
+        { table: 'clients', id: data.client_id, field: 'client_id' },
+        { table: 'projects', id: data.project_id, field: 'project_id' },
+        { table: 'tax_rates', id: data.tax_rate_id, field: 'tax_rate_id' },
+      ],
+      userId
+    );
+  }
+
   /** Fetch a single schedule scoped to its owner, or null. */
   async findById(id: string, userId: string): Promise<RecurringInvoice | null> {
     const query = `
       SELECT ri.*, c.name AS client_name, p.name AS project_name
       FROM recurring_invoices ri
-      LEFT JOIN clients c ON ri.client_id = c.id
-      LEFT JOIN projects p ON ri.project_id = p.id
+      LEFT JOIN clients c ON ri.client_id = c.id AND c.user_id = ri.user_id
+      LEFT JOIN projects p ON ri.project_id = p.id AND p.user_id = ri.user_id
       WHERE ri.id = $1 AND ri.user_id = $2
     `;
     const result = await this.db.query(query, [id, userId]);
@@ -162,6 +186,7 @@ export class RecurringInvoiceService {
   async update(id: string, userId: string, data: UpdateRecurringInvoiceDto): Promise<RecurringInvoice | null> {
     const existing = await this.findById(id, userId);
     if (!existing) return null;
+    await this.assertReferencesOwned(data, userId);
 
     const fields: string[] = [];
     const values: any[] = [];
@@ -306,7 +331,7 @@ export class RecurringInvoiceService {
     }));
 
     if (items.length > 0) {
-      await this.invoiceService.addLineItems(invoice.id, items as any);
+      await this.invoiceService.addLineItems(invoice.id, schedule.user_id, items as any);
     }
 
     logger.info(

@@ -21,6 +21,7 @@ import {
   deleteRateQuerySchema,
 } from '../../schemas/business/project-rate.schema';
 import { logger } from '../../utils/logger';
+import { ownsRow } from '../../services/ownership.service';
 
 export class ProjectRateController {
   /**
@@ -38,6 +39,12 @@ export class ProjectRateController {
       const { error, value } = projectIdParamSchema.validate(req.params);
       if (error) {
         res.status(400).json({ error: 'Validation error', details: error.details });
+        return;
+      }
+
+      // Another user's project reads as not found (not as an empty timeline)
+      if (!(await ownsRow('projects', value.id, userId))) {
+        res.status(404).json({ error: 'Not found', message: 'Project not found' });
         return;
       }
 
@@ -71,6 +78,11 @@ export class ProjectRateController {
       const { error: queryError, value: query } = effectiveRateQuerySchema.validate(req.query);
       if (queryError) {
         res.status(400).json({ error: 'Validation error', details: queryError.details });
+        return;
+      }
+
+      if (!(await ownsRow('projects', params.id, userId))) {
+        res.status(404).json({ error: 'Not found', message: 'Project not found' });
         return;
       }
 
