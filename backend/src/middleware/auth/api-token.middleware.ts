@@ -16,7 +16,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { apiTokenService } from '../../services/auth/api-token.service';
 import { isLoopback, TOOL_CALL_HEADER } from '../../services/auth/internal-call';
-import { checkPermission, requirementFor } from '../../services/auth/api-token-permissions';
+import { checkPermission, isDirectWrite, requirementFor } from '../../services/auth/api-token-permissions';
+import { refuseScope } from './token-permission';
 import { logger } from '../../utils/logger';
 import { apiTokenRateLimiter } from '../rate-limit.middleware';
 
@@ -65,17 +66,33 @@ export async function authenticateApiToken(
     approvalMode: token.approval_mode,
   };
 
+  // Record use before any refusal, so probing with a stolen token shows up in
+  // the activity log too. The assistant's and the MCP server's own tool calls
+  // come back over loopback with the same token — that is not new use. The
+  // socket address is checked, not req.ip: a forwarded-for header can't fake it.
+  const ownToolCall = req.get(TOOL_CALL_HEADER) === '1' && isLoopback(req.socket.remoteAddress);
+  if (!ownToolCall) apiTokenService.touch(token.id, req.ip, req.get('user-agent'));
+
   // The rate limit comes first, so refused requests count against it too.
   apiTokenRateLimiter(req, res, () => {
     const path = req.baseUrl + req.path;
     const check = checkPermission(token.permissions, requirementFor(req.method, path));
     if (!check.ok) {
       logger.warn(`[ApiToken] Token ${token.id} denied ${req.method} ${path}: needs ${check.missing}`);
-      res.set('WWW-Authenticate', `Bearer realm="OpenTyme", error="insufficient_scope", scope="${check.missing}"`);
+      refuseScope(res, check.missing);
+      return;
+    }
+
+    // "Approve in OpenTyme" is a boundary, not a preference: such a token
+    // changes data only through the assistant, whose changes wait for the
+    // owner's approval — never directly (REST, MCP write tools, email).
+    if (token.approval_mode === 'in_app' && isDirectWrite(req.method, path)) {
+      logger.warn(`[ApiToken] In-app-approval token ${token.id} refused direct ${req.method} ${path}`);
       res.status(403).json({
         error: 'Forbidden',
-        message: `This token does not allow this request (needs ${check.missing}).`,
-        required: check.missing,
+        code: 'APPROVAL_IN_APP',
+        message:
+          "This token's changes need its owner's approval in OpenTyme. Ask the OpenTyme assistant (POST /api/ai/run or A2A) to make them.",
       });
       return;
     }
@@ -100,10 +117,6 @@ export async function authenticateApiToken(
       },
     };
 
-    // The assistant's and the MCP server's own tool calls come back over
-    // loopback with the same token — that is not new use of the token.
-    const ownToolCall = req.get(TOOL_CALL_HEADER) === '1' && isLoopback(req.ip);
-    if (!ownToolCall) apiTokenService.touch(token.id, req.ip, req.get('user-agent'));
     logger.debug(`[ApiToken] Token ${token.id} authorised ${req.method} ${path}`);
     next();
   });

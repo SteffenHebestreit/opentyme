@@ -2473,6 +2473,11 @@ CREATE INDEX IF NOT EXISTS idx_api_token_events_user ON public.api_token_events(
 -- When the owner was told the token expires soon (reset when regenerated).
 ALTER TABLE public.api_tokens ADD COLUMN IF NOT EXISTS expiry_reminded_at timestamp with time zone;
 
+-- Migration: remember that a token started a conversation, also after the token is revoked (idempotent)
+-- (api_token_id is SET NULL on revoke; the conversation must stay limited.)
+ALTER TABLE public.ai_conversations ADD COLUMN IF NOT EXISTS started_by_token boolean NOT NULL DEFAULT false;
+UPDATE public.ai_conversations SET started_by_token = true WHERE api_token_id IS NOT NULL AND NOT started_by_token;
+
 --
 -- PostgreSQL database dump complete
 --

@@ -35,13 +35,12 @@ export class PasswordResetController {
             return;
         }
 
-        try {
-            await this.passwordResetService.requestReset(email.trim());
-            res.status(200).json({ message: LINK_SENT_MESSAGE });
-        } catch (error) {
-            logger.error('Error requesting password reset:', error);
-            res.status(500).json({ message: 'An internal server error occurred. Please try again later.' });
-        }
+        // Same answer, at once, whether or not the address has an account —
+        // waiting for Keycloak and the mail would tell them apart by status or time.
+        res.status(200).json({ message: LINK_SENT_MESSAGE });
+        this.passwordResetService
+            .requestReset(email.trim())
+            .catch((error) => logger.error('Error requesting password reset:', error));
     };
 
     /**

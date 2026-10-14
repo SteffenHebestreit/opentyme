@@ -203,6 +203,23 @@ export function requirementFor(method: string, rawPath: string): Requirement {
   return { allowed: false, reason: 'unmapped' };
 }
 
+/**
+ * Would this request change something directly? A token whose owner approves
+ * in OpenTyme (approval_mode 'in_app') may not: its changes go through the
+ * assistant, which waits for that approval. Reads (incl. POST-only reads like
+ * previews) and the assistant and MCP transports themselves are not direct
+ * writes — MCP's write tools come back as API calls and are refused there.
+ */
+export function isDirectWrite(method: string, rawPath: string): boolean {
+  const verb = method.toUpperCase();
+  if (verb === 'GET' || verb === 'HEAD' || verb === 'OPTIONS') return false;
+  const path = normalizePath(rawPath);
+  if (under(path, '/api/ai') || under(path, '/api/mcp')) return false;
+  const requirement = requirementFor(verb, path);
+  const isRead = requirement.allowed && requirement.resource?.level === 'read' && !requirement.capability;
+  return !isRead;
+}
+
 export function hasLevel(granted: PermissionLevel | undefined, needed: PermissionLevel): boolean {
   return LEVEL_RANK[granted ?? 'none'] >= LEVEL_RANK[needed];
 }

@@ -61,22 +61,36 @@ export class PasswordResetService {
   }
 
   /**
-   * Sets the new password for the token's user. The token is used up only
-   * once Keycloak has accepted the password, so a password the policy rejects
-   * can be corrected and resubmitted with the same link.
+   * Sets the new password for the token's user. The link is used up
+   * atomically; if Keycloak rejects the password it is restored, so the user
+   * can correct it and resubmit with the same link.
    */
   async resetPassword(token: string, newPassword: string): Promise<void> {
     const db = getDbClient();
     const tokenHash = hashResetToken(token);
+    // Use the link up atomically, so two concurrent resets can't both pass…
     const { rows } = await db.query(
-      `SELECT user_id FROM password_reset_tokens WHERE token_hash = $1 AND expires_at > NOW()`,
+      `DELETE FROM password_reset_tokens WHERE token_hash = $1 AND expires_at > NOW() RETURNING user_id, expires_at`,
       [tokenHash]
     );
     if (!rows[0]) throw new InvalidResetTokenError();
     const userId: string = rows[0].user_id;
 
-    await keycloakService.setUserPassword(userId, newPassword);
-    await db.query('DELETE FROM password_reset_tokens WHERE user_id = $1', [userId]);
+    try {
+      await keycloakService.setUserPassword(userId, newPassword);
+    } catch (error) {
+      // …and give it back when the password was refused (or Keycloak failed),
+      // so the user can correct it with the same link — unless a newer link
+      // was requested meanwhile.
+      await db
+        .query(
+          `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)
+           ON CONFLICT (user_id) DO NOTHING`,
+          [userId, tokenHash, rows[0].expires_at]
+        )
+        .catch((restoreError) => logger.error(`[PasswordReset] Could not restore the link for ${userId}: ${restoreError.message}`));
+      throw error;
+    }
 
     // Whoever may have had the old password is signed out.
     try {

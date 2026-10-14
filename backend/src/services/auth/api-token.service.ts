@@ -23,6 +23,7 @@ import { logger } from '../../utils/logger';
 import { BoundedLru } from '../../utils/bounded-lru';
 import { keycloakService } from '../keycloak.service';
 import { normalizePermissions } from './api-token-permissions';
+import { EmailService } from '../external/email.service';
 import {
   ApiToken,
   ApiTokenOwner,
@@ -169,6 +170,8 @@ export class ApiTokenService {
   private ownerCache = new BoundedLru<{ owner: ApiTokenOwner | null; until: number }>(1000);
   private lastUsedWrites = new BoundedLru<number>(1000);
   private lastSeenIp = new BoundedLru<string>(1000);
+  /** When a hash was last evicted — a lookup that started earlier must not re-cache it. */
+  private evictedAt = new BoundedLru<number>(1000);
 
   async list(userId: string): Promise<ApiToken[]> {
     const { rows } = await getDbClient().query(
@@ -248,7 +251,7 @@ export class ApiTokenService {
         values
       );
       if (!rows[0]) return null;
-      this.tokenCache.delete(rows[0].token_hash);
+      this.evict(rows[0].token_hash);
       const { token_hash: _hash, ...row } = rows[0];
       const token = toPublic(row);
       await this.recordEvent(userId, id, token.name, 'updated', {
@@ -286,7 +289,7 @@ export class ApiTokenService {
       [id, userId, hash, prefix, expiresAt]
     );
     if (!rows[0]) return null;
-    this.tokenCache.delete(rows[0].old_hash);
+    this.evict(rows[0].old_hash);
     this.lastSeenIp.delete(id);
     const { old_hash: _old, ...row } = rows[0];
     const token = toPublic(row);
@@ -300,7 +303,7 @@ export class ApiTokenService {
       [id, userId]
     );
     if (!rows[0]) return false;
-    this.tokenCache.delete(rows[0].token_hash);
+    this.evict(rows[0].token_hash);
     await this.recordEvent(userId, id, rows[0].name, 'revoked', null, actor);
     return true;
   }
@@ -343,10 +346,17 @@ export class ApiTokenService {
     }
   }
 
+  /** Drops a token from the lookup cache, e.g. after it was changed or revoked. */
+  private evict(hash: string): void {
+    this.tokenCache.delete(hash);
+    this.evictedAt.set(hash, Date.now());
+  }
+
   /** Resolves a bearer secret to its token. Expiry is checked on every call, cached or not. */
   async lookup(secret: string): Promise<ApiTokenLookup> {
     if (!hasValidApiTokenFormat(secret)) return { status: 'invalid' };
     const hash = hashApiToken(secret);
+    const started = Date.now();
 
     const cached = this.tokenCache.get(hash);
     let token = cached && cached.until > Date.now() ? cached.token : undefined;
@@ -358,7 +368,11 @@ export class ApiTokenService {
       );
       if (!rows[0]) return { status: 'invalid' };
       token = { ...rows[0], permissions: normalizePermissions(rows[0].permissions) } as AuthenticatedApiToken;
-      this.tokenCache.set(hash, { token, until: Date.now() + TOKEN_CACHE_TTL_MS });
+      // Changed or revoked while we were reading: serve this one request, but
+      // don't keep the stale row for a minute.
+      if ((this.evictedAt.get(hash) ?? 0) < started) {
+        this.tokenCache.set(hash, { token, until: Date.now() + TOKEN_CACHE_TTL_MS });
+      }
     }
 
     return isExpired(token.expires_at) ? { status: 'expired' } : { status: 'ok', token };
@@ -433,3 +447,37 @@ export class ApiTokenService {
 }
 
 export const apiTokenService = new ApiTokenService();
+
+/**
+ * Tells the owner a token was added to their account — so a token someone
+ * else created (with a stolen password or session) doesn't go unnoticed.
+ * System SMTP, best effort: never fails the request.
+ */
+export async function notifyTokenCreated(
+  ownerEmail: string,
+  token: ApiToken,
+  actor: ApiTokenActor,
+  emailService: { sendNotificationEmail: EmailService['sendNotificationEmail'] } = new EmailService()
+): Promise<void> {
+  if (!ownerEmail) return;
+  const link = `${(process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/+$/, '')}/config/api-tokens`;
+  const granted = [
+    ...Object.entries(token.permissions.resources).map(([key, level]) => `${key}: ${level}`),
+    ...token.permissions.capabilities,
+  ];
+  const lines = [
+    `A new API token was added to your OpenTyme account.`,
+    '',
+    `Name: ${token.name}`,
+    `Access: ${granted.join(', ') || 'none'}`,
+    `Expires: ${token.expires_at ? new Date(token.expires_at).toISOString().slice(0, 10) : 'never'}`,
+    `Created from: ${cleanIp(actor.ip) ?? 'unknown address'}${actor.userAgent ? ` (${actor.userAgent.slice(0, 120)})` : ''}`,
+    '',
+    `If this wasn't you, revoke the token now and change your password: ${link}`,
+  ];
+  try {
+    await emailService.sendNotificationEmail(ownerEmail, `OpenTyme: new API token "${token.name}"`, lines.join('\n'));
+  } catch (error: any) {
+    logger.warn(`[ApiToken] Could not send the new-token notice for ${token.id}: ${error.message}`);
+  }
+}

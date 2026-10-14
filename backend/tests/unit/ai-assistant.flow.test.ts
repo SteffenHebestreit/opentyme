@@ -654,6 +654,18 @@ describe('AIAssistantService orchestration', () => {
       expect(resultFor('r2')).toContain('invoices:read');
     });
 
+    it('keeps no permissions once the token that started it is revoked', async () => {
+      conversationRows = [{ api_token_id: null, started_by_token: true, permissions: null }];
+      llmRounds = [
+        { content: '', toolCalls: [makeCall('r1', 'get_clients', {})], finishReason: 'tool_calls' },
+        { content: 'Nothing I can do here.', toolCalls: [], finishReason: 'stop' },
+      ];
+      await run(); // the owner continues it in the web app
+
+      expect(execCalls).toHaveLength(0);
+      expect(resultFor('r1')).toContain('clients:read');
+    });
+
     it('never puts a disallowed write on the approval card', async () => {
       conversationRows = [{ api_token_id: 'tok-1', permissions: TOKEN_PERMS }];
       llmRounds = [

@@ -82,6 +82,8 @@ export interface McpCaller {
   bearerToken: string;
   roles: string[];
   permissions: ApiTokenPermissions | null;
+  /** false for tokens whose owner approves changes in OpenTyme: read-only tools only. */
+  writesAllowed: boolean;
 }
 
 const curated = new Set<string>(MCP_TOOL_NAMES);
@@ -93,8 +95,13 @@ function availableTools(caller: McpCaller): ToolWithMeta[] {
     .filter(
       (t) =>
         isToolAllowedForRoles(t, caller.roles) &&
+        (caller.writesAllowed || isReadOnly(t)) &&
         (!caller.permissions || toolPermissionDenial(t.tool.function.name, caller.permissions) === null)
     );
+}
+
+function isReadOnly(t: ToolWithMeta): boolean {
+  return t.method === 'GET';
 }
 
 function title(name: string): string {
@@ -107,7 +114,7 @@ function title(name: string): string {
 export function toMcpTool(t: ToolWithMeta): Tool {
   const { name, description, parameters } = t.tool.function;
   const custom = t.method === 'CUSTOM';
-  const readOnly = !custom && t.method === 'GET';
+  const readOnly = isReadOnly(t);
   const requirement = custom ? null : requirementFor(t.method, t.pathTemplate);
   const destructive = !!requirement && requirement.allowed && requirement.resource?.level === 'delete';
   return {
@@ -130,6 +137,12 @@ function errorResult(text: string): CallToolResult {
 
 export async function callMcpTool(caller: McpCaller, name: string, args: Record<string, unknown>): Promise<CallToolResult> {
   if (!curated.has(name)) throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${name}`);
+  const tool = getToolsWithMeta().find((t) => t.tool.function.name === name);
+  if (!caller.writesAllowed && (!tool || !isReadOnly(tool))) {
+    return errorResult(
+      `${name} changes data, and this token's changes need its owner's approval in OpenTyme — ask the OpenTyme assistant instead.`
+    );
+  }
   if (caller.permissions) {
     const missing = toolPermissionDenial(name, caller.permissions);
     if (missing) return errorResult(`This API token does not allow ${name} (needs ${missing}).`);

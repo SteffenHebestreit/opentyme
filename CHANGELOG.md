@@ -2,6 +2,11 @@
 
 ## Unreleased (since v1.5.0)
 
+### Security fix — registration could create administrators
+- **Anyone who could reach the app could register as an administrator**: the public sign-up
+  accepted a `role` field and assigned "admin" when asked. Sign-up no longer accepts a role.
+  Check Keycloak for admin accounts you don't recognise.
+
 ### API tokens — connect scripts, AI agents and MCP clients
 - **Personal access tokens** (Configuration → Integrations → API tokens): each token gets
   None, Read, Write or Delete per area (clients, projects, time, expenses, invoices,
@@ -21,6 +26,8 @@
   curated set of tools (look-ups, summaries, logging time by project name, the timer,
   creating clients, projects and invoices from time), filtered per token. The setup
   dialog shows the `claude mcp add` command and an `mcpServers` block, filled in.
+- "Approve in OpenTyme" is a hard limit: such a token changes data only through the assistant
+  after your approval, never directly. You get an email whenever a token is added.
 - **Recent activity** per token (created, changed, regenerated, revoked, first use, use from
   a new address), an email a week before a token expires, and a per-token rate limit
   (600 requests/minute by default). Guide: [docs/API_TOKENS.md](docs/API_TOKENS.md).

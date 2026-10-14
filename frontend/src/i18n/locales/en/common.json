@@ -259,7 +259,9 @@
     "viaToken": "via {{name}}",
     "needsApproval": "Needs your approval",
     "startedByToken": "Started by the API token “{{name}}”. It can only use what that token allows.",
-    "approvalWaitingElsewhere": "another conversation needs your approval"
+    "approvalWaitingElsewhere": "another conversation needs your approval",
+    "viaRevokedToken": "via a revoked API token",
+    "startedByRevokedToken": "Started by an API token that has since been revoked. The assistant can’t use any tools in this conversation."
   },
   "shell": {
     "mainNavigation": "Main navigation",

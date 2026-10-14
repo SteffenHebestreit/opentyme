@@ -449,11 +449,11 @@
         "title": "Wer bestätigt die Änderungen des Assistenten?",
         "self": {
           "label": "Die verbundene Anwendung",
-          "description": "Die Anwendung mit diesem Token bestätigt jede Änderung selbst – für Agenten, die unbeaufsichtigt laufen."
+          "description": "Die Anwendung mit diesem Token bestätigt jede Änderung selbst – für Agenten, die unbeaufsichtigt laufen. Sie kann im Rahmen ihrer Berechtigungen auch direkt Daten ändern."
         },
         "in_app": {
           "label": "Ich, in OpenTyme",
-          "description": "Änderungen warten, bis Sie sie im OpenTyme-Chat bestätigen."
+          "description": "Änderungen warten, bis Sie sie im OpenTyme-Chat bestätigen. Auf anderem Weg kann das Token keine Daten ändern – weder über die API noch über MCP oder E-Mail."
         }
       },
       "form": {

@@ -259,7 +259,9 @@
     "viaToken": "über {{name}}",
     "needsApproval": "Wartet auf Ihre Bestätigung",
     "startedByToken": "Gestartet über das API-Token „{{name}}“. Es kann nur nutzen, was dieses Token erlaubt.",
-    "approvalWaitingElsewhere": "eine andere Unterhaltung wartet auf Ihre Bestätigung"
+    "approvalWaitingElsewhere": "eine andere Unterhaltung wartet auf Ihre Bestätigung",
+    "viaRevokedToken": "über ein widerrufenes API-Token",
+    "startedByRevokedToken": "Gestartet über ein inzwischen widerrufenes API-Token. Der Assistent kann in dieser Unterhaltung keine Werkzeuge nutzen."
   },
   "shell": {
     "mainNavigation": "Hauptnavigation",

@@ -21,6 +21,7 @@ router.post('/', async (req: Request, res: Response) => {
     bearerToken: req.headers.authorization ?? '',
     roles: req.user?.roles ?? [],
     permissions: req.authContext?.method === 'pat' ? req.authContext.permissions : null,
+    writesAllowed: !(req.authContext?.method === 'pat' && req.authContext.approvalMode === 'in_app'),
   });
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   res.on('close', () => {

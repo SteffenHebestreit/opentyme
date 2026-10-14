@@ -182,8 +182,8 @@ export class AIAssistantService {
     let ownedLock: string | null = null;
     if (!conversationId) {
       const result = await db.query(
-        `INSERT INTO ai_conversations (user_id, title, api_token_id) VALUES ($1, $2, $3) RETURNING id`,
-        [userId, userMessage.slice(0, 100), access?.tokenId ?? null]
+        `INSERT INTO ai_conversations (user_id, title, api_token_id, started_by_token) VALUES ($1, $2, $3, $4) RETURNING id`,
+        [userId, userMessage.slice(0, 100), access?.tokenId ?? null, !!access]
       );
       this.ceiling = access?.permissions ?? null;
       conversationId = result.rows[0].id as string;
@@ -493,7 +493,7 @@ export class AIAssistantService {
     access?: TokenAccess | null
   ): Promise<{ ceiling: ApiTokenPermissions | null } | null> {
     const { rows } = await pool().query(
-      `SELECT c.api_token_id, t.permissions
+      `SELECT c.api_token_id, c.started_by_token, t.permissions
          FROM ai_conversations c
          LEFT JOIN api_tokens t ON t.id = c.api_token_id
         WHERE c.id = $1 AND c.user_id = $2`,
@@ -502,7 +502,9 @@ export class AIAssistantService {
     if (rows.length === 0) return null;
     const startedBy: string | null = rows[0].api_token_id;
     if (access) return startedBy === access.tokenId ? { ceiling: access.permissions } : null;
-    return { ceiling: startedBy ? normalizePermissions(rows[0].permissions) : null };
+    if (startedBy) return { ceiling: normalizePermissions(rows[0].permissions) };
+    // Started by a token that has since been revoked: no permissions remain.
+    return { ceiling: rows[0].started_by_token ? normalizePermissions(null) : null };
   }
 
   /** Why the ceiling refuses this tool (a message for the model), or null. */

@@ -749,14 +749,19 @@ export default function AIChatPanel({
       {/* Messages */}
       <div className="relative min-h-0 flex-1">
         <div ref={scrollRef} onScroll={onScroll} className="h-full overflow-y-auto overscroll-contain px-4 py-4">
-          {activeConversation?.api_token_name && (
+          {(activeConversation?.api_token_name || activeConversation?.started_by_token) && (
             <div className="mb-3 flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300">
               <KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span>
-                {t('ai.startedByToken', {
-                  name: activeConversation.api_token_name,
-                  defaultValue: 'Started by the API token “{{name}}”. It can only use what that token allows.',
-                })}
+                {activeConversation.api_token_name
+                  ? t('ai.startedByToken', {
+                      name: activeConversation.api_token_name,
+                      defaultValue: 'Started by the API token “{{name}}”. It can only use what that token allows.',
+                    })
+                  : t(
+                      'ai.startedByRevokedToken',
+                      'Started by an API token that has since been revoked. The assistant can’t use any tools in this conversation.'
+                    )}
               </span>
             </div>
           )}

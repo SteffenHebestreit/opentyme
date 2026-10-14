@@ -496,16 +496,16 @@ describe('personal access tokens', () => {
       await settle();
       const { rows } = await getDbClient().query('SELECT last_used_at FROM api_tokens WHERE id = $1', [token.id]);
       expect(rows[0].last_used_at).toBeNull();
+      // (The marker is believed only from a loopback socket — forwarded-for headers can't fake that.
+      // Every test request comes from loopback, so the outside case is not reproducible here.)
+    });
 
-      // The marker is only believed from loopback.
-      await request(app)
-        .get('/api/clients')
-        .set('Authorization', bearer(secret))
-        .set('X-OpenTyme-Tool-Call', '1')
-        .set('X-Forwarded-For', '198.51.100.9');
+    it('records use even when the request is refused (probing shows up)', async () => {
+      const { token, secret } = await createToken({ name: uniqueName('Prober'), permissions: { resources: { clients: 'read' } } });
+      await request(app).get('/api/invoices').set('Authorization', bearer(secret)).set('X-Forwarded-For', '192.0.2.66');
       await settle();
-      const after = await getDbClient().query('SELECT last_used_ip FROM api_tokens WHERE id = $1', [token.id]);
-      expect(after.rows[0].last_used_ip).toBe('198.51.100.9');
+      const trail = (await events()).filter((e) => e.token_id === token.id);
+      expect(trail.map((e) => [e.event, e.ip])).toContainEqual(['first_use', '192.0.2.66']);
     });
 
     it('is visible to the signed-in owner only', async () => {
@@ -513,6 +513,70 @@ describe('personal access tokens', () => {
       expect((await request(app).get('/api/api-tokens/events').set('Authorization', bearer(secret))).status).toBe(403);
       const other = await request(app).get('/api/api-tokens/events').set('Authorization', session(OTHER));
       expect(other.body.events.every((e: any) => !e.token_name.startsWith('Nosy'))).toBe(true);
+    });
+  });
+
+  describe('permissions that depend on what a request touches', () => {
+    // The suite has made many tokens by now; stay under the per-user limit.
+    beforeAll(cleanTokens);
+
+    it('email_send alone may not attach invoices or reports, or mark an invoice as sent', async () => {
+      const { secret } = await createToken({ name: uniqueName('Mailer'), permissions: { resources: {}, capabilities: ['email_send'] } });
+      const send = (body: Record<string, unknown>) =>
+        request(app).post('/api/email/send').set('Authorization', bearer(secret)).send({ to: 'x@example.com', templateCategory: 'invoice', ...body });
+
+      const report = await send({ attachments: [{ type: 'report', reportType: 'invoice', dateFrom: '2000-01-01', dateTo: '2100-01-01' }] });
+      expect(report.status).toBe(403);
+      expect(report.body.required).toBe('reports:read');
+
+      const invoice = await send({ attachments: [{ type: 'invoice', invoiceId: '123e4567-e89b-42d3-a456-426614174000' }] });
+      expect(invoice.body.required).toBe('invoices:read');
+
+      const { secret: reader } = await createToken({
+        name: uniqueName('Mailer reader'),
+        permissions: { resources: { invoices: 'read' }, capabilities: ['email_send'] },
+      });
+      const markSent = await request(app)
+        .post('/api/email/send')
+        .set('Authorization', bearer(reader))
+        .send({ to: 'x@example.com', templateCategory: 'invoice', attachInvoiceId: '123e4567-e89b-42d3-a456-426614174000', updateInvoiceStatus: true });
+      expect(markSent.body.required).toBe('invoices:write');
+    });
+
+    it('the tax package needs read access to everything it bundles', async () => {
+      const { secret } = await createToken({ name: uniqueName('Tax only'), permissions: { resources: { tax: 'read' } } });
+      const full = await request(app).get('/api/tax-package/download?year=2025').set('Authorization', bearer(secret));
+      expect(full.status).toBe(403);
+      expect(full.body.required).toBe('invoices:read');
+
+      const taxOnly = await request(app)
+        .get('/api/tax-package/download?year=2025&include_invoice_pdfs=false&include_expense_receipts=false&include_reports=false&include_excel=false')
+        .set('Authorization', bearer(secret));
+      expect(taxOnly.status).not.toBe(403);
+    });
+
+    it('cancelling an invoice through an update needs invoices:delete too', async () => {
+      const { secret } = await createToken({ name: uniqueName('Invoice writer'), permissions: { resources: { invoices: 'write' } } });
+      const res = await request(app)
+        .put('/api/invoices/123e4567-e89b-42d3-a456-426614174000')
+        .set('Authorization', bearer(secret))
+        .send({ status: 'cancelled' });
+      expect(res.status).toBe(403);
+      expect(res.body.required).toBe('invoices:delete');
+    });
+
+    it('a token whose owner approves in OpenTyme reads, but never writes directly', async () => {
+      const { secret } = await createToken({
+        name: uniqueName('Supervised writer'),
+        permissions: { resources: { clients: 'delete' }, capabilities: ['assistant', 'email_send'] },
+        approval_mode: 'in_app',
+      });
+      expect((await request(app).get('/api/clients').set('Authorization', bearer(secret))).status).toBe(200);
+      for (const [method, path] of [['post', '/api/clients'], ['delete', '/api/clients/123e4567-e89b-42d3-a456-426614174000'], ['post', '/api/email/send']] as const) {
+        const res = await request(app)[method](path).set('Authorization', bearer(secret)).send({ name: 'X', to: 'x@example.com' });
+        expect(res.status).toBe(403);
+        expect(res.body.code).toBe('APPROVAL_IN_APP');
+      }
     });
   });
 });

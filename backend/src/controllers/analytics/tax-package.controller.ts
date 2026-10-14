@@ -12,6 +12,7 @@
 import { Request, Response } from 'express';
 import { taxPackageService, TaxPackageOptions } from '../../services/analytics/tax-package.service';
 import { logger } from '../../utils/logger';
+import { ensureTokenAllows } from '../../middleware/auth/token-permission';
 
 export class TaxPackageController {
   /**
@@ -53,6 +54,17 @@ export class TaxPackageController {
         include_reports = 'true',
         include_excel = 'true',
       } = req.query;
+
+      // The package bundles more than tax data: for an API token, each part
+      // needs the permission for what it contains (tax:read got it here).
+      const needs: Parameters<typeof ensureTokenAllows>[2] = [];
+      if (include_invoice_pdfs !== 'false') needs.push({ resource: 'invoices', level: 'read' });
+      if (include_expense_receipts !== 'false') needs.push({ resource: 'expenses', level: 'read' });
+      if (include_reports !== 'false') needs.push({ resource: 'reports', level: 'read' });
+      if (include_excel !== 'false') {
+        needs.push({ resource: 'invoices', level: 'read' }, { resource: 'expenses', level: 'read' });
+      }
+      if (!ensureTokenAllows(req, res, needs)) return;
 
       // Validate year
       if (!year) {

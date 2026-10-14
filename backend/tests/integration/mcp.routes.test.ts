@@ -178,6 +178,27 @@ describe('MCP server', () => {
     expect(unknown.body.error.code).toBe(-32602);
   });
 
+  it('offers only read-only tools to a token whose owner approves in OpenTyme', async () => {
+    const supervised = (
+      await request(app)
+        .post('/api/api-tokens')
+        .set('Authorization', `Bearer session:${OWNER}`)
+        .send({
+          name: `MCP supervised ${++tokenCount}`,
+          permissions: { resources: { clients: 'read', projects: 'read', time_entries: 'delete' }, capabilities: ['mcp', 'assistant'] },
+          approval_mode: 'in_app',
+          expires_at: null,
+        })
+    ).body.secret as string;
+    const tools = (await mcp(supervised, 'tools/list')).body.result.tools as Array<{ name: string; annotations: any }>;
+    expect(tools.length).toBeGreaterThan(0);
+    expect(tools.every((t) => t.annotations.readOnlyHint)).toBe(true);
+    const write = await mcp(supervised, 'tools/call', { name: 'log_time_entry', arguments: { project: 'x' } });
+    expect(write.body.result.isError).toBe(true);
+    expect(write.body.result.content[0].text).toContain('approval');
+    expect(calls).toHaveLength(0);
+  });
+
   it('needs the mcp capability', async () => {
     const noMcp = await token({ resources: { clients: 'read' } });
     const res = await mcp(noMcp, 'tools/list');

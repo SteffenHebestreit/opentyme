@@ -449,11 +449,11 @@
         "title": "Who approves the assistant’s changes?",
         "self": {
           "label": "The connected app",
-          "description": "The app holding this token confirms each change itself — for agents that run unattended."
+          "description": "The app holding this token confirms each change itself — for agents that run unattended. It can also change data directly within its permissions."
         },
         "in_app": {
           "label": "Me, in OpenTyme",
-          "description": "Changes wait until you approve them in the OpenTyme chat."
+          "description": "Changes wait until you approve them in the OpenTyme chat. The token can’t change data any other way — not through the API, MCP or email."
         }
       },
       "form": {

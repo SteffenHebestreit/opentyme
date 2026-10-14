@@ -14,6 +14,7 @@ import { InvoiceController } from '../financial/invoice.controller';
 import { reportService } from '../../services/analytics/report.service';
 import reportPDFService from '../../services/analytics/report-pdf.service';
 import { logger } from '../../utils/logger';
+import { ensureTokenAllows } from '../../middleware/auth/token-permission';
 
 /** Attachment specification for a single PDF to attach to the outgoing email. */
 interface AttachmentSpec {
@@ -129,6 +130,14 @@ export async function sendEmail(req: Request, res: Response): Promise<void> {
     : attachInvoiceId
       ? [{ type: 'invoice', invoiceId: attachInvoiceId }]
       : [];
+
+  // An API token may send mail (capability email_send) but only attach what
+  // it may read, and only mark an invoice as sent if it may write invoices.
+  const needs: Parameters<typeof ensureTokenAllows>[2] = [];
+  if (resolvedSpecs.some((spec) => spec.type === 'invoice')) needs.push({ resource: 'invoices', level: 'read' });
+  if (resolvedSpecs.some((spec) => spec.type === 'report')) needs.push({ resource: 'reports', level: 'read' });
+  if (updateInvoiceStatus && attachInvoiceId) needs.push({ resource: 'invoices', level: 'write' });
+  if (!ensureTokenAllows(req, res, needs)) return;
 
   try {
     const pool = getDbClient();

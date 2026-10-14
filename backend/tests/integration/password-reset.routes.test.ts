@@ -52,11 +52,20 @@ const findUserByEmail = jest.spyOn(keycloakService, 'findUserByEmail');
 const setUserPassword = jest.spyOn(keycloakService, 'setUserPassword');
 const logoutUser = jest.spyOn(keycloakService, 'logoutUser');
 
+/** The mail goes out after the response (same answer, same timing, for every address). */
+async function settle() {
+  for (let i = 0; i < 40; i++) {
+    if (mockSendResetEmail.mock.calls.length > 0) return;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+}
+
 async function requestLink(email = 'olga@example.com'): Promise<string> {
   mockSendResetEmail.mockClear();
   const res = await request(app).post('/api/password-reset/request').send({ email });
   expect(res.status).toBe(200);
   expect(res.body.message).toBe(LINK_SENT);
+  await settle();
   expect(mockSendResetEmail).toHaveBeenCalledTimes(1);
   const [to, link] = mockSendResetEmail.mock.calls[0];
   expect(to).toBe('olga@example.com');
@@ -94,6 +103,7 @@ describe('password reset', () => {
       expect(res.status).toBe(200);
       expect(res.body.message).toBe(LINK_SENT);
     }
+    await new Promise((r) => setTimeout(r, 200));
     expect(mockSendResetEmail).not.toHaveBeenCalled();
     const { rows } = await getDbClient().query('SELECT 1 FROM password_reset_tokens WHERE user_id = $1', [DISABLED_ID]);
     expect(rows).toHaveLength(0);
@@ -164,9 +174,17 @@ describe('password reset', () => {
     expect((await request(app).post('/api/password-reset/reset').send({ newPassword: 'x' })).status).toBe(400);
   });
 
-  it('answers 500 (not "link sent") when Keycloak cannot be asked', async () => {
+  it('gives the same answer when Keycloak cannot be asked (no hint that the account exists)', async () => {
     findUserByEmail.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
     const res = await request(app).post('/api/password-reset/request').send({ email: 'olga@example.com' });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe(LINK_SENT);
+  });
+
+  it('lets only one of two simultaneous resets use the link', async () => {
+    const token = await requestLink();
+    const results = await Promise.all([reset(token, 'First-passw0rd!'), reset(token, 'Second-passw0rd!')]);
+    expect(results.map((r) => r.status).sort()).toEqual([200, 400]);
+    expect(setUserPassword).toHaveBeenCalledTimes(1);
   });
 });

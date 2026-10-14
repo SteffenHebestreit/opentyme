@@ -506,6 +506,13 @@ async function ensureSchemaUpgrades(): Promise<void> {
       ALTER TABLE api_tokens ADD COLUMN IF NOT EXISTS expiry_reminded_at TIMESTAMP WITH TIME ZONE;
     `);
 
+    // A conversation started by a token stays limited after the token is
+    // revoked (api_token_id is then NULL), so remember who started it.
+    await db.query(`
+      ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS started_by_token BOOLEAN NOT NULL DEFAULT false;
+      UPDATE ai_conversations SET started_by_token = true WHERE api_token_id IS NOT NULL AND NOT started_by_token;
+    `);
+
     await enforceLinearDocumentVersions();
 
     logger.info('[Startup] ✓ Schema upgrades applied');

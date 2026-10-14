@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { ApiTokenActor, ApiTokenError, apiTokenService } from '../../services/auth/api-token.service';
+import { ApiTokenActor, ApiTokenError, apiTokenService, notifyTokenCreated } from '../../services/auth/api-token.service';
 import { permissionCatalog } from '../../services/auth/api-token-permissions';
 import {
   apiTokenIdSchema,
@@ -69,8 +69,10 @@ export class ApiTokenController {
       return;
     }
     try {
-      const { token, secret } = await apiTokenService.create(req.user!.id, value, actorOf(req));
+      const actor = actorOf(req);
+      const { token, secret } = await apiTokenService.create(req.user!.id, value, actor);
       logger.info(`[ApiToken] User ${req.user!.id} created token ${token.id}`);
+      void notifyTokenCreated(req.user!.email, token, actor);
       res.status(201).json({ message: 'Token created', token, secret });
     } catch (err: any) {
       this.sendError(res, err, 'Create API token error:');

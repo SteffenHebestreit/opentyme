@@ -309,7 +309,8 @@ export async function listConversations(req: Request, res: Response): Promise<vo
     // api_token_name: which token started it (null = the web app).
     // awaiting_approval: actions wait for a decision (e.g. a token's run in "approve in app" mode).
     const result = await db.query(
-      `SELECT c.id, c.title, c.created_at, c.updated_at, c.api_token_id, t.name AS api_token_name,
+      `SELECT c.id, c.title, c.created_at, c.updated_at, c.api_token_id, c.started_by_token,
+              t.name AS api_token_name,
               EXISTS (
                 SELECT 1 FROM ai_messages m
                 WHERE m.conversation_id = c.id AND m.role = 'assistant'
@@ -352,7 +353,8 @@ export async function getConversation(req: Request, res: Response): Promise<void
 
     const scope = conversationScope(req, 3);
     const convResult = await db.query(
-      `SELECT c.id, c.title, c.created_at, c.updated_at, c.api_token_id, t.name AS api_token_name
+      `SELECT c.id, c.title, c.created_at, c.updated_at, c.api_token_id, c.started_by_token,
+              t.name AS api_token_name
        FROM ai_conversations c
        LEFT JOIN api_tokens t ON t.id = c.api_token_id
        WHERE c.id = $1 AND c.user_id = $2${scope.sql}`,

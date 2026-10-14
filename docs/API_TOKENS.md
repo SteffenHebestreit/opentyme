@@ -25,11 +25,14 @@ when you created it.
 - **Data access** — None, Read, Write or Delete per area (see below). Presets
   fill in common combinations.
 - **Features** — the OpenTyme assistant, the MCP server, sending emails.
-- **Approvals** (with the assistant) — who confirms the assistant's changes:
-  the connected app itself, or you in the OpenTyme chat.
+- **Approvals** (with the assistant) — who confirms changes: the connected
+  app itself, or you in the OpenTyme chat. *You in OpenTyme* is a hard limit:
+  such a token changes data only through the assistant, after your approval —
+  never directly (API, MCP write tools, email).
 
 The token (`oty_pat_…`) is shown **once**. OpenTyme stores only its SHA-256
-hash and can't show it again; if you lose it, regenerate it.
+hash and can't show it again; if you lose it, regenerate it. You get an email
+whenever a token is added to your account.
 
 ## Permissions
 
@@ -55,7 +58,11 @@ invoice (irreversible) needs Delete.
 |---|---|
 | OpenTyme assistant | `/api/ai/*` — chatting with the assistant (AG-UI and A2A) |
 | MCP server | `/api/mcp` |
-| Send emails | `POST /api/email/send` (may attach invoice and report PDFs); emailing a report also needs Reports: Read |
+| Send emails | `POST /api/email/send`; attaching invoices needs Invoices: Read, attaching or emailing reports Reports: Read, marking the invoice as sent Invoices: Write |
+
+Some requests need more than their path suggests: the tax package download
+needs Read on invoices, expenses and reports for the parts it includes, and
+setting an invoice's status to cancelled needs Delete, like `/cancel`.
 
 **Never available to a token**, whatever its permissions: sign-in and profile
 (`/api/auth`), password reset, settings, system administration, addon
@@ -80,6 +87,7 @@ approval mode, expiry and owner — so a client can check what it may do.
 |---|---|
 | `401` + `WWW-Authenticate: Bearer error="invalid_token"` | unknown, revoked or expired token, or its owner is disabled |
 | `403` + `error="insufficient_scope", scope="…"` | the token lacks a permission; the body's `required` says which (`invoices:read`, `capability:email_send`) |
+| `403` + `code: "APPROVAL_IN_APP"` | the token's changes need your approval in OpenTyme — it may not write directly |
 | `429` | the token's rate limit is used up (`RateLimit-*` headers say when it resets) |
 | `503` | the token couldn't be checked (Keycloak unreachable) — retry |
 
@@ -108,7 +116,8 @@ listing the actions. Then, depending on the token's approval setting:
 
 A token sees only the conversations it started — never your other chats. A
 conversation started with a token stays limited to that token's permissions
-for good, even when you continue it in the app.
+for good, even when you continue it in the app; once the token is revoked,
+the assistant can't use any tools in it.
 
 ## A2A (agent to agent)
 
@@ -176,7 +185,8 @@ entries and invoices; summaries of time, revenue, expenses and profit; logging
 time (`log_time_entry` takes a project *name*), the timer; creating clients,
 projects and invoices from time entries — and lists only those the token
 allows. There's no OpenTyme approval step: tools are marked read-only or
-destructive, and your MCP client asks you before changes.
+destructive, and your MCP client asks you before changes. Tokens whose owner
+approves in OpenTyme get read-only tools only.
 
 ## Activity, expiry and revoking
 
@@ -188,7 +198,8 @@ address — tokens revoked since included.
 one stops working at once. It's also how you change the expiry.
 
 **Revoke** deletes the token; it stops working on its next request. Changes to
-permissions apply on the next request too.
+permissions apply on the next request too. Disabling or deleting the owner's
+Keycloak account stops their tokens within five minutes.
 
 ## Running OpenTyme with tokens
 

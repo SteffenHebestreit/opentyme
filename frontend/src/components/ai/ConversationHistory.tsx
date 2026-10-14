@@ -81,10 +81,12 @@ export function ConversationHistory({ conversations, loadError, activeThreadId, 
                     </span>
                     <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
                       <span>{formatDistanceToNow(conversation.updated_at)}</span>
-                      {conversation.api_token_name && (
+                      {(conversation.api_token_name || conversation.started_by_token) && (
                         <span className="inline-flex items-center gap-1">
                           <KeyRound className="h-3 w-3" aria-hidden="true" />
-                          {t('ai.viaToken', { name: conversation.api_token_name, defaultValue: 'via {{name}}' })}
+                          {conversation.api_token_name
+                            ? t('ai.viaToken', { name: conversation.api_token_name, defaultValue: 'via {{name}}' })
+                            : t('ai.viaRevokedToken', 'via a revoked API token')}
                         </span>
                       )}
                       {conversation.awaiting_approval && (

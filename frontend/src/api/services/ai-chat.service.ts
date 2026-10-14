@@ -28,6 +28,8 @@ export interface Conversation {
   /** Set when an API token started it (e.g. an external agent); null = this app. */
   api_token_id?: string | null;
   api_token_name?: string | null;
+  /** A token started it — stays true after that token is revoked (api_token_id is then null). */
+  started_by_token?: boolean;
   /** Actions wait for a decision (list endpoint only). */
   awaiting_approval?: boolean;
 }
