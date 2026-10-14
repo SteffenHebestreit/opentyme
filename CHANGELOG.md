@@ -26,6 +26,13 @@
   curated set of tools (look-ups, summaries, logging time by project name, the timer,
   creating clients, projects and invoices from time), filtered per token. The setup
   dialog shows the `claude mcp add` command and an `mcpServers` block, filled in.
+- **Connect MCP clients by URL:** claude.ai connectors and other clients that support MCP
+  authorization need only `https://…/api/mcp`. OpenTyme signs you in, asks what the client
+  may do (read-only and 30 days to start with) and issues it an ordinary token, marked
+  "Connected via OAuth" in your list. OpenTyme is its own OAuth 2.1 server for this —
+  dynamic client registration, PKCE, no Keycloak changes.
+- **Administrators** see every user's tokens under System admin → API tokens and can revoke
+  any of them; the owner's activity log records it.
 - "Approve in OpenTyme" is a hard limit: such a token changes data only through the assistant
   after your approval, never directly. You get an email whenever a token is added.
 - **Recent activity** per token (created, changed, regenerated, revoked, first use, use from
@@ -33,6 +40,10 @@
   (600 requests/minute by default). Guide: [docs/API_TOKENS.md](docs/API_TOKENS.md).
 
 ### Fixed on the way
+- **Signing out now ends the session at once.** A signed-out access token kept working for
+  up to 15 minutes: when Keycloak's check failed, the backend fell back to checking the
+  signature alone, and the sign-out request was cancelled by the redirect to the login.
+  Keycloak now decides; the signature check is used only when Keycloak can't be reached.
 - **"Forgot password" works again.** It always failed: it looked accounts up in a database
   table that no longer exists (accounts live in Keycloak). Links are now single-use, expire
   after an hour, are stored only as a hash, and a reset signs you out everywhere.

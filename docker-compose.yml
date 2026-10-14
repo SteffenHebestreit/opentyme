@@ -79,20 +79,20 @@ services:
       start_period: 40s
     networks:
       - project-network
-    # /api plus the public A2A agent card (/.well-known/agent-card.json) go to the backend.
+    # /api, the public A2A agent card and the OAuth discovery documents (/.well-known/oauth-*) go to the backend.
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.backend-local.rule=Host(`localhost`) && (PathPrefix(`/api`) || Path(`/.well-known/agent-card.json`) || Path(`/.well-known/agent.json`))"
+      - "traefik.http.routers.backend-local.rule=Host(`localhost`) && (PathPrefix(`/api`) || Path(`/.well-known/agent-card.json`) || Path(`/.well-known/agent.json`) || PathPrefix(`/.well-known/oauth-`))"
       - "traefik.http.routers.backend-local.entrypoints=web"
       - "traefik.http.routers.backend-local.priority=10"
       - "traefik.http.routers.backend-local.service=backend"
       - "traefik.http.routers.backend-local.middlewares=compression@file,security-headers@file"
-      - "traefik.http.routers.backend-redirect.rule=Host(`${APP_HOST:-localhost}`) && !Host(`localhost`) && (PathPrefix(`/api`) || Path(`/.well-known/agent-card.json`) || Path(`/.well-known/agent.json`))"
+      - "traefik.http.routers.backend-redirect.rule=Host(`${APP_HOST:-localhost}`) && !Host(`localhost`) && (PathPrefix(`/api`) || Path(`/.well-known/agent-card.json`) || Path(`/.well-known/agent.json`) || PathPrefix(`/.well-known/oauth-`))"
       - "traefik.http.routers.backend-redirect.entrypoints=web"
       - "traefik.http.routers.backend-redirect.priority=20"
       - "traefik.http.routers.backend-redirect.service=backend"
       - "traefik.http.routers.backend-redirect.middlewares=https-redirect@file"
-      - "traefik.http.routers.backend-secure.rule=Host(`${APP_HOST:-localhost}`) && !Host(`localhost`) && (PathPrefix(`/api`) || Path(`/.well-known/agent-card.json`) || Path(`/.well-known/agent.json`))"
+      - "traefik.http.routers.backend-secure.rule=Host(`${APP_HOST:-localhost}`) && !Host(`localhost`) && (PathPrefix(`/api`) || Path(`/.well-known/agent-card.json`) || Path(`/.well-known/agent.json`) || PathPrefix(`/.well-known/oauth-`))"
       - "traefik.http.routers.backend-secure.entrypoints=websecure"
       - "traefik.http.routers.backend-secure.priority=20"
       - "traefik.http.routers.backend-secure.tls=true"

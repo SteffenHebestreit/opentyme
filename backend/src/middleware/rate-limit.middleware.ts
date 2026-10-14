@@ -109,3 +109,24 @@ export const apiTokenRateLimiter: RequestHandler = rateLimit({
     res.status(options.statusCode).json(options.message);
   },
 });
+
+/**
+ * OAuth client registration is open to anyone (RFC 7591), so it is limited
+ * per IP: 20 per hour by default (OAUTH_REGISTER_RATE_LIMIT_MAX).
+ */
+export const oauthRegisterRateLimiter: RequestHandler = rateLimit({
+  windowMs: envInt('OAUTH_REGISTER_RATE_LIMIT_WINDOW_MS', 60 * 60 * 1000),
+  max: envInt('OAUTH_REGISTER_RATE_LIMIT_MAX', 20),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'temporarily_unavailable', error_description: 'Too many registrations. Try again later.' },
+});
+
+/** The OAuth token endpoint: 60 requests per minute per IP by default (OAUTH_TOKEN_RATE_LIMIT_MAX). */
+export const oauthTokenRateLimiter: RequestHandler = rateLimit({
+  windowMs: envInt('OAUTH_TOKEN_RATE_LIMIT_WINDOW_MS', 60 * 1000),
+  max: envInt('OAUTH_TOKEN_RATE_LIMIT_MAX', 60),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'temporarily_unavailable', error_description: 'Too many token requests. Try again shortly.' },
+});

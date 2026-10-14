@@ -17,12 +17,12 @@ import { Request, Response, NextFunction } from 'express';
 import { apiTokenService } from '../../services/auth/api-token.service';
 import { isLoopback, TOOL_CALL_HEADER } from '../../services/auth/internal-call';
 import { checkPermission, isDirectWrite, requirementFor } from '../../services/auth/api-token-permissions';
-import { refuseScope } from './token-permission';
+import { refuseScope, setBearerChallenge } from './token-permission';
 import { logger } from '../../utils/logger';
 import { apiTokenRateLimiter } from '../rate-limit.middleware';
 
 function challenge(res: Response, status: number, error: string, description: string): void {
-  res.set('WWW-Authenticate', `Bearer realm="OpenTyme", error="${error}", error_description="${description}"`);
+  setBearerChallenge(res, { error, error_description: description });
   res.status(status).json({ error: status === 401 ? 'Unauthorized' : 'Forbidden', message: description });
 }
 

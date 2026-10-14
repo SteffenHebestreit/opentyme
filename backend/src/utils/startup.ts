@@ -513,6 +513,33 @@ async function ensureSchemaUpgrades(): Promise<void> {
       UPDATE ai_conversations SET started_by_token = true WHERE api_token_id IS NOT NULL AND NOT started_by_token;
     `);
 
+    // OAuth for MCP clients: registered clients, short-lived authorization
+    // codes, and which client a token was issued to.
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS oauth_clients (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(100) NOT NULL,
+        redirect_uris JSONB NOT NULL,
+        token_endpoint_auth_method VARCHAR(30) NOT NULL DEFAULT 'none',
+        client_secret_hash CHAR(64),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS oauth_authorization_codes (
+        code_hash CHAR(64) PRIMARY KEY,
+        client_id UUID NOT NULL REFERENCES oauth_clients(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL,
+        redirect_uri TEXT NOT NULL,
+        code_challenge VARCHAR(128) NOT NULL,
+        resource TEXT,
+        permissions JSONB NOT NULL,
+        approval_mode VARCHAR(10) NOT NULL,
+        token_expires_at TIMESTAMP WITH TIME ZONE,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      ALTER TABLE api_tokens ADD COLUMN IF NOT EXISTS oauth_client_id UUID REFERENCES oauth_clients(id) ON DELETE SET NULL;
+    `);
+
     await enforceLinearDocumentVersions();
 
     logger.info('[Startup] ✓ Schema upgrades applied');

@@ -11,7 +11,9 @@ when you created it.
 - [The OpenTyme assistant](#the-opentyme-assistant)
 - [A2A (agent to agent)](#a2a-agent-to-agent)
 - [MCP](#mcp)
+- [Connecting MCP clients by URL (OAuth)](#connecting-mcp-clients-by-url-oauth)
 - [Activity, expiry and revoking](#activity-expiry-and-revoking)
+- [Administrators](#administrators)
 - [Running OpenTyme with tokens](#running-opentyme-with-tokens)
 
 ## Create a token
@@ -188,6 +190,41 @@ allows. There's no OpenTyme approval step: tools are marked read-only or
 destructive, and your MCP client asks you before changes. Tokens whose owner
 approves in OpenTyme get read-only tools only.
 
+## Connecting MCP clients by URL (OAuth)
+
+Clients that support MCP authorization — claude.ai and Claude Desktop
+connectors, for example — need only the URL, no token:
+
+```
+https://opentyme.example.com/api/mcp
+```
+
+The client registers itself with OpenTyme and opens OpenTyme in your browser.
+After you sign in, OpenTyme asks what the client may do — the same choices as
+a new token, starting from read-only, with the MCP server always on and a
+30-day expiry. The page shows where the client will send you back: client
+names are chosen by the client, so check that address. **Allow access**
+creates an ordinary API token for the client; it appears in your token list
+marked *Connected via OAuth*, and you edit or revoke it there like any other.
+When it expires, the client asks you again — there are no refresh tokens.
+
+OpenTyme is its own OAuth 2.1 authorization server for this; Keycloak isn't
+involved beyond signing you in. Details for client authors:
+
+- `401` responses from `/api/mcp` carry `WWW-Authenticate: Bearer
+  resource_metadata="…/.well-known/oauth-protected-resource/api/mcp"`.
+- Metadata: `/.well-known/oauth-protected-resource` (RFC 9728) and
+  `/.well-known/oauth-authorization-server` (RFC 8414).
+- Dynamic client registration at `/api/oauth/register` (RFC 7591). Redirect
+  URIs must be `https`, or `http` on `localhost`/`127.0.0.1`/`[::1]`. Public
+  clients (`none`) and `client_secret_post`/`client_secret_basic`.
+- Authorization code grant only, with PKCE `S256` required. Codes are
+  single-use and live ten minutes. The `resource` parameter (RFC 8707), if
+  sent, must be the MCP URL; the redirect carries `iss` (RFC 9207). The only
+  scope is `mcp`.
+- The access token is an `oty_pat_…` token — it also works for the REST API
+  and the assistant within the permissions you granted.
+
 ## Activity, expiry and revoking
 
 **Recent activity** on the API tokens page lists what happened to your tokens:
@@ -201,6 +238,14 @@ one stops working at once. It's also how you change the expiry.
 permissions apply on the next request too. Disabling or deleting the owner's
 Keycloak account stops their tokens within five minutes.
 
+## Administrators
+
+**System admin → API tokens** lists every user's tokens — name, owner,
+permissions, expiry, last use — without their secrets, and lets an
+administrator revoke any of them, e.g. after someone leaves. The owner sees
+the revocation in their activity log. This page, like all administration,
+needs a signed-in session; a token can't reach it.
+
 ## Running OpenTyme with tokens
 
 | Variable | Default | |
@@ -209,12 +254,14 @@ Keycloak account stops their tokens within five minutes.
 | `API_TOKEN_RATE_LIMIT_WINDOW_MS` | `60000` | rate limit window |
 | `API_TOKEN_EXPIRY_CRON` | `0 9 * * *` | when expiry reminders are sent |
 | `FRONTEND_URL` | — | links in reminder and password-reset emails |
-| `PUBLIC_URL` | request host | base URL in the A2A agent card |
+| `PUBLIC_URL` | request host | base URL in the A2A agent card, OAuth metadata and the MCP resource URL |
 | `TRUST_PROXY` | — | number of proxy hops; without it "last used from" and the activity log show the proxy's address |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` | — | system mail for expiry reminders |
 
-Traefik routes `/api` and `/.well-known/agent-card.json` (plus the older
-`/.well-known/agent.json`) to the backend.
+Traefik routes `/api`, `/.well-known/agent-card.json` (plus the older
+`/.well-known/agent.json`) and `/.well-known/oauth-*` to the backend. Set
+`PUBLIC_URL` when OpenTyme is reachable under more than one host name: OAuth
+metadata and the MCP resource URL are built from it.
 
 The backend assumes a single replica: token lookups are cached in memory for a
 minute (evicted at once when a token changes), and rate limits and the

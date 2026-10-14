@@ -22,6 +22,7 @@ import {
 } from '../../services/ai/a2a.service';
 import { buildAgentCard } from '../../services/ai/a2a-agent.service';
 import { EventType } from '../../services/ai/ai-events';
+import { publicBaseUrl } from '../../utils/public-url';
 import { checkRateLimit, detectPromptInjection, MAX_MESSAGE_LENGTH, tokenAccess } from './ai-assistant.controller';
 
 type RpcId = string | number | null;
@@ -186,6 +187,5 @@ async function streamMessage(caller: A2ACaller, params: Record<string, unknown>,
 
 /** GET /.well-known/agent-card.json (and /.well-known/agent.json) — public. */
 export function getAgentCard(req: Request, res: Response): void {
-  const base = (process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`).replace(/\/+$/, '');
-  res.json(buildAgentCard(base));
+  res.json(buildAgentCard(publicBaseUrl(req)));
 }

@@ -5,6 +5,8 @@ import { logger } from '../utils/logger';
 import authRoutes from './auth/auth.routes';
 import passwordResetRoutes from './auth/password-reset.routes';
 import apiTokenRoutes from './auth/api-token.routes';
+import oauthRoutes from './auth/oauth.routes';
+import { oauthController } from '../controllers/auth/oauth.controller';
 
 // Business routes
 import clientRoutes from './business/client.routes';
@@ -52,6 +54,12 @@ export default function setupRoutes(app: Application) {
   logger.debug('Password reset routes registered under /api/password-reset');
 
   app.use('/api/api-tokens', apiTokenRoutes);
+
+  // OAuth 2.1 for MCP clients: OpenTyme is the authorization server
+  app.use('/api/oauth', oauthRoutes);
+  app.get('/.well-known/oauth-authorization-server', oauthController.authorizationServerMetadata);
+  app.get(['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/api/mcp'], oauthController.protectedResourceMetadata);
+  logger.debug('OAuth routes registered under /api/oauth and /.well-known/oauth-*');
   logger.debug('API token routes registered under /api/api-tokens');
 
   // Business endpoints

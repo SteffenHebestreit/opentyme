@@ -10,9 +10,23 @@ import { Request, Response } from 'express';
 import { hasLevel, PermissionLevel, ResourceKey } from '../../services/auth/api-token-permissions';
 import { logger } from '../../utils/logger';
 
+/**
+ * Sets an RFC 6750 `WWW-Authenticate: Bearer …` challenge. On the MCP route
+ * it also carries `resource_metadata` (RFC 9728) — that is how OAuth MCP
+ * clients find out where to authorize (set by routes/mcp/mcp.routes.ts).
+ */
+export function setBearerChallenge(res: Response, params: Record<string, string> = {}): void {
+  const all: Record<string, string> = { realm: 'OpenTyme', ...params };
+  if (typeof res.locals.resourceMetadata === 'string') all.resource_metadata = res.locals.resourceMetadata;
+  const value = Object.entries(all)
+    .map(([key, v]) => `${key}="${v.replace(/["\\]/g, '')}"`)
+    .join(', ');
+  res.set('WWW-Authenticate', `Bearer ${value}`);
+}
+
 /** 403 for a token that lacks `missing` ("invoices:write"), with the RFC 6750 hint. */
 export function refuseScope(res: Response, missing: string): void {
-  res.set('WWW-Authenticate', `Bearer realm="OpenTyme", error="insufficient_scope", scope="${missing}"`);
+  setBearerChallenge(res, { error: 'insufficient_scope', scope: missing });
   res.status(403).json({
     error: 'Forbidden',
     message: `This token does not allow this request (needs ${missing}).`,

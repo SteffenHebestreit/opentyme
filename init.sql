@@ -2478,6 +2478,32 @@ ALTER TABLE public.api_tokens ADD COLUMN IF NOT EXISTS expiry_reminded_at timest
 ALTER TABLE public.ai_conversations ADD COLUMN IF NOT EXISTS started_by_token boolean NOT NULL DEFAULT false;
 UPDATE public.ai_conversations SET started_by_token = true WHERE api_token_id IS NOT NULL AND NOT started_by_token;
 
+-- Migration: OAuth for MCP clients — OpenTyme as authorization server (idempotent)
+-- Clients register themselves (RFC 7591); an approved authorization code is
+-- exchanged (PKCE) for an ordinary API token, which remembers its client.
+CREATE TABLE IF NOT EXISTS public.oauth_clients (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name character varying(100) NOT NULL,
+    redirect_uris jsonb NOT NULL,
+    token_endpoint_auth_method character varying(30) NOT NULL DEFAULT 'none',
+    client_secret_hash character(64),
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS public.oauth_authorization_codes (
+    code_hash character(64) PRIMARY KEY,
+    client_id uuid NOT NULL REFERENCES public.oauth_clients(id) ON DELETE CASCADE,
+    user_id uuid NOT NULL,
+    redirect_uri text NOT NULL,
+    code_challenge character varying(128) NOT NULL,
+    resource text,
+    permissions jsonb NOT NULL,
+    approval_mode character varying(10) NOT NULL,
+    token_expires_at timestamp with time zone,
+    expires_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE public.api_tokens ADD COLUMN IF NOT EXISTS oauth_client_id uuid REFERENCES public.oauth_clients(id) ON DELETE SET NULL;
+
 --
 -- PostgreSQL database dump complete
 --

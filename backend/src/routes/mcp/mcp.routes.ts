@@ -3,9 +3,15 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { authenticateKeycloak, extractKeycloakUser } from '../../middleware/auth/keycloak.middleware';
 import { createMcpServer } from '../../services/mcp/mcp-server.service';
 import { logger } from '../../utils/logger';
+import { publicBaseUrl } from '../../utils/public-url';
 
 const router = Router();
 
+// Every 401/403 here points OAuth clients to the protected-resource metadata.
+router.use((req: Request, res: Response, next) => {
+  res.locals.resourceMetadata = `${publicBaseUrl(req)}/.well-known/oauth-protected-resource/api/mcp`;
+  next();
+});
 router.use(authenticateKeycloak);
 router.use(extractKeycloakUser);
 

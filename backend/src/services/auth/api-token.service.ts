@@ -48,7 +48,12 @@ const MISSING_OWNER_CACHE_TTL_MS = 60 * 1000;
 const LAST_USED_WRITE_INTERVAL_MS = 60 * 1000;
 
 const PUBLIC_COLUMNS = `id, name, description, token_prefix, permissions, approval_mode, expires_at,
-  last_used_at, last_used_ip, last_used_user_agent, created_at, updated_at`;
+  last_used_at, last_used_ip, last_used_user_agent, created_at, updated_at, oauth_client_id`;
+/** The same columns qualified with `t.`, for queries that join other tables. */
+const PUBLIC_COLUMNS_T = PUBLIC_COLUMNS.split(',').map((c) => `t.${c.trim()}`).join(', ');
+/** Lists also say which OAuth client (if any) a token was issued to. */
+const WITH_CLIENT = `${PUBLIC_COLUMNS_T}, c.name AS oauth_client_name
+  FROM api_tokens t LEFT JOIN oauth_clients c ON c.id = t.oauth_client_id`;
 
 export class ApiTokenError extends Error {
   constructor(
@@ -175,7 +180,7 @@ export class ApiTokenService {
 
   async list(userId: string): Promise<ApiToken[]> {
     const { rows } = await getDbClient().query(
-      `SELECT ${PUBLIC_COLUMNS} FROM api_tokens WHERE user_id = $1 ORDER BY created_at DESC`,
+      `SELECT ${WITH_CLIENT} WHERE t.user_id = $1 ORDER BY t.created_at DESC`,
       [userId]
     );
     return rows.map(toPublic);
@@ -183,7 +188,7 @@ export class ApiTokenService {
 
   async get(userId: string, id: string): Promise<ApiToken | null> {
     const { rows } = await getDbClient().query(
-      `SELECT ${PUBLIC_COLUMNS} FROM api_tokens WHERE id = $1 AND user_id = $2`,
+      `SELECT ${WITH_CLIENT} WHERE t.id = $1 AND t.user_id = $2`,
       [id, userId]
     );
     return rows[0] ? toPublic(rows[0]) : null;
@@ -203,8 +208,8 @@ export class ApiTokenService {
     const { secret, hash, prefix } = generateApiToken();
     try {
       const { rows } = await db.query(
-        `INSERT INTO api_tokens (user_id, name, description, token_hash, token_prefix, permissions, approval_mode, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO api_tokens (user_id, name, description, token_hash, token_prefix, permissions, approval_mode, expires_at, oauth_client_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING ${PUBLIC_COLUMNS}`,
         [
           userId,
@@ -215,6 +220,7 @@ export class ApiTokenService {
           JSON.stringify(normalizePermissions(dto.permissions)),
           dto.approval_mode ?? 'self',
           dto.expires_at ?? null,
+          dto.oauth_client_id ?? null,
         ]
       );
       const token = toPublic(rows[0]);
@@ -285,7 +291,7 @@ export class ApiTokenService {
               expiry_reminded_at = NULL, updated_at = CURRENT_TIMESTAMP
          FROM old
         WHERE t.id = $1 AND t.user_id = $2
-       RETURNING old.token_hash AS old_hash, ${PUBLIC_COLUMNS.split(',').map((c) => `t.${c.trim()}`).join(', ')}`,
+       RETURNING old.token_hash AS old_hash, ${PUBLIC_COLUMNS_T}`,
       [id, userId, hash, prefix, expiresAt]
     );
     if (!rows[0]) return null;
@@ -311,7 +317,7 @@ export class ApiTokenService {
   /** Every user's tokens, newest first — for administrators. Secrets are never included. */
   async listAll(): Promise<Array<ApiToken & { user_id: string }>> {
     const { rows } = await getDbClient().query(
-      `SELECT user_id, ${PUBLIC_COLUMNS} FROM api_tokens ORDER BY created_at DESC LIMIT 1000`
+      `SELECT t.user_id, ${WITH_CLIENT} ORDER BY t.created_at DESC LIMIT 1000`
     );
     return rows.map((row) => ({ ...toPublic(row), user_id: row.user_id }));
   }

@@ -26,6 +26,10 @@ export interface ApiToken {
   last_used_user_agent: string | null;
   created_at: Date;
   updated_at: Date;
+  /** Set when an OAuth client (e.g. an MCP client) obtained the token. */
+  oauth_client_id: string | null;
+  /** That client's self-declared name (lists only). */
+  oauth_client_name?: string | null;
 }
 
 /** What the auth middleware needs to authorise a request. */
@@ -44,6 +48,8 @@ export interface CreateApiTokenDto {
   permissions: ApiTokenPermissions;
   approval_mode?: ApprovalMode;
   expires_at?: Date | null;
+  /** The OAuth client the token is issued to (set by the token endpoint). */
+  oauth_client_id?: string | null;
 }
 
 /** Expiry changes only by regenerating, so a leaked token can't be extended. */

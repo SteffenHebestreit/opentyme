@@ -533,7 +533,8 @@
           "first_use": "“{{name}}” was used for the first time",
           "new_ip": "“{{name}}” was used from a new address"
         }
-      }
+      },
+      "viaOAuth": "Connected via OAuth"
     }
   },
   "messages": {
@@ -556,5 +557,16 @@
     "changePassword": "Change password",
     "keycloakTitle": "Authentication managed by Keycloak",
     "keycloakText": "Your account information is managed through Keycloak. Profile details are read-only and synchronized from your Keycloak account. To change your password or enable two-factor authentication, click \"Change password\" above."
+  },
+  "oauth": {
+    "title": "Connect “{{client}}” to OpenTyme",
+    "intro": "{{client}} wants to work with your OpenTyme data through MCP. Choose what it may do — you can change or revoke this any time under Configuration → API tokens.",
+    "verify": "Only continue if you started this in {{client}}. The name comes from the app itself; after you decide, you are sent to {{host}}.",
+    "allow": "Allow access",
+    "deny": "Deny",
+    "backToApp": "Back to the app",
+    "failedTitle": "This connection request can’t be completed",
+    "failed": "The request is invalid or has expired.",
+    "revokeHint": "The app gets an API token with exactly these permissions. It appears in your token list, where you can see when it was used and revoke it."
   }
 }

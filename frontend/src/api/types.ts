@@ -475,6 +475,10 @@ export interface ApiToken {
   last_used_user_agent: string | null;
   created_at: string;
   updated_at: string;
+  /** Set when an app obtained the token through OAuth (e.g. an MCP client). */
+  oauth_client_id?: string | null;
+  /** That app's self-declared name. */
+  oauth_client_name?: string | null;
 }
 
 /** A token together with its secret — only ever returned by create and regenerate. */

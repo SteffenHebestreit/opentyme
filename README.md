@@ -61,7 +61,7 @@ docker compose up -d
 - **Reports** — VAT (Umsatzsteuervoranmeldung), EÜR, invoice/expense/time reports; export to PDF/CSV/XLSX
 - **Email** — per-user SMTP, MJML template editor with live preview
 - **AI assistant** — agentic access to all your data: it plans, calls the app's API as tools (role-filtered, relevance-curated), and every create/update/delete pauses for your **approve / edit / reject** in a batch approval card. Configurable provider (local LLM via LM Studio, any OpenAI-compatible API)
-- **API tokens for agents** — personal access tokens with None/Read/Write/Delete per area for scripts, AI agents (the assistant over AG-UI or A2A) and MCP clients (`/api/mcp`); see [docs/API_TOKENS.md](docs/API_TOKENS.md)
+- **API tokens for agents** — personal access tokens with None/Read/Write/Delete per area for scripts, AI agents (the assistant over AG-UI or A2A) and MCP clients (`/api/mcp`, also connectable by URL via OAuth, e.g. as a claude.ai connector); see [docs/API_TOKENS.md](docs/API_TOKENS.md)
 - **Addon system** — manifest-driven plugins; slot-based frontend injection; AI tool registration
 
 ---

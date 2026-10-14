@@ -6,6 +6,7 @@ import jwt, { JwtPayload } from 'jsonwebtoken';
 import { logger } from '../../utils/logger';
 import { isApiToken } from '../../services/auth/api-token.service';
 import { authenticateApiToken } from './api-token.middleware';
+import { setBearerChallenge } from './token-permission';
 
 // Use the internal service URL for backend-to-Keycloak communication so
 // token introspection does not depend on trusting the public certificate chain.
@@ -199,6 +200,7 @@ export const authenticateKeycloak = async (req: Request, res: Response, next: Ne
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      setBearerChallenge(res);
       res.status(401).json({
         error: 'Unauthorized',
         message: 'No token provided'
@@ -220,7 +222,7 @@ export const authenticateKeycloak = async (req: Request, res: Response, next: Ne
     // Inactive, expired or unverifiable (validateToken returns null) — 401, so
     // clients know to sign in again rather than treating it as a permission problem.
     if (!tokenInfo?.active) {
-      res.set('WWW-Authenticate', 'Bearer realm="OpenTyme", error="invalid_token"');
+      setBearerChallenge(res, { error: 'invalid_token' });
       res.status(401).json({
         error: 'Unauthorized',
         message: 'Token is not active or has expired'

@@ -29,6 +29,22 @@ if (process.env.TRUST_PROXY) {
 
 // Security middleware
 app.use(helmet());
+
+// Endpoints other sites' clients call directly (MCP and A2A clients, OAuth).
+// Any origin, never with cookies: they authenticate with bearer tokens only.
+app.use(
+  [
+    '/.well-known/oauth-authorization-server',
+    '/.well-known/oauth-protected-resource',
+    '/.well-known/agent-card.json',
+    '/.well-known/agent.json',
+    '/api/oauth/register',
+    '/api/oauth/token',
+    '/api/mcp',
+    '/api/ai/a2a',
+  ],
+  cors({ origin: '*', exposedHeaders: ['WWW-Authenticate', 'Mcp-Session-Id', 'Mcp-Protocol-Version'] })
+);
 app.use(cors({
   origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'],
   credentials: true,

@@ -78,6 +78,9 @@ const ApiTokensPage: FC = () => {
               <div className="mt-0.5 max-w-xs truncate text-xs text-gray-500 dark:text-gray-400">{token.description}</div>
             )}
             <div className="mt-1 font-mono text-xs text-gray-400 dark:text-gray-500">{token.token_prefix}…</div>
+            {token.oauth_client_id && (
+              <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('admin.apiTokens.viaOAuth')}</div>
+            )}
           </div>
         ),
       },

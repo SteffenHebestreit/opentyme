@@ -92,7 +92,7 @@ export const CAPABILITIES: readonly CapabilityDefinition[] = [
  * assistant's traffic) and token management itself, so a token can never mint
  * or widen tokens.
  */
-const NEVER_PATHS = ['/api/auth', '/api/password-reset', '/api/system', '/api/settings', '/api/api-tokens'];
+const NEVER_PATHS = ['/api/auth', '/api/password-reset', '/api/system', '/api/settings', '/api/api-tokens', '/api/oauth'];
 
 /**
  * Plugin management lives under /api/plugins, and so do some addons' own

@@ -533,7 +533,8 @@
           "first_use": "„{{name}}“ wurde zum ersten Mal verwendet",
           "new_ip": "„{{name}}“ wurde von einer neuen Adresse verwendet"
         }
-      }
+      },
+      "viaOAuth": "Über OAuth verbunden"
     }
   },
   "messages": {
@@ -556,5 +557,16 @@
     "changePassword": "Passwort ändern",
     "keycloakTitle": "Anmeldung über Keycloak",
     "keycloakText": "Ihre Kontoinformationen werden über Keycloak verwaltet. Profildaten sind schreibgeschützt und werden aus Ihrem Keycloak-Konto übernommen. Um Ihr Passwort zu ändern oder die Zwei-Faktor-Authentifizierung zu aktivieren, klicken Sie oben auf „Passwort ändern“."
+  },
+  "oauth": {
+    "title": "„{{client}}“ mit OpenTyme verbinden",
+    "intro": "{{client}} möchte über MCP mit Ihren OpenTyme-Daten arbeiten. Legen Sie fest, was die Anwendung darf – Sie können das jederzeit unter Konfiguration → API-Tokens ändern oder widerrufen.",
+    "verify": "Fahren Sie nur fort, wenn Sie dies in {{client}} gestartet haben. Der Name stammt von der Anwendung selbst; nach Ihrer Entscheidung werden Sie zu {{host}} weitergeleitet.",
+    "allow": "Zugriff erlauben",
+    "deny": "Ablehnen",
+    "backToApp": "Zurück zur Anwendung",
+    "failedTitle": "Diese Verbindungsanfrage kann nicht abgeschlossen werden",
+    "failed": "Die Anfrage ist ungültig oder abgelaufen.",
+    "revokeHint": "Die Anwendung erhält ein API-Token mit genau diesen Berechtigungen. Es erscheint in Ihrer Token-Liste, wo Sie die Verwendung sehen und es widerrufen können."
   }
 }
