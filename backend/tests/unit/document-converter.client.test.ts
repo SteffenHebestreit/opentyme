@@ -73,6 +73,23 @@ describe('DocumentConverterClient', () => {
     });
   });
 
+  it('reports NO_TEXT when the converter reports an empty extraction as a failure', async () => {
+    // fastapi_mcp_template since 958dc13: success=false, but with extraction metadata
+    post.mockResolvedValue({
+      data: {
+        success: true,
+        result: {
+          success: false,
+          error: 'No text could be extracted',
+          warnings: ['No text could be extracted from the document.'],
+          metadata: { extraction_method: 'ocr', page_count: 1, token_estimate: 0 },
+        },
+      },
+    });
+    const client = new DocumentConverterClient('http://converter:8000');
+    await expect(client.extractDocumentText(Buffer.from('%PDF'), 'scan.pdf')).rejects.toMatchObject({ code: 'NO_TEXT' });
+  });
+
   it('reports FAILED when the tool reports an error', async () => {
     post.mockResolvedValue({ data: { success: true, result: { success: false, error: 'Conversion failed: bad PDF' } } });
     const client = new DocumentConverterClient('http://converter:8000');

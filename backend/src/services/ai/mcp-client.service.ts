@@ -170,6 +170,9 @@ export class DocumentConverterClient {
     if (typeof result === 'string') return result;
 
     if (result && typeof result === 'object') {
+      // Newer converters report an empty extraction as a failure that still
+      // carries extraction metadata (token_estimate 0); real errors carry none.
+      if (result.success === false && result.metadata?.token_estimate === 0) return '';
       if (result.success === false) {
         logger.error(
           `[DocumentConverter] file_to_markdown failed: ${describeDetail(result.error)}`

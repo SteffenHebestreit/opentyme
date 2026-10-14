@@ -40,6 +40,9 @@
   (600 requests/minute by default). Guide: [docs/API_TOKENS.md](docs/API_TOKENS.md).
 
 ### Fixed on the way
+- **Document converter updated** (OCR for scanned receipts without an AI key, SSRF guard,
+  CORS fix). OpenTyme understands its new "no text found" answer, so a receipt without
+  readable text still asks you to enter the details by hand instead of showing an error.
 - **Signing out now ends the session at once.** A signed-out access token kept working for
   up to 15 minutes: when Keycloak's check failed, the backend fell back to checking the
   signature alone, and the sign-out request was cancelled by the redirect to the login.
