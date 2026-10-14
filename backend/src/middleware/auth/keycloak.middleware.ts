@@ -53,6 +53,29 @@ export function invalidateTokenCache(token: string): boolean {
 }
 
 /**
+ * Headers that make Keycloak judge a token issued under its public URL.
+ *
+ * The browser gets its tokens from the public URL (issuer
+ * https://auth.example/realms/x), but the backend asks Keycloak over the
+ * internal URL. Keycloak checks the token's issuer against the URL it was
+ * asked on, so it called every browser token inactive — and the old fallback
+ * to a local signature check then accepted tokens even after sign-out.
+ * Keycloak runs with KC_PROXY_HEADERS=xforwarded, so forwarded headers for
+ * the public URL make it check against the right issuer.
+ */
+function introspectionHeaders(token: string): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
+  if (!KEYCLOAK_PUBLIC_URL) return headers;
+  const issuer = (jwt.decode(token) as JwtPayload | null)?.iss;
+  if (issuer !== `${KEYCLOAK_PUBLIC_URL.replace(/\/+$/, '')}/realms/${REALM}`) return headers;
+  const url = new URL(KEYCLOAK_PUBLIC_URL);
+  headers['X-Forwarded-Proto'] = url.protocol.replace(':', '');
+  headers['X-Forwarded-Host'] = url.host;
+  headers['X-Forwarded-Port'] = url.port || (url.protocol === 'https:' ? '443' : '80');
+  return headers;
+}
+
+/**
  * Introspect token using Keycloak Admin API with caching
  */
 async function introspectToken(token: string): Promise<any> {
@@ -74,11 +97,7 @@ async function introspectToken(token: string): Promise<any> {
         client_secret: CLIENT_SECRET,
         token: token,
       }),
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      }
+      { headers: introspectionHeaders(token) }
     );
 
     const data = response.data;
@@ -95,7 +114,13 @@ async function introspectToken(token: string): Promise<any> {
     return data;
   } catch (error: any) {
     logger.error('[Keycloak] Token introspection error:', error.response?.data || error.message);
-    throw new Error('Failed to introspect token');
+    throw new IntrospectionUnavailableError();
+  }
+}
+
+class IntrospectionUnavailableError extends Error {
+  constructor() {
+    super('Failed to introspect token');
   }
 }
 
@@ -145,18 +170,23 @@ async function verifyJwtLocally(token: string): Promise<any | null> {
   }
 }
 
+/**
+ * Keycloak's answer is final: "inactive" means expired, signed out or
+ * revoked, and the token is refused. Only when Keycloak can't be asked at all
+ * is the signature checked locally, so an outage doesn't sign everyone out
+ * (sign-outs during the outage can't be seen then).
+ */
 async function validateToken(token: string): Promise<any> {
-  const introspection = await introspectToken(token);
-
-  if (introspection?.active) {
-    return introspection;
+  try {
+    const introspection = await introspectToken(token);
+    return introspection?.active ? introspection : null;
+  } catch (error) {
+    if (!(error instanceof IntrospectionUnavailableError)) throw error;
+    logger.warn('[Keycloak] Introspection unavailable, verifying the token signature locally', {
+      tokenFingerprint: fingerprintToken(token),
+    });
+    return verifyJwtLocally(token);
   }
-
-  logger.warn('[Keycloak] Token introspection returned inactive token, falling back to local JWT verification', {
-    tokenFingerprint: fingerprintToken(token),
-  });
-
-  return verifyJwtLocally(token);
 }
 
 /**

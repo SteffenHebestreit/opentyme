@@ -4,7 +4,6 @@ import { keycloak, TOKEN_REFRESH_THRESHOLD, TOKEN_CHECK_INTERVAL, getPkceMethod,
 import { setTokens, clearTokens, getUserFromToken } from '../services/auth/tokenManager';
 import { useApp } from '../store/AppContext';
 import { getSettings } from '../api/services/settings.service';
-import apiClient from '../api/services/client';
 
 // Define user interface
 interface User {
@@ -330,10 +329,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log('[Auth] Logging out...');
 
     // Best-effort: evict the server-side token introspection cache so the token
-    // cannot continue to be served from cache. Fire-and-forget — must run before
-    // clearTokens() so the request still carries the bearer token, and must never
-    // block the logout flow on a network error.
-    apiClient.post('/auth/logout').catch(() => { /* ignore — logout proceeds regardless */ });
+    // stops working at once rather than when the cache expires. `keepalive`
+    // lets the request outlive the redirect to Keycloak below (an ordinary
+    // request was cancelled by it and never arrived). Must run before
+    // clearTokens(), and must never block the logout flow.
+    if (keycloak.token) {
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        keepalive: true,
+        headers: { Authorization: `Bearer ${keycloak.token}` },
+      }).catch(() => { /* ignore — logout proceeds regardless */ });
+    }
 
     // Clear local state
     clearTokens();
