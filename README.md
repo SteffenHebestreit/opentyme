@@ -29,10 +29,9 @@ Local development uses `localhost` for the app and `*.localhost` for the support
 127.0.0.1  traefik.localhost
 127.0.0.1  mail.localhost
 127.0.0.1  s3.localhost
-127.0.0.1  mcp.localhost
 ```
 
-To expose the stack under a custom LAN hostname instead, override `APP_HOST`, `AUTH_HOST`, `TRAEFIK_HOST`, `MAIL_HOST`, `S3_HOST`, and `MCP_HOST` in `.env` and point those names to the Docker host.
+To expose the stack under a custom LAN hostname instead, override `APP_HOST`, `AUTH_HOST`, `TRAEFIK_HOST`, `MAIL_HOST` and `S3_HOST` in `.env` and point those names to the Docker host.
 
 Scripts are provided: `scripts/setup-hosts.sh` (Linux/macOS) or `scripts/setup-hosts.bat` (Windows, run as Administrator).
 
@@ -50,7 +49,7 @@ docker compose up -d
 | App | http://localhost | admin / Admin123! |
 | Keycloak admin | http://auth.localhost | admin / admin |
 | MailHog | http://mail.localhost | — |
-| API docs | http://localhost/api/api-docs | — |
+| API docs | http://localhost/api-docs | — |
 
 ---
 
@@ -62,6 +61,7 @@ docker compose up -d
 - **Reports** — VAT (Umsatzsteuervoranmeldung), EÜR, invoice/expense/time reports; export to PDF/CSV/XLSX
 - **Email** — per-user SMTP, MJML template editor with live preview
 - **AI assistant** — agentic access to all your data: it plans, calls the app's API as tools (role-filtered, relevance-curated), and every create/update/delete pauses for your **approve / edit / reject** in a batch approval card. Configurable provider (local LLM via LM Studio, any OpenAI-compatible API)
+- **API tokens for agents** — personal access tokens with None/Read/Write/Delete per area for scripts, AI agents (the assistant over AG-UI or A2A) and MCP clients (`/api/mcp`); see [docs/API_TOKENS.md](docs/API_TOKENS.md)
 - **Addon system** — manifest-driven plugins; slot-based frontend injection; AI tool registration
 
 ---

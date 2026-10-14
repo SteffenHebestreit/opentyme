@@ -20,6 +20,7 @@ import { SettingsHeader } from '../../components/admin/SettingsSection';
 import { ApiTokenFormModal, CAPABILITY_ICONS } from '../../components/admin/api-tokens/ApiTokenFormModal';
 import { ApiTokenRegenerateModal } from '../../components/admin/api-tokens/ApiTokenRegenerateModal';
 import { ApiTokenSecretModal } from '../../components/admin/api-tokens/ApiTokenSecretModal';
+import { ApiTokenActivity } from '../../components/admin/api-tokens/ApiTokenActivity';
 import { expiryState, grantedResources } from '../../components/admin/api-tokens/apiTokenHelpers';
 import type { ApiToken, ApiTokenWithSecret } from '../../api/types';
 import { formatDate, formatDistanceToNow } from '../../utils/date';
@@ -271,6 +272,7 @@ const ApiTokensPage: FC = () => {
     <div className="space-y-6">
       {header}
       {body}
+      <ApiTokenActivity />
 
       {editing !== undefined && (
         <ApiTokenFormModal

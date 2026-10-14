@@ -59,6 +59,30 @@ export class ApiTokenError extends Error {
   }
 }
 
+/** Who did something to a token, for the activity log. */
+export interface ApiTokenActor {
+  ip?: string;
+  userAgent?: string;
+}
+
+export type ApiTokenEventType = 'created' | 'updated' | 'regenerated' | 'revoked' | 'first_use' | 'new_ip';
+
+export interface ApiTokenEvent {
+  id: string;
+  token_id: string | null;
+  token_name: string;
+  event: ApiTokenEventType;
+  details: Record<string, unknown> | null;
+  ip: string | null;
+  user_agent: string | null;
+  created_at: Date;
+}
+
+/** "::ffff:203.0.113.7" (IPv4 seen through an IPv6 socket) → "203.0.113.7". */
+function cleanIp(ip: string | undefined): string | null {
+  return ip ? ip.replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '').slice(0, 64) : null;
+}
+
 export type ApiTokenLookup =
   | { status: 'ok'; token: AuthenticatedApiToken }
   | { status: 'invalid' }
@@ -144,6 +168,7 @@ export class ApiTokenService {
   private tokenCache = new BoundedLru<{ token: AuthenticatedApiToken; until: number }>(1000);
   private ownerCache = new BoundedLru<{ owner: ApiTokenOwner | null; until: number }>(1000);
   private lastUsedWrites = new BoundedLru<number>(1000);
+  private lastSeenIp = new BoundedLru<string>(1000);
 
   async list(userId: string): Promise<ApiToken[]> {
     const { rows } = await getDbClient().query(
@@ -162,7 +187,7 @@ export class ApiTokenService {
   }
 
   /** Creates a token. `secret` is the only time the plaintext exists outside the caller. */
-  async create(userId: string, dto: CreateApiTokenDto): Promise<{ token: ApiToken; secret: string }> {
+  async create(userId: string, dto: CreateApiTokenDto, actor?: ApiTokenActor): Promise<{ token: ApiToken; secret: string }> {
     const db = getDbClient();
     const { rows: countRows } = await db.query(
       'SELECT COUNT(*)::int AS count FROM api_tokens WHERE user_id = $1',
@@ -189,13 +214,19 @@ export class ApiTokenService {
           dto.expires_at ?? null,
         ]
       );
-      return { token: toPublic(rows[0]), secret };
+      const token = toPublic(rows[0]);
+      await this.recordEvent(userId, token.id, token.name, 'created', {
+        permissions: token.permissions,
+        expires_at: token.expires_at,
+        approval_mode: token.approval_mode,
+      }, actor);
+      return { token, secret };
     } catch (error) {
       throw this.translateUniqueViolation(error);
     }
   }
 
-  async update(userId: string, id: string, dto: UpdateApiTokenDto): Promise<ApiToken | null> {
+  async update(userId: string, id: string, dto: UpdateApiTokenDto, actor?: ApiTokenActor): Promise<ApiToken | null> {
     const sets: string[] = [];
     const values: unknown[] = [];
     const add = (column: string, value: unknown) => {
@@ -219,7 +250,13 @@ export class ApiTokenService {
       if (!rows[0]) return null;
       this.tokenCache.delete(rows[0].token_hash);
       const { token_hash: _hash, ...row } = rows[0];
-      return toPublic(row);
+      const token = toPublic(row);
+      await this.recordEvent(userId, id, token.name, 'updated', {
+        changed: Object.keys(dto).filter((k) => (dto as Record<string, unknown>)[k] !== undefined),
+        permissions: token.permissions,
+        approval_mode: token.approval_mode,
+      }, actor);
+      return token;
     } catch (error) {
       throw this.translateUniqueViolation(error);
     }
@@ -233,7 +270,8 @@ export class ApiTokenService {
   async regenerate(
     userId: string,
     id: string,
-    expiresAt: Date | null
+    expiresAt: Date | null,
+    actor?: ApiTokenActor
   ): Promise<{ token: ApiToken; secret: string } | null> {
     const { secret, hash, prefix } = generateApiToken();
     const { rows } = await getDbClient().query(
@@ -241,7 +279,7 @@ export class ApiTokenService {
        UPDATE api_tokens t
           SET token_hash = $3, token_prefix = $4, expires_at = $5,
               last_used_at = NULL, last_used_ip = NULL, last_used_user_agent = NULL,
-              updated_at = CURRENT_TIMESTAMP
+              expiry_reminded_at = NULL, updated_at = CURRENT_TIMESTAMP
          FROM old
         WHERE t.id = $1 AND t.user_id = $2
        RETURNING old.token_hash AS old_hash, ${PUBLIC_COLUMNS.split(',').map((c) => `t.${c.trim()}`).join(', ')}`,
@@ -249,18 +287,60 @@ export class ApiTokenService {
     );
     if (!rows[0]) return null;
     this.tokenCache.delete(rows[0].old_hash);
+    this.lastSeenIp.delete(id);
     const { old_hash: _old, ...row } = rows[0];
-    return { token: toPublic(row), secret };
+    const token = toPublic(row);
+    await this.recordEvent(userId, id, token.name, 'regenerated', { expires_at: token.expires_at }, actor);
+    return { token, secret };
   }
 
-  async remove(userId: string, id: string): Promise<boolean> {
+  async remove(userId: string, id: string, actor?: ApiTokenActor): Promise<boolean> {
     const { rows } = await getDbClient().query(
-      'DELETE FROM api_tokens WHERE id = $1 AND user_id = $2 RETURNING token_hash',
+      'DELETE FROM api_tokens WHERE id = $1 AND user_id = $2 RETURNING token_hash, name',
       [id, userId]
     );
     if (!rows[0]) return false;
     this.tokenCache.delete(rows[0].token_hash);
+    await this.recordEvent(userId, id, rows[0].name, 'revoked', null, actor);
     return true;
+  }
+
+  /** The user's token activity, newest first — including tokens revoked since. */
+  async listEvents(userId: string, limit = 50): Promise<ApiTokenEvent[]> {
+    const { rows } = await getDbClient().query(
+      `SELECT id, token_id, token_name, event, details, ip, user_agent, created_at
+         FROM api_token_events WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`,
+      [userId, limit]
+    );
+    return rows;
+  }
+
+  /** The activity log must never make the action itself fail. */
+  private async recordEvent(
+    userId: string,
+    tokenId: string,
+    tokenName: string,
+    event: ApiTokenEventType,
+    details: Record<string, unknown> | null,
+    actor?: ApiTokenActor
+  ): Promise<void> {
+    try {
+      await getDbClient().query(
+        `INSERT INTO api_token_events (user_id, token_id, token_name, event, details, ip, user_agent)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          userId,
+          tokenId,
+          tokenName,
+          event,
+          details ? JSON.stringify(details) : null,
+          cleanIp(actor?.ip),
+          actor?.userAgent?.slice(0, 255) ?? null,
+        ]
+      );
+    } catch (error: any) {
+      logger.warn(`[ApiToken] Could not record ${event} for token ${tokenId}: ${error.message}`);
+    }
   }
 
   /** Resolves a bearer secret to its token. Expiry is checked on every call, cached or not. */
@@ -311,18 +391,36 @@ export class ApiTokenService {
     return owner;
   }
 
-  /** Records use, at most once a minute per token. Never fails the request. */
+  /**
+   * Records use — at most once a minute per token, but at once when the
+   * address changes, so the first use and every new address are logged.
+   * Never fails the request.
+   */
   touch(tokenId: string, ip: string | undefined, userAgent: string | undefined): void {
+    const ipChanged = this.lastSeenIp.get(tokenId) !== (ip ?? '');
     const last = this.lastUsedWrites.get(tokenId);
-    if (last && Date.now() - last < LAST_USED_WRITE_INTERVAL_MS) return;
+    if (!ipChanged && last && Date.now() - last < LAST_USED_WRITE_INTERVAL_MS) return;
     this.lastUsedWrites.set(tokenId, Date.now());
+    this.lastSeenIp.set(tokenId, ip ?? '');
 
+    const address = cleanIp(ip);
     getDbClient()
       .query(
-        `UPDATE api_tokens SET last_used_at = CURRENT_TIMESTAMP, last_used_ip = $2, last_used_user_agent = $3
-          WHERE id = $1`,
-        [tokenId, ip?.slice(0, 64) ?? null, userAgent?.slice(0, 255) ?? null]
+        `WITH prev AS (SELECT last_used_at, last_used_ip FROM api_tokens WHERE id = $1)
+         UPDATE api_tokens t
+            SET last_used_at = CURRENT_TIMESTAMP, last_used_ip = $2, last_used_user_agent = $3
+           FROM prev
+          WHERE t.id = $1
+         RETURNING t.user_id, t.name, prev.last_used_at AS previous_use, prev.last_used_ip AS previous_ip`,
+        [tokenId, address, userAgent?.slice(0, 255) ?? null]
       )
+      .then(async ({ rows }) => {
+        const row = rows[0];
+        if (!row) return;
+        const event: ApiTokenEventType | null =
+          row.previous_use === null ? 'first_use' : row.previous_ip !== address ? 'new_ip' : null;
+        if (event) await this.recordEvent(row.user_id, tokenId, row.name, event, null, { ip, userAgent });
+      })
       .catch((error) => logger.warn(`[ApiToken] Could not record use of token ${tokenId}: ${error.message}`));
   }
 

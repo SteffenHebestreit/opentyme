@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   createApiToken,
   getApiTokenCatalog,
+  getApiTokenEvents,
   getApiTokens,
   regenerateApiToken,
   revokeApiToken,
@@ -10,11 +11,25 @@ import {
 import { CreateApiTokenPayload, UpdateApiTokenPayload } from '../../api/types';
 import { queryKeys } from './queryKeys';
 
+/** A change shows in the list and in the activity log. */
+const invalidateTokens = (queryClient: ReturnType<typeof useQueryClient>) =>
+  Promise.all([
+    queryClient.invalidateQueries({ queryKey: queryKeys.apiTokens.list }),
+    queryClient.invalidateQueries({ queryKey: queryKeys.apiTokens.events }),
+  ]);
+
 /** The signed-in user's API tokens. */
 export const useApiTokens = () =>
   useQuery({
     queryKey: queryKeys.apiTokens.list,
     queryFn: getApiTokens,
+  });
+
+/** Recent activity of the user's tokens. */
+export const useApiTokenEvents = () =>
+  useQuery({
+    queryKey: queryKeys.apiTokens.events,
+    queryFn: () => getApiTokenEvents(20),
   });
 
 /** What a token can be given. Static per server version, so cached for the session. */
@@ -29,7 +44,7 @@ export const useCreateApiToken = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: CreateApiTokenPayload) => createApiToken(data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.apiTokens.list }),
+    onSuccess: () => invalidateTokens(queryClient),
   });
 };
 
@@ -37,7 +52,7 @@ export const useUpdateApiToken = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateApiTokenPayload }) => updateApiToken(id, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.apiTokens.list }),
+    onSuccess: () => invalidateTokens(queryClient),
   });
 };
 
@@ -45,7 +60,7 @@ export const useRegenerateApiToken = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, expiresAt }: { id: string; expiresAt: string | null }) => regenerateApiToken(id, expiresAt),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.apiTokens.list }),
+    onSuccess: () => invalidateTokens(queryClient),
   });
 };
 
@@ -53,6 +68,6 @@ export const useRevokeApiToken = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => revokeApiToken(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.apiTokens.list }),
+    onSuccess: () => invalidateTokens(queryClient),
   });
 };

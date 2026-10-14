@@ -62,6 +62,8 @@ const OUTAGE = '423e4567-e89b-42d3-a456-426614174996';
 const USERS = [OWNER, OTHER, DISABLED, OUTAGE];
 
 const app = express();
+// Lets tests stand in for different client addresses via X-Forwarded-For.
+app.set('trust proxy', true);
 app.use(express.json());
 setupRoutes(app);
 
@@ -436,6 +438,81 @@ describe('personal access tokens', () => {
       const res = await request(app).get('/api/ai/conversations').set('Authorization', bearer(secret));
       expect(res.status).toBe(403);
       expect(res.body.required).toBe('capability:assistant');
+    });
+  });
+
+  describe('activity log', () => {
+    const events = async () =>
+      (await request(app).get('/api/api-tokens/events?limit=200').set('Authorization', session())).body.events as Array<{
+        token_id: string;
+        token_name: string;
+        event: string;
+        ip: string | null;
+        details: any;
+      }>;
+    const settle = () => new Promise((r) => setTimeout(r, 150)); // use is recorded after the response
+
+    it('records what was done to a token, by whom, and keeps it after revoking', async () => {
+      const { token } = await createToken({ name: uniqueName('Audited'), permissions: { resources: { clients: 'read' } } });
+      await request(app)
+        .patch(`/api/api-tokens/${token.id}`)
+        .set('Authorization', session())
+        .set('X-Forwarded-For', '203.0.113.7')
+        .send({ permissions: { resources: { clients: 'write' } } });
+      await request(app).post(`/api/api-tokens/${token.id}/regenerate`).set('Authorization', session()).send({ expires_at: null });
+      await request(app).delete(`/api/api-tokens/${token.id}`).set('Authorization', session());
+
+      const trail = (await events()).filter((e) => e.token_id === token.id);
+      expect(trail.map((e) => e.event)).toEqual(['revoked', 'regenerated', 'updated', 'created']);
+      expect(trail.every((e) => e.token_name === token.name)).toBe(true);
+      const updated = trail.find((e) => e.event === 'updated')!;
+      expect(updated.ip).toBe('203.0.113.7');
+      expect(updated.details).toMatchObject({ changed: ['permissions'], permissions: { resources: { clients: 'write' } } });
+    });
+
+    it('logs the first use and each use from a new address — not repeat use', async () => {
+      const { token, secret } = await createToken({ name: uniqueName('Roaming'), permissions: { resources: { clients: 'read' } } });
+      const use = (ip: string) =>
+        request(app).get('/api/clients').set('Authorization', bearer(secret)).set('X-Forwarded-For', ip);
+
+      await use('198.51.100.1');
+      await settle();
+      await use('198.51.100.1');
+      await settle();
+      await use('198.51.100.2');
+      await settle();
+
+      const trail = (await events()).filter((e) => e.token_id === token.id).reverse();
+      expect(trail.map((e) => [e.event, e.ip])).toEqual([
+        ['created', expect.anything()],
+        ['first_use', '198.51.100.1'],
+        ['new_ip', '198.51.100.2'],
+      ]);
+    });
+
+    it("doesn't count the assistant's own tool calls as use", async () => {
+      const { token, secret } = await createToken({ name: uniqueName('Tool calls'), permissions: { resources: { clients: 'read' } } });
+      await request(app).get('/api/clients').set('Authorization', bearer(secret)).set('X-OpenTyme-Tool-Call', '1');
+      await settle();
+      const { rows } = await getDbClient().query('SELECT last_used_at FROM api_tokens WHERE id = $1', [token.id]);
+      expect(rows[0].last_used_at).toBeNull();
+
+      // The marker is only believed from loopback.
+      await request(app)
+        .get('/api/clients')
+        .set('Authorization', bearer(secret))
+        .set('X-OpenTyme-Tool-Call', '1')
+        .set('X-Forwarded-For', '198.51.100.9');
+      await settle();
+      const after = await getDbClient().query('SELECT last_used_ip FROM api_tokens WHERE id = $1', [token.id]);
+      expect(after.rows[0].last_used_ip).toBe('198.51.100.9');
+    });
+
+    it('is visible to the signed-in owner only', async () => {
+      const { secret } = await createToken({ name: uniqueName('Nosy'), permissions: { resources: { clients: 'read' } } });
+      expect((await request(app).get('/api/api-tokens/events').set('Authorization', bearer(secret))).status).toBe(403);
+      const other = await request(app).get('/api/api-tokens/events').set('Authorization', session(OTHER));
+      expect(other.body.events.every((e: any) => !e.token_name.startsWith('Nosy'))).toBe(true);
     });
   });
 });

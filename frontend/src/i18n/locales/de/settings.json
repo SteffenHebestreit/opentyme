@@ -520,6 +520,19 @@
         "description": "OpenTyme erzeugt ein neues Token für „{{name}}“. Das bisherige funktioniert sofort nicht mehr; Name und Berechtigungen bleiben gleich.",
         "confirm": "Neu erzeugen",
         "error": "Das Token konnte nicht neu erzeugt werden."
+      },
+      "activity": {
+        "title": "Letzte Aktivitäten",
+        "description": "Änderungen an Ihren Tokens, ihre erste Verwendung und Verwendung von neuen Adressen.",
+        "fromIp": "von {{ip}}",
+        "events": {
+          "created": "„{{name}}“ wurde erstellt",
+          "updated": "„{{name}}“ wurde geändert",
+          "regenerated": "„{{name}}“ wurde neu erzeugt",
+          "revoked": "„{{name}}“ wurde widerrufen",
+          "first_use": "„{{name}}“ wurde zum ersten Mal verwendet",
+          "new_ip": "„{{name}}“ wurde von einer neuen Adresse verwendet"
+        }
       }
     }
   },

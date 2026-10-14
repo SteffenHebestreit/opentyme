@@ -37,6 +37,7 @@ jest.mock('../../src/hooks/api/useApiTokens', () => ({
   useCreateApiToken: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useUpdateApiToken: () => ({ mutateAsync: jest.fn(), isPending: false }),
   useRegenerateApiToken: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useApiTokenEvents: () => ({ data: [] }),
 }));
 
 const L = 'admin.apiTokens';

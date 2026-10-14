@@ -502,6 +502,20 @@ export interface CreateApiTokenPayload {
 /** Expiry can't be changed here — regenerate the token for that. */
 export type UpdateApiTokenPayload = Partial<Omit<CreateApiTokenPayload, 'expires_at'>>;
 
+export type ApiTokenEventType = 'created' | 'updated' | 'regenerated' | 'revoked' | 'first_use' | 'new_ip';
+
+/** One entry of the tokens' activity log; outlives a revoked token. */
+export interface ApiTokenEvent {
+  id: string;
+  token_id: string | null;
+  token_name: string;
+  event: ApiTokenEventType;
+  details: Record<string, unknown> | null;
+  ip: string | null;
+  user_agent: string | null;
+  created_at: string;
+}
+
 // Client with billing address
 export interface ClientWithBilling extends Client {
   use_separate_billing_address: boolean;

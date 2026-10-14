@@ -53,6 +53,30 @@ router.get('/catalog', controller.catalog.bind(controller));
 
 /**
  * @openapi
+ * /api/api-tokens/events:
+ *   get:
+ *     tags:
+ *       - API Tokens
+ *     summary: Recent activity of your API tokens
+ *     description: Created, changed, regenerated and revoked tokens, first use and use from a new address — newest first, revoked tokens included.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 200
+ *           default: 50
+ *     responses:
+ *       200:
+ *         description: The events
+ */
+router.get('/events', controller.events.bind(controller));
+
+/**
+ * @openapi
  * /api/api-tokens:
  *   get:
  *     tags:

@@ -2455,6 +2455,24 @@ CREATE TABLE IF NOT EXISTS public.password_reset_tokens (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uq_password_reset_tokens_hash ON public.password_reset_tokens(token_hash);
 
+-- Migration: API token activity log and expiry reminders (idempotent)
+-- No FK to api_tokens: the trail must outlive a revoked token, so it keeps
+-- the token's name. event: created | updated | regenerated | revoked | first_use | new_ip.
+CREATE TABLE IF NOT EXISTS public.api_token_events (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL,
+    token_id uuid,
+    token_name character varying(100) NOT NULL,
+    event character varying(20) NOT NULL,
+    details jsonb,
+    ip character varying(64),
+    user_agent character varying(255),
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_api_token_events_user ON public.api_token_events(user_id, created_at DESC);
+-- When the owner was told the token expires soon (reset when regenerated).
+ALTER TABLE public.api_tokens ADD COLUMN IF NOT EXISTS expiry_reminded_at timestamp with time zone;
+
 --
 -- PostgreSQL database dump complete
 --

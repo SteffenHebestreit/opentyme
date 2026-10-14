@@ -488,6 +488,24 @@ async function ensureSchemaUpgrades(): Promise<void> {
       CREATE UNIQUE INDEX IF NOT EXISTS uq_password_reset_tokens_hash ON password_reset_tokens(token_hash);
     `);
 
+    // API token activity log — no FK, so the trail outlives a revoked token.
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS api_token_events (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL,
+        token_id UUID,
+        token_name VARCHAR(100) NOT NULL,
+        event VARCHAR(20) NOT NULL,
+        details JSONB,
+        ip VARCHAR(64),
+        user_agent VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_api_token_events_user ON api_token_events(user_id, created_at DESC);
+      ALTER TABLE api_tokens ADD COLUMN IF NOT EXISTS expiry_reminded_at TIMESTAMP WITH TIME ZONE;
+    `);
+
     await enforceLinearDocumentVersions();
 
     logger.info('[Startup] ✓ Schema upgrades applied');

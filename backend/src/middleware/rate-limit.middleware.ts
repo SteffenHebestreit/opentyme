@@ -86,3 +86,26 @@ export const globalRateLimiter: RequestHandler = globalEnabled
       },
     })
   : (_req, _res, next) => next();
+
+/**
+ * Per-token limit for requests made with a personal access token — keyed by
+ * the token, so it works behind the proxy without TRUST_PROXY and one busy
+ * agent can't use up another's budget. Counts the assistant's and the MCP
+ * server's tool calls too, so a token can't multiply its budget through them.
+ * Defaults: 600 requests per minute; tune via API_TOKEN_RATE_LIMIT_WINDOW_MS /
+ * API_TOKEN_RATE_LIMIT_MAX. In-memory store (one backend replica).
+ */
+export const apiTokenRateLimiter: RequestHandler = rateLimit({
+  windowMs: envInt('API_TOKEN_RATE_LIMIT_WINDOW_MS', 60 * 1000),
+  max: envInt('API_TOKEN_RATE_LIMIT_MAX', 600),
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => (req.authContext?.method === 'pat' ? `pat:${req.authContext.tokenId}` : 'none'),
+  skip: (req) => req.authContext?.method !== 'pat',
+  message: { error: 'Too Many Requests', message: 'This API token made too many requests. Slow down and retry shortly.' },
+  handler: (req, res, _next, options) => {
+    const tokenId = req.authContext?.method === 'pat' ? req.authContext.tokenId : 'unknown';
+    logger.warn(`[RateLimit] API token ${tokenId} exceeded its limit on ${req.method} ${req.originalUrl.split('?')[0]}`);
+    res.status(options.statusCode).json(options.message);
+  },
+});

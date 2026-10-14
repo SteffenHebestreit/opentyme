@@ -15,8 +15,10 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { apiTokenService } from '../../services/auth/api-token.service';
+import { isLoopback, TOOL_CALL_HEADER } from '../../services/auth/internal-call';
 import { checkPermission, requirementFor } from '../../services/auth/api-token-permissions';
 import { logger } from '../../utils/logger';
+import { apiTokenRateLimiter } from '../rate-limit.middleware';
 
 function challenge(res: Response, status: number, error: string, description: string): void {
   res.set('WWW-Authenticate', `Bearer realm="OpenTyme", error="${error}", error_description="${description}"`);
@@ -98,9 +100,12 @@ export async function authenticateApiToken(
     approvalMode: token.approval_mode,
   };
 
-  apiTokenService.touch(token.id, req.ip, req.get('user-agent'));
+  // The assistant's and the MCP server's own tool calls come back over
+  // loopback with the same token — that is not new use of the token.
+  const ownToolCall = req.get(TOOL_CALL_HEADER) === '1' && isLoopback(req.ip);
+  if (!ownToolCall) apiTokenService.touch(token.id, req.ip, req.get('user-agent'));
   logger.debug(`[ApiToken] Token ${token.id} authorised ${req.method} ${path}`);
-  next();
+  apiTokenRateLimiter(req, res, next);
 }
 
 /**

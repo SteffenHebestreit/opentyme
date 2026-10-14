@@ -520,6 +520,19 @@
         "description": "OpenTyme issues a new token for “{{name}}”. The current one stops working immediately; name and permissions stay the same.",
         "confirm": "Regenerate",
         "error": "Could not regenerate the token."
+      },
+      "activity": {
+        "title": "Recent activity",
+        "description": "Changes to your tokens, their first use, and use from new addresses.",
+        "fromIp": "from {{ip}}",
+        "events": {
+          "created": "“{{name}}” was created",
+          "updated": "“{{name}}” was changed",
+          "regenerated": "“{{name}}” was regenerated",
+          "revoked": "“{{name}}” was revoked",
+          "first_use": "“{{name}}” was used for the first time",
+          "new_ip": "“{{name}}” was used from a new address"
+        }
       }
     }
   },

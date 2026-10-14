@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { ApiTokenError, apiTokenService } from '../../services/auth/api-token.service';
+import { ApiTokenActor, ApiTokenError, apiTokenService } from '../../services/auth/api-token.service';
 import { permissionCatalog } from '../../services/auth/api-token-permissions';
 import {
   apiTokenIdSchema,
@@ -16,6 +16,10 @@ import { logger } from '../../utils/logger';
  *
  * @class ApiTokenController
  */
+function actorOf(req: Request): ApiTokenActor {
+  return { ip: req.ip, userAgent: req.get('user-agent') };
+}
+
 export class ApiTokenController {
   /**
    * Lists the user's tokens. Secrets are never returned.
@@ -65,7 +69,7 @@ export class ApiTokenController {
       return;
     }
     try {
-      const { token, secret } = await apiTokenService.create(req.user!.id, value);
+      const { token, secret } = await apiTokenService.create(req.user!.id, value, actorOf(req));
       logger.info(`[ApiToken] User ${req.user!.id} created token ${token.id}`);
       res.status(201).json({ message: 'Token created', token, secret });
     } catch (err: any) {
@@ -82,7 +86,7 @@ export class ApiTokenController {
       return;
     }
     try {
-      const token = await apiTokenService.update(req.user!.id, id, value);
+      const token = await apiTokenService.update(req.user!.id, id, value, actorOf(req));
       if (!token) {
         res.status(404).json({ message: 'Token not found' });
         return;
@@ -107,7 +111,7 @@ export class ApiTokenController {
       return;
     }
     try {
-      const result = await apiTokenService.regenerate(req.user!.id, id, value.expires_at);
+      const result = await apiTokenService.regenerate(req.user!.id, id, value.expires_at, actorOf(req));
       if (!result) {
         res.status(404).json({ message: 'Token not found' });
         return;
@@ -124,7 +128,7 @@ export class ApiTokenController {
     const id = this.validId(req, res);
     if (!id) return;
     try {
-      const deleted = await apiTokenService.remove(req.user!.id, id);
+      const deleted = await apiTokenService.remove(req.user!.id, id, actorOf(req));
       if (!deleted) {
         res.status(404).json({ message: 'Token not found' });
         return;
@@ -133,6 +137,20 @@ export class ApiTokenController {
       res.json({ message: 'Token revoked' });
     } catch (err: any) {
       logger.error('Revoke API token error:', err);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+
+  /**
+   * Recent activity of the user's tokens (created, changed, regenerated,
+   * revoked, first use, use from a new address) — revoked tokens included.
+   */
+  async events(req: Request, res: Response): Promise<void> {
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? '50'), 10) || 50, 1), 200);
+    try {
+      res.json({ events: await apiTokenService.listEvents(req.user!.id, limit) });
+    } catch (err: any) {
+      logger.error('List API token events error:', err);
       res.status(500).json({ message: 'Internal server error' });
     }
   }

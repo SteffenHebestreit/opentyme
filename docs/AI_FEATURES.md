@@ -39,18 +39,22 @@ The OpenTYME project has a multi-layered AI integration architecture designed fo
 
 ## Architecture
 
-### MCP Server
+### MCP Server (document converter)
 
-The MCP (Model Context Protocol) server handles PDF-to-text extraction.
+The `mcp-server` container converts receipts and other PDFs to text. It is
+internal only — no published port and no Traefik route — because it has no
+authentication of its own; the backend reaches it at `http://mcp-server:8000`.
+
+Not to be confused with OpenTyme's own MCP server for MCP clients (Claude
+Code, Cursor, …) at `/api/mcp`, which uses API tokens — see
+[API_TOKENS.md](API_TOKENS.md#mcp).
 
 **Configuration** (docker-compose.yml):
 ```yaml
 mcp-server:
   image: fastapi_mcp_template
   container: opentyme-mcp-server
-  port: 8001 (external) → 8000 (internal)
-  url: http://mcp-server:8000
-  traefik: mcp.localhost
+  url: http://mcp-server:8000   # internal only
 ```
 
 **Environment Variables**:

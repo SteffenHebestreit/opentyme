@@ -3,6 +3,7 @@
  * using the user's original Bearer token for proper authorization enforcement.
  */
 
+import { TOOL_CALL_HEADER } from '../auth/internal-call';
 import axios from 'axios';
 import { logger } from '../../utils/logger';
 import { checkPathParam, getOperationByName } from './openapi-tool-builder.service';
@@ -103,6 +104,8 @@ export async function executeToolCall(
       headers: {
         Authorization: bearerToken,
         'Content-Type': 'application/json',
+        // Marks the call as the assistant's own (not new use of an API token).
+        [TOOL_CALL_HEADER]: '1',
       },
       timeout: 30000,
       maxContentLength: MAX_CONTENT_LENGTH,

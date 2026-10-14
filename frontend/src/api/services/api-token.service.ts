@@ -2,6 +2,7 @@ import apiClient from './client';
 import {
   ApiToken,
   ApiTokenCatalog,
+  ApiTokenEvent,
   ApiTokenWithSecret,
   CreateApiTokenPayload,
   UpdateApiTokenPayload,
@@ -41,4 +42,10 @@ export const regenerateApiToken = async (id: string, expiresAt: string | null): 
 
 export const revokeApiToken = async (id: string): Promise<void> => {
   await apiClient.delete(`/api-tokens/${id}`);
+};
+
+/** Recent activity of the user's tokens, newest first. */
+export const getApiTokenEvents = async (limit = 20): Promise<ApiTokenEvent[]> => {
+  const response = await apiClient.get('/api-tokens/events', { params: { limit } });
+  return response.data.events;
 };
