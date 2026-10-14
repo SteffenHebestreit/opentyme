@@ -59,4 +59,8 @@ export const queryKeys = {
   depreciation: {
     schedule: (expenseId: string) => ['depreciation', 'schedule', expenseId] as const,
   },
+  apiTokens: {
+    list: ['apiTokens', 'list'] as const,
+    catalog: ['apiTokens', 'catalog'] as const,
+  },
 };

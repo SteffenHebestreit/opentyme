@@ -436,6 +436,72 @@ export interface InvoiceTextTemplatePayload {
   sort_order?: number;
 }
 
+// Personal access tokens (API tokens)
+
+/** Cumulative: delete includes write includes read. */
+export type ApiTokenLevel = 'none' | 'read' | 'write' | 'delete';
+export type ApiTokenResource =
+  | 'clients'
+  | 'projects'
+  | 'time_entries'
+  | 'expenses'
+  | 'invoices'
+  | 'payments'
+  | 'tax'
+  | 'templates'
+  | 'reports'
+  | 'addons';
+export type ApiTokenCapability = 'assistant' | 'mcp' | 'email_send';
+/** Who approves the assistant's changes in runs started with the token. */
+export type ApiTokenApprovalMode = 'self' | 'in_app';
+
+export interface ApiTokenPermissions {
+  resources: Partial<Record<ApiTokenResource, ApiTokenLevel>>;
+  capabilities: ApiTokenCapability[];
+}
+
+export interface ApiToken {
+  id: string;
+  name: string;
+  description: string | null;
+  /** First characters of the token, e.g. "oty_pat_AbCd" */
+  token_prefix: string;
+  permissions: ApiTokenPermissions;
+  approval_mode: ApiTokenApprovalMode;
+  /** null = never expires */
+  expires_at: string | null;
+  last_used_at: string | null;
+  last_used_ip: string | null;
+  last_used_user_agent: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A token together with its secret — only ever returned by create and regenerate. */
+export interface ApiTokenWithSecret {
+  token: ApiToken;
+  secret: string;
+}
+
+export interface ApiTokenCatalog {
+  levels: ApiTokenLevel[];
+  resources: Array<{ key: ApiTokenResource; levels: ApiTokenLevel[] }>;
+  capabilities: Array<{ key: ApiTokenCapability }>;
+  approvalModes: ApiTokenApprovalMode[];
+}
+
+export interface CreateApiTokenPayload {
+  name: string;
+  description?: string | null;
+  permissions: ApiTokenPermissions;
+  approval_mode: ApiTokenApprovalMode;
+  /** ISO date-time in the future, or null for no expiry */
+  expires_at: string | null;
+}
+
+/** Expiry can't be changed here — regenerate the token for that. */
+export type UpdateApiTokenPayload = Partial<Omit<CreateApiTokenPayload, 'expires_at'>>;
+
 // Client with billing address
 export interface ClientWithBilling extends Client {
   use_separate_billing_address: boolean;

@@ -5,6 +5,7 @@
  * - Tax rate management
  * - Invoice text template management
  * - Plugin management
+ * - API tokens for scripts, AI agents and MCP clients
  * - Addon-injected settings tabs (via slot)
  *
  * The active tab lives in the URL (`/config/:tab`). Wide screens get a sticky
@@ -19,6 +20,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   Blocks,
   FileText,
+  KeyRound,
   LayoutTemplate,
   Palette,
   Percent,
@@ -34,6 +36,7 @@ import GeneralSettingsPage from './GeneralSettingsPage';
 import PluginsPage from './PluginsPage';
 import EmailSettingsPage from './EmailSettingsPage';
 import ThemeSettingsPage from './ThemeSettingsPage';
+import ApiTokensPage from './ApiTokensPage';
 import EmailTemplatesPage from '../email-templates/EmailTemplatesPage';
 import { Slot } from '@/plugins/slots';
 import { frontendPluginRegistry } from '@/plugins/plugin-registry';
@@ -41,7 +44,15 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { Tabs } from '@/components/common/Tabs';
 import { cn } from '@/lib/cn';
 
-type CoreTab = 'general' | 'tax-rates' | 'invoice-templates' | 'email-templates' | 'email' | 'theme' | 'plugins';
+type CoreTab =
+  | 'general'
+  | 'tax-rates'
+  | 'invoice-templates'
+  | 'email-templates'
+  | 'email'
+  | 'theme'
+  | 'api-tokens'
+  | 'plugins';
 
 interface NavTab {
   id: string;
@@ -82,6 +93,7 @@ export default function AdminPage() {
     'email-templates': { id: 'email-templates', label: t('admin.tabs.emailTemplates'), icon: LayoutTemplate },
     email: { id: 'email', label: t('admin.tabs.email'), icon: Send },
     theme: { id: 'theme', label: t('admin.tabs.theme'), icon: Palette },
+    'api-tokens': { id: 'api-tokens', label: t('admin.tabs.apiTokens'), icon: KeyRound },
     plugins: { id: 'plugins', label: t('admin.tabs.plugins'), icon: Puzzle },
   };
 
@@ -114,6 +126,11 @@ export default function AdminPage() {
       id: 'appearance',
       label: t('admin.navGroups.appearance'),
       tabs: [coreTabs.theme],
+    },
+    {
+      id: 'integrations',
+      label: t('admin.navGroups.integrations'),
+      tabs: [coreTabs['api-tokens']],
     },
     {
       id: 'extensions',
@@ -202,6 +219,7 @@ export default function AdminPage() {
           {activeTab === 'email-templates' && <EmailTemplatesPage />}
           {activeTab === 'email' && <EmailSettingsPage />}
           {activeTab === 'theme' && <ThemeSettingsPage />}
+          {activeTab === 'api-tokens' && <ApiTokensPage />}
           {activeTab === 'plugins' && <PluginsPage />}
 
           {/* Addon-injected settings tabs (settings-tabs slot) */}

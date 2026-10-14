@@ -24,6 +24,8 @@
     "refresh": "Refresh",
     "reset": "Reset",
     "clear": "Clear",
+    "copy": "Copy",
+    "copied": "Copied",
     "apply": "Apply",
     "yes": "Yes",
     "no": "No",
@@ -131,7 +133,8 @@
     "unsavedChanges": "You have unsaved changes. Are you sure you want to leave?",
     "noData": "No data available",
     "tryAgain": "Please try again",
-    "somethingWentWrong": "Something went wrong"
+    "somethingWentWrong": "Something went wrong",
+    "copyFailed": "Could not copy to the clipboard"
   },
   "time": {
     "second": "second",

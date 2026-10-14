@@ -256,6 +256,7 @@
       "emailTemplates": "E-Mail-Vorlagen",
       "email": "E-Mail",
       "theme": "Design",
+      "apiTokens": "API-Tokens",
       "plugins": "Addons"
     },
     "email": {
@@ -314,6 +315,7 @@
       "business": "Geschäft",
       "communication": "Kommunikation",
       "appearance": "Darstellung",
+      "integrations": "Integrationen",
       "extensions": "Erweiterungen"
     },
     "plugins": {
@@ -340,6 +342,177 @@
       "settingsSaveError": "Einstellungen konnten nicht gespeichert werden.",
       "toggleError": "Der Status des Addons konnte nicht geändert werden.",
       "loadError": "Addons konnten nicht geladen werden"
+    },
+    "apiTokens": {
+      "title": "API-Tokens",
+      "subtitle": "Lassen Sie Skripte, KI-Agenten und MCP-Clients in Ihrem Namen mit OpenTyme arbeiten. Jedes Token darf nur, was Sie erlauben.",
+      "newButton": "Neues Token",
+      "usageHint": "Senden Sie das Token bei jeder Anfrage im Authorization-Header:",
+      "loadError": "Ihre API-Tokens konnten nicht geladen werden.",
+      "empty": {
+        "title": "Noch keine API-Tokens",
+        "description": "Erstellen Sie ein Token, um ein Skript, einen KI-Agenten oder einen MCP-Client mit Ihrem Konto zu verbinden."
+      },
+      "columns": {
+        "name": "Name",
+        "access": "Zugriff",
+        "lastUsed": "Zuletzt verwendet",
+        "expires": "Läuft ab",
+        "actions": "Aktionen"
+      },
+      "neverUsed": "Nie verwendet",
+      "noAccess": "Kein Zugriff",
+      "moreAccess_one": "+{{count}} weitere",
+      "moreAccess_other": "+{{count}} weitere",
+      "expiry": {
+        "never": "Kein Ablaufdatum",
+        "expired": "Abgelaufen",
+        "inDays_one": "Läuft innerhalb eines Tages ab",
+        "inDays_other": "Läuft in {{count}} Tagen ab"
+      },
+      "actions": {
+        "edit": "Bearbeiten",
+        "regenerate": "Neu erzeugen",
+        "revoke": "Widerrufen"
+      },
+      "revoke": {
+        "title": "Token widerrufen?",
+        "message": "Alles, was „{{name}}“ verwendet, funktioniert sofort nicht mehr. Das lässt sich nicht rückgängig machen.",
+        "confirm": "Token widerrufen",
+        "success": "Token widerrufen",
+        "error": "Das Token konnte nicht widerrufen werden."
+      },
+      "levels": {
+        "none": "Keine",
+        "read": "Lesen",
+        "write": "Schreiben",
+        "delete": "Löschen"
+      },
+      "levelsHint": "Jede Stufe schließt die vorherigen ein. „Löschen“ umfasst auch das Stornieren von Rechnungen.",
+      "resources": {
+        "clients": {
+          "label": "Kunden",
+          "description": "Kunden und ihre Dokumente"
+        },
+        "projects": {
+          "label": "Projekte",
+          "description": "Projekte und Stundensätze"
+        },
+        "time_entries": {
+          "label": "Zeiteinträge",
+          "description": "Zeiteinträge und der Timer"
+        },
+        "expenses": {
+          "label": "Ausgaben",
+          "description": "Ausgaben und Belege"
+        },
+        "invoices": {
+          "label": "Rechnungen",
+          "description": "Rechnungen und wiederkehrende Rechnungen"
+        },
+        "payments": {
+          "label": "Zahlungen",
+          "description": "Zahlungseingänge"
+        },
+        "tax": {
+          "label": "Steuern",
+          "description": "Steuersätze, Steuervorauszahlungen, Abschreibungen und das Steuerpaket"
+        },
+        "templates": {
+          "label": "Vorlagen",
+          "description": "Rechnungstext- und E-Mail-Vorlagen"
+        },
+        "reports": {
+          "label": "Berichte",
+          "description": "Auswertungen, Berichte und Zusammenfassungen – nur lesend"
+        },
+        "addons": {
+          "label": "Addons",
+          "description": "Daten und Aktionen installierter Addons"
+        }
+      },
+      "capabilities": {
+        "assistant": {
+          "label": "OpenTyme-Assistent",
+          "description": "Mit dem Assistenten sprechen. Er kann nur den oben erlaubten Datenzugriff nutzen."
+        },
+        "mcp": {
+          "label": "MCP-Server",
+          "description": "MCP-Clients wie Claude Code oder Cursor verbinden. Sie können nur den oben erlaubten Datenzugriff nutzen."
+        },
+        "email_send": {
+          "label": "E-Mails senden",
+          "description": "E-Mails von Ihrem Konto senden, auch mit Rechnungen und Berichten als PDF-Anhang."
+        }
+      },
+      "approval": {
+        "title": "Wer bestätigt die Änderungen des Assistenten?",
+        "self": {
+          "label": "Die verbundene Anwendung",
+          "description": "Die Anwendung mit diesem Token bestätigt jede Änderung selbst – für Agenten, die unbeaufsichtigt laufen."
+        },
+        "in_app": {
+          "label": "Ich, in OpenTyme",
+          "description": "Änderungen warten, bis Sie sie im OpenTyme-Chat bestätigen."
+        }
+      },
+      "form": {
+        "createTitle": "Neues API-Token",
+        "editTitle": "API-Token bearbeiten",
+        "nameLabel": "Name",
+        "namePlaceholder": "z. B. Claude Code auf meinem Laptop",
+        "nameRequired": "Geben Sie dem Token einen Namen.",
+        "nameTaken": "Sie haben bereits ein Token mit diesem Namen.",
+        "descriptionLabel": "Beschreibung (optional)",
+        "descriptionPlaceholder": "Wofür wird das Token verwendet?",
+        "expiryLabel": "Gültigkeit",
+        "expiryOptions": {
+          "7": "7 Tage",
+          "30": "30 Tage",
+          "90": "90 Tage",
+          "365": "1 Jahr",
+          "custom": "Eigenes Datum",
+          "never": "Kein Ablaufdatum"
+        },
+        "customDateLabel": "Läuft ab am",
+        "customDateRequired": "Wählen Sie ein Datum in der Zukunft.",
+        "neverWarning": "Ein Token ohne Ablaufdatum bleibt gültig, bis Sie es widerrufen. Legen Sie wenn möglich ein Datum fest.",
+        "expiresOn": "Läuft ab am {{date}}",
+        "expiryFixed": "Um das Ablaufdatum zu ändern, erzeugen Sie das Token neu.",
+        "resourcesTitle": "Datenzugriff",
+        "capabilitiesTitle": "Funktionen",
+        "presetsLabel": "Vorlage:",
+        "presets": {
+          "readOnly": "Nur lesen",
+          "timeTracking": "Zeiterfassung",
+          "bookkeeping": "Buchhaltung",
+          "full": "Voller Zugriff",
+          "clear": "Zurücksetzen"
+        },
+        "nothingGranted": "Geben Sie dem Token mindestens eine Berechtigung.",
+        "catalogError": "Die verfügbaren Berechtigungen konnten nicht geladen werden.",
+        "create": "Token erstellen",
+        "save": "Änderungen speichern",
+        "saving": "Wird gespeichert …",
+        "createError": "Das Token konnte nicht erstellt werden.",
+        "saveError": "Das Token konnte nicht gespeichert werden.",
+        "saveSuccess": "Token aktualisiert"
+      },
+      "secret": {
+        "title": "Neues Token kopieren",
+        "warning": "Kopieren Sie das Token jetzt – es wird nicht noch einmal angezeigt. Falls Sie es verlieren, erzeugen Sie es neu.",
+        "tokenLabel": "Token",
+        "tryIt": "Ausprobieren",
+        "tryItHint": "Dieser Befehl zeigt, was das Token darf:",
+        "copyCommand": "Befehl kopieren",
+        "done": "Ich habe es kopiert"
+      },
+      "regenerate": {
+        "title": "Token neu erzeugen",
+        "description": "OpenTyme erzeugt ein neues Token für „{{name}}“. Das bisherige funktioniert sofort nicht mehr; Name und Berechtigungen bleiben gleich.",
+        "confirm": "Neu erzeugen",
+        "error": "Das Token konnte nicht neu erzeugt werden."
+      }
     }
   },
   "messages": {

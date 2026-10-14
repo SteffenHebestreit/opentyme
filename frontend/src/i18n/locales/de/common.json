@@ -24,6 +24,8 @@
     "refresh": "Aktualisieren",
     "reset": "Zurücksetzen",
     "clear": "Löschen",
+    "copy": "Kopieren",
+    "copied": "Kopiert",
     "apply": "Anwenden",
     "yes": "Ja",
     "no": "Nein",
@@ -131,7 +133,8 @@
     "unsavedChanges": "Sie haben ungespeicherte Änderungen. Möchten Sie wirklich fortfahren?",
     "noData": "Keine Daten verfügbar",
     "tryAgain": "Bitte versuchen Sie es erneut",
-    "somethingWentWrong": "Etwas ist schief gelaufen"
+    "somethingWentWrong": "Etwas ist schief gelaufen",
+    "copyFailed": "Kopieren in die Zwischenablage fehlgeschlagen"
   },
   "time": {
     "second": "Sekunde",
