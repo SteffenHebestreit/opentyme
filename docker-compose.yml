@@ -456,17 +456,20 @@ services:
       - LOG_LEVEL=INFO
       - ENABLED_TOOLS=file_converter
       - MAX_FILE_SIZE=10485760
-      # Effective settings (FTMD_ prefix). Without this the server defaults to
-      # debug=True, i.e. uvicorn auto-reload in production.
+      # Effective settings (FTMD_ prefix). Debug is off by default since the
+      # template's 958dc13; kept explicit.
       - FTMD_DEBUG=false
+      # Load only the converter: OpenTyme uses no other tool, and url_fetcher
+      # fetches arbitrary URLs from inside the network.
+      - FTMD_ENABLED_TOOLS=file_converter
       # LLM Integration (optional - for enhanced OCR)
       - FTMD_MARKITDOWN_ENABLE_LLM=${MCP_ENABLE_LLM:-false}
       - FTMD_OPENAI_API_KEY=${MCP_OPENAI_API_KEY:-}
       - FTMD_OPENAI_BASE_URL=${MCP_OPENAI_BASE_URL:-}
       - FTMD_OPENAI_MODEL=${MCP_OPENAI_MODEL:-gpt-4o-mini}
     # Internal only — no published port and no Traefik route. The server has no
-    # authentication and ships a url_fetcher tool (server-side request forgery),
-    # and the backend reaches it over the Docker network as mcp-server:8000.
+    # authentication unless FTMD_API_KEY is set (OpenTyme doesn't send one), and
+    # the backend reaches it over the Docker network as mcp-server:8000.
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
       interval: 30s
