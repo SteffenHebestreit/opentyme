@@ -308,6 +308,29 @@ export class ApiTokenService {
     return true;
   }
 
+  /** Every user's tokens, newest first — for administrators. Secrets are never included. */
+  async listAll(): Promise<Array<ApiToken & { user_id: string }>> {
+    const { rows } = await getDbClient().query(
+      `SELECT user_id, ${PUBLIC_COLUMNS} FROM api_tokens ORDER BY created_at DESC LIMIT 1000`
+    );
+    return rows.map((row) => ({ ...toPublic(row), user_id: row.user_id }));
+  }
+
+  /**
+   * Revokes any user's token (administrators). The owner's activity log
+   * records who did it.
+   */
+  async revokeAsAdmin(id: string, admin: string, actor?: ApiTokenActor): Promise<{ userId: string; name: string } | null> {
+    const { rows } = await getDbClient().query(
+      'DELETE FROM api_tokens WHERE id = $1 RETURNING user_id, token_hash, name',
+      [id]
+    );
+    if (!rows[0]) return null;
+    this.evict(rows[0].token_hash);
+    await this.recordEvent(rows[0].user_id, id, rows[0].name, 'revoked', { by_admin: admin }, actor);
+    return { userId: rows[0].user_id, name: rows[0].name };
+  }
+
   /** The user's token activity, newest first — including tokens revoked since. */
   async listEvents(userId: string, limit = 50): Promise<ApiTokenEvent[]> {
     const { rows } = await getDbClient().query(

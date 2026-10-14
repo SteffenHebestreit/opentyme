@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
+  adminRevokeApiToken,
   createApiToken,
+  getAllApiTokens,
   getApiTokenCatalog,
   getApiTokenEvents,
   getApiTokens,
@@ -69,5 +71,22 @@ export const useRevokeApiToken = () => {
   return useMutation({
     mutationFn: (id: string) => revokeApiToken(id),
     onSuccess: () => invalidateTokens(queryClient),
+  });
+};
+
+/** Administrators: every user's tokens. Loaded only when `enabled` (the tab is open). */
+export const useAllApiTokens = (enabled = true) =>
+  useQuery({
+    queryKey: queryKeys.apiTokens.all,
+    queryFn: getAllApiTokens,
+    enabled,
+  });
+
+export const useAdminRevokeApiToken = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminRevokeApiToken(id),
+    onSuccess: () =>
+      Promise.all([invalidateTokens(queryClient), queryClient.invalidateQueries({ queryKey: queryKeys.apiTokens.all })]),
   });
 };

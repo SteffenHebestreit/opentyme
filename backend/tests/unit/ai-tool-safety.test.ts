@@ -165,6 +165,7 @@ describe('admin-only tools follow the routes’ real role guards', () => {
     };
     walk(root);
     expect(guarded.sort()).toEqual([
+      'system/api-token-admin.routes.ts',
       'system/backup.routes.ts',
       'system/initialization.routes.ts',
     ]);

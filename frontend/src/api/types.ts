@@ -502,6 +502,12 @@ export interface CreateApiTokenPayload {
 /** Expiry can't be changed here — regenerate the token for that. */
 export type UpdateApiTokenPayload = Partial<Omit<CreateApiTokenPayload, 'expires_at'>>;
 
+/** A token as administrators see it: with its owner. */
+export interface AdminApiToken extends ApiToken {
+  user_id: string;
+  owner: { username: string | null; email: string | null };
+}
+
 export type ApiTokenEventType = 'created' | 'updated' | 'regenerated' | 'revoked' | 'first_use' | 'new_ip';
 
 /** One entry of the tokens' activity log; outlives a revoked token. */

@@ -27,6 +27,7 @@ import {
   Pencil,
   Plus,
   ShieldCheck,
+  KeyRound,
   Trash2,
   XCircle,
 } from 'lucide-react';
@@ -46,6 +47,7 @@ import {
   TabPanel,
 } from '../components/common';
 import type { BadgeVariant } from '../components/common/Badge';
+import { AllApiTokensTab } from '../components/admin/api-tokens/AllApiTokensTab';
 import { toast } from '../lib/toast';
 import { confirmDialog } from '../lib/confirm';
 
@@ -119,7 +121,7 @@ function IncludeOption({
 
 export default function SystemAdmin() {
   const { t } = useTranslation('system');
-  const [activeTab, setActiveTab] = useState<'backups' | 'schedules'>('backups');
+  const [activeTab, setActiveTab] = useState<'backups' | 'schedules' | 'apiTokens'>('backups');
   const [backups, setBackups] = useState<Backup[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -470,10 +472,11 @@ export default function SystemAdmin() {
       <Tabs
         tabs={[
           { id: 'backups', label: t('tabs.backups'), icon: Database, badge: backups.length },
-          { id: 'schedules', label: t('tabs.schedules'), icon: CalendarClock, badge: schedules.length }
+          { id: 'schedules', label: t('tabs.schedules'), icon: CalendarClock, badge: schedules.length },
+          { id: 'apiTokens', label: t('tabs.apiTokens'), icon: KeyRound },
         ]}
         activeTab={activeTab}
-        onChange={(tabId) => setActiveTab(tabId as 'backups' | 'schedules')}
+        onChange={(tabId) => setActiveTab(tabId as 'backups' | 'schedules' | 'apiTokens')}
       />
 
       {/* Backups Tab */}
@@ -648,6 +651,11 @@ export default function SystemAdmin() {
             </div>
           )}
         </div>
+      </TabPanel>
+
+      {/* API tokens of all users */}
+      <TabPanel tabId="apiTokens" activeTab={activeTab}>
+        <AllApiTokensTab active={activeTab === 'apiTokens'} />
       </TabPanel>
 
       {/* Create Backup Modal */}

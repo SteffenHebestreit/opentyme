@@ -3,7 +3,8 @@
   "subtitle": "Manage system backups, recovery, and automatic backup schedules",
   "tabs": {
     "backups": "Backups",
-    "schedules": "Schedules"
+    "schedules": "Schedules",
+    "apiTokens": "API tokens"
   },
   "backups": {
     "title": "Backup History",
@@ -121,5 +122,27 @@
     "title": "Danger zone",
     "restore": "Restoring a backup overwrites all current data with the state of that backup.",
     "delete": "Deleting a backup removes it permanently — it cannot be restored afterwards."
+  },
+  "apiTokens": {
+    "title": "API tokens of all users",
+    "description": "Who has which token and what it may do. Revoke a token when someone leaves or a token leaks — its owner gets an email.",
+    "columns": {
+      "owner": "Owner",
+      "token": "Token",
+      "access": "Access",
+      "lastUsed": "Last used",
+      "expires": "Expires",
+      "actions": "Actions"
+    },
+    "unknownUser": "Unknown user",
+    "empty": "No API tokens yet.",
+    "loadError": "Could not load the API tokens.",
+    "revoke": {
+      "title": "Revoke this token?",
+      "message": "“{{name}}” of {{owner}} stops working immediately. {{owner}} is told by email.",
+      "confirm": "Revoke token",
+      "success": "Token revoked",
+      "error": "Could not revoke the token"
+    }
   }
 }

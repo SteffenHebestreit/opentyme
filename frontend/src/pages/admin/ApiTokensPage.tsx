@@ -9,7 +9,7 @@
 import { FC, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { KeyRound, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
-import { useApiTokenCatalog, useApiTokens, useRevokeApiToken } from '../../hooks/api/useApiTokens';
+import { useApiTokens, useRevokeApiToken } from '../../hooks/api/useApiTokens';
 import { Button } from '../../components/common/Button';
 import { Alert } from '../../components/common/Alert';
 import { Badge } from '../../components/common/Badge';
@@ -18,11 +18,11 @@ import { SkeletonItem } from '../../components/common/Skeleton';
 import { Table, Column } from '../../components/common/Table';
 import { SettingsHeader } from '../../components/admin/SettingsSection';
 import { ApiTokenFormModal } from '../../components/admin/api-tokens/ApiTokenFormModal';
-import { CAPABILITY_ICONS } from '../../components/admin/api-tokens/capabilityIcons';
+import { ApiTokenAccessBadges } from '../../components/admin/api-tokens/ApiTokenAccessBadges';
 import { ApiTokenRegenerateModal } from '../../components/admin/api-tokens/ApiTokenRegenerateModal';
 import { ApiTokenSecretModal } from '../../components/admin/api-tokens/ApiTokenSecretModal';
 import { ApiTokenActivity } from '../../components/admin/api-tokens/ApiTokenActivity';
-import { apiErrorBody, expiryState, grantedResources } from '../../components/admin/api-tokens/apiTokenHelpers';
+import { apiErrorBody, expiryState } from '../../components/admin/api-tokens/apiTokenHelpers';
 import type { ApiToken, ApiTokenWithSecret } from '../../api/types';
 import { formatDate, formatDistanceToNow } from '../../utils/date';
 import { toast } from '../../lib/toast';
@@ -31,13 +31,9 @@ import { confirmDialog } from '../../lib/confirm';
 const iconButton =
   'inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500';
 
-/** How many resource badges a row shows before "+N more". */
-const VISIBLE_RESOURCES = 3;
-
 const ApiTokensPage: FC = () => {
   const { t } = useTranslation('settings');
   const { data: tokens, isLoading, error } = useApiTokens();
-  const { data: catalog } = useApiTokenCatalog();
   const revokeMutation = useRevokeApiToken();
 
   /** undefined = closed, null = creating */
@@ -45,8 +41,6 @@ const ApiTokensPage: FC = () => {
   const [regenerating, setRegenerating] = useState<ApiToken | null>(null);
   const [revealed, setRevealed] = useState<ApiTokenWithSecret | null>(null);
 
-  const levelLabel = (level: string) => t(`admin.apiTokens.levels.${level}`);
-  const resourceLabel = (key: string) => t(`admin.apiTokens.resources.${key}.label`);
 
   const showSecret = (result: ApiTokenWithSecret) => {
     setEditing(undefined);
@@ -90,37 +84,7 @@ const ApiTokensPage: FC = () => {
       {
         key: 'access',
         header: t('admin.apiTokens.columns.access'),
-        render: (token) => {
-          const granted = grantedResources(token.permissions, catalog);
-          const hidden = granted.slice(VISIBLE_RESOURCES);
-          return (
-            <div className="flex max-w-sm flex-wrap gap-1">
-              {token.permissions.capabilities.map((capability) => {
-                const Icon = CAPABILITY_ICONS[capability];
-                return (
-                  <Badge key={capability} variant="brand" size="sm" icon={<Icon className="h-3 w-3" />}>
-                    {t(`admin.apiTokens.capabilities.${capability}.label`)}
-                  </Badge>
-                );
-              })}
-              {granted.slice(0, VISIBLE_RESOURCES).map(({ key, level }) => (
-                <Badge key={key} variant={level === 'delete' ? 'red' : level === 'write' ? 'amber' : 'gray'} size="sm">
-                  {resourceLabel(key)} · {levelLabel(level)}
-                </Badge>
-              ))}
-              {hidden.length > 0 && (
-                <span title={hidden.map(({ key, level }) => `${resourceLabel(key)} · ${levelLabel(level)}`).join('\n')}>
-                  <Badge variant="gray" size="sm">
-                    {t('admin.apiTokens.moreAccess', { count: hidden.length })}
-                  </Badge>
-                </span>
-              )}
-              {granted.length === 0 && token.permissions.capabilities.length === 0 && (
-                <span className="text-xs text-gray-400">{t('admin.apiTokens.noAccess')}</span>
-              )}
-            </div>
-          );
-        },
+        render: (token) => <ApiTokenAccessBadges permissions={token.permissions} />,
       },
       {
         key: 'last_used_at',
@@ -214,7 +178,7 @@ const ApiTokensPage: FC = () => {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [t, catalog]
+    [t]
   );
 
   const header = (

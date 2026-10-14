@@ -23,6 +23,7 @@ import recurringInvoiceRoutes from './financial/recurring-invoice.routes';
 
 // System routes
 import backupRoutes from './system/backup.routes';
+import apiTokenAdminRoutes from './system/api-token-admin.routes';
 import initializationRoutes from './system/initialization.routes';
 import settingsRoutes from './system/settings.routes';
 import pluginsRoutes from './system/plugins.routes';
@@ -92,6 +93,9 @@ export default function setupRoutes(app: Application) {
   // System endpoints
   app.use('/api/system/backups', backupRoutes);
   logger.debug('Backup/Restore routes registered under /api/system/backups');
+
+  app.use('/api/system/api-tokens', apiTokenAdminRoutes);
+  logger.debug('API token administration registered under /api/system/api-tokens');
 
   app.use('/api/system', initializationRoutes);
   logger.debug('System initialization routes registered under /api/system');

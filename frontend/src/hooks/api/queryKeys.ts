@@ -63,5 +63,6 @@ export const queryKeys = {
     list: ['apiTokens', 'list'] as const,
     catalog: ['apiTokens', 'catalog'] as const,
     events: ['apiTokens', 'events'] as const,
+    all: ['apiTokens', 'all'] as const,
   },
 };

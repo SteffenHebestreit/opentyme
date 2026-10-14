@@ -1,5 +1,6 @@
 import apiClient from './client';
 import {
+  AdminApiToken,
   ApiToken,
   ApiTokenCatalog,
   ApiTokenEvent,
@@ -48,4 +49,15 @@ export const revokeApiToken = async (id: string): Promise<void> => {
 export const getApiTokenEvents = async (limit = 20): Promise<ApiTokenEvent[]> => {
   const response = await apiClient.get('/api-tokens/events', { params: { limit } });
   return response.data.events;
+};
+
+/** Administrators: every user's tokens with their owners. */
+export const getAllApiTokens = async (): Promise<AdminApiToken[]> => {
+  const response = await apiClient.get('/system/api-tokens');
+  return response.data.tokens;
+};
+
+/** Administrators: revoke any user's token; the owner is told by email. */
+export const adminRevokeApiToken = async (id: string): Promise<void> => {
+  await apiClient.delete(`/system/api-tokens/${id}`);
 };

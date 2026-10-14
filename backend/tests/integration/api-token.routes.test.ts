@@ -25,12 +25,14 @@ jest.mock('../../src/middleware/auth/keycloak.middleware', () => {
   return {
     ...actual,
     authenticateKeycloak: (req: any, res: any, next: any) => {
-      const session = /^Bearer session:(.+)$/.exec(req.headers.authorization ?? '');
+      // `session:<id>` = a signed-in admin, `session-user:<id>` = a signed-in non-admin.
+      const session = /^Bearer session(-user)?:(.+)$/.exec(req.headers.authorization ?? '');
       if (!session) return actual.authenticateKeycloak(req, res, next);
+      const roles = session[1] ? ['user'] : ['user', 'admin'];
       req.kauth = {
         grant: {
           access_token: {
-            content: { sub: session[1], email: 'owner@example.com', preferred_username: 'owner', realm_access: { roles: ['user', 'admin'] } },
+            content: { sub: session[2], email: 'owner@example.com', preferred_username: 'owner', realm_access: { roles } },
           },
         },
       };
@@ -54,6 +56,7 @@ import setupRoutes from '../../src/routes';
 import { getDbClient } from '../../src/utils/database';
 import { keycloakService } from '../../src/services/keycloak.service';
 import { MAX_TOKENS_PER_USER, generateApiToken } from '../../src/services/auth/api-token.service';
+import { EmailService } from '../../src/services/external/email.service';
 
 const OWNER = '123e4567-e89b-12d3-a456-426614174000';
 const OTHER = '223e4567-e89b-42d3-a456-426614174998';
@@ -577,6 +580,48 @@ describe('personal access tokens', () => {
         expect(res.status).toBe(403);
         expect(res.body.code).toBe('APPROVAL_IN_APP');
       }
+    });
+  });
+
+  describe('administration', () => {
+    beforeAll(cleanTokens);
+
+    it('shows administrators every user\'s tokens with their owners — and nobody else', async () => {
+      jest.spyOn(keycloakService, 'getAllUsers').mockResolvedValue([
+        { id: OWNER, username: 'olga', email: 'olga@example.com' },
+        { id: OTHER, username: 'otto', email: 'otto@example.com' },
+      ]);
+      const mine = await createToken({ name: uniqueName('Admin view A'), permissions: { resources: { clients: 'read' } } });
+      const theirs = await createToken({ name: uniqueName('Admin view B'), permissions: { resources: { clients: 'read' } } }, OTHER);
+
+      const res = await request(app).get('/api/system/api-tokens').set('Authorization', session());
+      expect(res.status).toBe(200);
+      const byId = Object.fromEntries(res.body.tokens.map((t: any) => [t.id, t]));
+      expect(byId[mine.token.id].owner).toEqual({ username: 'olga', email: 'olga@example.com' });
+      expect(byId[theirs.token.id].owner).toEqual({ username: 'otto', email: 'otto@example.com' });
+      expect(JSON.stringify(res.body)).not.toContain(mine.secret);
+      expect(res.body.tokens[0]).not.toHaveProperty('token_hash');
+
+      expect((await request(app).get('/api/system/api-tokens').set('Authorization', `Bearer session-user:${OTHER}`)).status).toBe(403);
+      expect((await request(app).get('/api/system/api-tokens').set('Authorization', bearer(mine.secret))).status).toBe(403);
+    });
+
+    it("lets an administrator revoke another user's token; the owner sees who and gets an email", async () => {
+      const notify = jest.spyOn(EmailService.prototype, 'sendNotificationEmail').mockResolvedValue(undefined);
+      const theirs = await createToken({ name: uniqueName('Leaked'), permissions: { resources: { clients: 'read' } } }, OTHER);
+      expect((await request(app).get('/api/clients').set('Authorization', bearer(theirs.secret))).status).toBe(200);
+
+      const res = await request(app).delete(`/api/system/api-tokens/${theirs.token.id}`).set('Authorization', session());
+      expect(res.status).toBe(200);
+      expect((await request(app).get('/api/clients').set('Authorization', bearer(theirs.secret))).status).toBe(401);
+
+      const ownerEvents = await request(app).get('/api/api-tokens/events').set('Authorization', `Bearer session-user:${OTHER}`);
+      const revoked = ownerEvents.body.events.find((e: any) => e.token_id === theirs.token.id && e.event === 'revoked');
+      expect(revoked.details).toEqual({ by_admin: 'owner' });
+      await new Promise((r) => setTimeout(r, 50));
+      expect(notify).toHaveBeenCalledWith('owner@example.com', expect.stringContaining('was revoked'), expect.stringContaining('administrator (owner)'));
+
+      expect((await request(app).delete(`/api/system/api-tokens/${theirs.token.id}`).set('Authorization', session())).status).toBe(404);
     });
   });
 });
