@@ -5,7 +5,7 @@ import { Modal } from '../../ui/Modal';
 import { Button } from '../../common/Button';
 import { Alert } from '../../common/Alert';
 import { ExpiryField } from './ExpiryField';
-import { DEFAULT_EXPIRY, ExpiryChoice, expiryToIso } from './apiTokenHelpers';
+import { apiErrorBody, DEFAULT_EXPIRY, ExpiryChoice, expiryToIso } from './apiTokenHelpers';
 import { useRegenerateApiToken } from '../../../hooks/api/useApiTokens';
 import type { ApiToken, ApiTokenWithSecret } from '../../../api/types';
 
@@ -37,8 +37,8 @@ export const ApiTokenRegenerateModal: FC<ApiTokenRegenerateModalProps> = ({ toke
     }
     try {
       onRegenerated(await regenerate.mutateAsync({ id: token.id, expiresAt }));
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? t('admin.apiTokens.regenerate.error'));
+    } catch (err: unknown) {
+      setError(apiErrorBody(err).message ?? t('admin.apiTokens.regenerate.error'));
     }
   };
 

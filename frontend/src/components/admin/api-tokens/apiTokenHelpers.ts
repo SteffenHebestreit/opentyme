@@ -108,3 +108,9 @@ export function presetResources(
   }
   return resources;
 }
+
+/** The API's error body ({ message, code }) when a request failed with one. */
+export function apiErrorBody(error: unknown): { message?: string; code?: string } {
+  const data = (error as { response?: { data?: unknown } } | null)?.response?.data;
+  return data && typeof data === 'object' ? (data as { message?: string; code?: string }) : {};
+}

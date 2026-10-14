@@ -17,11 +17,12 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { SkeletonItem } from '../../components/common/Skeleton';
 import { Table, Column } from '../../components/common/Table';
 import { SettingsHeader } from '../../components/admin/SettingsSection';
-import { ApiTokenFormModal, CAPABILITY_ICONS } from '../../components/admin/api-tokens/ApiTokenFormModal';
+import { ApiTokenFormModal } from '../../components/admin/api-tokens/ApiTokenFormModal';
+import { CAPABILITY_ICONS } from '../../components/admin/api-tokens/capabilityIcons';
 import { ApiTokenRegenerateModal } from '../../components/admin/api-tokens/ApiTokenRegenerateModal';
 import { ApiTokenSecretModal } from '../../components/admin/api-tokens/ApiTokenSecretModal';
 import { ApiTokenActivity } from '../../components/admin/api-tokens/ApiTokenActivity';
-import { expiryState, grantedResources } from '../../components/admin/api-tokens/apiTokenHelpers';
+import { apiErrorBody, expiryState, grantedResources } from '../../components/admin/api-tokens/apiTokenHelpers';
 import type { ApiToken, ApiTokenWithSecret } from '../../api/types';
 import { formatDate, formatDistanceToNow } from '../../utils/date';
 import { toast } from '../../lib/toast';
@@ -64,8 +65,8 @@ const ApiTokensPage: FC = () => {
     try {
       await revokeMutation.mutateAsync(token.id);
       toast.success(t('admin.apiTokens.revoke.success'));
-    } catch (err: any) {
-      toast.error(t('admin.apiTokens.revoke.error'), { description: err.response?.data?.message });
+    } catch (err: unknown) {
+      toast.error(t('admin.apiTokens.revoke.error'), { description: apiErrorBody(err).message });
     }
   };
 

@@ -1,6 +1,6 @@
 import { FC, FormEvent, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Bot, KeyRound, Mail, Plug, type LucideIcon } from 'lucide-react';
+import { KeyRound } from 'lucide-react';
 import { Modal } from '../../ui/Modal';
 import { Button } from '../../common/Button';
 import { Alert } from '../../common/Alert';
@@ -8,12 +8,14 @@ import { SkeletonItem } from '../../common/Skeleton';
 import { Input } from '../../forms';
 import { SettingsSwitch } from '../SettingsSection';
 import { PermissionLevelPicker } from './PermissionLevelPicker';
+import { CAPABILITY_ICONS } from './capabilityIcons';
 import { ExpiryField } from './ExpiryField';
 import {
   DEFAULT_EXPIRY,
   ExpiryChoice,
   PRESET_IDS,
   PresetId,
+  apiErrorBody,
   expiryToIso,
   grantsAnything,
   presetResources,
@@ -30,12 +32,6 @@ import type {
 } from '../../../api/types';
 import { formatDate } from '../../../utils/date';
 import { cn } from '../../../lib/cn';
-
-export const CAPABILITY_ICONS: Record<ApiTokenCapability, LucideIcon> = {
-  assistant: Bot,
-  mcp: Plug,
-  email_send: Mail,
-};
 
 interface ApiTokenFormModalProps {
   /** null = create a new token */
@@ -110,13 +106,14 @@ export const ApiTokenFormModal: FC<ApiTokenFormModalProps> = ({ token, open, onC
       } else {
         onCreated(await createMutation.mutateAsync({ ...common, expires_at: expiresAt ?? null }));
       }
-    } catch (err: any) {
-      if (err.response?.data?.code === 'NAME_TAKEN') {
+    } catch (err: unknown) {
+      const body = apiErrorBody(err);
+      if (body.code === 'NAME_TAKEN') {
         setErrors({ name: t('admin.apiTokens.form.nameTaken') });
         return;
       }
       setErrors({
-        permissions: err.response?.data?.message ?? t(token ? 'admin.apiTokens.form.saveError' : 'admin.apiTokens.form.createError'),
+        permissions: body.message ?? t(token ? 'admin.apiTokens.form.saveError' : 'admin.apiTokens.form.createError'),
       });
     }
   };
