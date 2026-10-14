@@ -9,7 +9,7 @@ import { logger } from './utils/logger';
 import { sanitizeRequestBody } from './middleware/sanitize.middleware';
 import { globalRateLimiter } from './middleware/rate-limit.middleware';
 import { captureException } from './utils/observability';
-import { sessionConfig, isKeycloakConfigured, logKeycloakConfig } from './config/keycloak.config';
+import { isKeycloakConfigured, logKeycloakConfig } from './config/keycloak.config';
 import { swaggerSpec } from './config/swagger.config';
 import recurringExpenseScheduler from './services/financial/recurring-expense-scheduler.service';
 import { pluginLoader } from './plugins/plugin-loader';
@@ -61,15 +61,12 @@ app.get('/api-docs.json', (req: Request, res: Response) => {
   res.send(swaggerSpec);
 });
 
-// Keycloak configuration check
-// Session middleware is still needed for other purposes
+// Keycloak configuration check. Authentication is stateless (bearer tokens):
+// no server-side sessions — an unused session middleware here once stored a
+// new in-memory session for every cookie-less request (scripts, agents).
 if (isKeycloakConfigured()) {
   logger.info('[Keycloak] Keycloak is properly configured');
   logKeycloakConfig();
-  
-  app.use(sessionConfig);
-  
-  logger.info('[Keycloak] Session middleware initialized');
 } else {
   logger.warn('[Keycloak] Keycloak is not properly configured. Authentication will not work!');
   logger.warn('[Keycloak] Please check your environment variables.');
