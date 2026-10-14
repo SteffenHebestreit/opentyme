@@ -4,6 +4,8 @@ import axios from 'axios';
 import crypto from 'crypto';
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import { logger } from '../../utils/logger';
+import { isApiToken } from '../../services/auth/api-token.service';
+import { authenticateApiToken } from './api-token.middleware';
 
 // Use the internal service URL for backend-to-Keycloak communication so
 // token introspection does not depend on trusting the public certificate chain.
@@ -36,7 +38,7 @@ setInterval(() => {
       tokenCache.delete(token);
     }
   }
-}, 5 * 60 * 1000); // Clean up every 5 minutes
+}, 5 * 60 * 1000).unref(); // Clean up every 5 minutes; never keeps the process alive on its own
 
 /**
  * Remove a token from the introspection cache.
@@ -176,6 +178,12 @@ export const authenticateKeycloak = async (req: Request, res: Response, next: Ne
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
+    // Personal access tokens carry their own prefix and never reach Keycloak.
+    if (isApiToken(token)) {
+      await authenticateApiToken(req, res, next, token);
+      return;
+    }
+
     // Introspect the token with Keycloak
     const tokenInfo = await validateToken(token);
 
@@ -197,6 +205,7 @@ export const authenticateKeycloak = async (req: Request, res: Response, next: Ne
         }
       }
     };
+    req.auth = { method: 'session' };
 
     logger.info(`[Keycloak] Token validated for user: ${tokenInfo.preferred_username}`);
     next();

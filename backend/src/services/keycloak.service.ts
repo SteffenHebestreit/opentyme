@@ -273,6 +273,20 @@ class KeycloakService {
   }
 
   /**
+   * Get user by ID, telling "no such user" (null) apart from "Keycloak could
+   * not be asked" (throws). Callers that gate access need the difference —
+   * an outage must not look like a deleted account.
+   */
+  async findUserById(userId: string): Promise<any | null> {
+    await this.authenticate();
+    const user = await this.client.users.findOne({
+      realm: this.config.realmName,
+      id: userId,
+    });
+    return user ?? null;
+  }
+
+  /**
    * Get all users from Keycloak
    * @param {number} max - Maximum number of users to return (default: 1000)
    * @returns {Promise<any[]>} Array of user objects

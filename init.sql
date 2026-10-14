@@ -2417,6 +2417,33 @@ CREATE TABLE IF NOT EXISTS public.schema_migrations (
 -- nothing once every entry carries its rate.
 CREATE INDEX IF NOT EXISTS idx_time_entries_unstamped ON public.time_entries(project_id, entry_date) WHERE hourly_rate IS NULL AND project_id IS NOT NULL;
 
+-- Migration: personal access tokens for the API, the assistant and MCP (idempotent)
+-- Only the SHA-256 hash of a token is stored; the plaintext is shown once and
+-- cannot be recovered. permissions = { resources: {<key>: level}, capabilities: [...] },
+-- see backend/src/services/auth/api-token-permissions.ts. expires_at NULL means "never".
+CREATE TABLE IF NOT EXISTS public.api_tokens (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL,
+    name character varying(100) NOT NULL,
+    description text,
+    token_hash character(64) NOT NULL,
+    token_prefix character varying(20) NOT NULL,
+    permissions jsonb NOT NULL DEFAULT '{"resources": {}, "capabilities": []}'::jsonb,
+    approval_mode character varying(10) NOT NULL DEFAULT 'self' CHECK (approval_mode IN ('self', 'in_app')),
+    expires_at timestamp with time zone,
+    last_used_at timestamp with time zone,
+    last_used_ip character varying(64),
+    last_used_user_agent character varying(255),
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_api_tokens_hash ON public.api_tokens(token_hash);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_api_tokens_user_name ON public.api_tokens(user_id, lower(name));
+CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON public.api_tokens(user_id);
+
+-- Which token started an assistant conversation (NULL = the web app).
+ALTER TABLE public.ai_conversations ADD COLUMN IF NOT EXISTS api_token_id uuid REFERENCES public.api_tokens(id) ON DELETE SET NULL;
+
 --
 -- PostgreSQL database dump complete
 --

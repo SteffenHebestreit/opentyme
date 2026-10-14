@@ -4,6 +4,7 @@ import { logger } from '../utils/logger';
 // Auth routes
 import authRoutes from './auth/auth.routes';
 import passwordResetRoutes from './auth/password-reset.routes';
+import apiTokenRoutes from './auth/api-token.routes';
 
 // Business routes
 import clientRoutes from './business/client.routes';
@@ -47,6 +48,9 @@ export default function setupRoutes(app: Application) {
 
   app.use('/api/password-reset', passwordResetRoutes);
   logger.debug('Password reset routes registered under /api/password-reset');
+
+  app.use('/api/api-tokens', apiTokenRoutes);
+  logger.debug('API token routes registered under /api/api-tokens');
 
   // Business endpoints
   app.use('/api/clients', clientRoutes);

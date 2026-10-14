@@ -446,6 +446,36 @@ async function ensureSchemaUpgrades(): Promise<void> {
         WHERE hourly_rate IS NULL AND project_id IS NOT NULL
     `);
 
+    // Personal access tokens. Only the SHA-256 hash is stored; the plaintext is
+    // shown once. expires_at NULL means the token never expires.
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS api_tokens (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        description TEXT,
+        token_hash CHAR(64) NOT NULL,
+        token_prefix VARCHAR(20) NOT NULL,
+        permissions JSONB NOT NULL DEFAULT '{"resources": {}, "capabilities": []}'::jsonb,
+        approval_mode VARCHAR(10) NOT NULL DEFAULT 'self' CHECK (approval_mode IN ('self', 'in_app')),
+        expires_at TIMESTAMP WITH TIME ZONE,
+        last_used_at TIMESTAMP WITH TIME ZONE,
+        last_used_ip VARCHAR(64),
+        last_used_user_agent VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_api_tokens_hash ON api_tokens(token_hash);
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_api_tokens_user_name ON api_tokens(user_id, lower(name));
+      CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id);
+    `);
+
+    // Which token started an assistant conversation (NULL = the web app).
+    await db.query(
+      `ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS api_token_id UUID REFERENCES api_tokens(id) ON DELETE SET NULL`
+    );
+
     await enforceLinearDocumentVersions();
 
     logger.info('[Startup] ✓ Schema upgrades applied');

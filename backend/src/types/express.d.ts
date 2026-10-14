@@ -4,10 +4,25 @@
  */
 
 import { Request } from 'express';
+import type { ApiTokenPermissions, ApprovalMode } from '../services/auth/api-token-permissions';
 
 declare global {
   namespace Express {
     interface Request {
+      /**
+       * How the request authenticated; set by authenticateKeycloak. A 'pat'
+       * request (personal access token) is limited to the token's permissions.
+       */
+      auth?:
+        | { method: 'session' }
+        | {
+            method: 'pat';
+            tokenId: string;
+            tokenName: string;
+            permissions: ApiTokenPermissions;
+            approvalMode: ApprovalMode;
+          };
+
       /**
        * User information from JWT or Keycloak authentication
        * Can be populated by either authenticateToken or Keycloak middleware
