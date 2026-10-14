@@ -187,8 +187,10 @@ export const authenticateKeycloak = async (req: Request, res: Response, next: Ne
     // Introspect the token with Keycloak
     const tokenInfo = await validateToken(token);
 
-    // Check if token is active
-    if (!tokenInfo.active) {
+    // Inactive, expired or unverifiable (validateToken returns null) — 401, so
+    // clients know to sign in again rather than treating it as a permission problem.
+    if (!tokenInfo?.active) {
+      res.set('WWW-Authenticate', 'Bearer realm="OpenTyme", error="invalid_token"');
       res.status(401).json({
         error: 'Unauthorized',
         message: 'Token is not active or has expired'
