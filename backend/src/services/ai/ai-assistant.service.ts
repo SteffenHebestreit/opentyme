@@ -47,10 +47,19 @@ import { selectTools } from './tool-selection.service';
 import { executeToolCall, isWriteTool } from './tool-executor.service';
 import { getCustomToolByName } from './ai-tool-registry.service';
 import { runLockKey, tryAcquireRunLock, releaseRunLock } from './run-lock';
+import { toolPermissionDenial } from './tool-permissions';
+import { ApiTokenPermissions, ApprovalMode, normalizePermissions } from '../auth/api-token-permissions';
 
 // Re-exported for existing importers (controller, A2A adapter).
 export type { EventEmitter } from './ai-events';
 export type { ConversationMessage } from './conversation-history.service';
+
+/** The API token a request was made with (absent for the signed-in web app). */
+export interface TokenAccess {
+  tokenId: string;
+  permissions: ApiTokenPermissions;
+  approvalMode: ApprovalMode;
+}
 
 export interface ToolApprovalDecision {
   toolCallId: string;
@@ -102,6 +111,13 @@ export class AIAssistantService {
   private apiUrl = '';
   private apiKey = '';
   private abortSignal?: AbortSignal;
+  /**
+   * Set for a conversation started with an API token: every tool this run
+   * offers or executes must be allowed by that token — whoever drives the run.
+   */
+  private ceiling: ApiTokenPermissions | null = null;
+  /** The calling token's approval mode, reported with TOOL_APPROVAL_REQUIRED. */
+  private approvalMode: ApprovalMode | null = null;
 
   async initialize(userId: string): Promise<void> {
     try {
@@ -153,20 +169,23 @@ export class AIAssistantService {
     bearerToken: string,
     roles: string[],
     emit: EventEmitter,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    access?: TokenAccess | null
   ): Promise<void> {
     const runId = uuidv4();
     const db = pool();
     this.abortSignal = signal;
+    this.approvalMode = access?.approvalMode ?? null;
 
     // Resolve or create conversation
     let conversationId = threadId;
     let ownedLock: string | null = null;
     if (!conversationId) {
       const result = await db.query(
-        `INSERT INTO ai_conversations (user_id, title) VALUES ($1, $2) RETURNING id`,
-        [userId, userMessage.slice(0, 100)]
+        `INSERT INTO ai_conversations (user_id, title, api_token_id) VALUES ($1, $2, $3) RETURNING id`,
+        [userId, userMessage.slice(0, 100), access?.tokenId ?? null]
       );
+      this.ceiling = access?.permissions ?? null;
       conversationId = result.rows[0].id as string;
       // Existing threads are locked by the controller (HTTP 409 before SSE);
       // a brand-new thread is locked from creation on, so a follow-up request
@@ -174,15 +193,12 @@ export class AIAssistantService {
       ownedLock = runLockKey(userId, conversationId);
       tryAcquireRunLock(ownedLock);
     } else {
-      // Verify ownership
-      const check = await db.query(
-        `SELECT id FROM ai_conversations WHERE id = $1 AND user_id = $2`,
-        [conversationId, userId]
-      );
-      if (check.rows.length === 0) {
+      const found = await this.resolveConversation(conversationId, userId, access);
+      if (!found) {
         emit({ type: EventType.RUN_ERROR, message: 'Conversation not found', code: '404' });
         return;
       }
+      this.ceiling = found.ceiling;
     }
 
     try {
@@ -257,6 +273,7 @@ export class AIAssistantService {
       apiUrl: this.apiUrl,
       apiKey: this.apiKey,
       conversationId,
+      permissions: this.ceiling,
     });
 
     await this.runLoop(conversationId, messages, tools, roles, bearerToken, runId, emit);
@@ -278,20 +295,20 @@ export class AIAssistantService {
     emit: EventEmitter,
     signal?: AbortSignal,
     /** Id of the approval batch the client is answering (TOOL_APPROVAL_REQUIRED.batchId). */
-    batchId?: string | null
+    batchId?: string | null,
+    access?: TokenAccess | null
   ): Promise<void> {
     const runId = uuidv4();
     const db = pool();
     this.abortSignal = signal;
+    this.approvalMode = access?.approvalMode ?? null;
 
-    const conv = await db.query(`SELECT id FROM ai_conversations WHERE id = $1 AND user_id = $2`, [
-      conversationId,
-      userId,
-    ]);
-    if (conv.rows.length === 0) {
+    const found = await this.resolveConversation(conversationId, userId, access);
+    if (!found) {
       emit({ type: EventType.RUN_ERROR, message: 'Conversation not found', code: '404' });
       return;
     }
+    this.ceiling = found.ceiling;
 
     emit({ type: EventType.RUN_STARTED, threadId: conversationId, runId });
 
@@ -424,6 +441,7 @@ export class AIAssistantService {
         // The sticky set was computed when this run started — no need to pay
         // another embedding round trip per approve click.
         reuseSticky: true,
+        permissions: this.ceiling,
       });
       await this.runLoop(conversationId, messages, tools, roles, bearerToken, runId, emit);
     } catch (error: unknown) {
@@ -460,6 +478,39 @@ export class AIAssistantService {
       const event = toRunErrorEvent(error, this.abortSignal, 'resumeRun');
       if (event) emit(event);
     }
+  }
+
+  /**
+   * Finds the conversation for this caller and the permission ceiling it runs
+   * under, or null when the caller may not use it. A token only sees the
+   * conversations it started; a conversation started with a token stays
+   * within that token's current permissions, whoever continues it.
+   */
+  private async resolveConversation(
+    conversationId: string,
+    userId: string,
+    access?: TokenAccess | null
+  ): Promise<{ ceiling: ApiTokenPermissions | null } | null> {
+    const { rows } = await pool().query(
+      `SELECT c.api_token_id, t.permissions
+         FROM ai_conversations c
+         LEFT JOIN api_tokens t ON t.id = c.api_token_id
+        WHERE c.id = $1 AND c.user_id = $2`,
+      [conversationId, userId]
+    );
+    if (rows.length === 0) return null;
+    const startedBy: string | null = rows[0].api_token_id;
+    if (access) return startedBy === access.tokenId ? { ceiling: access.permissions } : null;
+    return { ceiling: startedBy ? normalizePermissions(rows[0].permissions) : null };
+  }
+
+  /** Why the ceiling refuses this tool (a message for the model), or null. */
+  private ceilingDenial(toolName: string): string | null {
+    if (!this.ceiling) return null;
+    const missing = toolPermissionDenial(toolName, this.ceiling);
+    return missing
+      ? `${toolName} is not allowed in this conversation: it runs with an API token that lacks ${missing}. Tell the user which permission is missing instead of retrying.`
+      : null;
   }
 
   /**
@@ -672,6 +723,13 @@ export class AIAssistantService {
             continue;
           }
 
+          // Token conversations: a disallowed write never reaches the approval card.
+          const denied = this.ceilingDenial(tc.function.name);
+          if (denied) {
+            await this.recordSyntheticResult(tc, conversationId, messages, emit, { error: denied });
+            continue;
+          }
+
           executable.push(tc);
         }
 
@@ -744,6 +802,10 @@ export class AIAssistantService {
             // actions; /approve may echo it back to refuse stale decisions.
             batchId: assistantMsgId,
             planText: content || '',
+            // 'in_app': the token's owner approves in the OpenTyme web app; the
+            // calling client cannot (POST /approve answers 403) and should poll
+            // the conversation instead.
+            ...(this.approvalMode ? { approvalMode: this.approvalMode } : {}),
             actions: approvable.map((tc) => ({
               toolCallId: tc.id,
               toolName: tc.function.name,
@@ -842,7 +904,13 @@ export class AIAssistantService {
     let isError = false;
     let isInfraError = false;
     const parsed = parseToolArguments(tc.function.arguments);
-    if (!parsed.ok) {
+    // Checked again here: an approved write executes later, and the token's
+    // permissions may have been narrowed in the meantime.
+    const denied = this.ceilingDenial(tcName);
+    if (denied) {
+      isError = true;
+      resultContent = JSON.stringify({ error: denied });
+    } else if (!parsed.ok) {
       resultContent = JSON.stringify({
         error: `Invalid tool arguments (${parsed.error}). Re-send this call with the arguments as one valid JSON object matching the tool schema.`,
       });

@@ -25,6 +25,11 @@ export interface Conversation {
   title: string | null;
   created_at: string;
   updated_at: string;
+  /** Set when an API token started it (e.g. an external agent); null = this app. */
+  api_token_id?: string | null;
+  api_token_name?: string | null;
+  /** Actions wait for a decision (list endpoint only). */
+  awaiting_approval?: boolean;
 }
 
 export interface ConversationWithMessages extends Conversation {

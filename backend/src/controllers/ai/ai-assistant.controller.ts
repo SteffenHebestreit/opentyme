@@ -3,6 +3,7 @@ import { logger } from '../../utils/logger';
 import { pool } from '../../utils/database';
 import {
   AIAssistantService,
+  TokenAccess,
   ToolApprovalDecision,
   toRunErrorEvent,
 } from '../../services/ai/ai-assistant.service';
@@ -43,6 +44,22 @@ function checkRateLimit(userId: string): boolean {
   if (entry.count >= RATE_LIMIT_RPM) return false;
   entry.count++;
   return true;
+}
+
+/** The API token behind this request, or null for the signed-in web app. */
+export function tokenAccess(req: Request): TokenAccess | null {
+  return req.auth?.method === 'pat'
+    ? { tokenId: req.auth.tokenId, permissions: req.auth.permissions, approvalMode: req.auth.approvalMode }
+    : null;
+}
+
+/**
+ * Conversations a request may see: the web app sees all of the user's, a
+ * token only those it started — never the owner's other chats.
+ */
+function conversationScope(req: Request, firstParam: number): { sql: string; params: string[] } {
+  const access = tokenAccess(req);
+  return access ? { sql: ` AND c.api_token_id = $${firstParam}`, params: [access.tokenId] } : { sql: '', params: [] };
 }
 
 // ── SSE plumbing ──────────────────────────────────────────────────────────────
@@ -173,7 +190,8 @@ export async function runStream(req: Request, res: Response): Promise<void> {
       bearerToken,
       req.user?.roles ?? [],
       sse.emit,
-      sse.signal
+      sse.signal,
+      tokenAccess(req)
     );
   } catch (error: unknown) {
     const event = toRunErrorEvent(error, sse?.signal, 'runStream controller');
@@ -212,6 +230,13 @@ export async function approveRun(req: Request, res: Response): Promise<void> {
   }
   if (!Array.isArray(approvals) || approvals.length === 0) {
     res.status(400).json({ error: 'approvals array is required' });
+    return;
+  }
+  if (tokenAccess(req)?.approvalMode === 'in_app') {
+    res.status(403).json({
+      error: "This token's actions are approved by its owner in the OpenTyme app. Poll the conversation for the outcome.",
+      code: 'APPROVAL_IN_APP',
+    });
     return;
   }
   if (!checkRateLimit(userId)) {
@@ -257,7 +282,8 @@ export async function approveRun(req: Request, res: Response): Promise<void> {
       sse.emit,
       sse.signal,
       // Non-string values are passed through so the service reports them as stale.
-      batchId === undefined || batchId === null ? undefined : (batchId as string)
+      batchId === undefined || batchId === null ? undefined : (batchId as string),
+      tokenAccess(req)
     );
   } catch (error: unknown) {
     const event = toRunErrorEvent(error, sse?.signal, 'approveRun controller');
@@ -280,13 +306,22 @@ export async function listConversations(req: Request, res: Response): Promise<vo
 
   try {
     const db = pool();
+    const scope = conversationScope(req, 2);
+    // api_token_name: which token started it (null = the web app).
+    // awaiting_approval: actions wait for a decision (e.g. a token's run in "approve in app" mode).
     const result = await db.query(
-      `SELECT id, title, created_at, updated_at
-       FROM ai_conversations
-       WHERE user_id = $1
-       ORDER BY updated_at DESC
+      `SELECT c.id, c.title, c.created_at, c.updated_at, c.api_token_id, t.name AS api_token_name,
+              EXISTS (
+                SELECT 1 FROM ai_messages m
+                WHERE m.conversation_id = c.id AND m.role = 'assistant'
+                  AND m.metadata->>'status' = 'awaiting_approval'
+              ) AS awaiting_approval
+       FROM ai_conversations c
+       LEFT JOIN api_tokens t ON t.id = c.api_token_id
+       WHERE c.user_id = $1${scope.sql}
+       ORDER BY c.updated_at DESC
        LIMIT 50`,
-      [userId]
+      [userId, ...scope.params]
     );
     res.json(result.rows);
   } catch (error: unknown) {
@@ -316,9 +351,13 @@ export async function getConversation(req: Request, res: Response): Promise<void
   try {
     const db = pool();
 
+    const scope = conversationScope(req, 3);
     const convResult = await db.query(
-      `SELECT id, title, created_at, updated_at FROM ai_conversations WHERE id = $1 AND user_id = $2`,
-      [id, userId]
+      `SELECT c.id, c.title, c.created_at, c.updated_at, c.api_token_id, t.name AS api_token_name
+       FROM ai_conversations c
+       LEFT JOIN api_tokens t ON t.id = c.api_token_id
+       WHERE c.id = $1 AND c.user_id = $2${scope.sql}`,
+      [id, userId, ...scope.params]
     );
 
     if (convResult.rows.length === 0) {
@@ -365,9 +404,10 @@ export async function deleteConversation(req: Request, res: Response): Promise<v
 
   try {
     const db = pool();
+    const scope = conversationScope(req, 3);
     const result = await db.query(
-      `DELETE FROM ai_conversations WHERE id = $1 AND user_id = $2`,
-      [id, userId]
+      `DELETE FROM ai_conversations c WHERE c.id = $1 AND c.user_id = $2${scope.sql}`,
+      [id, userId, ...scope.params]
     );
 
     if (result.rowCount === 0) {

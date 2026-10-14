@@ -371,4 +371,71 @@ describe('personal access tokens', () => {
       expect(row.last_used_user_agent).toBe('agent-test/1.0');
     });
   });
+
+  describe('the assistant with a token', () => {
+    const assistantToken = (label: string, approval_mode: 'self' | 'in_app' = 'self') =>
+      createToken({ name: uniqueName(label), permissions: { resources: { clients: 'read' }, capabilities: ['assistant'] }, approval_mode });
+
+    async function conversation(title: string, apiTokenId: string | null, awaitingApproval = false) {
+      const db = getDbClient();
+      const { rows } = await db.query(
+        `INSERT INTO ai_conversations (user_id, title, api_token_id) VALUES ($1, $2, $3) RETURNING id`,
+        [OWNER, title, apiTokenId]
+      );
+      if (awaitingApproval) {
+        await db.query(
+          `INSERT INTO ai_messages (conversation_id, role, content, metadata) VALUES ($1, 'assistant', 'plan', $2)`,
+          [rows[0].id, JSON.stringify({ status: 'awaiting_approval', pending: [] })]
+        );
+      }
+      return rows[0].id as string;
+    }
+
+    afterAll(async () => {
+      await getDbClient().query(`DELETE FROM ai_conversations WHERE user_id = $1`, [OWNER]);
+    });
+
+    it("sees only the conversations it started, never the owner's other chats", async () => {
+      const a = await assistantToken('Agent A');
+      const b = await assistantToken('Agent B');
+      const web = await conversation('my private chat', null);
+      const mine = await conversation('agent A chat', a.token.id, true);
+      const theirs = await conversation('agent B chat', b.token.id);
+
+      const list = await request(app).get('/api/ai/conversations').set('Authorization', bearer(a.secret));
+      expect(list.status).toBe(200);
+      expect(list.body.map((c: any) => c.id)).toEqual([mine]);
+
+      for (const id of [web, theirs]) {
+        expect((await request(app).get(`/api/ai/conversations/${id}`).set('Authorization', bearer(a.secret))).status).toBe(404);
+        expect((await request(app).delete(`/api/ai/conversations/${id}`).set('Authorization', bearer(a.secret))).status).toBe(404);
+      }
+      expect((await request(app).get(`/api/ai/conversations/${mine}`).set('Authorization', bearer(a.secret))).status).toBe(200);
+
+      // The web app sees all of them, labelled, with the waiting approval flagged.
+      const all = await request(app).get('/api/ai/conversations').set('Authorization', session());
+      const byId = Object.fromEntries(all.body.map((c: any) => [c.id, c]));
+      expect(byId[web]).toMatchObject({ api_token_name: null, awaiting_approval: false });
+      expect(byId[mine]).toMatchObject({ api_token_name: a.token.name, awaiting_approval: true });
+      expect(byId[theirs].api_token_name).toBe(b.token.name);
+    });
+
+    it('may not approve when its owner approves in the app', async () => {
+      const inApp = await assistantToken('Supervised', 'in_app');
+      const id = await conversation('supervised chat', inApp.token.id, true);
+      const res = await request(app)
+        .post(`/api/ai/run/${id}/approve`)
+        .set('Authorization', bearer(inApp.secret))
+        .send({ approvals: [{ toolCallId: 'x', decision: 'approve' }] });
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe('APPROVAL_IN_APP');
+    });
+
+    it('needs the assistant capability', async () => {
+      const { secret } = await createToken({ name: uniqueName('No assistant'), permissions: { resources: { clients: 'read' } } });
+      const res = await request(app).get('/api/ai/conversations').set('Authorization', bearer(secret));
+      expect(res.status).toBe(403);
+      expect(res.body.required).toBe('capability:assistant');
+    });
+  });
 });

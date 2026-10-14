@@ -174,6 +174,10 @@ export function registerCoreAiTools(): void {
       },
       required: ['project', 'entry_date', 'start_time', 'end_time'],
     },
+    apiAccess: [
+      { method: 'GET', path: '/api/projects' },
+      { method: 'POST', path: '/api/time-entries' },
+    ],
     // Resolve the project BEFORE the approval card is shown, so the user
     // reviews the exact project (name + id) that will be booked — and an
     // ambiguous or unknown name never reaches the card at all.

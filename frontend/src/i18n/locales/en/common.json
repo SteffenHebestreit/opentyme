@@ -250,7 +250,16 @@
       "timeout": "Speech recognition took too long. Please try again.",
       "network": "Connection to the server failed.",
       "invalidAudio": "The recording could not be processed. Please try again."
-    }
+    },
+    "history": "Conversations",
+    "backToChat": "Back to the chat",
+    "historyEmpty": "No saved conversations yet.",
+    "historyLoadError": "The conversations could not be loaded.",
+    "untitled": "Untitled conversation",
+    "viaToken": "via {{name}}",
+    "needsApproval": "Needs your approval",
+    "startedByToken": "Started by the API token “{{name}}”. It can only use what that token allows.",
+    "approvalWaitingElsewhere": "another conversation needs your approval"
   },
   "shell": {
     "mainNavigation": "Main navigation",

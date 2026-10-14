@@ -250,7 +250,16 @@
       "timeout": "Die Spracherkennung hat zu lange gebraucht. Bitte erneut versuchen.",
       "network": "Keine Verbindung zum Server.",
       "invalidAudio": "Die Aufnahme konnte nicht verarbeitet werden. Bitte erneut versuchen."
-    }
+    },
+    "history": "Unterhaltungen",
+    "backToChat": "Zurück zum Chat",
+    "historyEmpty": "Noch keine gespeicherten Unterhaltungen.",
+    "historyLoadError": "Die Unterhaltungen konnten nicht geladen werden.",
+    "untitled": "Unterhaltung ohne Titel",
+    "viaToken": "über {{name}}",
+    "needsApproval": "Wartet auf Ihre Bestätigung",
+    "startedByToken": "Gestartet über das API-Token „{{name}}“. Es kann nur nutzen, was dieses Token erlaubt.",
+    "approvalWaitingElsewhere": "eine andere Unterhaltung wartet auf Ihre Bestätigung"
   },
   "shell": {
     "mainNavigation": "Hauptnavigation",

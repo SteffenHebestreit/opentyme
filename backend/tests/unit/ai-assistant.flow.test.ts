@@ -18,6 +18,7 @@ const hooks = globalThis as unknown as {
   ) => Promise<{ status: number; data?: unknown; error?: string }>;
   __validate: (name: string, args: Record<string, unknown>) => { ok: true } | { ok: false; errors: string[] };
   __customTools: Record<string, unknown>;
+  __operations: Record<string, { method: string; pathTemplate: string }>;
 };
 
 jest.mock('../../src/utils/database', () => ({
@@ -47,6 +48,7 @@ jest.mock('../../src/services/ai/ai-tool-registry.service', () => ({
 }));
 jest.mock('../../src/services/ai/openapi-tool-builder.service', () => ({
   validateToolArguments: (name: string, args: Record<string, unknown>) => hooks.__validate(name, args),
+  getOperationByName: (name: string) => hooks.__operations[name],
 }));
 jest.mock('../../src/services/ai/system-prompt.builder', () => ({
   buildSystemPrompt: () => 'SYS',
@@ -83,6 +85,8 @@ describe('AIAssistantService orchestration', () => {
   let execSignals: Array<AbortSignal | undefined>;
   let execResult: (name: string) => { status: number; data?: unknown; error?: string };
   let claimRows: unknown[];
+  /** What the conversation lookup returns: which token started it, with that token's permissions. */
+  let conversationRows: unknown[];
 
   const emit = (e: Record<string, unknown>) => events.push(e);
 
@@ -95,7 +99,9 @@ describe('AIAssistantService orchestration', () => {
     execSignals = [];
     execResult = () => ({ status: 200, data: { ok: true } });
     claimRows = [];
+    conversationRows = [{ api_token_id: null, permissions: null }];
     hooks.__customTools = {};
+    hooks.__operations = {};
 
     hooks.__query = async (sql: string, params?: unknown[]) => {
       queries.push({ sql, params: params ?? [] });
@@ -105,7 +111,7 @@ describe('AIAssistantService orchestration', () => {
         };
       }
       if (sql.includes('INSERT INTO ai_conversations')) return { rows: [{ id: CONV }] };
-      if (sql.includes('SELECT id FROM ai_conversations')) return { rows: [{ id: CONV }] };
+      if (sql.includes('FROM ai_conversations c')) return { rows: conversationRows };
       if (sql.includes('RETURNING id, metadata')) {
         // Mirrors the claim's "($2::uuid IS NULL OR id = $2::uuid)" batch filter.
         const batch = params?.[1];
@@ -611,5 +617,119 @@ describe('AIAssistantService orchestration', () => {
     expect(execCalls).toHaveLength(0); // truncated call never executed
     expect(llmCallCount).toBe(2); // loop continued with a retry instruction
     expect(events.some((e) => e.type === 'RUN_FINISHED')).toBe(true);
+  });
+
+  describe('conversations started with an API token', () => {
+    const TOKEN_PERMS = { resources: { clients: 'read' }, capabilities: ['assistant'] };
+    const access = (tokenId = 'tok-1', approvalMode: 'self' | 'in_app' = 'self') => ({
+      tokenId,
+      permissions: TOKEN_PERMS as any,
+      approvalMode,
+    });
+
+    beforeEach(() => {
+      hooks.__operations = {
+        get_clients: { method: 'GET', pathTemplate: '/api/clients' },
+        get_invoices: { method: 'GET', pathTemplate: '/api/invoices' },
+        post_clients: { method: 'POST', pathTemplate: '/api/clients' },
+      };
+    });
+
+    const resultFor = (id: string) =>
+      queries.find((q) => q.sql.includes("'tool'") && q.params[2] === id)?.params[1] as string | undefined;
+
+    it('stays within the token permissions even when the web app continues it', async () => {
+      conversationRows = [{ api_token_id: 'tok-1', permissions: TOKEN_PERMS }];
+      llmRounds = [
+        {
+          content: '',
+          toolCalls: [makeCall('r1', 'get_clients', {}), makeCall('r2', 'get_invoices', {})],
+          finishReason: 'tool_calls',
+        },
+        { content: 'Here you go.', toolCalls: [], finishReason: 'stop' },
+      ];
+      await run(); // signed-in web app session, no token
+
+      expect(execCalls.map((c) => c.name)).toEqual(['get_clients']);
+      expect(resultFor('r2')).toContain('invoices:read');
+    });
+
+    it('never puts a disallowed write on the approval card', async () => {
+      conversationRows = [{ api_token_id: 'tok-1', permissions: TOKEN_PERMS }];
+      llmRounds = [
+        { content: 'Creating it.', toolCalls: [makeCall('w1', 'post_clients', { name: 'X' })], finishReason: 'tool_calls' },
+        { content: 'I am not allowed to.', toolCalls: [], finishReason: 'stop' },
+      ];
+      await run();
+
+      expect(events.some((e) => e.type === 'TOOL_APPROVAL_REQUIRED')).toBe(false);
+      expect(execCalls).toHaveLength(0);
+      expect(resultFor('w1')).toContain('clients:write');
+    });
+
+    it('offers custom tools only when they declare API calls the token allows', async () => {
+      conversationRows = [{ api_token_id: 'tok-1', permissions: TOKEN_PERMS }];
+      hooks.__customTools = {
+        undeclared_tool: { name: 'undeclared_tool', requiresApproval: false },
+        client_lookup: { name: 'client_lookup', requiresApproval: false, apiAccess: [{ method: 'GET', path: '/api/clients' }] },
+      };
+      llmRounds = [
+        {
+          content: '',
+          toolCalls: [makeCall('c1', 'undeclared_tool', {}), makeCall('c2', 'client_lookup', {})],
+          finishReason: 'tool_calls',
+        },
+        { content: 'Done.', toolCalls: [], finishReason: 'stop' },
+      ];
+      await run();
+
+      expect(execCalls.map((c) => c.name)).toEqual(['client_lookup']);
+      expect(resultFor('c1')).toContain('not available to API tokens');
+    });
+
+    it("a token can't use the web app's or another token's conversations", async () => {
+      for (const startedBy of [null, 'tok-other']) {
+        conversationRows = [{ api_token_id: startedBy, permissions: startedBy ? TOKEN_PERMS : null }];
+        events = [];
+        const svc = new AIAssistantService();
+        await svc.initialize('user-1');
+        await svc.runStream('user-1', CONV, 'hello', 'User', 'u@x', 'en', 'Bearer t', [], emit, undefined, access());
+        expect(events).toEqual([expect.objectContaining({ type: 'RUN_ERROR', code: '404' })]);
+      }
+      expect(llmCallCount).toBe(0);
+    });
+
+    it('records the token on a new conversation and reports the in-app approval mode', async () => {
+      llmRounds = [
+        { content: 'Plan.', toolCalls: [makeCall('w1', 'post_time_entries', { a: 1 })], finishReason: 'tool_calls' },
+      ];
+      hooks.__operations.post_time_entries = { method: 'POST', pathTemplate: '/api/time-entries' };
+      const svc = new AIAssistantService();
+      await svc.initialize('user-1');
+      const writer = {
+        tokenId: 'tok-1',
+        permissions: { resources: { time_entries: 'write' }, capabilities: ['assistant'] } as any,
+        approvalMode: 'in_app' as const,
+      };
+      await svc.runStream('user-1', null, 'log 1h', 'User', 'u@x', 'en', 'Bearer t', [], emit, undefined, writer);
+
+      const insert = queries.find((q) => q.sql.includes('INSERT INTO ai_conversations'));
+      expect(insert?.params[2]).toBe('tok-1');
+      const approval = events.find((e) => e.type === 'TOOL_APPROVAL_REQUIRED') as any;
+      expect(approval.approvalMode).toBe('in_app');
+    });
+
+    it('re-checks an approved write against the current permissions before running it', async () => {
+      // Proposed while the token could write clients; narrowed to read before approval.
+      conversationRows = [{ api_token_id: 'tok-1', permissions: TOKEN_PERMS }];
+      claimRows = [{ id: 'amsg-1', metadata: { status: 'resolved', pending: [makeCall('w1', 'post_clients', { name: 'X' })] } }];
+      llmRounds = [{ content: 'Could not.', toolCalls: [], finishReason: 'stop' }];
+      const svc = new AIAssistantService();
+      await svc.initialize('user-1');
+      await svc.resumeRun('user-1', CONV, [{ toolCallId: 'w1', decision: 'approve' }], 'User', 'u@x', 'en', 'Bearer t', [], emit);
+
+      expect(execCalls).toHaveLength(0);
+      expect(resultFor('w1')).toContain('clients:write');
+    });
   });
 });
