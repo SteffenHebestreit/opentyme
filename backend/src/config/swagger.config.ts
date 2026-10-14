@@ -55,8 +55,10 @@ const swaggerDefinition = {
       bearerAuth: {
         type: 'http',
         scheme: 'bearer',
-        bearerFormat: 'JWT',
-        description: 'Enter your Keycloak access token'
+        description:
+          'A Keycloak access token (JWT), or a personal access token (oty_pat_…) created under ' +
+          'Configuration → API tokens. A personal access token can only call the routes its ' +
+          'permissions allow; see GET /api/api-tokens/current.'
       },
       keycloakAuth: {
         type: 'oauth2',
@@ -663,6 +665,10 @@ const swaggerDefinition = {
     {
       name: 'System',
       description: 'System administration endpoints'
+    },
+    {
+      name: 'API Tokens',
+      description: 'Personal access tokens for scripts, AI agents and MCP clients'
     }
   ]
 };

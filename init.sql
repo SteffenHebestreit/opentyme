@@ -2417,6 +2417,93 @@ CREATE TABLE IF NOT EXISTS public.schema_migrations (
 -- nothing once every entry carries its rate.
 CREATE INDEX IF NOT EXISTS idx_time_entries_unstamped ON public.time_entries(project_id, entry_date) WHERE hourly_rate IS NULL AND project_id IS NOT NULL;
 
+-- Migration: personal access tokens for the API, the assistant and MCP (idempotent)
+-- Only the SHA-256 hash of a token is stored; the plaintext is shown once and
+-- cannot be recovered. permissions = { resources: {<key>: level}, capabilities: [...] },
+-- see backend/src/services/auth/api-token-permissions.ts. expires_at NULL means "never".
+CREATE TABLE IF NOT EXISTS public.api_tokens (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL,
+    name character varying(100) NOT NULL,
+    description text,
+    token_hash character(64) NOT NULL,
+    token_prefix character varying(20) NOT NULL,
+    permissions jsonb NOT NULL DEFAULT '{"resources": {}, "capabilities": []}'::jsonb,
+    approval_mode character varying(10) NOT NULL DEFAULT 'self' CHECK (approval_mode IN ('self', 'in_app')),
+    expires_at timestamp with time zone,
+    last_used_at timestamp with time zone,
+    last_used_ip character varying(64),
+    last_used_user_agent character varying(255),
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_api_tokens_hash ON public.api_tokens(token_hash);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_api_tokens_user_name ON public.api_tokens(user_id, lower(name));
+CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON public.api_tokens(user_id);
+
+-- Which token started an assistant conversation (NULL = the web app).
+ALTER TABLE public.ai_conversations ADD COLUMN IF NOT EXISTS api_token_id uuid REFERENCES public.api_tokens(id) ON DELETE SET NULL;
+
+-- Migration: password reset links for Keycloak accounts (idempotent)
+-- One active link per user (a new request replaces it); only the SHA-256 hash
+-- of the emailed token is stored. user_id is the Keycloak user id.
+CREATE TABLE IF NOT EXISTS public.password_reset_tokens (
+    user_id uuid PRIMARY KEY,
+    token_hash character(64) NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_password_reset_tokens_hash ON public.password_reset_tokens(token_hash);
+
+-- Migration: API token activity log and expiry reminders (idempotent)
+-- No FK to api_tokens: the trail must outlive a revoked token, so it keeps
+-- the token's name. event: created | updated | regenerated | revoked | first_use | new_ip.
+CREATE TABLE IF NOT EXISTS public.api_token_events (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL,
+    token_id uuid,
+    token_name character varying(100) NOT NULL,
+    event character varying(20) NOT NULL,
+    details jsonb,
+    ip character varying(64),
+    user_agent character varying(255),
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_api_token_events_user ON public.api_token_events(user_id, created_at DESC);
+-- When the owner was told the token expires soon (reset when regenerated).
+ALTER TABLE public.api_tokens ADD COLUMN IF NOT EXISTS expiry_reminded_at timestamp with time zone;
+
+-- Migration: remember that a token started a conversation, also after the token is revoked (idempotent)
+-- (api_token_id is SET NULL on revoke; the conversation must stay limited.)
+ALTER TABLE public.ai_conversations ADD COLUMN IF NOT EXISTS started_by_token boolean NOT NULL DEFAULT false;
+UPDATE public.ai_conversations SET started_by_token = true WHERE api_token_id IS NOT NULL AND NOT started_by_token;
+
+-- Migration: OAuth for MCP clients — OpenTyme as authorization server (idempotent)
+-- Clients register themselves (RFC 7591); an approved authorization code is
+-- exchanged (PKCE) for an ordinary API token, which remembers its client.
+CREATE TABLE IF NOT EXISTS public.oauth_clients (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name character varying(100) NOT NULL,
+    redirect_uris jsonb NOT NULL,
+    token_endpoint_auth_method character varying(30) NOT NULL DEFAULT 'none',
+    client_secret_hash character(64),
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS public.oauth_authorization_codes (
+    code_hash character(64) PRIMARY KEY,
+    client_id uuid NOT NULL REFERENCES public.oauth_clients(id) ON DELETE CASCADE,
+    user_id uuid NOT NULL,
+    redirect_uri text NOT NULL,
+    code_challenge character varying(128) NOT NULL,
+    resource text,
+    permissions jsonb NOT NULL,
+    approval_mode character varying(10) NOT NULL,
+    token_expires_at timestamp with time zone,
+    expires_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE public.api_tokens ADD COLUMN IF NOT EXISTS oauth_client_id uuid REFERENCES public.oauth_clients(id) ON DELETE SET NULL;
+
 --
 -- PostgreSQL database dump complete
 --

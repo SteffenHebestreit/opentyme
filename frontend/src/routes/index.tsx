@@ -42,6 +42,8 @@ export const router = createBrowserRouter(
         // Protected routes (require authentication)
         { path: 'dashboard', loader: authGuardLoader, lazy: page(() => import('@/components/dashboard/Dashboard')) },
         { path: 'profile', loader: authGuardLoader, lazy: page(() => import('@/pages/profile/ProfilePage')) },
+        // OAuth consent for MCP clients (e.g. claude.ai connectors)
+        { path: 'oauth/authorize', loader: authGuardLoader, lazy: page(() => import('@/pages/oauth/OAuthAuthorizePage')) },
         { path: 'clients', loader: authGuardLoader, lazy: page(() => import('@/components/business/clients/ClientList')) },
         { path: 'projects', loader: authGuardLoader, lazy: page(() => import('@/components/business/projects/ProjectList')) },
         { path: 'time-entries', loader: authGuardLoader, lazy: page(() => import('@/components/business/time-tracking/TimeEntryList')) },

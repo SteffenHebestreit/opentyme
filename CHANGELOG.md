@@ -2,6 +2,65 @@
 
 ## Unreleased (since v1.5.0)
 
+### Security fix — registration could create administrators
+- **Anyone who could reach the app could register as an administrator**: the public sign-up
+  accepted a `role` field and assigned "admin" when asked. Sign-up no longer accepts a role.
+  Check Keycloak for admin accounts you don't recognise.
+
+### API tokens — connect scripts, AI agents and MCP clients
+- **Personal access tokens** (Configuration → Integrations → API tokens): each token gets
+  None, Read, Write or Delete per area (clients, projects, time, expenses, invoices,
+  payments, tax, templates, reports, addons) plus the features it may use — the assistant,
+  the MCP server, sending emails. Presets fill in common combinations. The token is shown
+  once; OpenTyme keeps only a hash. Editing or revoking applies on the next request.
+- A token can never sign in, change settings, administer the system or manage tokens, and
+  never acts as an administrator. Every API route is classified; a test fails if one isn't.
+- **The assistant for other agents:** over AG-UI (`/api/ai/run`) or **A2A 0.3** (agent card
+  at `/.well-known/agent-card.json`, JSON-RPC at `/api/ai/a2a`). A token sees only the
+  conversations it started, and such a conversation stays within the token's permissions —
+  also when you continue it. Per token you choose who approves the assistant's changes: the
+  connected app, or **you in the OpenTyme chat**.
+- **Chat history:** the assistant now lists past conversations, marks those started by a
+  token and those waiting for your approval; the chat button shows a dot when one waits.
+- **OpenTyme MCP server** at `/api/mcp` for Claude Code, Cursor and other MCP clients: a
+  curated set of tools (look-ups, summaries, logging time by project name, the timer,
+  creating clients, projects and invoices from time), filtered per token. The setup
+  dialog shows the `claude mcp add` command and an `mcpServers` block, filled in.
+- **Connect MCP clients by URL:** claude.ai connectors and other clients that support MCP
+  authorization need only `https://…/api/mcp`. OpenTyme signs you in, asks what the client
+  may do (read-only and 30 days to start with) and issues it an ordinary token, marked
+  "Connected via OAuth" in your list. OpenTyme is its own OAuth 2.1 server for this —
+  dynamic client registration, PKCE, no Keycloak changes.
+- **Administrators** see every user's tokens under System admin → API tokens and can revoke
+  any of them; the owner's activity log records it.
+- "Approve in OpenTyme" is a hard limit: such a token changes data only through the assistant
+  after your approval, never directly. You get an email whenever a token is added.
+- **Recent activity** per token (created, changed, regenerated, revoked, first use, use from
+  a new address), an email a week before a token expires, and a per-token rate limit
+  (600 requests/minute by default). Guide: [docs/API_TOKENS.md](docs/API_TOKENS.md).
+
+### Fixed on the way
+- **Signing out now ends the session at once.** A signed-out access token kept working for
+  up to 15 minutes: when Keycloak's check failed, the backend fell back to checking the
+  signature alone, and the sign-out request was cancelled by the redirect to the login.
+  Keycloak now decides; the signature check is used only when Keycloak can't be reached.
+- **"Forgot password" works again.** It always failed: it looked accounts up in a database
+  table that no longer exists (accounts live in Keycloak). Links are now single-use, expire
+  after an hour, are stored only as a hash, and a reset signs you out everywhere.
+- **Dates and amounts follow the app language** instead of the browser's: a German interface
+  in an English browser showed "Nov 13, 2026" and "1,234.50" in 22 places.
+- **Confirmation dialogs are announced properly** by screen readers (they were all just
+  "Dialog").
+- **An expired sign-in now sends you back to the login page.** Expired or invalid tokens got
+  "403 Forbidden" instead of "401", so the app showed errors instead of asking to sign in.
+- **Memory:** the backend created and kept a new in-memory session for every request
+  without a cookie, although nothing used sessions. Removed — it would have grown with
+  every API token call.
+- Removed five account endpoints that could only ever fail (they also used the missing
+  table), among them "delete my account", which didn't check the password it asked for.
+- Docs: API docs are at `/api-docs` (not `/api/api-docs`); the internal document converter
+  has no `mcp.localhost` route.
+
 ### New look — logo and "Polarlicht" colour scheme
 - **New logo:** a ring of four quarter hours, three of them tracked, around a T. It replaces the
   traced growth curve and stays legible down to a 16 px browser tab (app, favicon and README).

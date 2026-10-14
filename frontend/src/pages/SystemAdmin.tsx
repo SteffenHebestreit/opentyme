@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
+import { getAppLocale } from '../utils/locale';
 import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle,
@@ -26,6 +27,7 @@ import {
   Pencil,
   Plus,
   ShieldCheck,
+  KeyRound,
   Trash2,
   XCircle,
 } from 'lucide-react';
@@ -45,6 +47,7 @@ import {
   TabPanel,
 } from '../components/common';
 import type { BadgeVariant } from '../components/common/Badge';
+import { AllApiTokensTab } from '../components/admin/api-tokens/AllApiTokensTab';
 import { toast } from '../lib/toast';
 import { confirmDialog } from '../lib/confirm';
 
@@ -118,7 +121,7 @@ function IncludeOption({
 
 export default function SystemAdmin() {
   const { t } = useTranslation('system');
-  const [activeTab, setActiveTab] = useState<'backups' | 'schedules'>('backups');
+  const [activeTab, setActiveTab] = useState<'backups' | 'schedules' | 'apiTokens'>('backups');
   const [backups, setBackups] = useState<Backup[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -422,7 +425,7 @@ export default function SystemAdmin() {
       header: t('backups.table.created'),
       render: (backup) => (
         <span className="whitespace-nowrap tabular-nums text-gray-500 dark:text-gray-400">
-          {new Date(backup.started_at).toLocaleString()}
+          {new Date(backup.started_at).toLocaleString(getAppLocale())}
         </span>
       ),
       sortable: true,
@@ -469,10 +472,11 @@ export default function SystemAdmin() {
       <Tabs
         tabs={[
           { id: 'backups', label: t('tabs.backups'), icon: Database, badge: backups.length },
-          { id: 'schedules', label: t('tabs.schedules'), icon: CalendarClock, badge: schedules.length }
+          { id: 'schedules', label: t('tabs.schedules'), icon: CalendarClock, badge: schedules.length },
+          { id: 'apiTokens', label: t('tabs.apiTokens'), icon: KeyRound },
         ]}
         activeTab={activeTab}
-        onChange={(tabId) => setActiveTab(tabId as 'backups' | 'schedules')}
+        onChange={(tabId) => setActiveTab(tabId as 'backups' | 'schedules' | 'apiTokens')}
       />
 
       {/* Backups Tab */}
@@ -603,7 +607,7 @@ export default function SystemAdmin() {
                           <Clock className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                           <dt>{t('schedules.lastRun')}:</dt>
                           <dd className="tabular-nums text-gray-900 dark:text-gray-200">
-                            {new Date(schedule.last_run_at).toLocaleString()}
+                            {new Date(schedule.last_run_at).toLocaleString(getAppLocale())}
                           </dd>
                         </div>
                       )}
@@ -612,7 +616,7 @@ export default function SystemAdmin() {
                           <CalendarClock className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                           <dt>{t('schedules.nextRun')}:</dt>
                           <dd className="tabular-nums text-gray-900 dark:text-gray-200">
-                            {new Date(schedule.next_run_at).toLocaleString()}
+                            {new Date(schedule.next_run_at).toLocaleString(getAppLocale())}
                           </dd>
                         </div>
                       )}
@@ -647,6 +651,11 @@ export default function SystemAdmin() {
             </div>
           )}
         </div>
+      </TabPanel>
+
+      {/* API tokens of all users */}
+      <TabPanel tabId="apiTokens" activeTab={activeTab}>
+        <AllApiTokensTab active={activeTab === 'apiTokens'} />
       </TabPanel>
 
       {/* Create Backup Modal */}

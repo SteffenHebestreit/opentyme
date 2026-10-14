@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Sparkles, X } from 'lucide-react';
 import { useAIChat } from '../../api/hooks/useAIChat';
+import { getConversations } from '../../api/services/ai-chat.service';
 import AIChatPanel from './AIChatPanel';
 import { getSettings } from '../../api/services/settings.service';
 import { useAuth } from '../../contexts/AuthContext';
@@ -68,6 +69,21 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
 
   const approvalWaiting = !!chat.pendingApproval && chat.pendingApproval.actions.length > 0 && !chat.isStreaming;
 
+  // Saved conversations for the history view. Approvals can also come from
+  // outside this tab — an API token's run waiting for its owner — so look
+  // again every minute, whenever the panel opens and after each run.
+  const conversations = useQuery({
+    queryKey: ['aiConversations'],
+    queryFn: getConversations,
+    refetchInterval: 60_000,
+  });
+  const { refetch: refetchConversations } = conversations;
+  useEffect(() => {
+    if (open || !chat.isStreaming) void refetchConversations();
+  }, [open, chat.isStreaming, refetchConversations]);
+  const waitingElsewhere =
+    conversations.data?.some((c) => c.awaiting_approval && c.id !== chat.threadId) ?? false;
+
   return (
     <>
       {mounted && (
@@ -108,6 +124,10 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
               restoreFailed={chat.restoreFailed}
               onRetryRestore={chat.retryRestore}
               onDismissError={chat.dismissError}
+              conversations={conversations.data}
+              conversationsError={conversations.isError}
+              activeThreadId={chat.threadId}
+              onOpenConversation={chat.openConversation}
             />
           </div>
         </>
@@ -127,7 +147,7 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
         aria-label={
           open
             ? t('ai.close')
-            : approvalWaiting
+            : approvalWaiting || waitingElsewhere
               ? `${t('ai.open')} — ${t('ai.approvalWaiting', 'changes are waiting for your approval')}`
               : chat.isStreaming
                 ? `${t('ai.open')} — ${t('ai.thinking')}`
@@ -163,6 +183,13 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
           >
             {chat.pendingApproval?.actions.length}
           </span>
+        )}
+        {/* Another conversation (e.g. an API token's) waits for approval */}
+        {!open && !approvalWaiting && !chat.isStreaming && waitingElsewhere && (
+          <span
+            className="absolute right-0 top-0 h-3.5 w-3.5 animate-pop-in rounded-full border-2 border-white bg-amber-500 dark:border-gray-950"
+            aria-hidden="true"
+          />
         )}
       </button>
     </>

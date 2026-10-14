@@ -10,7 +10,6 @@
 
 import KcAdminClient from '@keycloak/keycloak-admin-client';
 import axios from 'axios';
-import jwt, { JwtPayload } from 'jsonwebtoken';
 import { logger } from '../utils/logger';
 
 interface KeycloakConfig {
@@ -22,24 +21,6 @@ interface KeycloakConfig {
   clientSecret: string;
 }
 
-interface TokenIntrospection {
-  active: boolean;
-  sub?: string;
-  preferred_username?: string;
-  email?: string;
-  email_verified?: boolean;
-  name?: string;
-  given_name?: string;
-  family_name?: string;
-  realm_access?: {
-    roles: string[];
-  };
-  exp?: number;
-  iat?: number;
-  aud?: string | string[];
-  iss?: string;
-  typ?: string;
-}
 
 interface UserInfo {
   id: string;
@@ -71,12 +52,19 @@ interface KeycloakUserRegistration {
   role?: string;
 }
 
+/** Keycloak refused a password (realm password policy); the message says why. */
+export class PasswordRejectedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PasswordRejectedError';
+  }
+}
+
 class KeycloakService {
   private client: KcAdminClient;
   private config: KeycloakConfig;
   private authenticated: boolean = false;
   private authPromise: Promise<void> | null = null;
-  private realmPublicKeyPem: string | null = null;
 
   constructor() {
     this.config = {
@@ -137,125 +125,6 @@ class KeycloakService {
   }
 
   /**
-   * Verify and introspect a token
-   * Returns token details if valid, null if invalid
-   */
-  async verifyToken(token: string): Promise<TokenIntrospection | null> {
-    try {
-      await this.authenticate();
-
-      // Use token introspection endpoint
-      const response = await fetch(
-        `${this.config.baseUrl}/realms/${this.config.realmName}/protocol/openid-connect/token/introspect`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            client_id: this.config.clientId,
-            client_secret: this.config.clientSecret,
-            token: token,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        logger.error('[Keycloak Service] Token introspection failed:', response.status);
-        return null;
-      }
-
-      const introspection: TokenIntrospection = await response.json();
-
-      if (!introspection.active) {
-        logger.warn('[Keycloak Service] Token introspection returned inactive token, falling back to local JWT verification');
-        return await this.verifyJwtLocally(token);
-      }
-
-      return introspection;
-    } catch (error) {
-      logger.error('[Keycloak Service] Token verification error:', error);
-      return null;
-    }
-  }
-
-  private async getRealmPublicKeyPem(): Promise<string> {
-    if (this.realmPublicKeyPem) {
-      return this.realmPublicKeyPem;
-    }
-
-    const response = await axios.get(`${this.config.baseUrl}/realms/${this.config.realmName}`);
-    const publicKey = response.data?.public_key;
-
-    if (!publicKey) {
-      throw new Error('Keycloak realm public key is missing');
-    }
-
-    this.realmPublicKeyPem = `-----BEGIN PUBLIC KEY-----\n${publicKey}\n-----END PUBLIC KEY-----`;
-    return this.realmPublicKeyPem;
-  }
-
-  private async verifyJwtLocally(token: string): Promise<TokenIntrospection | null> {
-    try {
-      const publicKeyPem = await this.getRealmPublicKeyPem();
-      const acceptedIssuers = [
-        process.env.KEYCLOAK_PUBLIC_URL ? `${process.env.KEYCLOAK_PUBLIC_URL}/realms/${this.config.realmName}` : null,
-        `${this.config.baseUrl}/realms/${this.config.realmName}`,
-      ].filter(Boolean) as string[];
-      const issuer = acceptedIssuers.length === 1
-        ? acceptedIssuers[0]
-        : acceptedIssuers as [string, ...string[]];
-
-      const payload = jwt.verify(token, publicKeyPem, {
-        algorithms: ['RS256'],
-        issuer,
-      }) as JwtPayload;
-
-      return {
-        active: true,
-        sub: payload.sub,
-        preferred_username: typeof payload.preferred_username === 'string' ? payload.preferred_username : undefined,
-        email: typeof payload.email === 'string' ? payload.email : undefined,
-        email_verified: typeof payload.email_verified === 'boolean' ? payload.email_verified : undefined,
-        name: typeof payload.name === 'string' ? payload.name : undefined,
-        given_name: typeof payload.given_name === 'string' ? payload.given_name : undefined,
-        family_name: typeof payload.family_name === 'string' ? payload.family_name : undefined,
-        realm_access: typeof payload.realm_access === 'object' && payload.realm_access !== null
-          ? payload.realm_access as { roles: string[] }
-          : undefined,
-        exp: typeof payload.exp === 'number' ? payload.exp : undefined,
-        iat: typeof payload.iat === 'number' ? payload.iat : undefined,
-        aud: Array.isArray(payload.aud) || typeof payload.aud === 'string' ? payload.aud : undefined,
-        iss: typeof payload.iss === 'string' ? payload.iss : undefined,
-        typ: typeof payload.typ === 'string' ? payload.typ : undefined,
-      };
-    } catch (error) {
-      logger.error('[Keycloak Service] Local JWT verification error:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Get user information from token introspection
-   */
-  getUserInfoFromToken(introspection: TokenIntrospection): UserInfo | null {
-    if (!introspection.active || !introspection.sub) {
-      return null;
-    }
-
-    return {
-      id: introspection.sub,
-      username: introspection.preferred_username || '',
-      email: introspection.email || '',
-      emailVerified: introspection.email_verified || false,
-      firstName: introspection.given_name,
-      lastName: introspection.family_name,
-      name: introspection.name,
-      roles: introspection.realm_access?.roles || [],
-    };
-  }
-
-  /**
    * Get user by ID from Keycloak
    */
   async getUserById(userId: string): Promise<any> {
@@ -270,6 +139,61 @@ class KeycloakService {
       logger.error('[Keycloak Service] Error fetching user:', error);
       return null;
     }
+  }
+
+  /**
+   * Get user by ID, telling "no such user" (null) apart from "Keycloak could
+   * not be asked" (throws). Callers that gate access need the difference —
+   * an outage must not look like a deleted account.
+   */
+  async findUserById(userId: string): Promise<any | null> {
+    await this.authenticate();
+    const user = await this.client.users.findOne({
+      realm: this.config.realmName,
+      id: userId,
+    });
+    return user ?? null;
+  }
+
+  /** The user with exactly this email address, or null. Throws when Keycloak can't be asked. */
+  async findUserByEmail(email: string): Promise<any | null> {
+    await this.authenticate();
+    const users = await this.client.users.find({
+      realm: this.config.realmName,
+      email,
+      exact: true,
+    });
+    return users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase()) ?? null;
+  }
+
+  /**
+   * Sets a user's password. Keycloak enforces the realm's password policy;
+   * a rejected password throws a PasswordRejectedError carrying Keycloak's reason.
+   */
+  async setUserPassword(userId: string, password: string): Promise<void> {
+    await this.authenticate();
+    try {
+      await this.client.users.resetPassword({
+        realm: this.config.realmName,
+        id: userId,
+        credential: { type: 'password', value: password, temporary: false },
+      });
+    } catch (error: any) {
+      const status = error?.response?.status;
+      if (status === 400) {
+        const data = error.responseData ?? error.response?.data;
+        throw new PasswordRejectedError(
+          data?.error_description || data?.errorMessage || 'The password does not meet the requirements.'
+        );
+      }
+      throw error;
+    }
+  }
+
+  /** Ends all of the user's sessions, e.g. after a password reset. */
+  async logoutUser(userId: string): Promise<void> {
+    await this.authenticate();
+    await this.client.users.logout({ realm: this.config.realmName, id: userId });
   }
 
   /**

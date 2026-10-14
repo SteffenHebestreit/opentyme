@@ -1,4 +1,5 @@
 import { FC, useMemo } from 'react';
+import { getAppLocale } from '../../utils/locale';
 import { useTranslation } from 'react-i18next';
 import { Briefcase, Clock3, FileWarning, HandCoins, TrendingUp, Users } from 'lucide-react';
 import { DashboardMetrics } from '../../api/types';
@@ -17,7 +18,7 @@ interface MetricsGridProps {
 }
 
 const formatMoney = (value: number) => formatCurrency(value);
-const formatCount = (value: number) => Math.round(value).toLocaleString();
+const formatCount = (value: number) => Math.round(value).toLocaleString(getAppLocale());
 
 /**
  * Dense grid of the day-to-day ("at a glance") metrics.

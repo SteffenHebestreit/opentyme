@@ -4,6 +4,9 @@ import axios from 'axios';
 import crypto from 'crypto';
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import { logger } from '../../utils/logger';
+import { isApiToken } from '../../services/auth/api-token.service';
+import { authenticateApiToken } from './api-token.middleware';
+import { setBearerChallenge } from './token-permission';
 
 // Use the internal service URL for backend-to-Keycloak communication so
 // token introspection does not depend on trusting the public certificate chain.
@@ -36,7 +39,7 @@ setInterval(() => {
       tokenCache.delete(token);
     }
   }
-}, 5 * 60 * 1000); // Clean up every 5 minutes
+}, 5 * 60 * 1000).unref(); // Clean up every 5 minutes; never keeps the process alive on its own
 
 /**
  * Remove a token from the introspection cache.
@@ -48,6 +51,29 @@ setInterval(() => {
  */
 export function invalidateTokenCache(token: string): boolean {
   return tokenCache.delete(token);
+}
+
+/**
+ * Headers that make Keycloak judge a token issued under its public URL.
+ *
+ * The browser gets its tokens from the public URL (issuer
+ * https://auth.example/realms/x), but the backend asks Keycloak over the
+ * internal URL. Keycloak checks the token's issuer against the URL it was
+ * asked on, so it called every browser token inactive — and the old fallback
+ * to a local signature check then accepted tokens even after sign-out.
+ * Keycloak runs with KC_PROXY_HEADERS=xforwarded, so forwarded headers for
+ * the public URL make it check against the right issuer.
+ */
+function introspectionHeaders(token: string): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
+  if (!KEYCLOAK_PUBLIC_URL) return headers;
+  const issuer = (jwt.decode(token) as JwtPayload | null)?.iss;
+  if (issuer !== `${KEYCLOAK_PUBLIC_URL.replace(/\/+$/, '')}/realms/${REALM}`) return headers;
+  const url = new URL(KEYCLOAK_PUBLIC_URL);
+  headers['X-Forwarded-Proto'] = url.protocol.replace(':', '');
+  headers['X-Forwarded-Host'] = url.host;
+  headers['X-Forwarded-Port'] = url.port || (url.protocol === 'https:' ? '443' : '80');
+  return headers;
 }
 
 /**
@@ -72,11 +98,7 @@ async function introspectToken(token: string): Promise<any> {
         client_secret: CLIENT_SECRET,
         token: token,
       }),
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      }
+      { headers: introspectionHeaders(token) }
     );
 
     const data = response.data;
@@ -93,7 +115,13 @@ async function introspectToken(token: string): Promise<any> {
     return data;
   } catch (error: any) {
     logger.error('[Keycloak] Token introspection error:', error.response?.data || error.message);
-    throw new Error('Failed to introspect token');
+    throw new IntrospectionUnavailableError();
+  }
+}
+
+class IntrospectionUnavailableError extends Error {
+  constructor() {
+    super('Failed to introspect token');
   }
 }
 
@@ -143,18 +171,23 @@ async function verifyJwtLocally(token: string): Promise<any | null> {
   }
 }
 
+/**
+ * Keycloak's answer is final: "inactive" means expired, signed out or
+ * revoked, and the token is refused. Only when Keycloak can't be asked at all
+ * is the signature checked locally, so an outage doesn't sign everyone out
+ * (sign-outs during the outage can't be seen then).
+ */
 async function validateToken(token: string): Promise<any> {
-  const introspection = await introspectToken(token);
-
-  if (introspection?.active) {
-    return introspection;
+  try {
+    const introspection = await introspectToken(token);
+    return introspection?.active ? introspection : null;
+  } catch (error) {
+    if (!(error instanceof IntrospectionUnavailableError)) throw error;
+    logger.warn('[Keycloak] Introspection unavailable, verifying the token signature locally', {
+      tokenFingerprint: fingerprintToken(token),
+    });
+    return verifyJwtLocally(token);
   }
-
-  logger.warn('[Keycloak] Token introspection returned inactive token, falling back to local JWT verification', {
-    tokenFingerprint: fingerprintToken(token),
-  });
-
-  return verifyJwtLocally(token);
 }
 
 /**
@@ -167,6 +200,7 @@ export const authenticateKeycloak = async (req: Request, res: Response, next: Ne
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      setBearerChallenge(res);
       res.status(401).json({
         error: 'Unauthorized',
         message: 'No token provided'
@@ -176,11 +210,19 @@ export const authenticateKeycloak = async (req: Request, res: Response, next: Ne
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
+    // Personal access tokens carry their own prefix and never reach Keycloak.
+    if (isApiToken(token)) {
+      await authenticateApiToken(req, res, next, token);
+      return;
+    }
+
     // Introspect the token with Keycloak
     const tokenInfo = await validateToken(token);
 
-    // Check if token is active
-    if (!tokenInfo.active) {
+    // Inactive, expired or unverifiable (validateToken returns null) — 401, so
+    // clients know to sign in again rather than treating it as a permission problem.
+    if (!tokenInfo?.active) {
+      setBearerChallenge(res, { error: 'invalid_token' });
       res.status(401).json({
         error: 'Unauthorized',
         message: 'Token is not active or has expired'
@@ -197,6 +239,7 @@ export const authenticateKeycloak = async (req: Request, res: Response, next: Ne
         }
       }
     };
+    req.authContext = { method: 'session' };
 
     logger.info(`[Keycloak] Token validated for user: ${tokenInfo.preferred_username}`);
     next();

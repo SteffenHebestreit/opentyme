@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { getAppLocale } from '../../../utils/locale';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Plus, Users } from 'lucide-react';
@@ -231,7 +232,7 @@ export default function ClientList() {
       const saved = change.replaceRateId
         ? await updateProjectRate.mutateAsync({ projectId: change.projectId, rateId: change.replaceRateId, payload })
         : await addProjectRate.mutateAsync({ projectId: change.projectId, payload });
-      const rate = new Intl.NumberFormat(undefined, {
+      const rate = new Intl.NumberFormat(getAppLocale(), {
         style: 'currency',
         currency: change.currency || 'EUR',
       }).format(saved.hourly_rate);

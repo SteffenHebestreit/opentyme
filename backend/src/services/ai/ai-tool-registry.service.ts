@@ -58,6 +58,13 @@ export interface CustomToolDefinition {
    * approval card is shown.
    */
   prepare?: (args: Record<string, unknown>, ctx: { bearerToken: string }) => Promise<Record<string, unknown>>;
+  /**
+   * The app API calls this tool makes (e.g. `{ method: 'GET', path: '/api/projects' }`).
+   * A conversation started with an API token may only use the tool when the
+   * token allows every one of them; a tool that doesn't declare its calls is
+   * not offered in such conversations at all.
+   */
+  apiAccess?: Array<{ method: string; path: string }>;
 }
 
 // ── Registry ──────────────────────────────────────────────────────────────────

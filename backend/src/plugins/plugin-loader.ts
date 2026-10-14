@@ -18,6 +18,7 @@ import { pluginRegistry } from './plugin-registry';
 import { logger } from '../utils/logger';
 import { pool } from '../utils/database';
 import { authenticateKeycloak, extractKeycloakUser } from '../middleware/auth/keycloak.middleware';
+import { registerAddonRoutePrefix } from '../services/auth/api-token-permissions';
 import { registerCustomTool } from '../services/ai/ai-tool-registry.service';
 import { registerSystemPromptExtension } from '../services/ai/system-prompt-registry.service';
 import semver from 'semver';
@@ -259,6 +260,8 @@ class PluginLoader {
             // Automatically protect all plugin routes with Keycloak auth.
             // Plugin developers do NOT need to add auth middleware themselves.
             app.use(prefix, authenticateKeycloak, extractKeycloakUser, addonPlugin.routes);
+            // API tokens reach addon routes only with the 'addons' permission.
+            registerAddonRoutePrefix(prefix);
             plugin.router = addonPlugin.routes;
             logger.info(`Plugin ${manifest.name} routes registered at ${prefix} (auth protected)`);
           }

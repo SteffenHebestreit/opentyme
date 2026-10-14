@@ -3,7 +3,8 @@
   "subtitle": "Verwalten Sie System-Backups, Wiederherstellung und automatische Backup-Zeitpläne",
   "tabs": {
     "backups": "Backups",
-    "schedules": "Zeitpläne"
+    "schedules": "Zeitpläne",
+    "apiTokens": "API-Tokens"
   },
   "backups": {
     "title": "Backup-Verlauf",
@@ -121,5 +122,27 @@
     "title": "Gefahrenbereich",
     "restore": "Eine Wiederherstellung überschreibt alle aktuellen Daten mit dem Stand der Sicherung.",
     "delete": "Gelöschte Sicherungen sind endgültig entfernt und können nicht wiederhergestellt werden."
+  },
+  "apiTokens": {
+    "title": "API-Tokens aller Benutzer",
+    "description": "Wer welches Token hat und was es darf. Widerrufen Sie ein Token, wenn jemand ausscheidet oder ein Token abhandenkommt – der Inhaber wird per E-Mail informiert.",
+    "columns": {
+      "owner": "Inhaber",
+      "token": "Token",
+      "access": "Zugriff",
+      "lastUsed": "Zuletzt verwendet",
+      "expires": "Läuft ab",
+      "actions": "Aktionen"
+    },
+    "unknownUser": "Unbekannter Benutzer",
+    "empty": "Noch keine API-Tokens.",
+    "loadError": "Die API-Tokens konnten nicht geladen werden.",
+    "revoke": {
+      "title": "Token widerrufen?",
+      "message": "„{{name}}“ von {{owner}} funktioniert sofort nicht mehr. {{owner}} wird per E-Mail informiert.",
+      "confirm": "Token widerrufen",
+      "success": "Token widerrufen",
+      "error": "Das Token konnte nicht widerrufen werden"
+    }
   }
 }

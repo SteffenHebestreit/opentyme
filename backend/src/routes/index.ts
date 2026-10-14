@@ -4,6 +4,9 @@ import { logger } from '../utils/logger';
 // Auth routes
 import authRoutes from './auth/auth.routes';
 import passwordResetRoutes from './auth/password-reset.routes';
+import apiTokenRoutes from './auth/api-token.routes';
+import oauthRoutes from './auth/oauth.routes';
+import { oauthController } from '../controllers/auth/oauth.controller';
 
 // Business routes
 import clientRoutes from './business/client.routes';
@@ -22,6 +25,7 @@ import recurringInvoiceRoutes from './financial/recurring-invoice.routes';
 
 // System routes
 import backupRoutes from './system/backup.routes';
+import apiTokenAdminRoutes from './system/api-token-admin.routes';
 import initializationRoutes from './system/initialization.routes';
 import settingsRoutes from './system/settings.routes';
 import pluginsRoutes from './system/plugins.routes';
@@ -33,7 +37,8 @@ import emailSendRoutes from './communication/email-send.routes';
 // AI routes
 import aiRoutes from './ai/ai-assistant.routes';
 import aiInsightsRoutes from './ai/ai-insights.routes';
-import { getAgentCard } from '../controllers/ai/ai-assistant.controller';
+import { getAgentCard } from '../controllers/ai/a2a.controller';
+import mcpRoutes from './mcp/mcp.routes';
 
 // Analytics routes
 import analyticsRoutes from './analytics/analytics.routes';
@@ -47,6 +52,15 @@ export default function setupRoutes(app: Application) {
 
   app.use('/api/password-reset', passwordResetRoutes);
   logger.debug('Password reset routes registered under /api/password-reset');
+
+  app.use('/api/api-tokens', apiTokenRoutes);
+
+  // OAuth 2.1 for MCP clients: OpenTyme is the authorization server
+  app.use('/api/oauth', oauthRoutes);
+  app.get('/.well-known/oauth-authorization-server', oauthController.authorizationServerMetadata);
+  app.get(['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/api/mcp'], oauthController.protectedResourceMetadata);
+  logger.debug('OAuth routes registered under /api/oauth and /.well-known/oauth-*');
+  logger.debug('API token routes registered under /api/api-tokens');
 
   // Business endpoints
   app.use('/api/clients', clientRoutes);
@@ -88,6 +102,9 @@ export default function setupRoutes(app: Application) {
   app.use('/api/system/backups', backupRoutes);
   logger.debug('Backup/Restore routes registered under /api/system/backups');
 
+  app.use('/api/system/api-tokens', apiTokenAdminRoutes);
+  logger.debug('API token administration registered under /api/system/api-tokens');
+
   app.use('/api/system', initializationRoutes);
   logger.debug('System initialization routes registered under /api/system');
 
@@ -125,9 +142,13 @@ export default function setupRoutes(app: Application) {
   app.use('/api/insights', aiInsightsRoutes);
   logger.debug('AI insights routes registered under /api/insights');
 
-  // A2A Agent Card at well-known path
-  app.get('/.well-known/agent.json', getAgentCard);
-  logger.debug('A2A Agent Card registered at /.well-known/agent.json');
+  // OpenTyme's MCP server (Streamable HTTP) for MCP clients with an API token
+  app.use('/api/mcp', mcpRoutes);
+  logger.debug('MCP server registered under /api/mcp');
+
+  // A2A agent card (public): agent-card.json is A2A 0.3, agent.json for older clients
+  app.get(['/.well-known/agent-card.json', '/.well-known/agent.json'], getAgentCard);
+  logger.debug('A2A agent card registered at /.well-known/agent-card.json');
 
   logger.info('All routes registered successfully');
 }

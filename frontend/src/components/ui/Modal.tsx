@@ -18,6 +18,9 @@ import { usePresence } from '../../hooks/ui/usePresence';
  * @property {boolean} [closeOnBackdrop=true] - Close when the backdrop is clicked
  * @property {boolean} [closeOnEsc=true] - Close on Escape
  * @property {boolean} [showCloseButton=true] - Show the × in the header
+ * @property {string} [labelledBy] - id of the element naming the dialog when it has no `title`
+ * @property {string} [describedBy] - id of the element describing the dialog
+ * @property {'dialog' | 'alertdialog'} [role='dialog'] - `alertdialog` for confirmations that interrupt
  */
 interface ModalProps {
   open: boolean;
@@ -31,6 +34,9 @@ interface ModalProps {
   closeOnBackdrop?: boolean;
   closeOnEsc?: boolean;
   showCloseButton?: boolean;
+  labelledBy?: string;
+  describedBy?: string;
+  role?: 'dialog' | 'alertdialog';
   className?: string;
   bodyClassName?: string;
 }
@@ -71,6 +77,9 @@ export const Modal: FC<ModalProps> = ({
   closeOnBackdrop = true,
   closeOnEsc = true,
   showCloseButton = true,
+  labelledBy,
+  describedBy,
+  role = 'dialog',
   className,
   bodyClassName,
 }) => {
@@ -174,10 +183,11 @@ export const Modal: FC<ModalProps> = ({
           sizeClass[size],
           className
         )}
-        role="dialog"
+        role={role}
         aria-modal="true"
-        aria-labelledby={shown.title ? titleId : undefined}
-        aria-label={shown.title ? undefined : 'Dialog'}
+        aria-labelledby={shown.title ? titleId : labelledBy}
+        aria-label={shown.title || labelledBy ? undefined : t('common.dialog', 'Dialog')}
+        aria-describedby={describedBy}
       >
         {(shown.title || showCloseButton) && (
           <div className="flex shrink-0 items-start justify-between gap-4 border-b border-gray-100 px-6 py-4 dark:border-gray-800">

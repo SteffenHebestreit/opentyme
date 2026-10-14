@@ -6,6 +6,7 @@ import { InvoicePdfController } from './invoice-pdf.controller';
 import { logger } from '../../utils/logger';
 import { processPlaceholders, PlaceholderContext, getAvailablePlaceholders } from '../../utils/placeholder';
 import { ForeignReferenceError, invalidReferenceBody, isUuid, ownsRow } from '../../services/ownership.service';
+import { ensureTokenAllows } from '../../middleware/auth/token-permission';
 
 /**
  * The authenticated user's id, or null after answering 401.
@@ -342,6 +343,11 @@ export class InvoiceController {
     }
     const userId = requireUserId(req, res);
     if (!userId) return;
+    // Cancelling is irreversible: for an API token it needs invoices:delete,
+    // whether it goes through /cancel or sets the status here.
+    if (req.body?.status === 'cancelled' && !ensureTokenAllows(req, res, [{ resource: 'invoices', level: 'delete' }])) {
+      return;
+    }
 
     try {
       const validatedBody = req.body; // Joi schema will validate all required fields

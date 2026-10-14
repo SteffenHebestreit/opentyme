@@ -135,11 +135,9 @@ describe('admin-only tools follow the routes’ real role guards', () => {
     expect(isAdminOnlyOperation({ method: 'POST', pathTemplate: '/api/system/backups/{id}/restore' })).toBe(true);
     expect(isAdminOnlyOperation({ method: 'POST', pathTemplate: '/api/system/initialize-users' })).toBe(true);
     expect(isAdminOnlyOperation({ method: 'GET', pathTemplate: '/api/settings' })).toBe(false);
-    expect(isAdminOnlyOperation({ method: 'GET', pathTemplate: '/api/auth/profile/{id}' })).toBe(true);
-    expect(isAdminOnlyOperation({ method: 'GET', pathTemplate: '/api/auth/users/all' })).toBe(true);
     expect(isAdminOnlyOperation({ method: 'GET', pathTemplate: '/api/auth/profile/me' })).toBe(false);
-    expect(isToolAllowedForRoles({ method: 'GET', pathTemplate: '/api/auth/users/all' }, ['user'])).toBe(false);
-    expect(isToolAllowedForRoles({ method: 'GET', pathTemplate: '/api/auth/users/all' }, ['admin'])).toBe(true);
+    expect(isToolAllowedForRoles({ method: 'GET', pathTemplate: '/api/system/backups' }, ['user'])).toBe(false);
+    expect(isToolAllowedForRoles({ method: 'GET', pathTemplate: '/api/system/backups' }, ['admin'])).toBe(true);
     expect(isAdminOnlyOperation({ method: 'CUSTOM', pathTemplate: 'log_time_entry' })).toBe(false);
   });
 
@@ -167,7 +165,7 @@ describe('admin-only tools follow the routes’ real role guards', () => {
     };
     walk(root);
     expect(guarded.sort()).toEqual([
-      'auth/auth.routes.ts',
+      'system/api-token-admin.routes.ts',
       'system/backup.routes.ts',
       'system/initialization.routes.ts',
     ]);

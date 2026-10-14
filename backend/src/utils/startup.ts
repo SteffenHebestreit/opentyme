@@ -446,6 +446,100 @@ async function ensureSchemaUpgrades(): Promise<void> {
         WHERE hourly_rate IS NULL AND project_id IS NOT NULL
     `);
 
+    // Personal access tokens. Only the SHA-256 hash is stored; the plaintext is
+    // shown once. expires_at NULL means the token never expires.
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS api_tokens (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        description TEXT,
+        token_hash CHAR(64) NOT NULL,
+        token_prefix VARCHAR(20) NOT NULL,
+        permissions JSONB NOT NULL DEFAULT '{"resources": {}, "capabilities": []}'::jsonb,
+        approval_mode VARCHAR(10) NOT NULL DEFAULT 'self' CHECK (approval_mode IN ('self', 'in_app')),
+        expires_at TIMESTAMP WITH TIME ZONE,
+        last_used_at TIMESTAMP WITH TIME ZONE,
+        last_used_ip VARCHAR(64),
+        last_used_user_agent VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_api_tokens_hash ON api_tokens(token_hash);
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_api_tokens_user_name ON api_tokens(user_id, lower(name));
+      CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON api_tokens(user_id);
+    `);
+
+    // Which token started an assistant conversation (NULL = the web app).
+    await db.query(
+      `ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS api_token_id UUID REFERENCES api_tokens(id) ON DELETE SET NULL`
+    );
+
+    // Password reset links: one per user, only the token's hash is stored.
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        user_id UUID PRIMARY KEY,
+        token_hash CHAR(64) NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_password_reset_tokens_hash ON password_reset_tokens(token_hash);
+    `);
+
+    // API token activity log — no FK, so the trail outlives a revoked token.
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS api_token_events (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL,
+        token_id UUID,
+        token_name VARCHAR(100) NOT NULL,
+        event VARCHAR(20) NOT NULL,
+        details JSONB,
+        ip VARCHAR(64),
+        user_agent VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_api_token_events_user ON api_token_events(user_id, created_at DESC);
+      ALTER TABLE api_tokens ADD COLUMN IF NOT EXISTS expiry_reminded_at TIMESTAMP WITH TIME ZONE;
+    `);
+
+    // A conversation started by a token stays limited after the token is
+    // revoked (api_token_id is then NULL), so remember who started it.
+    await db.query(`
+      ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS started_by_token BOOLEAN NOT NULL DEFAULT false;
+      UPDATE ai_conversations SET started_by_token = true WHERE api_token_id IS NOT NULL AND NOT started_by_token;
+    `);
+
+    // OAuth for MCP clients: registered clients, short-lived authorization
+    // codes, and which client a token was issued to.
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS oauth_clients (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(100) NOT NULL,
+        redirect_uris JSONB NOT NULL,
+        token_endpoint_auth_method VARCHAR(30) NOT NULL DEFAULT 'none',
+        client_secret_hash CHAR(64),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE TABLE IF NOT EXISTS oauth_authorization_codes (
+        code_hash CHAR(64) PRIMARY KEY,
+        client_id UUID NOT NULL REFERENCES oauth_clients(id) ON DELETE CASCADE,
+        user_id UUID NOT NULL,
+        redirect_uri TEXT NOT NULL,
+        code_challenge VARCHAR(128) NOT NULL,
+        resource TEXT,
+        permissions JSONB NOT NULL,
+        approval_mode VARCHAR(10) NOT NULL,
+        token_expires_at TIMESTAMP WITH TIME ZONE,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      ALTER TABLE api_tokens ADD COLUMN IF NOT EXISTS oauth_client_id UUID REFERENCES oauth_clients(id) ON DELETE SET NULL;
+    `);
+
     await enforceLinearDocumentVersions();
 
     logger.info('[Startup] ✓ Schema upgrades applied');

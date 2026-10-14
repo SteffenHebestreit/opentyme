@@ -16,6 +16,8 @@ import { logger } from '../../utils/logger';
 import { pool } from '../../utils/database';
 import { BoundedLru } from '../../utils/bounded-lru';
 import { getToolsWithMeta, LLMTool, ToolWithMeta } from './openapi-tool-builder.service';
+import type { ApiTokenPermissions } from '../auth/api-token-permissions';
+import { toolPermissionDenial } from './tool-permissions';
 
 // ~20 tools is the documented reliability cliff for small local models
 // (arXiv 2411.15399; OpenAI function-calling guide: "aim for fewer than 20").
@@ -32,7 +34,6 @@ const USE_EMBEDDINGS = (process.env.AI_TOOL_EMBEDDINGS ?? 'true') !== 'false';
  *  - routes/system/backup.routes.ts: router.use(requireAdmin) → all of /api/system/backups
  *  - routes/system/initialization.routes.ts: router.use(requireAdmin), mounted at
  *    /api/system → every /api/system/* request that reaches it
- *  - routes/auth/auth.routes.ts: GET/PUT /api/auth/profile/:id, GET /api/auth/users/all
  *
  * /auth and /system/backups are also excluded from tool generation
  * (BLOCKED_PREFIXES); this is the defence-in-depth gate.
@@ -41,9 +42,6 @@ const USE_EMBEDDINGS = (process.env.AI_TOOL_EMBEDDINGS ?? 'true') !== 'false';
  */
 const ADMIN_ONLY_ROUTES: Array<{ method?: string; path: RegExp }> = [
   { path: /^\/api\/system(\/|$)/ },
-  { method: 'GET', path: /^\/api\/auth\/profile\/\{[^}]+\}$/ },
-  { method: 'PUT', path: /^\/api\/auth\/profile\/\{[^}]+\}$/ },
-  { method: 'GET', path: /^\/api\/auth\/users\/all$/ },
 ];
 
 // Always-available tools: entity resolution + summaries/overviews. These survive
@@ -130,6 +128,11 @@ export interface SelectToolsOptions {
    * round trip per approve click.
    */
   reuseSticky?: boolean;
+  /**
+   * Conversation started with an API token: only offer tools the token's
+   * permissions allow (the executor enforces the same limit).
+   */
+  permissions?: ApiTokenPermissions | null;
 }
 
 // Sticky per-conversation tool selection (in-memory; single backend replica).
@@ -201,11 +204,15 @@ function validateCoreToolNames(allNames: Set<string>): void {
 }
 
 export async function selectTools(opts: SelectToolsOptions): Promise<LLMTool[]> {
-  const { userMessage, roles, apiUrl, apiKey, conversationId, reuseSticky } = opts;
+  const { userMessage, roles, apiUrl, apiKey, conversationId, reuseSticky, permissions } = opts;
 
   const allMeta = getToolsWithMeta();
   validateCoreToolNames(new Set(allMeta.map((t) => t.tool.function.name)));
-  const allowed = allMeta.filter((t) => isToolAllowedForRoles(t, roles));
+  const allowed = allMeta.filter(
+    (t) =>
+      isToolAllowedForRoles(t, roles) &&
+      (!permissions || toolPermissionDenial(t.tool.function.name, permissions) === null)
+  );
 
   // Resume fast path: reuse the set already selected for this conversation.
   if (reuseSticky && conversationId) {

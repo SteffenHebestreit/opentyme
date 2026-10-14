@@ -86,3 +86,47 @@ export const globalRateLimiter: RequestHandler = globalEnabled
       },
     })
   : (_req, _res, next) => next();
+
+/**
+ * Per-token limit for requests made with a personal access token — keyed by
+ * the token, so it works behind the proxy without TRUST_PROXY and one busy
+ * agent can't use up another's budget. Counts the assistant's and the MCP
+ * server's tool calls too, so a token can't multiply its budget through them.
+ * Defaults: 600 requests per minute; tune via API_TOKEN_RATE_LIMIT_WINDOW_MS /
+ * API_TOKEN_RATE_LIMIT_MAX. In-memory store (one backend replica).
+ */
+export const apiTokenRateLimiter: RequestHandler = rateLimit({
+  windowMs: envInt('API_TOKEN_RATE_LIMIT_WINDOW_MS', 60 * 1000),
+  max: envInt('API_TOKEN_RATE_LIMIT_MAX', 600),
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => (req.authContext?.method === 'pat' ? `pat:${req.authContext.tokenId}` : 'none'),
+  skip: (req) => req.authContext?.method !== 'pat',
+  message: { error: 'Too Many Requests', message: 'This API token made too many requests. Slow down and retry shortly.' },
+  handler: (req, res, _next, options) => {
+    const tokenId = req.authContext?.method === 'pat' ? req.authContext.tokenId : 'unknown';
+    logger.warn(`[RateLimit] API token ${tokenId} exceeded its limit on ${req.method} ${req.originalUrl.split('?')[0]}`);
+    res.status(options.statusCode).json(options.message);
+  },
+});
+
+/**
+ * OAuth client registration is open to anyone (RFC 7591), so it is limited
+ * per IP: 20 per hour by default (OAUTH_REGISTER_RATE_LIMIT_MAX).
+ */
+export const oauthRegisterRateLimiter: RequestHandler = rateLimit({
+  windowMs: envInt('OAUTH_REGISTER_RATE_LIMIT_WINDOW_MS', 60 * 60 * 1000),
+  max: envInt('OAUTH_REGISTER_RATE_LIMIT_MAX', 20),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'temporarily_unavailable', error_description: 'Too many registrations. Try again later.' },
+});
+
+/** The OAuth token endpoint: 60 requests per minute per IP by default (OAUTH_TOKEN_RATE_LIMIT_MAX). */
+export const oauthTokenRateLimiter: RequestHandler = rateLimit({
+  windowMs: envInt('OAUTH_TOKEN_RATE_LIMIT_WINDOW_MS', 60 * 1000),
+  max: envInt('OAUTH_TOKEN_RATE_LIMIT_MAX', 60),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'temporarily_unavailable', error_description: 'Too many token requests. Try again shortly.' },
+});

@@ -15,6 +15,7 @@
  * model to ask the user instead of being guessed.
  */
 
+import { TOOL_CALL_HEADER } from '../auth/internal-call';
 import axios from 'axios';
 import { registerCustomTool } from './ai-tool-registry.service';
 import { logger } from '../../utils/logger';
@@ -87,7 +88,7 @@ export function matchProject(project: string, projects: ProjectCandidate[]): { i
 
 async function fetchProjects(bearerToken: string): Promise<ProjectCandidate[]> {
   const res = await axios.get(`${INTERNAL_BASE_URL}/api/projects`, {
-    headers: { Authorization: bearerToken },
+    headers: { Authorization: bearerToken, [TOOL_CALL_HEADER]: '1' },
     timeout: 15000,
     maxContentLength: 2 * 1024 * 1024,
   });
@@ -174,6 +175,10 @@ export function registerCoreAiTools(): void {
       },
       required: ['project', 'entry_date', 'start_time', 'end_time'],
     },
+    apiAccess: [
+      { method: 'GET', path: '/api/projects' },
+      { method: 'POST', path: '/api/time-entries' },
+    ],
     // Resolve the project BEFORE the approval card is shown, so the user
     // reviews the exact project (name + id) that will be booked — and an
     // ambiguous or unknown name never reaches the card at all.
@@ -200,7 +205,7 @@ export function registerCoreAiTools(): void {
           duration_hours: Math.round((durationMinutes / 60) * 100) / 100,
           billable: true,
         },
-        { headers: { Authorization: ctx.bearerToken }, timeout: 15000, validateStatus: () => true }
+        { headers: { Authorization: ctx.bearerToken, [TOOL_CALL_HEADER]: '1' }, timeout: 15000, validateStatus: () => true }
       );
       if (res.status >= 400) {
         throw new Error(`Creating the time entry failed (${res.status}): ${JSON.stringify(res.data).slice(0, 300)}`);

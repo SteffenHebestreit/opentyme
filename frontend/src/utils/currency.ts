@@ -1,3 +1,4 @@
+import { getAppLocale } from './locale';
 /**
  * @fileoverview Currency utilities for multi-currency support in the frontend.
  * 
@@ -274,13 +275,13 @@ export function formatCurrency(value: number | string, currency?: string): strin
   }
 
   try {
-    return new Intl.NumberFormat(undefined, {
+    return new Intl.NumberFormat(getAppLocale(), {
       style: 'currency',
       currency: currencyCode,
     }).format(numericValue);
   } catch (_error) {
     // Fallback to EUR if currency code is invalid
-    return new Intl.NumberFormat(undefined, {
+    return new Intl.NumberFormat(getAppLocale(), {
       style: 'currency',
       currency: 'EUR',
     }).format(numericValue);

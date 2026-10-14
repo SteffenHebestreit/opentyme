@@ -1,4 +1,5 @@
 import { FC, useMemo } from 'react';
+import { getAppLocale } from '../../../utils/locale';
 import { useTranslation } from 'react-i18next';
 import { Eye, FilePen, LoaderCircle, Pencil, Trash2 } from 'lucide-react';
 import { formatDate } from '../../../utils/date';
@@ -76,29 +77,18 @@ interface InvoiceTableProps {
 }
 
 /**
- * Fallback currency formatter for USD.
- *
- * @constant
- */
-const currencyFormatter = new Intl.NumberFormat(undefined, {
-  style: 'currency',
-  currency: 'USD',
-  maximumFractionDigits: 2,
-});
-
-/**
  * Formats a value in the invoice's currency.
  * Falls back to USD if the currency is invalid.
  */
 const formatInCurrency = (value: number, currency: string | undefined): string => {
   try {
-    return new Intl.NumberFormat(undefined, {
+    return new Intl.NumberFormat(getAppLocale(), {
       style: 'currency',
       currency: currency || 'USD',
       maximumFractionDigits: 2,
     }).format(value);
   } catch (_error) {
-    return currencyFormatter.format(value);
+    return new Intl.NumberFormat(getAppLocale(), { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value);
   }
 };
 

@@ -24,6 +24,8 @@
     "refresh": "Refresh",
     "reset": "Reset",
     "clear": "Clear",
+    "copy": "Copy",
+    "copied": "Copied",
     "apply": "Apply",
     "yes": "Yes",
     "no": "No",
@@ -104,7 +106,8 @@
     "endDate": "End Date",
     "createdAt": "Created At",
     "updatedAt": "Updated At",
-    "deletedAt": "Deleted At"
+    "deletedAt": "Deleted At",
+    "dialog": "Dialog"
   },
   "status": {
     "active": "Active",
@@ -131,7 +134,8 @@
     "unsavedChanges": "You have unsaved changes. Are you sure you want to leave?",
     "noData": "No data available",
     "tryAgain": "Please try again",
-    "somethingWentWrong": "Something went wrong"
+    "somethingWentWrong": "Something went wrong",
+    "copyFailed": "Could not copy to the clipboard"
   },
   "time": {
     "second": "second",
@@ -246,7 +250,18 @@
       "timeout": "Speech recognition took too long. Please try again.",
       "network": "Connection to the server failed.",
       "invalidAudio": "The recording could not be processed. Please try again."
-    }
+    },
+    "history": "Conversations",
+    "backToChat": "Back to the chat",
+    "historyEmpty": "No saved conversations yet.",
+    "historyLoadError": "The conversations could not be loaded.",
+    "untitled": "Untitled conversation",
+    "viaToken": "via {{name}}",
+    "needsApproval": "Needs your approval",
+    "startedByToken": "Started by the API token “{{name}}”. It can only use what that token allows.",
+    "approvalWaitingElsewhere": "another conversation needs your approval",
+    "viaRevokedToken": "via a revoked API token",
+    "startedByRevokedToken": "Started by an API token that has since been revoked. The assistant can’t use any tools in this conversation."
   },
   "shell": {
     "mainNavigation": "Main navigation",

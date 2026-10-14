@@ -1,5 +1,4 @@
 import KcAdminClient from '@keycloak/keycloak-admin-client';
-import session from 'express-session';
 import { logger } from '../utils/logger';
 
 /**
@@ -22,29 +21,6 @@ const keycloakConfig = {
 export const kcAdminClient = new KcAdminClient({
   baseUrl: keycloakConfig.baseUrl,
   realmName: keycloakConfig.realm,
-});
-
-/**
- * Session Store
- * In production, use Redis or another persistent session store.
- * For development, MemoryStore is acceptable but data is lost on restart.
- */
-const memoryStore = new session.MemoryStore();
-
-/**
- * Session Configuration
- * Used by Keycloak to manage session state.
- */
-export const sessionConfig = session({
-  secret: process.env.SESSION_SECRET || 'change-me-in-production-use-random-string',
-  resave: false,
-  saveUninitialized: true,
-  store: memoryStore,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
 });
 
 /**

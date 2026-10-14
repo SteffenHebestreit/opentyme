@@ -6,12 +6,10 @@
  */
 
 import { Request, Response } from 'express';
-import { UserService } from '../../services/auth/user.service';
 import { KeycloakService } from '../../services/keycloak.service';
 import Joi from 'joi';
 import { logger } from '../../utils/logger';
 
-const userService = new UserService();
 const keycloakService = new KeycloakService();
 
 // Validation schemas using Joi
@@ -40,18 +38,9 @@ const loginSchema = Joi.object({
   password: Joi.string().required(),
 });
 
-const updateProfileSchema = Joi.object({
-  username: Joi.string().alphanum().min(3).max(30).optional(),
-  email: Joi.string().email().optional(),
-  first_name: Joi.string().allow('', null).optional(),
-  last_name: Joi.string().allow('', null).optional(),
-  // Role should not be updatable by a user directly via this endpoint
-  avatar_url: Joi.string().uri().allow('', null).optional(), 
-});
-
 /**
  * Controller for handling user authentication and profile management.
- * Provides endpoints for user registration, login, profile operations, and account management.
+ * Registration, login and the signed-in user's profile — all backed by Keycloak.
  */
 export class UserController {
   
@@ -146,139 +135,6 @@ export class UserController {
   }
 
   /**
-   * Retrieves the authenticated user's profile.
-   * Requires valid JWT token in Authorization header.
-   * User ID is extracted from the token by auth middleware.
-   * 
-   * @async
-   * @param {Request} req - Express request with authenticated user
-   * @param {Response} res - Express response object
-   * @returns {Promise<void>} Sends 200 with user profile or 404 if not found
-   * 
-   * @example
-   * GET /api/auth/profile
-   * Headers: { Authorization: "Bearer <token>" }
-   * Response: 200 { id: "uuid", username: "johndoe", email: "john@example.com", ... }
-   */
-  async getProfile(req: Request, res: Response): Promise<void> {
-    // The authentication middleware should populate req.user
-    const userId = (req as any).user?.id; 
-    if (!userId) {
-      res.status(401).json({ message: 'Unauthorized: No user ID found' });
-      return;
-    }
-
-    try {
-      const user = await userService.findById(userId);
-      if (!user) {
-        res.status(404).json({ message: 'User not found' });
-        return;
-      }
-      res.status(200).json(user);
-    } catch (err) {
-      logger.error('Get profile error:', err);
-      res.status(500).json({ message: 'Internal server error' });
-    }
-  }
-
-  /**
-   * Updates the authenticated user's profile.
-   * Supports partial updates (only provided fields are updated).
-   * Role cannot be updated through this endpoint (admin-only operation).
-   * Enforces unique username and email constraints.
-   * 
-   * @async
-   * @param {Request} req - Express request with authenticated user and body containing updates
-   * @param {Response} res - Express response object
-   * @returns {Promise<void>} Sends 200 with updated user or error response
-   * 
-   * @example
-   * PUT /api/auth/profile
-   * Headers: { Authorization: "Bearer <token>" }
-   * Body: { first_name: "Jane", avatar_url: "https://example.com/avatar.jpg" }
-   * Response: 200 { message: "Profile updated successfully", user: { ... } }
-   */
-  async updateProfile(req: Request, res: Response): Promise<void> {
-    const userId = (req as any).user?.id; 
-    if (!userId) {
-      res.status(401).json({ message: 'Unauthorized: No user ID found' });
-      return;
-    }
-    
-    // Admin might be able to update other users, but for now, it's self-update
-    // const targetUserId = req.params.id === 'me' ? userId : req.params.id; 
-
-    const { error, value } = updateProfileSchema.validate(req.body);
-    if (error) {
-      res.status(400).json({ message: 'Validation error', details: error.details });
-      return;
-    }
-
-    try {
-      const updatedUser = await userService.update(userId, value);
-      if (!updatedUser) {
-        res.status(404).json({ message: 'User not found' });
-        return;
-      }
-      res.status(200).json({
-        message: 'Profile updated successfully',
-        user: updatedUser,
-      });
-    } catch (err: any) {
-      if (err.message === 'Username or email already exists.') {
-        res.status(409).json({ message: err.message });
-      } else {
-        logger.error('Update profile error:', err);
-        res.status(500).json({ message: 'Internal server error' });
-      }
-    }
-  }
-
-  /**
-   * Deletes the authenticated user's account.
-   * Requires password confirmation in request body for security.
-   * This action cannot be undone. May fail if user has associated data (foreign key constraints).
-   * 
-   * @async
-   * @param {Request} req - Express request with authenticated user and body.password
-   * @param {Response} res - Express response object
-   * @returns {Promise<void>} Sends 200 on success or error response
-   * 
-   * @example
-   * DELETE /api/auth/account
-   * Headers: { Authorization: "Bearer <token>" }
-   * Body: { password: "SecurePass123!" }
-   * Response: 200 { message: "Account deleted successfully" }
-   */
-  async deleteAccount(req: Request, res: Response): Promise<void> {
-     const userId = (req as any).user?.id; 
-    if (!userId) {
-      res.status(401).json({ message: 'Unauthorized: No user ID found' });
-      return;
-    }
-    
-    try {
-        // Add a check for password confirmation before deleting an account
-        const { password } = req.body; // Expecting password in body for confirmation
-        if (!password) {
-            res.status(400).json({ message: 'Password is required to confirm deletion.' });
-            return;
-        }
-        
-
-        const deleted = await userService.delete(userId);
-        if (deleted) {
-          res.status(200).json({ message: 'Account deleted successfully' });
-        } else {
-          res.status(404).json({ message: 'User not found, or already deleted' });
-        }
-    } catch (err) {
-        logger.error('Delete account error:', err);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-  }
-
-  /**
    * Retrieves the authenticated user's profile (alias for getProfile).
    * Provides a more specific endpoint at /api/auth/me.
    * User data is extracted from Keycloak token by middleware.
@@ -308,38 +164,4 @@ export class UserController {
       res.status(500).json({ message: 'Internal server error' });
     }
   }
-
-  /**
-   * Retrieves all users (admin only).
-   * Returns empty array with message if no users found.
-   * Should be protected by admin authorization middleware.
-   * 
-   * @async
-   * @param {Request} req - Express request
-   * @param {Response} res - Express response object
-   * @returns {Promise<void>} Sends 200 with users array
-   * 
-   * @example
-   * GET /api/users
-   * Headers: { Authorization: "Bearer <admin-token>" }
-   * Response: 200 [
-   *   { id: "uuid", username: "user1", ... },
-   *   { id: "uuid", username: "user2", ... }
-   * ]
-   */
-  async getAllUsers(req: Request, res: Response) {
-    // Authentication and authorization (admin check) should be handled by middleware
-    try {
-      const users = await userService.findAll(); 
-      if (!users || users.length === 0) { // Handle case where no users are found or service returns null/undefined
-        res.status(200).json({ message: 'No users found.', users: [] });
-        return;
-      }
-      res.status(200).json(users);
-    } catch (err: any) {
-      logger.error('Get all users error:', err);
-      res.status(500).json({ message: 'Internal server error' });
-    }
-  }
-
 }

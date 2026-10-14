@@ -496,6 +496,26 @@ export function useAIChat() {
     localStorage.removeItem(THREAD_STORAGE_KEY);
   }, []);
 
+  /** Switch to another saved conversation (from the history list). */
+  const openConversation = useCallback(
+    (id: string) => {
+      if (id === threadIdRef.current) return;
+      runGenerationRef.current += 1;
+      abortRef.current?.abort();
+      abortRef.current = null;
+      threadIdRef.current = id;
+      didRestoreRef.current = true;
+      setMessages([]);
+      setThreadId(id);
+      setError(null);
+      setPendingApproval(null);
+      setIsStreaming(false);
+      localStorage.setItem(THREAD_STORAGE_KEY, id);
+      restore(id);
+    },
+    [restore]
+  );
+
   const dismissError = useCallback(() => setError(null), []);
 
   return {
@@ -511,6 +531,7 @@ export function useAIChat() {
     approve,
     stopStreaming,
     clearConversation,
+    openConversation,
     dismissError,
   };
 }

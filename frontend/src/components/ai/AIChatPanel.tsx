@@ -12,6 +12,8 @@ import {
   Ban,
   Check,
   ChevronRight,
+  History,
+  KeyRound,
   Loader2,
   MessageSquarePlus,
   Mic,
@@ -25,7 +27,8 @@ import {
   X,
 } from 'lucide-react';
 import type { UIMessage, PendingApproval } from '../../api/hooks/useAIChat';
-import type { ApprovalAction, ApprovalDecision } from '../../api/services/ai-chat.service';
+import type { ApprovalAction, ApprovalDecision, Conversation } from '../../api/services/ai-chat.service';
+import { ConversationHistory } from './ConversationHistory';
 import { startRecording } from '../../api/services/ai-transcription.service';
 import type { RecordingHandle, RecordingStatus, TranscriptionError } from '../../api/services/ai-transcription.service';
 import { Slot } from '../../plugins/slots/Slot';
@@ -51,6 +54,12 @@ interface Props {
   restoreFailed?: boolean;
   onRetryRestore?: () => void;
   onDismissError?: () => void;
+  /** Saved conversations for the history view (undefined while loading) */
+  conversations?: Conversation[];
+  conversationsError?: boolean;
+  activeThreadId?: string | null;
+  /** Enables the history view */
+  onOpenConversation?: (id: string) => void;
 }
 
 /** Scrolled this close to the bottom counts as "following the conversation" */
@@ -499,9 +508,17 @@ export default function AIChatPanel({
   restoreFailed = false,
   onRetryRestore,
   onDismissError,
+  conversations,
+  conversationsError = false,
+  activeThreadId = null,
+  onOpenConversation,
 }: Props) {
   const { t } = useTranslation('common');
   const [input, setInput] = useState('');
+  const [showHistory, setShowHistory] = useState(false);
+  const historyButtonRef = useRef<HTMLButtonElement>(null);
+  const activeConversation = conversations?.find((c) => c.id === activeThreadId);
+  const waitingElsewhere = conversations?.some((c) => c.awaiting_approval && c.id !== activeThreadId) ?? false;
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>('idle');
   const [speechError, setSpeechError] = useState<TranscriptionError | null>(null);
   const [atBottom, setAtBottom] = useState(true);
@@ -630,7 +647,22 @@ export default function AIChatPanel({
         : 'ready';
 
   return (
-    <div className="flex h-full flex-col bg-white dark:bg-gray-900">
+    <div className="relative flex h-full flex-col bg-white dark:bg-gray-900">
+      {showHistory && onOpenConversation && (
+        <ConversationHistory
+          conversations={conversations}
+          loadError={conversationsError}
+          activeThreadId={activeThreadId}
+          onOpen={(id) => {
+            onOpenConversation(id);
+            setShowHistory(false);
+          }}
+          onBack={() => {
+            setShowHistory(false);
+            historyButtonRef.current?.focus({ preventScroll: true });
+          }}
+        />
+      )}
       {/* Header */}
       <div className="flex shrink-0 items-center gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-600/10 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20">
@@ -658,9 +690,37 @@ export default function AIChatPanel({
                   : t('ai.ready')}
           </p>
         </div>
+        {onOpenConversation && (
+          <button
+            ref={historyButtonRef}
+            type="button"
+            onClick={() => setShowHistory(true)}
+            title={t('ai.history', 'Conversations')}
+            aria-label={
+              waitingElsewhere
+                ? `${t('ai.history', 'Conversations')} — ${t('ai.approvalWaitingElsewhere', 'another conversation needs your approval')}`
+                : t('ai.history', 'Conversations')
+            }
+            className={cn(
+              iconButtonClass,
+              'relative text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-200'
+            )}
+          >
+            <History className="h-4 w-4" aria-hidden="true" />
+            {waitingElsewhere && (
+              <span
+                className="absolute right-1 top-1 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-white dark:ring-gray-900"
+                aria-hidden="true"
+              />
+            )}
+          </button>
+        )}
         <button
           type="button"
-          onClick={onClear}
+          onClick={() => {
+            setShowHistory(false);
+            onClear();
+          }}
           title={t('ai.newConversation')}
           aria-label={t('ai.newConversation')}
           className={cn(
@@ -689,6 +749,22 @@ export default function AIChatPanel({
       {/* Messages */}
       <div className="relative min-h-0 flex-1">
         <div ref={scrollRef} onScroll={onScroll} className="h-full overflow-y-auto overscroll-contain px-4 py-4">
+          {(activeConversation?.api_token_name || activeConversation?.started_by_token) && (
+            <div className="mb-3 flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:border-gray-800 dark:bg-white/[0.03] dark:text-gray-300">
+              <KeyRound className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                {activeConversation.api_token_name
+                  ? t('ai.startedByToken', {
+                      name: activeConversation.api_token_name,
+                      defaultValue: 'Started by the API token “{{name}}”. It can only use what that token allows.',
+                    })
+                  : t(
+                      'ai.startedByRevokedToken',
+                      'Started by an API token that has since been revoked. The assistant can’t use any tools in this conversation.'
+                    )}
+              </span>
+            </div>
+          )}
           {restoreFailed && (
             <div className="mb-3 flex animate-fade-in items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-200">
               <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />

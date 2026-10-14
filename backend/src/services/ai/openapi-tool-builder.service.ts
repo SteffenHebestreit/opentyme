@@ -92,6 +92,9 @@ const BLOCKED_PREFIXES = [
   '/health',
   '/ai',
   '/system/backups',
+  // Runs under the user's session, so it could otherwise mint API tokens.
+  '/api-tokens',
+  '/system/api-tokens',
 ];
 
 const MAX_TOOL_NAME_LENGTH = 64;

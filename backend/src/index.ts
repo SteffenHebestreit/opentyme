@@ -5,6 +5,7 @@ import { runStartupInitialization, shouldRunStartupInitialization } from './util
 import BackupScheduler from './services/system/backup-scheduler.service';
 import recurringExpenseScheduler from './services/financial/recurring-expense-scheduler.service';
 import invoiceReminderScheduler from './services/financial/invoice-reminder-scheduler.service';
+import { apiTokenExpiryScheduler } from './services/auth/api-token-expiry-scheduler.service';
 import recurringInvoiceScheduler from './services/financial/recurring-invoice-scheduler.service';
 import projectRateScheduler from './services/business/project-rate-scheduler.service';
 import { mcpClient } from './services/mcp/mcp-client.service';
@@ -64,6 +65,13 @@ async function startServer() {
       logger.info('✅ Invoice reminder scheduler initialized successfully');
     } catch (err: any) {
       logger.error('Failed to initialize invoice reminder scheduler:', err);
+    }
+
+    // Remind owners a week before an API token expires
+    try {
+      apiTokenExpiryScheduler.initialize();
+    } catch (err: any) {
+      logger.error('Failed to initialize API token expiry reminders:', err);
     }
 
     // Initialize recurring invoice scheduler

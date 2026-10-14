@@ -26,4 +26,8 @@ export class BoundedLru<V> {
       if (oldest !== undefined) this.map.delete(oldest);
     }
   }
+
+  delete(key: string): boolean {
+    return this.map.delete(key);
+  }
 }

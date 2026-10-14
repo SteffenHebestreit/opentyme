@@ -18,7 +18,8 @@ jest.mock('../../src/utils/database', () => ({
     query: async (sql: string, params: unknown[] = []) => {
       ctlHooks.__ctlQueries.push({ sql, params });
       if (sql.includes('FROM settings')) return { rows: [{ ai_enabled: false }] };
-      if (sql.includes('SELECT id FROM ai_conversations')) return { rows: [{ id: params[0] }] };
+      // The conversation exists and was started in the web app (no token).
+      if (sql.includes('FROM ai_conversations c')) return { rows: [{ api_token_id: null, permissions: null }] };
       return { rows: [], rowCount: 0 };
     },
   }),
