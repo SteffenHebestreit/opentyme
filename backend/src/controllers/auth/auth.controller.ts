@@ -26,7 +26,8 @@ const registerSchema = Joi.object({
     .required(),
   first_name: Joi.string().optional().allow('', null),
   last_name: Joi.string().optional().allow('', null),
-  role: Joi.string().valid('user', 'admin').optional(),
+  // No `role`: registration is public, so it must never choose privileges
+  // (it once accepted role: 'admin'). Unknown keys are rejected.
 });
 
 const loginSchema = Joi.object({
@@ -91,7 +92,6 @@ export class UserController {
         password: value.password,
         firstName: value.first_name,
         lastName: value.last_name,
-        role: value.role,
       });
 
       res.status(201).json(result);
