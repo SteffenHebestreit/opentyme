@@ -42,6 +42,11 @@ export default defineConfig({
         target: process.env.VITE_API_URL || 'http://backend:8000',
         changeOrigin: true,
       },
+      // Public A2A agent card, served by the backend
+      '/.well-known/agent': {
+        target: process.env.VITE_API_URL || 'http://backend:8000',
+        changeOrigin: true,
+      },
     },
   },
   build: {

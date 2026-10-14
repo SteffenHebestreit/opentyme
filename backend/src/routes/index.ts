@@ -34,7 +34,7 @@ import emailSendRoutes from './communication/email-send.routes';
 // AI routes
 import aiRoutes from './ai/ai-assistant.routes';
 import aiInsightsRoutes from './ai/ai-insights.routes';
-import { getAgentCard } from '../controllers/ai/ai-assistant.controller';
+import { getAgentCard } from '../controllers/ai/a2a.controller';
 
 // Analytics routes
 import analyticsRoutes from './analytics/analytics.routes';
@@ -129,9 +129,9 @@ export default function setupRoutes(app: Application) {
   app.use('/api/insights', aiInsightsRoutes);
   logger.debug('AI insights routes registered under /api/insights');
 
-  // A2A Agent Card at well-known path
-  app.get('/.well-known/agent.json', getAgentCard);
-  logger.debug('A2A Agent Card registered at /.well-known/agent.json');
+  // A2A agent card (public): agent-card.json is A2A 0.3, agent.json for older clients
+  app.get(['/.well-known/agent-card.json', '/.well-known/agent.json'], getAgentCard);
+  logger.debug('A2A agent card registered at /.well-known/agent-card.json');
 
   logger.info('All routes registered successfully');
 }

@@ -237,12 +237,13 @@ export class AIAssistantService {
     await this.supersedeStaleApprovals(conversationId);
 
     // Persist user message
-    await db.query(
-      `INSERT INTO ai_messages (conversation_id, role, content) VALUES ($1, 'user', $2)`,
+    const userRow = await db.query(
+      `INSERT INTO ai_messages (conversation_id, role, content) VALUES ($1, 'user', $2) RETURNING id`,
       [conversationId, userMessage]
     );
 
-    emit({ type: EventType.RUN_STARTED, threadId: conversationId, runId });
+    // userMessageId: the stored turn this run answers (A2A uses it as the task id).
+    emit({ type: EventType.RUN_STARTED, threadId: conversationId, runId, userMessageId: userRow.rows[0]?.id });
 
     if (!this.enabled || !this.client) {
       const msgId = uuidv4();
@@ -519,6 +520,11 @@ export class AIAssistantService {
    * message sequence API-valid) and flips their status so /approve can no
    * longer execute them.
    */
+  /** Declines whatever still awaits approval in this conversation (e.g. a cancelled A2A task). */
+  async declinePendingApprovals(conversationId: string): Promise<void> {
+    await this.supersedeStaleApprovals(conversationId);
+  }
+
   private async supersedeStaleApprovals(conversationId: string): Promise<void> {
     const db = pool();
     const stale = await db.query(

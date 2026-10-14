@@ -7,15 +7,14 @@ import {
   ToolApprovalDecision,
   toRunErrorEvent,
 } from '../../services/ai/ai-assistant.service';
-import { openTyMEAgentCard } from '../../services/ai/a2a-agent.service';
 import { transcriptionService, TranscriptionError } from '../../services/ai/transcription.service';
 import { normalizeLanguage } from '../../services/ai/system-prompt.builder';
 import { runLockKey, tryAcquireRunLock, releaseRunLock } from '../../services/ai/run-lock';
 
 // ── Guardrails ────────────────────────────────────────────────────────────────
 
-const MAX_MESSAGE_LENGTH = 4000;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const MAX_MESSAGE_LENGTH = 4000;
+export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Basic prompt-injection detection: patterns that attempt to override the system role
 const INJECTION_PATTERNS = [
@@ -26,7 +25,7 @@ const INJECTION_PATTERNS = [
   /\[SYSTEM\]/i,
 ];
 
-function detectPromptInjection(text: string): boolean {
+export function detectPromptInjection(text: string): boolean {
   return INJECTION_PATTERNS.some((re) => re.test(text));
 }
 
@@ -34,7 +33,7 @@ function detectPromptInjection(text: string): boolean {
 const userRequestCounts = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_RPM = 20;
 
-function checkRateLimit(userId: string): boolean {
+export function checkRateLimit(userId: string): boolean {
   const now = Date.now();
   const entry = userRequestCounts.get(userId);
   if (!entry || now > entry.resetAt) {
@@ -421,17 +420,6 @@ export async function deleteConversation(req: Request, res: Response): Promise<v
     logger.error(`[AI Controller] deleteConversation error: ${msg}`);
     res.status(500).json({ error: 'Internal server error' });
   }
-}
-
-/**
- * GET /.well-known/agent.json  (A2A Agent Card)
- */
-export async function getAgentCard(req: Request, res: Response): Promise<void> {
-  const card = {
-    ...openTyMEAgentCard,
-    url: `${req.protocol}://${req.get('host')}`,
-  };
-  res.json(card);
 }
 
 /**
