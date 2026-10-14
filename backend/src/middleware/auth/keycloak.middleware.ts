@@ -207,7 +207,7 @@ export const authenticateKeycloak = async (req: Request, res: Response, next: Ne
         }
       }
     };
-    req.auth = { method: 'session' };
+    req.authContext = { method: 'session' };
 
     logger.info(`[Keycloak] Token validated for user: ${tokenInfo.preferred_username}`);
     next();

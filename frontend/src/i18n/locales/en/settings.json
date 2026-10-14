@@ -505,7 +505,15 @@
         "tryIt": "Try it",
         "tryItHint": "This command shows what the token is allowed to do:",
         "copyCommand": "Copy command",
-        "done": "I’ve copied it"
+        "done": "I’ve copied it",
+        "mcpClaudeCode": "Connect Claude Code",
+        "mcpClaudeCodeHint": "Adds OpenTyme as an MCP server:",
+        "mcpJson": "Connect another MCP client",
+        "mcpJsonHint": "For clients configured with an mcpServers block (e.g. Cursor):",
+        "a2a": "Connect an AI agent (A2A)",
+        "a2aHint": "Agents that speak A2A find the assistant through this agent card:",
+        "copyConfig": "Copy configuration",
+        "copyUrl": "Copy URL"
       },
       "regenerate": {
         "title": "Regenerate token",

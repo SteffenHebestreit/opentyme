@@ -30,7 +30,7 @@ jest.mock('../../src/middleware/auth/keycloak.middleware', () => {
       const session = /^Bearer session:(.+)$/.exec(req.headers.authorization ?? '');
       if (!session) return actual.authenticateKeycloak(req, res, next);
       req.kauth = { grant: { access_token: { content: { sub: session[1], email: 'olga@example.com', preferred_username: 'olga' } } } };
-      req.auth = { method: 'session' };
+      req.authContext = { method: 'session' };
       next();
     },
   };

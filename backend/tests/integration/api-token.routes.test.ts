@@ -34,7 +34,7 @@ jest.mock('../../src/middleware/auth/keycloak.middleware', () => {
           },
         },
       };
-      req.auth = { method: 'session' };
+      req.authContext = { method: 'session' };
       next();
     },
   };

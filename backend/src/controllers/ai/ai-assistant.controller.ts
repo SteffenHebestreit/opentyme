@@ -47,8 +47,8 @@ export function checkRateLimit(userId: string): boolean {
 
 /** The API token behind this request, or null for the signed-in web app. */
 export function tokenAccess(req: Request): TokenAccess | null {
-  return req.auth?.method === 'pat'
-    ? { tokenId: req.auth.tokenId, permissions: req.auth.permissions, approvalMode: req.auth.approvalMode }
+  return req.authContext?.method === 'pat'
+    ? { tokenId: req.authContext.tokenId, permissions: req.authContext.permissions, approvalMode: req.authContext.approvalMode }
     : null;
 }
 

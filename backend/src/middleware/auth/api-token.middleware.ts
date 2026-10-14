@@ -90,7 +90,7 @@ export async function authenticateApiToken(
       },
     },
   };
-  req.auth = {
+  req.authContext = {
     method: 'pat',
     tokenId: token.id,
     tokenName: token.name,
@@ -108,7 +108,7 @@ export async function authenticateApiToken(
  * so a token can never create or widen tokens. Use after authenticateKeycloak.
  */
 export function requireInteractiveSession(req: Request, res: Response, next: NextFunction): void {
-  if (req.auth?.method === 'session') {
+  if (req.authContext?.method === 'session') {
     next();
     return;
   }

@@ -293,11 +293,7 @@ const ApiTokensPage: FC = () => {
         onRegenerated={showSecret}
       />
 
-      <ApiTokenSecretModal
-        secret={revealed?.secret ?? null}
-        tokenName={revealed?.token.name ?? ''}
-        onClose={() => setRevealed(null)}
-      />
+      <ApiTokenSecretModal result={revealed} onClose={() => setRevealed(null)} />
     </div>
   );
 };

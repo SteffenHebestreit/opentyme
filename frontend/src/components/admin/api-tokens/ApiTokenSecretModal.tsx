@@ -5,30 +5,56 @@ import { Modal } from '../../ui/Modal';
 import { Button } from '../../common/Button';
 import { Alert } from '../../common/Alert';
 import { CopyButton } from '../../common/CopyButton';
+import type { ApiTokenWithSecret } from '../../../api/types';
 
 interface ApiTokenSecretModalProps {
   /** null = closed */
-  secret: string | null;
-  tokenName: string;
+  result: ApiTokenWithSecret | null;
   onClose: () => void;
 }
 
+/** A labelled, copyable snippet. */
+function Snippet({ title, hint, code, copyLabel }: { title: string; hint: string; code: string; copyLabel: string }) {
+  return (
+    <div>
+      <p className="section-label">{title}</p>
+      <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{hint}</p>
+      <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-gray-900 p-3 font-mono text-xs leading-relaxed text-gray-100 dark:bg-black/40">
+        {code}
+      </pre>
+      <div className="mt-2">
+        <CopyButton value={code} label={copyLabel} />
+      </div>
+    </div>
+  );
+}
+
 /**
- * Shows a new token secret — the only time it is ever visible. Clicking the
+ * Shows a new token secret — the only time it is ever visible — with
+ * ready-to-paste setups for what the token may be used for. Clicking the
  * backdrop doesn't close it, so the secret isn't lost by a stray click.
  */
-export const ApiTokenSecretModal: FC<ApiTokenSecretModalProps> = ({ secret, tokenName, onClose }) => {
+export const ApiTokenSecretModal: FC<ApiTokenSecretModalProps> = ({ result, onClose }) => {
   const { t } = useTranslation('settings');
   const labelId = useId();
-  const tryItCommand = secret
-    ? `curl -H "Authorization: Bearer ${secret}" ${window.location.origin}/api/api-tokens/current`
-    : '';
+  const secret = result?.secret ?? '';
+  const capabilities = result?.token.permissions.capabilities ?? [];
+  const origin = window.location.origin;
+  const copyCommand = t('admin.apiTokens.secret.copyCommand');
+
+  const tryIt = `curl -H "Authorization: Bearer ${secret}" ${origin}/api/api-tokens/current`;
+  const claudeCode = `claude mcp add --transport http opentyme ${origin}/api/mcp --header "Authorization: Bearer ${secret}"`;
+  const mcpJson = JSON.stringify(
+    { mcpServers: { opentyme: { url: `${origin}/api/mcp`, headers: { Authorization: `Bearer ${secret}` } } } },
+    null,
+    2
+  );
 
   return (
     <Modal
-      open={secret !== null}
+      open={result !== null}
       title={t('admin.apiTokens.secret.title')}
-      description={tokenName}
+      description={result?.token.name}
       icon={<KeyRound className="h-4 w-4" />}
       onClose={onClose}
       closeOnBackdrop={false}
@@ -39,8 +65,8 @@ export const ApiTokenSecretModal: FC<ApiTokenSecretModalProps> = ({ secret, toke
         </Button>
       }
     >
-      {secret && (
-        <div className="space-y-5">
+      {result && (
+        <div className="space-y-6">
           <Alert type="warning" message={t('admin.apiTokens.secret.warning')} />
 
           <div>
@@ -58,16 +84,38 @@ export const ApiTokenSecretModal: FC<ApiTokenSecretModalProps> = ({ secret, toke
             </div>
           </div>
 
-          <div>
-            <p className="section-label">{t('admin.apiTokens.secret.tryIt')}</p>
-            <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{t('admin.apiTokens.secret.tryItHint')}</p>
-            <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-gray-900 p-3 font-mono text-xs leading-relaxed text-gray-100 dark:bg-black/40">
-              {tryItCommand}
-            </pre>
-            <div className="mt-2">
-              <CopyButton value={tryItCommand} label={t('admin.apiTokens.secret.copyCommand')} />
-            </div>
-          </div>
+          <Snippet
+            title={t('admin.apiTokens.secret.tryIt')}
+            hint={t('admin.apiTokens.secret.tryItHint')}
+            code={tryIt}
+            copyLabel={copyCommand}
+          />
+
+          {capabilities.includes('mcp') && (
+            <>
+              <Snippet
+                title={t('admin.apiTokens.secret.mcpClaudeCode')}
+                hint={t('admin.apiTokens.secret.mcpClaudeCodeHint')}
+                code={claudeCode}
+                copyLabel={copyCommand}
+              />
+              <Snippet
+                title={t('admin.apiTokens.secret.mcpJson')}
+                hint={t('admin.apiTokens.secret.mcpJsonHint')}
+                code={mcpJson}
+                copyLabel={t('admin.apiTokens.secret.copyConfig')}
+              />
+            </>
+          )}
+
+          {capabilities.includes('assistant') && (
+            <Snippet
+              title={t('admin.apiTokens.secret.a2a')}
+              hint={t('admin.apiTokens.secret.a2aHint')}
+              code={`${origin}/.well-known/agent-card.json`}
+              copyLabel={t('admin.apiTokens.secret.copyUrl')}
+            />
+          )}
         </div>
       )}
     </Modal>

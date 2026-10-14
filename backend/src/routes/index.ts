@@ -35,6 +35,7 @@ import emailSendRoutes from './communication/email-send.routes';
 import aiRoutes from './ai/ai-assistant.routes';
 import aiInsightsRoutes from './ai/ai-insights.routes';
 import { getAgentCard } from '../controllers/ai/a2a.controller';
+import mcpRoutes from './mcp/mcp.routes';
 
 // Analytics routes
 import analyticsRoutes from './analytics/analytics.routes';
@@ -128,6 +129,10 @@ export default function setupRoutes(app: Application) {
   // AI insights (pre-aggregated query endpoints for LLM tool use)
   app.use('/api/insights', aiInsightsRoutes);
   logger.debug('AI insights routes registered under /api/insights');
+
+  // OpenTyme's MCP server (Streamable HTTP) for MCP clients with an API token
+  app.use('/api/mcp', mcpRoutes);
+  logger.debug('MCP server registered under /api/mcp');
 
   // A2A agent card (public): agent-card.json is A2A 0.3, agent.json for older clients
   app.get(['/.well-known/agent-card.json', '/.well-known/agent.json'], getAgentCard);

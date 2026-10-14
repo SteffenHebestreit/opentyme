@@ -147,12 +147,12 @@ export class ApiTokenController {
    * what it may do. The only route here a token itself may call.
    */
   async current(req: Request, res: Response): Promise<void> {
-    if (req.auth?.method !== 'pat') {
+    if (req.authContext?.method !== 'pat') {
       res.status(400).json({ message: 'This request was not made with an API token.' });
       return;
     }
     try {
-      const token = await apiTokenService.get(req.user!.id, req.auth.tokenId);
+      const token = await apiTokenService.get(req.user!.id, req.authContext.tokenId);
       if (!token) {
         res.status(404).json({ message: 'Token not found' });
         return;

@@ -10,10 +10,11 @@ declare global {
   namespace Express {
     interface Request {
       /**
-       * How the request authenticated; set by authenticateKeycloak. A 'pat'
+       * How the request authenticated; set by authenticateKeycloak. (Not `auth`:
+       * the MCP SDK uses that name for its own auth info.) A 'pat'
        * request (personal access token) is limited to the token's permissions.
        */
-      auth?:
+      authContext?:
         | { method: 'session' }
         | {
             method: 'pat';

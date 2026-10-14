@@ -505,7 +505,15 @@
         "tryIt": "Ausprobieren",
         "tryItHint": "Dieser Befehl zeigt, was das Token darf:",
         "copyCommand": "Befehl kopieren",
-        "done": "Ich habe es kopiert"
+        "done": "Ich habe es kopiert",
+        "mcpClaudeCode": "Claude Code verbinden",
+        "mcpClaudeCodeHint": "Fügt OpenTyme als MCP-Server hinzu:",
+        "mcpJson": "Anderen MCP-Client verbinden",
+        "mcpJsonHint": "Für Clients, die mit einem mcpServers-Block konfiguriert werden (z. B. Cursor):",
+        "a2a": "KI-Agenten verbinden (A2A)",
+        "a2aHint": "Agenten, die A2A sprechen, finden den Assistenten über diese Agent Card:",
+        "copyConfig": "Konfiguration kopieren",
+        "copyUrl": "URL kopieren"
       },
       "regenerate": {
         "title": "Token neu erzeugen",
