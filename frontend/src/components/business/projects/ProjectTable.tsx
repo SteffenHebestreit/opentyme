@@ -1,4 +1,5 @@
 import { FC, useMemo } from 'react';
+import { getAppLocale } from '../../../utils/locale';
 import { useTranslation } from 'react-i18next';
 import { CalendarClock, Coins, Loader2, Pencil, Trash2 } from 'lucide-react';
 import { Project, ProjectStatus } from '../../../api/types';
@@ -54,7 +55,7 @@ const formatCurrency = (value: number | null, currency: string = 'USD') => {
   if (value === null || Number.isNaN(value)) {
     return '—';
   }
-  return new Intl.NumberFormat(undefined, {
+  return new Intl.NumberFormat(getAppLocale(), {
     style: 'currency',
     currency: currency,
     maximumFractionDigits: 0,

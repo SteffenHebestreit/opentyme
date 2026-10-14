@@ -20,6 +20,7 @@
  */
 
 import { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import { getAppLocale } from '../../../utils/locale';
 import { useTranslation } from 'react-i18next';
 import clsx from 'clsx';
 import {
@@ -554,7 +555,7 @@ const DocumentForm: FC<{
                   <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
                     {project.hourly_rate != null
                       ? t('documents.rate.current', {
-                          rate: new Intl.NumberFormat(undefined, {
+                          rate: new Intl.NumberFormat(getAppLocale(), {
                             style: 'currency',
                             currency: project.currency || 'EUR',
                           }).format(Number(project.hourly_rate)),

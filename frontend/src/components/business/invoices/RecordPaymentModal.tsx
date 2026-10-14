@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { getAppLocale } from '../../../utils/locale';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '../../ui/Modal';
 import { Input, CustomSelect, Textarea } from '../../forms';
@@ -28,7 +29,7 @@ const fieldRow = 'grid gap-4 sm:grid-cols-2 [&>div]:mb-0';
 // Format currency
 const formatCurrency = (amount: number, currency: string = 'EUR'): string => {
   try {
-    return new Intl.NumberFormat(undefined, {
+    return new Intl.NumberFormat(getAppLocale(), {
       style: 'currency',
       currency,
       maximumFractionDigits: 2,

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { getAppLocale } from '../../utils/locale';
 import { prefersReducedMotion } from '../../hooks/ui/useReducedMotion';
 import { cn } from '../../lib/cn';
 
@@ -15,7 +16,7 @@ interface AnimatedNumberProps {
 }
 
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-const defaultFormat = (value: number) => value.toLocaleString();
+const defaultFormat = (value: number) => value.toLocaleString(getAppLocale());
 
 /**
  * A number that counts smoothly to its new value and briefly highlights when it

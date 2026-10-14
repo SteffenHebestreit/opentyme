@@ -21,6 +21,7 @@
  */
 
 import { FC, ReactNode, useMemo, useState } from 'react';
+import { getAppLocale } from '../../../utils/locale';
 import { Trans, useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -87,13 +88,13 @@ interface InvoiceDetailModalProps {
  */
 const formatCurrency = (value: number, currency: string | undefined) => {
   try {
-    return new Intl.NumberFormat(undefined, {
+    return new Intl.NumberFormat(getAppLocale(), {
       style: 'currency',
       currency: currency || 'USD',
       maximumFractionDigits: 2,
     }).format(value);
   } catch (_error) {
-    return new Intl.NumberFormat(undefined, {
+    return new Intl.NumberFormat(getAppLocale(), {
       style: 'currency',
       currency: 'USD',
       maximumFractionDigits: 2,

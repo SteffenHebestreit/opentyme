@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getAppLocale } from '../../../utils/locale';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Info, Pencil, RefreshCw, Repeat } from 'lucide-react';
@@ -154,7 +155,7 @@ function EditRecurringModal({ expense, isOpen, onClose, onSaved }: EditRecurring
             {t('recurring.nextOccurrenceInfo', 'Next scheduled generation')}:{' '}
             <strong className="font-medium tabular-nums text-gray-900 dark:text-white">
               {expense.next_occurrence
-                ? new Date(expense.next_occurrence).toLocaleDateString()
+                ? new Date(expense.next_occurrence).toLocaleDateString(getAppLocale())
                 : t('recurring.noNextOccurrence', 'Not scheduled')}
             </strong>
           </p>
@@ -195,7 +196,7 @@ export function RecurringExpensesManager() {
 
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString();
+    return new Date(dateString).toLocaleDateString(getAppLocale());
   };
 
   const getFrequencyLabel = (freq: string | null | undefined) => {

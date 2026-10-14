@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
+import { getAppLocale } from '../utils/locale';
 import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle,
@@ -422,7 +423,7 @@ export default function SystemAdmin() {
       header: t('backups.table.created'),
       render: (backup) => (
         <span className="whitespace-nowrap tabular-nums text-gray-500 dark:text-gray-400">
-          {new Date(backup.started_at).toLocaleString()}
+          {new Date(backup.started_at).toLocaleString(getAppLocale())}
         </span>
       ),
       sortable: true,
@@ -603,7 +604,7 @@ export default function SystemAdmin() {
                           <Clock className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                           <dt>{t('schedules.lastRun')}:</dt>
                           <dd className="tabular-nums text-gray-900 dark:text-gray-200">
-                            {new Date(schedule.last_run_at).toLocaleString()}
+                            {new Date(schedule.last_run_at).toLocaleString(getAppLocale())}
                           </dd>
                         </div>
                       )}
@@ -612,7 +613,7 @@ export default function SystemAdmin() {
                           <CalendarClock className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                           <dt>{t('schedules.nextRun')}:</dt>
                           <dd className="tabular-nums text-gray-900 dark:text-gray-200">
-                            {new Date(schedule.next_run_at).toLocaleString()}
+                            {new Date(schedule.next_run_at).toLocaleString(getAppLocale())}
                           </dd>
                         </div>
                       )}

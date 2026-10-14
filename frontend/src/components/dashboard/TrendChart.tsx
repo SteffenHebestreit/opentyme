@@ -1,4 +1,5 @@
 import { FC, useMemo } from 'react';
+import { getAppLocale } from '../../utils/locale';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/cn';
 import { TimeSeriesPoint } from '../../api/types';
@@ -80,7 +81,7 @@ export const TrendChart: FC<TrendChartProps> = ({
           ) : null}
         </div>
         <div className="shrink-0 text-right text-sm tabular-nums text-gray-500 dark:text-gray-400">
-          {t('trendChart.max')}: {maxValue.toLocaleString()} {unit ?? ''}
+          {t('trendChart.max')}: {maxValue.toLocaleString(getAppLocale())} {unit ?? ''}
         </div>
       </div>
 
@@ -104,7 +105,7 @@ export const TrendChart: FC<TrendChartProps> = ({
                       : 'bg-violet-500 dark:bg-violet-400/80'
                   )}
                   style={{ height: `${Math.max(normalizedValues[index], 6)}%` }}
-                  title={`${point.label}: ${point.value.toLocaleString()} ${unit ?? ''}`}
+                  title={`${point.label}: ${point.value.toLocaleString(getAppLocale())} ${unit ?? ''}`}
                 />
               </div>
               <span className="mt-2 h-4 text-xs font-medium leading-4 text-gray-500 dark:text-gray-400">
@@ -118,7 +119,7 @@ export const TrendChart: FC<TrendChartProps> = ({
       <div className="mt-4 flex items-center justify-between border-t border-gray-100 pt-3 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
         <span>{t('trendChart.total')}</span>
         <span className="font-medium tabular-nums text-gray-900 dark:text-white">
-          {total.toLocaleString()} {unit ?? ''}
+          {total.toLocaleString(getAppLocale())} {unit ?? ''}
         </span>
       </div>
     </div>

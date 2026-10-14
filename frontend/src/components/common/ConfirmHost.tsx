@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '../ui/Modal';
@@ -11,6 +12,9 @@ export function ConfirmHost() {
   const open = useConfirmStore((state) => state.open);
   const settle = useConfirmStore((state) => state.settle);
 
+  const id = useId();
+  const titleId = `${id}-title`;
+  const messageId = `${id}-message`;
   const danger = request?.tone === 'danger';
   const confirmLabel = request?.confirmLabel ?? (danger ? t('buttons.delete') : t('buttons.confirm'));
 
@@ -20,6 +24,9 @@ export function ConfirmHost() {
       onClose={() => settle(false)}
       size="sm"
       showCloseButton={false}
+      role="alertdialog"
+      labelledBy={titleId}
+      describedBy={request?.message ? messageId : undefined}
       footer={
         <>
           <Button variant="secondary" type="button" onClick={() => settle(false)}>
@@ -38,9 +45,13 @@ export function ConfirmHost() {
           </span>
         )}
         <div className="min-w-0 pt-0.5">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-white">{request?.title}</h2>
+          <h2 id={titleId} className="text-base font-semibold text-gray-900 dark:text-white">
+            {request?.title}
+          </h2>
           {request?.message && (
-            <div className="mt-1.5 text-sm text-gray-600 dark:text-gray-300">{request.message}</div>
+            <div id={messageId} className="mt-1.5 text-sm text-gray-600 dark:text-gray-300">
+              {request.message}
+            </div>
           )}
         </div>
       </div>

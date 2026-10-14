@@ -106,7 +106,8 @@
     "endDate": "Enddatum",
     "createdAt": "Erstellt am",
     "updatedAt": "Aktualisiert am",
-    "deletedAt": "Gelöscht am"
+    "deletedAt": "Gelöscht am",
+    "dialog": "Dialog"
   },
   "status": {
     "active": "Aktiv",

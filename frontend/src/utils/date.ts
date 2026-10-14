@@ -1,6 +1,4 @@
-const relativeFormatter = new Intl.RelativeTimeFormat(undefined, {
-  numeric: 'auto',
-});
+import { getAppLocale } from './locale';
 
 const SECOND = 1000;
 const MINUTE = SECOND * 60;
@@ -20,6 +18,7 @@ export function formatDistanceToNow(dateLike: string | Date | null | undefined):
     return 'invalid date';
   }
 
+  const relativeFormatter = new Intl.RelativeTimeFormat(getAppLocale(), { numeric: 'auto' });
   const now = new Date();
   const diff = date.getTime() - now.getTime();
   const absDiff = Math.abs(diff);
@@ -49,7 +48,7 @@ export function formatDate(dateLike: string | Date | null | undefined, options?:
   if (!dateLike) return '—';
   const date = typeof dateLike === 'string' ? new Date(dateLike) : dateLike;
   if (Number.isNaN(date.getTime())) return '—';
-  return new Intl.DateTimeFormat(undefined, options ?? { year: 'numeric', month: 'short', day: 'numeric' }).format(date);
+  return new Intl.DateTimeFormat(getAppLocale(), options ?? { year: 'numeric', month: 'short', day: 'numeric' }).format(date);
 }
 
 /*
