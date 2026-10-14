@@ -264,7 +264,7 @@ describe('personal access tokens', () => {
       expect((await request(app).get('/api/settings').set('Authorization', auth)).status).toBe(403);
       expect((await request(app).put('/api/settings').set('Authorization', auth).send({ ai_api_url: 'https://evil.example' })).status).toBe(403);
       expect((await request(app).get('/api/system/backups').set('Authorization', auth)).status).toBe(403);
-      expect((await request(app).get('/api/auth/users/all').set('Authorization', auth)).status).toBe(403);
+      expect((await request(app).get('/api/auth/profile/me').set('Authorization', auth)).status).toBe(403);
     });
 
     it('describes itself at /current', async () => {

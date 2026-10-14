@@ -162,7 +162,7 @@ describe('checkPermission', () => {
       ['POST', '/api/api-tokens'],
       ['PUT', '/api/settings'],
       ['POST', '/api/system/backups'],
-      ['GET', '/api/auth/users/all'],
+      ['GET', '/api/auth/profile/me'],
       ['POST', '/api/plugins/x/enable'],
     ]) {
       expect(checkPermission(everything, req(method, path)).ok).toBe(false);

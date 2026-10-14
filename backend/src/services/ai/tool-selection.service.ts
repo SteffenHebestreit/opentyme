@@ -32,7 +32,6 @@ const USE_EMBEDDINGS = (process.env.AI_TOOL_EMBEDDINGS ?? 'true') !== 'false';
  *  - routes/system/backup.routes.ts: router.use(requireAdmin) → all of /api/system/backups
  *  - routes/system/initialization.routes.ts: router.use(requireAdmin), mounted at
  *    /api/system → every /api/system/* request that reaches it
- *  - routes/auth/auth.routes.ts: GET/PUT /api/auth/profile/:id, GET /api/auth/users/all
  *
  * /auth and /system/backups are also excluded from tool generation
  * (BLOCKED_PREFIXES); this is the defence-in-depth gate.
@@ -41,9 +40,6 @@ const USE_EMBEDDINGS = (process.env.AI_TOOL_EMBEDDINGS ?? 'true') !== 'false';
  */
 const ADMIN_ONLY_ROUTES: Array<{ method?: string; path: RegExp }> = [
   { path: /^\/api\/system(\/|$)/ },
-  { method: 'GET', path: /^\/api\/auth\/profile\/\{[^}]+\}$/ },
-  { method: 'PUT', path: /^\/api\/auth\/profile\/\{[^}]+\}$/ },
-  { method: 'GET', path: /^\/api\/auth\/users\/all$/ },
 ];
 
 // Always-available tools: entity resolution + summaries/overviews. These survive

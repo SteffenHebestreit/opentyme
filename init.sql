@@ -2444,6 +2444,17 @@ CREATE INDEX IF NOT EXISTS idx_api_tokens_user ON public.api_tokens(user_id);
 -- Which token started an assistant conversation (NULL = the web app).
 ALTER TABLE public.ai_conversations ADD COLUMN IF NOT EXISTS api_token_id uuid REFERENCES public.api_tokens(id) ON DELETE SET NULL;
 
+-- Migration: password reset links for Keycloak accounts (idempotent)
+-- One active link per user (a new request replaces it); only the SHA-256 hash
+-- of the emailed token is stored. user_id is the Keycloak user id.
+CREATE TABLE IF NOT EXISTS public.password_reset_tokens (
+    user_id uuid PRIMARY KEY,
+    token_hash character(64) NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_password_reset_tokens_hash ON public.password_reset_tokens(token_hash);
+
 --
 -- PostgreSQL database dump complete
 --

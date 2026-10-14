@@ -71,6 +71,14 @@ interface KeycloakUserRegistration {
   role?: string;
 }
 
+/** Keycloak refused a password (realm password policy); the message says why. */
+export class PasswordRejectedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PasswordRejectedError';
+  }
+}
+
 class KeycloakService {
   private client: KcAdminClient;
   private config: KeycloakConfig;
@@ -284,6 +292,47 @@ class KeycloakService {
       id: userId,
     });
     return user ?? null;
+  }
+
+  /** The user with exactly this email address, or null. Throws when Keycloak can't be asked. */
+  async findUserByEmail(email: string): Promise<any | null> {
+    await this.authenticate();
+    const users = await this.client.users.find({
+      realm: this.config.realmName,
+      email,
+      exact: true,
+    });
+    return users.find((u: any) => u.email?.toLowerCase() === email.toLowerCase()) ?? null;
+  }
+
+  /**
+   * Sets a user's password. Keycloak enforces the realm's password policy;
+   * a rejected password throws a PasswordRejectedError carrying Keycloak's reason.
+   */
+  async setUserPassword(userId: string, password: string): Promise<void> {
+    await this.authenticate();
+    try {
+      await this.client.users.resetPassword({
+        realm: this.config.realmName,
+        id: userId,
+        credential: { type: 'password', value: password, temporary: false },
+      });
+    } catch (error: any) {
+      const status = error?.response?.status;
+      if (status === 400) {
+        const data = error.responseData ?? error.response?.data;
+        throw new PasswordRejectedError(
+          data?.error_description || data?.errorMessage || 'The password does not meet the requirements.'
+        );
+      }
+      throw error;
+    }
+  }
+
+  /** Ends all of the user's sessions, e.g. after a password reset. */
+  async logoutUser(userId: string): Promise<void> {
+    await this.authenticate();
+    await this.client.users.logout({ realm: this.config.realmName, id: userId });
   }
 
   /**

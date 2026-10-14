@@ -1,131 +1,77 @@
 /**
  * Password Reset Controller
  * Handles HTTP requests for password reset functionality.
- * Provides endpoints for requesting password reset tokens and resetting passwords.
- * Uses cryptographically secure tokens with 1-hour expiration.
+ * Provides endpoints for requesting a reset link and setting a new password.
+ * Accounts live in Keycloak; links are single-use and expire after one hour.
  */
 
 import { Request, Response } from 'express';
-import { UserService } from '../../services/auth/user.service';
-import { EmailService } from '../../services/external/email.service'; // We will create this service later
-import crypto from 'crypto';
+import { InvalidResetTokenError, PasswordResetService } from '../../services/auth/password-reset.service';
+import { PasswordRejectedError } from '../../services/keycloak.service';
 import { logger } from '../../utils/logger';
+
+/** The same answer whether or not the address has an account. */
+const LINK_SENT_MESSAGE =
+    'If your email address exists in our database, you will receive a password reset link shortly.';
 
 /**
  * Controller for handling password reset operations.
- * Uses secure token generation and email delivery for password reset workflow.
  */
 export class PasswordResetController {
-    private userService: UserService;
-    private emailService: EmailService;
-
-    constructor(userService: UserService, emailService: EmailService) {
-        this.userService = userService;
-        this.emailService = emailService;
-    }
+    constructor(private readonly passwordResetService: PasswordResetService) {}
 
     /**
-     * Requests a password reset token for a user.
-     * Generates a cryptographically secure token, saves it with 1-hour expiration,
-     * and sends reset link via email. For security, returns generic success message
-     * regardless of whether email exists in database.
-     * 
-     * @async
-     * @param {Request} req - Express request with body.email
-     * @param {Response} res - Express response object
-     * @returns {Promise<void>} Sends 200 with generic message or error response
-     * 
+     * Emails a reset link to the account with this address, if there is one.
+     *
      * @example
-     * POST /api/auth/request-password-reset
-     * Body: { email: "john@example.com" }
-     * Response: 200 {
-     *   message: "If your email address exists in our database, you will receive a password reset link shortly."
-     * }
+     * POST /api/password-reset/request
+     * Body: { email: "user@example.com" }
+     * Response: 200 { message: "If your email address exists ..." }
      */
-    // Request password reset token
     requestPasswordReset = async (req: Request, res: Response): Promise<void> => {
+        const { email } = req.body ?? {};
+        if (typeof email !== 'string' || !email.trim()) {
+            res.status(400).json({ message: 'Email is required.' });
+            return;
+        }
+
         try {
-            const { email } = req.body;
-
-            if (!email) {
-                res.status(400).json({ message: 'Email is required.' });
-                return;
-            }
-
-            const user = await this.userService.findByEmail(email);
-            if (!user) {
-                // Don't reveal if an email exists or not for security
-                res.status(200).json({ message: 'If your email address exists in our database, you will receive a password reset link shortly.' });
-                return;
-            }
-
-            const token = crypto.randomBytes(32).toString('hex');
-            await this.userService.savePasswordResetToken(user.id, token);
-
-            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-            const resetLink = `${frontendUrl}/reset-password?token=${token}`; 
-            await this.emailService.sendPasswordResetEmail(email, resetLink);
-
-            res.status(200).json({ message: 'If your email address exists in our database, you will receive a password reset link shortly.' });
+            await this.passwordResetService.requestReset(email.trim());
+            res.status(200).json({ message: LINK_SENT_MESSAGE });
         } catch (error) {
             logger.error('Error requesting password reset:', error);
-            res.status(500).json({ message: 'An internal server occurred. Please try again later.' });
+            res.status(500).json({ message: 'An internal server error occurred. Please try again later.' });
         }
     };
 
     /**
-     * Resets user password using a valid reset token.
-     * Validates token, checks expiration, updates password, and clears token.
-     * Token expires in 1 hour from generation.
-     * 
-     * @async
-     * @param {Request} req - Express request with body containing token and newPassword
-     * @param {Response} res - Express response object
-     * @returns {Promise<void>} Sends 200 on success or error response
-     * 
+     * Sets a new password using the token from the emailed link.
+     *
      * @example
-     * POST /api/auth/reset-password
-     * Body: {
-     *   token: "a1b2c3d4e5f6...",
-     *   newPassword: "NewSecurePass123!"
-     * }
-     * Response: 200 {
-     *   message: "Password has been successfully reset. You can now log in with your new password."
-     * }
-     * Response: 400 { message: "Invalid or expired token." }
+     * POST /api/password-reset/reset
+     * Body: { token: "...", newPassword: "..." }
+     * Response: 200 { message: "Password has been successfully reset. ..." }
      */
-    // Reset password using token
     resetPassword = async (req: Request, res: Response): Promise<void> => {
+        const { token, newPassword } = req.body ?? {};
+        if (typeof token !== 'string' || !token || typeof newPassword !== 'string' || !newPassword) {
+            res.status(400).json({ message: 'Token and new password are required.' });
+            return;
+        }
+
         try {
-            const { token, newPassword } = req.body;
-
-            if (!token || !newPassword) {
-                res.status(400).json({ message: 'Token and new password are required.' });
-                return;
-            }
-
-            const user = await this.userService.findByResetToken(token);
-            if (!user) {
-                res.status(400).json({ message: 'Invalid or expired token.' });
-                return;
-            }
-            
-            // Check if token is expired (e.g., 1 hour expiry)
-            // Assuming userService.findyByResetToken also checks expiration or we add a check here
-            // For now, let's assume the service handles it or we add a check later.
-            // A simple approach: store createdAt with token and check diff.
-
-            await this.userService.updateUserPassword(user.id, newPassword);
-            await this.userService.clearPasswordResetToken(user.id); 
-
-            res.status(200).json({ message: 'Password has been successfully reset. You can now log in with your new password.' });
+            await this.passwordResetService.resetPassword(token, newPassword);
+            res.status(200).json({
+                message: 'Password has been successfully reset. You can now log in with your new password.',
+            });
         } catch (error) {
-            logger.error('Error resetting password:', error);
-            // Handle specific cases like expired token more gracefully if needed
-            if (error instanceof Error && error.message.includes('expired')) {
-                 res.status(400).json({ message: 'Invalid or expired token.' });
+            if (error instanceof InvalidResetTokenError) {
+                res.status(400).json({ message: error.message });
+            } else if (error instanceof PasswordRejectedError) {
+                res.status(400).json({ message: error.message, code: 'PASSWORD_REJECTED' });
             } else {
-                res.status(500).json({ message: 'An internal server occurred. Please try again later.' });
+                logger.error('Error resetting password:', error);
+                res.status(500).json({ message: 'An internal server error occurred. Please try again later.' });
             }
         }
     };

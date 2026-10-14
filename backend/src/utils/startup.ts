@@ -476,6 +476,18 @@ async function ensureSchemaUpgrades(): Promise<void> {
       `ALTER TABLE ai_conversations ADD COLUMN IF NOT EXISTS api_token_id UUID REFERENCES api_tokens(id) ON DELETE SET NULL`
     );
 
+    // Password reset links: one per user, only the token's hash is stored.
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        user_id UUID PRIMARY KEY,
+        token_hash CHAR(64) NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_password_reset_tokens_hash ON password_reset_tokens(token_hash);
+    `);
+
     await enforceLinearDocumentVersions();
 
     logger.info('[Startup] ✓ Schema upgrades applied');

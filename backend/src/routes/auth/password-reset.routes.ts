@@ -1,22 +1,10 @@
 import { Router } from 'express';
 import { PasswordResetController } from '../../controllers/auth/password-reset.controller';
-import { UserService } from '../../services/auth/user.service';
-import { EmailService } from '../../services/external/email.service';
+import { PasswordResetService } from '../../services/auth/password-reset.service';
 import { passwordResetRateLimiter } from '../../middleware/rate-limit.middleware';
 
-// These will be injected by the main app or a route-specific DI mechanism
-
 const router = Router();
-
-// Initialize controller with services (this would ideally be handled by dependency injection)
-// For now, we'll assume these are available globally or passed in somehow.
-// A better approach is to have this initialized in the main index.ts and passed around.
-
-// This is a simplified setup. In a larger app, you'd use proper DI.
-const userService = new UserService(); // This should ideally be a singleton instance
-const emailService = new EmailService();
-const passwordResetController = new PasswordResetController(userService, emailService);
-
+const passwordResetController = new PasswordResetController(new PasswordResetService());
 
 router.post('/request', passwordResetRateLimiter, passwordResetController.requestPasswordReset);
 router.post('/reset', passwordResetRateLimiter, passwordResetController.resetPassword);
