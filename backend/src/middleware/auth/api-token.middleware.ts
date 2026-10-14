@@ -57,41 +57,6 @@ export async function authenticateApiToken(
     return;
   }
 
-  const path = req.baseUrl + req.path;
-  const check = checkPermission(token.permissions, requirementFor(req.method, path));
-  if (!check.ok) {
-    logger.warn(`[ApiToken] Token ${token.id} denied ${req.method} ${path}: needs ${check.missing}`);
-    res.set(
-      'WWW-Authenticate',
-      `Bearer realm="OpenTyme", error="insufficient_scope", scope="${check.missing}"`
-    );
-    res.status(403).json({
-      error: 'Forbidden',
-      message: `This token does not allow this request (needs ${check.missing}).`,
-      required: check.missing,
-    });
-    return;
-  }
-
-  // Same claims a Keycloak access token carries. No realm roles: a token
-  // never acts as an admin, whatever its owner may do when signed in.
-  req.kauth = {
-    grant: {
-      access_token: {
-        content: {
-          active: true,
-          sub: owner.id,
-          email: owner.email,
-          email_verified: owner.emailVerified,
-          preferred_username: owner.username,
-          given_name: owner.firstName,
-          family_name: owner.lastName,
-          name: [owner.firstName, owner.lastName].filter(Boolean).join(' ') || undefined,
-          realm_access: { roles: [] },
-        },
-      },
-    },
-  };
   req.authContext = {
     method: 'pat',
     tokenId: token.id,
@@ -100,12 +65,48 @@ export async function authenticateApiToken(
     approvalMode: token.approval_mode,
   };
 
-  // The assistant's and the MCP server's own tool calls come back over
-  // loopback with the same token — that is not new use of the token.
-  const ownToolCall = req.get(TOOL_CALL_HEADER) === '1' && isLoopback(req.ip);
-  if (!ownToolCall) apiTokenService.touch(token.id, req.ip, req.get('user-agent'));
-  logger.debug(`[ApiToken] Token ${token.id} authorised ${req.method} ${path}`);
-  apiTokenRateLimiter(req, res, next);
+  // The rate limit comes first, so refused requests count against it too.
+  apiTokenRateLimiter(req, res, () => {
+    const path = req.baseUrl + req.path;
+    const check = checkPermission(token.permissions, requirementFor(req.method, path));
+    if (!check.ok) {
+      logger.warn(`[ApiToken] Token ${token.id} denied ${req.method} ${path}: needs ${check.missing}`);
+      res.set('WWW-Authenticate', `Bearer realm="OpenTyme", error="insufficient_scope", scope="${check.missing}"`);
+      res.status(403).json({
+        error: 'Forbidden',
+        message: `This token does not allow this request (needs ${check.missing}).`,
+        required: check.missing,
+      });
+      return;
+    }
+
+    // Same claims a Keycloak access token carries. No realm roles: a token
+    // never acts as an admin, whatever its owner may do when signed in.
+    req.kauth = {
+      grant: {
+        access_token: {
+          content: {
+            active: true,
+            sub: owner.id,
+            email: owner.email,
+            email_verified: owner.emailVerified,
+            preferred_username: owner.username,
+            given_name: owner.firstName,
+            family_name: owner.lastName,
+            name: [owner.firstName, owner.lastName].filter(Boolean).join(' ') || undefined,
+            realm_access: { roles: [] },
+          },
+        },
+      },
+    };
+
+    // The assistant's and the MCP server's own tool calls come back over
+    // loopback with the same token — that is not new use of the token.
+    const ownToolCall = req.get(TOOL_CALL_HEADER) === '1' && isLoopback(req.ip);
+    if (!ownToolCall) apiTokenService.touch(token.id, req.ip, req.get('user-agent'));
+    logger.debug(`[ApiToken] Token ${token.id} authorised ${req.method} ${path}`);
+    next();
+  });
 }
 
 /**

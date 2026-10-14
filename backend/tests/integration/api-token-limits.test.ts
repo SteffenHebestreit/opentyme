@@ -65,6 +65,15 @@ describe('API token limits and reminders', () => {
     expect((await request(app).get('/api/clients').set('Authorization', `Bearer ${b.secret}`)).status).toBe(200);
   });
 
+  it('counts refused requests against the limit too', async () => {
+    const t = await apiTokenService.create(OWNER, { name: 'prober', permissions, expires_at: null });
+    const statuses: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      statuses.push((await request(app).get('/api/invoices').set('Authorization', `Bearer ${t.secret}`)).status);
+    }
+    expect(statuses).toEqual([403, 403, 403, 403, 403, 429]);
+  });
+
   it('reminds the owner once, a week ahead, of the tokens about to expire', async () => {
     await clean();
     const soon = await apiTokenService.create(OWNER, { name: 'expires soon', permissions, expires_at: new Date(Date.now() + 3 * DAY) });
