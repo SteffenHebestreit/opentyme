@@ -122,7 +122,8 @@
       "title": "Update invoice status?",
       "message": "The email was sent successfully. Do you want to update the invoice status to <strong>Sent</strong>, or keep it as <strong>Draft</strong>?",
       "keepDraft": "Keep as draft",
-      "markSent": "Mark as sent"
+      "markSent": "Mark as sent",
+      "markSentFailed": "Could not mark the invoice as sent. Please try again."
     }
   },
   "cancelModal": {

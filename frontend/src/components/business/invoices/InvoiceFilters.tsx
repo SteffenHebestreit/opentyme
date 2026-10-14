@@ -142,6 +142,7 @@ export const InvoiceFilters: FC<InvoiceFiltersProps> = ({
           options={statusOptions}
           size="md"
           className="sm:w-44"
+          aria-label={t('filters.status.label')}
         />
         <CustomSelect
           value={clientId}
@@ -149,6 +150,7 @@ export const InvoiceFilters: FC<InvoiceFiltersProps> = ({
           options={clientOptions}
           size="md"
           className="sm:w-48"
+          aria-label={t('filters.client.label')}
         />
       </div>
     </div>

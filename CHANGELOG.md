@@ -25,8 +25,34 @@
 - Status no longer depends on colour alone: invoice statuses carry an icon, payment amounts a
   +/− sign, the tax KPI says "Refund" or "Amount due", near-budget projects say so in text,
   selected time slots show a check mark, the hours trend lines differ by point shape, and
-  holidays on the hours charts get a marker and a short legend (weekends are set lighter).
+  holidays on the hours charts get a marker besides their colour.
 - Fixed: ordinary weekdays on the hours charts were coloured like weekends.
+
+### Fixed after the redesign — features that had stopped working
+- **Chart tooltips work again, in every chart.** Since the redesign, hovering a chart threw an
+  error and no details appeared (e.g. project, task and time span of an entry in the daily
+  timeline, hours per day, holiday names). Tooltip footers are now readable in light mode too.
+- **Weekends and holidays are marked again** on the weekly and monthly hours charts: a
+  background band behind the day, a marker after the label, the holiday name in the tooltip
+  and a small legend. Holidays are loaded for the year actually shown and the chart redraws
+  once they arrive.
+- **Expenses:** the categories merged into "Other" keep their own amounts and shares (listed
+  below it and in the tooltip); the category filter offers all categories again (it listed
+  only 10).
+- **Time entries:** a new entry no longer opens on yesterday's date between midnight and 2 am;
+  choosing a client no longer wipes what was already typed; **editing an entry no longer
+  overwrites its own hourly rate** (a rate of 0 € was replaced by the project rate, and any
+  stored rate by the rate of the day) — the rate is looked up again only when project or date
+  change.
+- Invoice search also finds project names (as the placeholder promises); "Mark as sent" reports
+  a failed save; the payments empty state accounts for the type filter.
+- Tax prepayments show PDF receipts in the preview (they appeared broken) and offer a download.
+- Email templates: German labels for "Default" and the categories, feedback when a delete
+  fails; report date presets in the compose page no longer shift by a day.
+- System admin: "New schedule" starts from the defaults, not from a cancelled edit. Reports:
+  switching the report type clears the previous report instead of exporting it under the new type.
+- Long names that are now cut to one line show in full on hover; filter selects without a
+  visible label have an accessible name again.
 
 ### Security — every account only ever sees and changes its own data
 - **Fixed: several endpoints did not check who owns a record.** Invoices, projects, time

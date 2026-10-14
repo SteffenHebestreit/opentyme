@@ -64,7 +64,10 @@ export const RecentInvoices: FC<RecentInvoicesProps> = ({ invoices }) => {
       accessorKey: 'client_name',
       header: t('recentInvoices.client'),
       render: (invoice) => (
-        <span className="block max-w-[12rem] truncate text-gray-600 dark:text-gray-300">
+        <span
+          className="block max-w-[12rem] truncate text-gray-600 dark:text-gray-300"
+          title={invoice.client_name ?? undefined}
+        >
           {invoice.client_name ?? '—'}
         </span>
       ),

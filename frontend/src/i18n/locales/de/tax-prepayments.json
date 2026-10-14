@@ -76,7 +76,8 @@
     "title": "Steuervorauszahlung Details",
     "periodInfo": "Zeitrauminformationen",
     "additionalInfo": "Zusätzliche Informationen",
-    "receiptPreviewAlt": "Beleg"
+    "receiptPreviewAlt": "Beleg",
+    "previewUnavailable": "Der Beleg kann hier nicht angezeigt werden. Bitte stattdessen herunterladen."
   },
   
   "summary": {

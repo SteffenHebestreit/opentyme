@@ -16,7 +16,7 @@
  * @module components/business/time-tracking/TimeEntryFormModal
  */
 
-import { FC, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -32,6 +32,7 @@ import { fetchTimeEntries, checkTimeEntryOverlap } from '../../../api/services/t
 import { getEffectiveRate } from '../../../api/services/project-rate.service';
 import { CalendarClock, ChevronDown, Clock } from 'lucide-react';
 import { cn } from '../../../lib/cn';
+import { toYmd } from '../../../utils/date';
 
 /**
  * Props for the TimeEntryFormModal component.
@@ -117,6 +118,112 @@ const DEFAULT_VALUES: FormValues = {
  * @constant
  */
 const formId = 'time-entry-form-modal';
+
+/**
+ * The hourly rate stored on an entry, as a form value, or null when it has
+ * none. 0 is a real rate (a goodwill hour), only null / undefined mean "none".
+ */
+const getStoredRate = (entry: TimeEntry | null | undefined): string | null =>
+  entry && entry.hourly_rate !== null && entry.hourly_rate !== undefined
+    ? String(entry.hourly_rate)
+    : null;
+
+/**
+ * The calendar day of an existing entry as the form shows it (`YYYY-MM-DD`):
+ * the date part of entry_date, or the LOCAL day of a legacy start_time.
+ */
+const getEntryFormDate = (entry: TimeEntry): string => {
+  if (entry.entry_date) return entry.entry_date.split('T')[0];
+  if (entry.start_time) return toYmd(new Date(entry.start_time));
+  return '';
+};
+
+/**
+ * Values the form starts from: an existing entry (edit) or now / today with the
+ * default project (create). Dates are calendar days in LOCAL time — built from
+ * the date parts, never via toISOString(), which is UTC and lands on the
+ * previous day shortly after midnight in Europe.
+ */
+const getInitialValues = (
+  initialEntry: TimeEntry | null | undefined,
+  defaultProjectId: string | undefined,
+  projects: Project[]
+): FormValues => {
+  if (!initialEntry) {
+    // For create mode, set default date to today and use current time as-is (no rounding)
+    const now = new Date();
+
+    const dateStr = toYmd(now); // YYYY-MM-DD, local
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`; // HH:mm
+
+    // Get hourly rate from default project if available
+    const defaultProject = projects.find(p => p.id === defaultProjectId);
+    const hourlyRate = defaultProject?.hourly_rate ? String(defaultProject.hourly_rate) : '';
+
+    return {
+      ...DEFAULT_VALUES,
+      project_id: defaultProjectId ?? DEFAULT_VALUES.project_id,
+      entry_date: dateStr,
+      start_time: timeStr,
+      hourly_rate: hourlyRate,
+    };
+  }
+
+  // Edit mode - extract date and time from entry
+  let entryDate = '';
+  let startTime = '';
+  let endTime = '';
+
+  if (initialEntry.entry_date) {
+    // New format: use entry_date, entry_time, and entry_end_time.
+    // entry_date is a calendar day ("YYYY-MM-DD", possibly with a time part):
+    // take its date part as is, without converting it through a timezone.
+    entryDate = getEntryFormDate(initialEntry);
+    startTime = initialEntry.entry_time ? initialEntry.entry_time.slice(0, 5) : '';
+    endTime = initialEntry.entry_end_time ? initialEntry.entry_end_time.slice(0, 5) : '';
+
+    // Derive end time from start + duration when entry_end_time is not stored
+    if (!endTime && startTime && initialEntry.duration_hours) {
+      const [h, m] = startTime.split(':').map(Number);
+      const endMinutes = h * 60 + m + Math.round(initialEntry.duration_hours * 60);
+      const endH = Math.floor(endMinutes / 60) % 24;
+      const endM = endMinutes % 60;
+      endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+    }
+  } else if (initialEntry.start_time) {
+    // Legacy format: extract from start_time timestamp (local day and time)
+    const startDate = new Date(initialEntry.start_time);
+    entryDate = getEntryFormDate(initialEntry);
+    startTime = `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`;
+
+    if (initialEntry.end_time) {
+      const endDate = new Date(initialEntry.end_time);
+      endTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
+    }
+  }
+
+  // The entry's own rate (0 included); the project's rate only when it has none
+  let hourlyRate = getStoredRate(initialEntry) ?? '';
+  if (hourlyRate === '') {
+    const entryProject = projects.find(p => p.id === initialEntry.project_id);
+    if (entryProject?.hourly_rate) {
+      hourlyRate = String(entryProject.hourly_rate);
+    }
+  }
+
+  return {
+    project_id: initialEntry.project_id,
+    task_name: initialEntry.task_name ?? '',
+    description: initialEntry.description ?? '',
+    category: initialEntry.category ?? '',
+    entry_date: entryDate,
+    start_time: startTime,
+    end_time: endTime,
+    billable: initialEntry.billable,
+    hourly_rate: hourlyRate,
+    duration_hours: initialEntry.duration_hours ? String(initialEntry.duration_hours) : '',
+  };
+};
 
 /**
  * Modal form component for logging and editing time entries.
@@ -216,84 +323,12 @@ export const TimeEntryFormModal: FC<TimeEntryFormModalProps> = ({
   const hasProjects = projects.length > 0;
   const [showTimeSlotPicker, setShowTimeSlotPicker] = useState(false);
 
-  const initialValues = useMemo<FormValues>(() => {
-    if (!initialEntry) {
-      // For create mode, set default date to today and use current time as-is (no rounding)
-      const now = new Date();
-      
-      const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
-      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`; // HH:mm
-      
-      // Get hourly rate from default project if available
-      const defaultProject = projects.find(p => p.id === defaultProjectId);
-      const hourlyRate = defaultProject?.hourly_rate ? String(defaultProject.hourly_rate) : '';
-      
-      return {
-        ...DEFAULT_VALUES,
-        project_id: defaultProjectId ?? DEFAULT_VALUES.project_id,
-        entry_date: dateStr,
-        start_time: timeStr,
-        hourly_rate: hourlyRate,
-      };
-    }
-    
-    // Edit mode - extract date and time from entry
-    let entryDate = '';
-    let startTime = '';
-    let endTime = '';
-    
-    if (initialEntry.entry_date) {
-      // New format: use entry_date, entry_time, and entry_end_time
-      entryDate = typeof initialEntry.entry_date === 'string' 
-        ? initialEntry.entry_date.split('T')[0]  
-        : new Date(initialEntry.entry_date).toISOString().split('T')[0];
-      startTime = initialEntry.entry_time ? initialEntry.entry_time.slice(0, 5) : '';
-      endTime = initialEntry.entry_end_time ? initialEntry.entry_end_time.slice(0, 5) : '';
-
-      // Derive end time from start + duration when entry_end_time is not stored
-      if (!endTime && startTime && initialEntry.duration_hours) {
-        const [h, m] = startTime.split(':').map(Number);
-        const endMinutes = h * 60 + m + Math.round(initialEntry.duration_hours * 60);
-        const endH = Math.floor(endMinutes / 60) % 24;
-        const endM = endMinutes % 60;
-        endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
-      }
-    } else if (initialEntry.start_time) {
-      // Legacy format: extract from start_time timestamp
-      const startDate = new Date(initialEntry.start_time);
-      entryDate = startDate.toISOString().split('T')[0];
-      startTime = `${String(startDate.getHours()).padStart(2, '0')}:${String(startDate.getMinutes()).padStart(2, '0')}`;
-      
-      if (initialEntry.end_time) {
-        const endDate = new Date(initialEntry.end_time);
-        endTime = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
-      }
-    }
-    
-    // Get hourly rate from entry or project
-    let hourlyRate = '';
-    if (initialEntry.hourly_rate) {
-      hourlyRate = String(initialEntry.hourly_rate);
-    } else {
-      const entryProject = projects.find(p => p.id === initialEntry.project_id);
-      if (entryProject?.hourly_rate) {
-        hourlyRate = String(entryProject.hourly_rate);
-      }
-    }
-    
-    return {
-      project_id: initialEntry.project_id,
-      task_name: initialEntry.task_name ?? '',
-      description: initialEntry.description ?? '',
-      category: initialEntry.category ?? '',
-      entry_date: entryDate,
-      start_time: startTime,
-      end_time: endTime,
-      billable: initialEntry.billable,
-      hourly_rate: hourlyRate,
-      duration_hours: initialEntry.duration_hours ? String(initialEntry.duration_hours) : '',
-    };
-  }, [defaultProjectId, initialEntry, projects]);
+  // The client filter narrows `projects` while the dialog is open. The form is
+  // (re)initialised only when it opens or another entry is edited, so picking
+  // a client never wipes what was typed; the latest list is read from a ref.
+  const projectsRef = useRef(projects);
+  projectsRef.current = projects;
+  const [mountValues] = useState(() => getInitialValues(initialEntry, defaultProjectId, projects));
 
   const {
     register,
@@ -302,10 +337,11 @@ export const TimeEntryFormModal: FC<TimeEntryFormModalProps> = ({
     setError,
     clearErrors,
     watch,
+    getValues,
     setValue,
     formState: { errors, dirtyFields },
   } = useForm<FormValues>({
-    defaultValues: initialValues,
+    defaultValues: mountValues,
   });
 
   // Watch time fields to auto-calculate duration
@@ -390,9 +426,13 @@ export const TimeEntryFormModal: FC<TimeEntryFormModalProps> = ({
    *
    * Falls back to the project's current rate only when the lookup fails, so a
    * network hiccup degrades to the old behaviour rather than an empty field.
+   *
+   * Editing keeps the rate stored on the entry (0 included: a goodwill hour, a
+   * rate set by hand) as long as the entry stays on its project and date; only
+   * moving it to another project or day looks the rate up again.
    */
   useEffect(() => {
-    if (!watchProjectId) return;
+    if (!open || !watchProjectId) return;
 
     // Never overwrite a rate the user typed themselves. dirtyFields is checked
     // at apply time rather than in the dependency list, so a rate edited while
@@ -404,6 +444,20 @@ export const TimeEntryFormModal: FC<TimeEntryFormModalProps> = ({
       if (cancelled || dirtyFieldsRef.current.hourly_rate) return;
       setValue('hourly_rate', value);
     };
+
+    const storedRate = getStoredRate(initialEntry);
+    if (
+      initialEntry &&
+      storedRate !== null &&
+      watchProjectId === initialEntry.project_id &&
+      watchEntryDate === getEntryFormDate(initialEntry)
+    ) {
+      // Back on (or still at) the entry's own project and day: its own rate
+      apply(storedRate);
+      return () => {
+        cancelled = true;
+      };
+    }
 
     getEffectiveRate(watchProjectId, watchEntryDate || undefined)
       .then(result => {
@@ -417,21 +471,34 @@ export const TimeEntryFormModal: FC<TimeEntryFormModalProps> = ({
       })
       .catch(() => {
         // Degrade to the project's current rate rather than an empty field.
-        const selectedProject = projects.find(p => p.id === watchProjectId);
+        const selectedProject = projectsRef.current.find(p => p.id === watchProjectId);
         if (selectedProject?.hourly_rate) apply(String(selectedProject.hourly_rate));
       });
 
     return () => {
       cancelled = true;
     };
-  }, [watchProjectId, watchEntryDate, projects, setValue]);
+    // Only the project and the date decide the rate; the project list is read
+    // from the ref, so narrowing it by client does not trigger a new lookup.
+  }, [open, initialEntry, watchProjectId, watchEntryDate, setValue]);
 
+  // (Re)initialise when the dialog opens, another entry is edited or the project
+  // list arrives (hasProjects) - not when the client filter narrows the list.
   useEffect(() => {
-    if (open) {
-      reset(initialValues);
-      clearErrors();
+    if (!open) return;
+    reset(getInitialValues(initialEntry, defaultProjectId, projectsRef.current));
+    clearErrors();
+  }, [clearErrors, defaultProjectId, hasProjects, initialEntry, open, reset]);
+
+  // A client picked while the dialog is open can hide the selected project from
+  // the list. Clear it then, so the form never saves a project it no longer shows.
+  useEffect(() => {
+    if (!open) return;
+    const selectedProjectId = getValues('project_id');
+    if (selectedProjectId && !projects.some((project) => project.id === selectedProjectId)) {
+      setValue('project_id', '', { shouldDirty: true });
     }
-  }, [clearErrors, initialValues, open, reset]);
+  }, [getValues, open, projects, setValue]);
 
   const handleFormSubmit = async (values: FormValues) => {
     if (!values.project_id) {

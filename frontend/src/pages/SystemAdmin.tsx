@@ -545,6 +545,16 @@ export default function SystemAdmin() {
               type="button"
               onClick={() => {
                 setSelectedSchedule(null);
+                // Start from the defaults, not from a schedule that was opened for editing and cancelled
+                setScheduleForm({
+                  schedule_name: '',
+                  is_enabled: true,
+                  cron_expression: '0 2 * * *',
+                  includes_database: true,
+                  includes_storage: true,
+                  includes_config: false,
+                  retention_days: 30,
+                });
                 setShowScheduleModal(true);
               }}
               leftIcon={<Plus className="h-4 w-4" />}

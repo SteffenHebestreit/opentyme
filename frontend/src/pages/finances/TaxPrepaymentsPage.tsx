@@ -333,24 +333,28 @@ export default function TaxPrepaymentsPage({ taxYear: propTaxYear }: TaxPrepayme
             onChange={setTaxTypeFilter}
             options={taxTypeOptions}
             size="md"
+            aria-label={t('fields.taxType')}
           />
           <CustomSelect
             value={yearFilter}
             onChange={setYearFilter}
             options={yearOptions}
             size="md"
+            aria-label={t('fields.taxYear')}
           />
           <CustomSelect
             value={quarterFilter}
             onChange={setQuarterFilter}
             options={quarterOptions}
             size="md"
+            aria-label={t('fields.quarter')}
           />
           <CustomSelect
             value={statusFilter}
             onChange={setStatusFilter}
             options={statusOptions}
             size="md"
+            aria-label={t('fields.status')}
           />
         </div>
       </div>

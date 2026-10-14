@@ -374,6 +374,7 @@ export default function PaymentsPage({ startDate: propStartDate, endDate: propEn
             options={paymentTypeOptions}
             size="md"
             className="sm:w-48"
+            aria-label={t('filters.paymentType')}
           />
           <CustomSelect
             value={paymentMethodFilter}
@@ -381,6 +382,7 @@ export default function PaymentsPage({ startDate: propStartDate, endDate: propEn
             options={paymentMethodOptions}
             size="md"
             className="sm:w-44"
+            aria-label={t('filters.paymentMethod')}
           />
         </div>
       </div>
@@ -397,7 +399,7 @@ export default function PaymentsPage({ startDate: propStartDate, endDate: propEn
             icon={CreditCard}
             title={t('noPayments')}
             description={
-              searchTerm || paymentMethodFilter !== 'all'
+              searchTerm || paymentMethodFilter !== 'all' || paymentTypeFilter !== 'all'
                 ? t('tryAdjustingFilters')
                 : t('noPaymentsMessage')
             }

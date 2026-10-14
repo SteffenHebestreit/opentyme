@@ -22,7 +22,7 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Toolti
 import { Bar } from 'react-chartjs-2';
 import { getDayKindForDate, prefetchHolidays, holidayDateCache } from '../../../utils/holidays-api';
 import { useChartTheme } from '../../../hooks/ui/useChartTheme';
-import { chartColors, getBarChartOptions, getChartThemeColors, getDayTickStyle, getSeriesFill } from '../../../utils/chartConfig';
+import { chartColors, dayBandsPlugin, getBarChartOptions, getChartThemeColors, getDayTickStyle, getSeriesFill } from '../../../utils/chartConfig';
 import { DayMarkerLegend } from './DayMarkerLegend';
 import { AnimatedNumber } from '../../common/AnimatedNumber';
 import { fieldClasses, fieldLabelClass } from '../../forms/fieldStyles';
@@ -84,18 +84,11 @@ export const MonthlyHoursChart: FC<MonthlyHoursChartProps> = ({
   const [viewMode, setViewMode] = useState<ViewMode>('daily');
   const [groupMode, setGroupMode] = useState<GroupMode>('none');
   const [showFilters, setShowFilters] = useState(false);
-  const [holidaysLoaded, setHolidaysLoaded] = useState(false);
+  const [holidaysLoaded, setHolidaysLoaded] = useState(0);
   
   // Get localization settings from localStorage
   const region = localStorage.getItem('user_region') || undefined;
   
-  // Prefetch holiday data for current year and trigger re-render when loaded
-  useEffect(() => {
-    const currentYear = new Date().getFullYear();
-    prefetchHolidays(currentYear, 'DE').then(() => {
-      setHolidaysLoaded(true);
-    });
-  }, []);
   
   // Get month range - use provided dates or calculate current month
   const currentMonthRange = useMemo(() => {
@@ -122,6 +115,18 @@ export const MonthlyHoursChart: FC<MonthlyHoursChartProps> = ({
       end: formatDate(end),
     };
   }, [monthStart, monthEnd]);
+
+  // Load the holidays of the shown range's year(s); the chart redraws once they are in
+  useEffect(() => {
+    const years = new Set([currentMonthRange.start, currentMonthRange.end].map(d => Number(d.slice(0, 4))));
+    let cancelled = false;
+    Promise.all([...years].map(year => prefetchHolidays(year, 'DE'))).then(() => {
+      if (!cancelled) setHolidaysLoaded(n => n + 1);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentMonthRange]);
   
   // Filter entries for current month only
   const monthEntries = useMemo(() => {
@@ -316,6 +321,8 @@ export const MonthlyHoursChart: FC<MonthlyHoursChartProps> = ({
       maintainAspectRatio: false,
       plugins: {
         ...base.plugins,
+        // Weekends and holidays get a background band behind their column (daily view)
+        dayBands: { kinds: periodHours.map((_, index) => dayKindAt(index)), theme },
         legend: {
           ...base.plugins?.legend,
           display: stacked,
@@ -332,11 +339,11 @@ export const MonthlyHoursChart: FC<MonthlyHoursChartProps> = ({
             footer: (tooltipItems: TooltipItem<'bar'>[]) => {
               const index = tooltipItems[0]?.dataIndex ?? -1;
               if (index >= 0 && index < periodHours.length) {
-                const dateStr = periodHours[index].date;
-                const holiday = holidayDateCache.get(dateStr);
-                if (holiday) {
-                  return `${t('charts.holiday')}: ${holiday.name}`;
+                const kind = dayKindAt(index);
+                if (kind === 'national-holiday' || kind === 'regional-holiday') {
+                  return `${t('charts.holiday')}: ${holidayDateCache.get(periodHours[index].date)?.name ?? ''}`;
                 }
+                if (kind === 'weekend') return t('charts.weekend');
               }
               return '';
             },
@@ -515,7 +522,7 @@ export const MonthlyHoursChart: FC<MonthlyHoursChartProps> = ({
       {/* Chart */}
       <div className="h-64">
         {periodHours.length > 0 ? (
-          <Bar key={`chart-${holidaysLoaded}`} data={chartData} options={chartOptions} />
+          <Bar key={`chart-${holidaysLoaded}`} data={chartData} options={chartOptions} plugins={[dayBandsPlugin]} />
         ) : (
           <div className="flex h-full animate-fade-in flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-gray-200 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
             <BarChart3 className="h-5 w-5 text-gray-300 dark:text-gray-600" aria-hidden="true" />

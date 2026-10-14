@@ -76,7 +76,8 @@
     "title": "Tax Prepayment Details",
     "periodInfo": "Period Information",
     "additionalInfo": "Additional Information",
-    "receiptPreviewAlt": "Receipt"
+    "receiptPreviewAlt": "Receipt",
+    "previewUnavailable": "The receipt cannot be shown here. Please download it instead."
   },
   
   "summary": {

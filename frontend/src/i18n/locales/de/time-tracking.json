@@ -218,6 +218,7 @@
     "unknownProject": "Unbekanntes Projekt",
     "holiday": "Feiertag",
     "holidayNational": "Feiertag (bundesweit)",
-    "holidayRegional": "Feiertag (regional)"
+    "holidayRegional": "Feiertag (regional)",
+    "weekend": "Wochenende"
   }
 }

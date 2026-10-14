@@ -46,6 +46,7 @@ import { Table, Column } from '../../common/Table';
 import { useCancelInvoice, useInvoice, useInvoiceBillingStatus, useUpdateInvoice, useInvoices } from '../../../hooks/api/useInvoices';
 import { downloadInvoicePDF } from '../../../api/services/invoice.service';
 import { formatDate } from '../../../utils/date';
+import { extractErrorMessage } from '../../../utils/error';
 import { toast } from '../../../lib/toast';
 import { confirmDialog } from '../../../lib/confirm';
 import { cn } from '../../../lib/cn';
@@ -796,6 +797,7 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
                 void queryClient.invalidateQueries({ queryKey: ['invoices'] });
                 void refetch();
               }}
+              disabled={updateInvoice.isPending}
             >
               {t('detail.statusDialog.keepDraft')}
             </Button>
@@ -804,7 +806,16 @@ export const InvoiceDetailModal: FC<InvoiceDetailModalProps> = ({ open, invoiceI
               variant="primary"
               isLoading={updateInvoice.isPending}
               onClick={async () => {
-                await updateInvoice.mutateAsync({ id: invoiceId, payload: { status: 'sent' } });
+                try {
+                  await updateInvoice.mutateAsync({ id: invoiceId, payload: { status: 'sent' } });
+                } catch (err) {
+                  // Keep the dialog open so the user can retry or keep the draft
+                  console.error('Mark invoice as sent error:', err);
+                  toast.error(t('detail.statusDialog.markSentFailed'), {
+                    description: extractErrorMessage(err),
+                  });
+                  return;
+                }
                 setShowStatusDialog(false);
                 void queryClient.invalidateQueries({ queryKey: ['invoices'] });
                 void refetch();

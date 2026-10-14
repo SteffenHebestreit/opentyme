@@ -132,6 +132,7 @@ export const ActiveTimerCard: FC<ActiveTimerCardProps> = ({ entry, onPause, onSt
     return null;
   }
 
+  const projectName = entry.project_name ?? t('timer.activeProject');
   const subtitle = [entry.task_name || t('timer.untitledTask'), entry.client_name].filter(Boolean).join(' · ');
 
   return (
@@ -150,10 +151,17 @@ export const ActiveTimerCard: FC<ActiveTimerCardProps> = ({ entry, onPause, onSt
               {t('timer.running')}
             </span>
           </div>
-          <h2 id="active-timer-project" className="mt-2 truncate text-lg font-semibold tracking-tight text-gray-900 dark:text-white">
-            {entry.project_name ?? t('timer.activeProject')}
+          {/* Truncated to one line: the title keeps long names readable on hover */}
+          <h2
+            id="active-timer-project"
+            title={projectName}
+            className="mt-2 truncate text-lg font-semibold tracking-tight text-gray-900 dark:text-white"
+          >
+            {projectName}
           </h2>
-          <p className="mt-0.5 truncate text-sm text-gray-600 dark:text-gray-300">{subtitle}</p>
+          <p className="mt-0.5 truncate text-sm text-gray-600 dark:text-gray-300" title={subtitle}>
+            {subtitle}
+          </p>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             {t('timer.started')} {formatDate(entry.date_start || entry.start_time, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
           </p>

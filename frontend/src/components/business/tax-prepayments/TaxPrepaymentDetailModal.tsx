@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useTaxPrepayment, useDeleteTaxPrepayment, useDeleteReceipt } from '@/hooks/api/useTaxPrepayments';
 import { formatCurrency } from '@/utils/currency';
@@ -61,6 +61,10 @@ const statusVariants: Record<string, BadgeVariant> = {
 const iconButtonClass =
   'rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white';
 
+/** Whether a stored receipt is a PDF (by its mimetype, else by the file name). */
+const isPdfReceipt = (mimetype?: string | null, filename?: string | null) =>
+  mimetype?.toLowerCase() === 'application/pdf' || Boolean(filename?.toLowerCase().endsWith('.pdf'));
+
 export function TaxPrepaymentDetailModal({
   prepaymentId,
   isOpen,
@@ -72,36 +76,54 @@ export function TaxPrepaymentDetailModal({
   const deleteMutation = useDeleteTaxPrepayment();
   const deleteReceiptMutation = useDeleteReceipt();
   const [showReceiptPreview, setShowReceiptPreview] = useState(false);
-  const [receiptPreviewUrl, setReceiptPreviewUrl] = useState<string | null>(null);
+  const [receiptPreview, setReceiptPreview] = useState<{ url: string; isPdf: boolean } | null>(null);
+  const [previewFailed, setPreviewFailed] = useState(false);
+  const previewUrlRef = useRef<string | null>(null);
 
-  // Fetch receipt image as blob for preview (with auth)
+  // Release the last preview's blob URL when the modal goes away
+  useEffect(
+    () => () => {
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    },
+    []
+  );
+
+  // Fetch the receipt as a blob for the preview (with auth). PDFs and images both
+  // render inline; the blob is retyped so the browser's PDF viewer recognises it.
   useEffect(() => {
-    if (showReceiptPreview && prepayment?.id && prepayment.receipt_filename) {
-      const fetchReceiptBlob = async () => {
-        try {
-          const response = await api.get(`/tax-prepayments/${prepayment.id}/receipt/download`, {
-            responseType: 'blob',
-          });
+    if (!showReceiptPreview || !prepayment?.id || !prepayment.receipt_filename) return;
 
-          const blob = response.data as Blob;
-          const url = URL.createObjectURL(blob);
-          setReceiptPreviewUrl(url);
-        } catch (error) {
-          console.error('Failed to load receipt preview:', error);
-        }
-      };
+    let cancelled = false;
+    setPreviewFailed(false);
 
-      fetchReceiptBlob();
-    }
+    const fetchReceiptBlob = async () => {
+      try {
+        const response = await api.get(`/tax-prepayments/${prepayment.id}/receipt/download`, {
+          responseType: 'blob',
+        });
+        if (cancelled) return;
 
-    // Cleanup blob URL when modal closes
-    return () => {
-      if (receiptPreviewUrl) {
-        URL.revokeObjectURL(receiptPreviewUrl);
-        setReceiptPreviewUrl(null);
+        const blob = response.data as Blob;
+        const isPdf =
+          isPdfReceipt(prepayment.receipt_mimetype, prepayment.receipt_filename) || blob.type === 'application/pdf';
+        const type = isPdf ? 'application/pdf' : prepayment.receipt_mimetype || blob.type;
+        const url = URL.createObjectURL(type && blob.type !== type ? new Blob([blob], { type }) : blob);
+
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = url;
+        setReceiptPreview({ url, isPdf });
+      } catch (error) {
+        console.error('Failed to load receipt preview:', error);
+        if (!cancelled) setPreviewFailed(true);
       }
     };
-  }, [showReceiptPreview, prepayment?.id, prepayment?.receipt_filename]);
+
+    fetchReceiptBlob();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showReceiptPreview, prepayment?.id, prepayment?.receipt_filename, prepayment?.receipt_mimetype]);
 
   const handleDelete = async () => {
     const confirmed = await confirmDialog({
@@ -362,16 +384,43 @@ export function TaxPrepaymentDetailModal({
         title={prepayment.receipt_filename || t('actions.viewReceipt')}
         icon={<Eye className="h-4 w-4" aria-hidden="true" />}
         size="xl"
+        footer={
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleDownloadReceipt}
+            leftIcon={<Download className="h-4 w-4" aria-hidden="true" />}
+          >
+            {t('actions.downloadReceipt')}
+          </Button>
+        }
       >
         <div className="flex min-h-[16rem] items-center justify-center rounded-lg bg-gray-100 p-4 dark:bg-gray-950/60">
-          {receiptPreviewUrl ? (
+          {previewFailed ? (
+            <p className="max-w-sm text-center text-sm text-gray-600 dark:text-gray-300">
+              {t('details.previewUnavailable')}
+            </p>
+          ) : !receiptPreview ? (
+            <SkeletonItem className="h-64 w-full max-w-md" />
+          ) : receiptPreview.isPdf ? (
+            <object
+              data={receiptPreview.url}
+              type="application/pdf"
+              aria-label={prepayment.receipt_filename || t('details.receiptPreviewAlt')}
+              className="h-[70vh] w-full animate-fade-in rounded bg-white"
+            >
+              {/* Shown where the browser cannot display PDFs inline (e.g. many phones) */}
+              <p className="p-6 text-center text-sm text-gray-600 dark:text-gray-300">
+                {t('details.previewUnavailable')}
+              </p>
+            </object>
+          ) : (
             <img
-              src={receiptPreviewUrl}
+              src={receiptPreview.url}
               alt={t('details.receiptPreviewAlt')}
+              onError={() => setPreviewFailed(true)}
               className="max-h-[70vh] max-w-full animate-fade-in rounded object-contain"
             />
-          ) : (
-            <SkeletonItem className="h-64 w-full max-w-md" />
           )}
         </div>
       </Modal>

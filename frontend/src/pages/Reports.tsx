@@ -371,6 +371,8 @@ export default function Reports() {
                   if (type.key === 'taxPackage') {
                     setShowTaxPackage(true);
                   } else {
+                    // A report generated for another type must not be shown or exported under this one
+                    if (type.key !== selectedReport) setReportData(null);
                     setSelectedReport(type.key);
                     setShowTaxPackage(false);
                   }

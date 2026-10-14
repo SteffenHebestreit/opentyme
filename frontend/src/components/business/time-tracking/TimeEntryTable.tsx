@@ -26,6 +26,7 @@ import { useTranslation } from 'react-i18next';
 import { TimeEntry } from '../../../api/types';
 import { Table, Column } from '../../common/Table';
 import { cn } from '../../../lib/cn';
+import { parseYmd, toYmd } from '../../../utils/date';
 
 /** Small square icon button used for the row actions. */
 const iconButtonClass =
@@ -118,22 +119,40 @@ const humanizeMinutes = (minutesTotal: number): string => {
 };
 
 /**
- * Formats a date using locale-aware formatting.
- * 
+ * Formats a calendar day (`YYYY-MM-DD`) using locale-aware formatting.
+ *
+ * Parsed as a LOCAL date: `new Date('2026-10-14')` would be UTC midnight and
+ * show as the previous day west of UTC.
+ *
  * @function
- * @param {string | null} value - ISO 8601 date string to format
+ * @param {string | null} value - `YYYY-MM-DD` (a longer ISO string is cut to its date part)
  * @param {string} locale - Locale code (e.g., 'de-DE', 'en-US')
  * @returns {string} Formatted date string (e.g., "15.01.2024" for de-DE) or "—" if invalid
  */
 const formatDate = (value: string | null, locale: string = 'de-DE'): string => {
-  if (!value) {
-    return '—';
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
+  const date = parseYmd(value);
+  if (!date) {
     return '—';
   }
   return date.toLocaleDateString(locale);
+};
+
+/**
+ * Calendar day of an entry as `YYYY-MM-DD`: the date part of `entry_date`, or
+ * for legacy entries the LOCAL day of `start_time` (not the UTC one, which is
+ * the previous day for work started shortly after midnight in Europe).
+ */
+const getEntryDay = (entry: TimeEntry): string => {
+  if (entry.entry_date) {
+    return entry.entry_date.split('T')[0];
+  }
+  if (entry.start_time) {
+    const start = new Date(entry.start_time);
+    if (!Number.isNaN(start.getTime())) {
+      return toYmd(start);
+    }
+  }
+  return 'unknown';
 };
 
 /**
@@ -248,7 +267,7 @@ export const TimeEntryTable: FC<TimeEntryTableProps> = ({
         </span>
       ),
       sortable: true,
-      groupSortValue: (_, items) => items[0]?.entry_date || items[0]?.start_time || '',
+      groupSortValue: (_, items) => (items[0] ? getEntryDay(items[0]) : ''),
     },
     {
       key: 'client',
@@ -334,7 +353,7 @@ export const TimeEntryTable: FC<TimeEntryTableProps> = ({
   ], [t, userLocale, onEdit, onDelete, isDeletingId]);
 
   const groupBy = (entry: TimeEntry) => {
-    const date = entry.entry_date || (entry.start_time ? new Date(entry.start_time).toISOString().split('T')[0] : 'unknown');
+    const date = getEntryDay(entry);
     const projectId = entry.project_id || 'unknown';
     return `${date}-${projectId}`;
   };
@@ -346,7 +365,7 @@ export const TimeEntryTable: FC<TimeEntryTableProps> = ({
   const groupHeaderRender = (_groupKey: string, groupItems: TimeEntry[], isExpanded: boolean, _toggle: () => void) => {
     // Calculate group metadata
     const firstEntry = groupItems[0];
-    const date = firstEntry.entry_date || (firstEntry.start_time ? new Date(firstEntry.start_time).toISOString().split('T')[0] : 'unknown');
+    const date = getEntryDay(firstEntry);
     const projectName = firstEntry.project_name || t('timer.activeProject');
     const clientName = firstEntry.client_name;
     

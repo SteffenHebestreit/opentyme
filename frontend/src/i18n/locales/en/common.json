@@ -31,7 +31,8 @@
     "loading": "Loading...",
     "saveChanges": "Save Changes",
     "discardChanges": "Discard Changes",
-    "logout": "Logout"
+    "logout": "Logout",
+    "login": "Login"
   },
   "navigation": {
     "dashboard": "Dashboard",

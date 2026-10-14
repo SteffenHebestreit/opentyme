@@ -18,7 +18,9 @@
     "edit": "Edit",
     "delete": "Delete",
     "confirmDelete": "Confirm delete",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "deleteSuccess": "Template deleted.",
+    "deleteError": "Failed to delete template."
   },
   "builder": {
     "back": "Back to templates",

@@ -18,7 +18,9 @@
     "edit": "Bearbeiten",
     "delete": "Löschen",
     "confirmDelete": "Löschen bestätigen",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "deleteSuccess": "Vorlage gelöscht.",
+    "deleteError": "Vorlage konnte nicht gelöscht werden."
   },
   "builder": {
     "back": "Zurück zu Vorlagen",

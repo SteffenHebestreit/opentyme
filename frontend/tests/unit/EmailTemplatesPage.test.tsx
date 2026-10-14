@@ -148,8 +148,9 @@ describe('EmailTemplatesPage', () => {
 
     it('shows the category badge for each template', () => {
       renderPage();
-      expect(screen.getByText('invoice')).toBeInTheDocument();
-      expect(screen.getByText('welcome')).toBeInTheDocument();
+      // Categories are translated (the i18n mock returns the key)
+      expect(screen.getByText('categories.invoice')).toBeInTheDocument();
+      expect(screen.getByText('categories.welcome')).toBeInTheDocument();
     });
 
     it('shows the language in uppercase', () => {
@@ -160,7 +161,7 @@ describe('EmailTemplatesPage', () => {
 
     it('shows a Default badge for the default template', () => {
       renderPage();
-      expect(screen.getByText('Default')).toBeInTheDocument();
+      expect(screen.getByText('col.default')).toBeInTheDocument();
     });
 
     it('navigates to editor when Edit is clicked', async () => {

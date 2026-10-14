@@ -122,7 +122,8 @@
       "title": "Rechnungsstatus aktualisieren?",
       "message": "Die E-Mail wurde erfolgreich versendet. Möchten Sie den Rechnungsstatus auf <strong>Gesendet</strong> setzen oder als <strong>Entwurf</strong> belassen?",
       "keepDraft": "Als Entwurf belassen",
-      "markSent": "Als gesendet markieren"
+      "markSent": "Als gesendet markieren",
+      "markSentFailed": "Die Rechnung konnte nicht als gesendet markiert werden. Bitte versuchen Sie es erneut."
     }
   },
   "cancelModal": {

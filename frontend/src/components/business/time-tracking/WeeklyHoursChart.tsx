@@ -21,7 +21,7 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Toolti
 import { Bar } from 'react-chartjs-2';
 import { getDayKindForDate, prefetchHolidays, holidayDateCache } from '../../../utils/holidays-api';
 import { useChartTheme } from '../../../hooks/ui/useChartTheme';
-import { chartColors, getBarChartOptions, getChartThemeColors, getDayTickStyle, getSeriesFill } from '../../../utils/chartConfig';
+import { chartColors, dayBandsPlugin, getBarChartOptions, getChartThemeColors, getDayTickStyle, getSeriesFill } from '../../../utils/chartConfig';
 import { DayMarkerLegend } from './DayMarkerLegend';
 import { AnimatedNumber } from '../../common/AnimatedNumber';
 import { fieldClasses, fieldLabelClass } from '../../forms/fieldStyles';
@@ -70,12 +70,6 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
   // Get localization settings from localStorage
   const region = localStorage.getItem('user_region') || undefined;
   
-  // Prefetch holiday data for current year
-  useEffect(() => {
-    const currentYear = new Date().getFullYear();
-    prefetchHolidays(currentYear, 'DE');
-  }, []);
-  
   // Get week range - use provided dates or calculate current week
   const currentWeekRange = useMemo(() => {
     // If weekStart and weekEnd are provided, use them
@@ -109,6 +103,19 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
       end: formatDate(sunday),
     };
   }, [weekStart, weekEnd]);
+
+  // Load the holidays of the shown week's year(s); the chart redraws once they are in
+  const [holidaysLoaded, setHolidaysLoaded] = useState(0);
+  useEffect(() => {
+    const years = new Set([currentWeekRange.start, currentWeekRange.end].map(d => Number(d.slice(0, 4))));
+    let cancelled = false;
+    Promise.all([...years].map(year => prefetchHolidays(year, 'DE'))).then(() => {
+      if (!cancelled) setHolidaysLoaded(n => n + 1);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentWeekRange]);
   
   // Filter entries for current week only
   const weekEntries = useMemo(() => {
@@ -244,6 +251,8 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
       maintainAspectRatio: false,
       plugins: {
         ...base.plugins,
+        // Weekends and holidays get a background band behind their column
+        dayBands: { kinds: dailyHours.map((_, index) => dayKindAt(index)), theme },
         legend: {
           ...base.plugins?.legend,
           display: stacked,
@@ -261,10 +270,11 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
               const index = tooltipItems[0]?.dataIndex ?? -1;
               if (index >= 0 && index < dailyHours.length) {
                 const dateStr = dailyHours[index].date;
-                const holiday = holidayDateCache.get(dateStr);
-                if (holiday) {
-                  return `${t('charts.holiday')}: ${holiday.name}`;
+                const kind = getDayKindForDate(dateStr, 'DE', region);
+                if (kind === 'national-holiday' || kind === 'regional-holiday') {
+                  return `${t('charts.holiday')}: ${holidayDateCache.get(dateStr)?.name ?? ''}`;
                 }
+                if (kind === 'weekend') return t('charts.weekend');
               }
               return '';
             },
@@ -299,7 +309,7 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
         },
       },
     };
-  }, [theme, groupMode, dailyHours, region, t]);
+  }, [theme, groupMode, dailyHours, region, holidaysLoaded, t]);
   
   return (
     <section className="surface flex flex-col p-5 sm:p-6" aria-labelledby={`${fieldId}-title`}>
@@ -397,7 +407,7 @@ export const WeeklyHoursChart: FC<WeeklyHoursChartProps> = ({
       
       {/* Chart */}
       <div className="h-64">
-        <Bar data={chartData} options={chartOptions} />
+        <Bar data={chartData} options={chartOptions} plugins={[dayBandsPlugin]} />
       </div>
       <DayMarkerLegend dates={dailyHours.map(day => day.date)} region={region} />
     </section>

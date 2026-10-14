@@ -7,7 +7,7 @@ import { getDepreciationSummary } from '@/api/services/depreciation.service';
 import { AddExpenseModal } from '@/components/business/expenses/AddExpenseModal';
 import { ExpenseDetailModal } from '@/components/business/expenses/ExpenseDetailModal';
 import { RecurringExpensesManager } from '@/components/business/expenses/RecurringExpensesManager';
-import { expenseCategoryLabel } from '@/components/business/expenses/expenseCategories';
+import { expenseCategoryLabel, getExpenseCategoryOptions } from '@/components/business/expenses/expenseCategories';
 import { CustomSelect } from '@/components/forms';
 import { fieldClasses } from '@/components/forms/fieldStyles';
 import { formatCurrency } from '@/utils/currency';
@@ -158,20 +158,17 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
     [locale]
   );
 
-  // Category options
-  const categoryOptions = [
-    { value: 'all', label: t('categories.all') },
-    { value: 'travel', label: t('categories.travel') },
-    { value: 'meals', label: t('categories.meals') },
-    { value: 'software', label: t('categories.software') },
-    { value: 'hardware', label: t('categories.hardware') },
-    { value: 'office_supplies', label: t('categories.office_supplies') },
-    { value: 'professional_services', label: t('categories.professional_services') },
-    { value: 'marketing', label: t('categories.marketing') },
-    { value: 'utilities', label: t('categories.utilities') },
-    { value: 'training', label: t('categories.training') },
-    { value: 'other', label: t('categories.other') },
-  ];
+  // Category filter: every category an expense can be booked under, plus the legacy
+  // "hardware" (older expenses may still carry it), with "Other" last
+  const categoryOptions = useMemo(() => {
+    const options = getExpenseCategoryOptions(t);
+    return [
+      { value: 'all', label: t('categories.all') },
+      ...options.filter((option) => option.value !== 'other'),
+      { value: 'hardware', label: t('categories.hardware') },
+      ...options.filter((option) => option.value === 'other'),
+    ];
+  }, [t]);
 
   // Get category label
   const getCategoryLabel = useCallback((category: string) => expenseCategoryLabel(t, category), [t]);
@@ -219,7 +216,7 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
       label: getCategoryLabel(category),
       total: data.total,
       color: palette[index % palette.length],
-      members: [] as string[],
+      members: [] as Array<{ key: string; label: string; total: number }>,
     }));
     if (rest.length > 0) {
       slices.push({
@@ -227,7 +224,12 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
         label: t('charts.otherCategories', { count: rest.length }),
         total: rest.reduce((sum, [, data]) => sum + data.total, 0),
         color: OTHER_SLICE_COLOR[theme],
-        members: rest.map(([category]) => getCategoryLabel(category)),
+        // Keep each merged category's own total: it is listed under "Other" and in its tooltip
+        members: rest.map(([category, data]) => ({
+          key: category,
+          label: getCategoryLabel(category),
+          total: data.total,
+        })),
       });
     }
     return slices;
@@ -269,12 +271,18 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
               const percentage = categoryTotal ? ((value / categoryTotal) * 100).toFixed(1) : '0.0';
               return `${formatCurrency(value)} (${percentage}%)`;
             },
+            // "Other" breaks down into the categories merged into it
+            afterLabel: (context) =>
+              (categorySlices[context.dataIndex]?.members ?? []).map((member) => {
+                const percentage = categoryTotal ? ((member.total / categoryTotal) * 100).toFixed(1) : '0.0';
+                return `${member.label}: ${formatCurrency(member.total)} (${percentage}%)`;
+              }),
           },
         },
       },
       elements: { arc: { borderWidth: 2, borderColor: colors.surface, hoverOffset: 4 } },
     };
-  }, [theme, categoryTotal]);
+  }, [theme, categoryTotal, categorySlices]);
 
   // Expense trend: monthly totals over the selected range
   const trend = useMemo(() => {
@@ -612,6 +620,7 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
               onChange={setCategoryFilter}
               options={categoryOptions}
               size="md"
+              aria-label={t('fields.category')}
             />
           </div>
           {/* Status filter hidden - not needed for solo freelancer (all expenses auto-approved) */}
@@ -680,9 +689,19 @@ export default function ExpensesPage({ startDate: propStartDate, endDate: propEn
                                   </span>
                                 </div>
                                 {slice.members.length > 0 && (
-                                  <p className="ml-[1.375rem] mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                                    {slice.members.join(', ')}
-                                  </p>
+                                  <ul className="ml-[1.375rem] mt-1 space-y-0.5 text-xs text-gray-500 dark:text-gray-400">
+                                    {slice.members.map((member) => (
+                                      <li key={member.key} className="flex items-center gap-3">
+                                        <span className="min-w-0 flex-1 truncate">{member.label}</span>
+                                        <span className="whitespace-nowrap tabular-nums">
+                                          {formatCurrency(member.total)}
+                                        </span>
+                                        <span className="w-12 whitespace-nowrap text-right tabular-nums">
+                                          {((member.total / categoryTotal) * 100).toFixed(1)}%
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
                                 )}
                               </li>
                             );

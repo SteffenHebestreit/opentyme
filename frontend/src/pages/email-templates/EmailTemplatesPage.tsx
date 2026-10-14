@@ -16,6 +16,7 @@ import { Alert } from '@/components/common/Alert';
 import { EmptyState } from '@/components/common/EmptyState';
 import { SkeletonItem } from '@/components/common/Skeleton';
 import { cn } from '@/lib/cn';
+import { toast } from '@/lib/toast';
 
 const CATEGORY_BADGE_VARIANTS: Record<string, BadgeVariant> = {
   invoice: 'blue',
@@ -39,8 +40,14 @@ export default function EmailTemplatesPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const handleDelete = async (id: string) => {
-    await deleteTemplate.mutateAsync(id);
-    setDeleteConfirmId(null);
+    try {
+      await deleteTemplate.mutateAsync(id);
+      toast.success(t('action.deleteSuccess'));
+    } catch {
+      toast.error(t('action.deleteError'));
+    } finally {
+      setDeleteConfirmId(null);
+    }
   };
 
   const formatDate = (dateStr: string) =>
@@ -141,7 +148,7 @@ export default function EmailTemplatesPage() {
                       <div className="flex items-center gap-2">
                         <span className="whitespace-nowrap font-medium text-gray-900 dark:text-white">{tpl.name}</span>
                         {tpl.is_default && (
-                          <Badge variant="green" size="sm" dot>Default</Badge>
+                          <Badge variant="green" size="sm" dot>{t('col.default')}</Badge>
                         )}
                       </div>
                     </td>
@@ -150,7 +157,7 @@ export default function EmailTemplatesPage() {
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={CATEGORY_BADGE_VARIANTS[tpl.category] ?? 'gray'} size="sm">
-                        {tpl.category}
+                        {t(`categories.${tpl.category}`, { defaultValue: tpl.category })}
                       </Badge>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-gray-500 dark:text-gray-400">

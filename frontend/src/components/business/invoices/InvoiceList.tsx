@@ -167,6 +167,11 @@ export default function InvoiceList({
   const startDateObj = useMemo(() => normalizeDate(propStartDate || ''), [propStartDate]);
   const endDateObj = useMemo(() => normalizeDate(propEndDate || '', true), [propEndDate]);
 
+  const projectNameById = useMemo(
+    () => new Map(projects.map((project) => [project.id, project.name])),
+    [projects],
+  );
+
   const filteredInvoices = useMemo(() => {
     return invoices.filter((invoice) => {
       if (statusFilter !== 'all' && invoice.status !== statusFilter) {
@@ -192,6 +197,8 @@ export default function InvoiceList({
         const haystack = [
           invoice.invoice_number,
           invoice.client_name,
+          // The placeholder promises a search by project as well
+          (invoice.project_id ? projectNameById.get(invoice.project_id) : undefined) ?? invoice.project_name,
           invoice.notes,
         ];
         const matches = haystack
@@ -203,18 +210,17 @@ export default function InvoiceList({
       }
       return true;
     });
-  }, [clientFilter, debouncedSearch, endDateObj, invoices, startDateObj, statusFilter]);
+  }, [clientFilter, debouncedSearch, endDateObj, invoices, projectNameById, startDateObj, statusFilter]);
 
   const invoicesWithProjectNames = useMemo(() => {
     if (!projects.length) {
       return filteredInvoices;
     }
-    const projectMap = new Map(projects.map((project) => [project.id, project.name]));
     return filteredInvoices.map((invoice) => ({
       ...invoice,
-      project_name: invoice.project_id ? projectMap.get(invoice.project_id) : undefined,
+      project_name: invoice.project_id ? projectNameById.get(invoice.project_id) : undefined,
     }));
-  }, [filteredInvoices, projects]);
+  }, [filteredInvoices, projectNameById, projects.length]);
 
   const sortedInvoices = useMemo(() => {
     return [...invoicesWithProjectNames].sort((a, b) => {

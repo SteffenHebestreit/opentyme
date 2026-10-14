@@ -22,7 +22,7 @@ import { Alert } from '@/components/common/Alert';
 import { SkeletonItem } from '@/components/common/Skeleton';
 import { fieldClasses, fieldLabelClass } from '@/components/forms/fieldStyles';
 import { formatCurrency } from '@/utils/currency';
-import { formatDate, parseYmd } from '@/utils/date';
+import { formatDate, parseYmd, toYmd } from '@/utils/date';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/cn';
 
@@ -48,8 +48,9 @@ interface ReportEntry {
 
 // ─── Date helpers (module-level — computed once, stable references in effects) ─
 
+/** Local calendar day as YYYY-MM-DD (toISOString would shift it by a day east of UTC). */
 function fmt(d: Date) {
-  return d.toISOString().slice(0, 10);
+  return toYmd(d);
 }
 
 function buildPresets() {

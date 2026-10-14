@@ -150,6 +150,7 @@ export const TimeEntryFilters: FC<TimeEntryFiltersProps> = ({
           onChange={onProjectChange}
           options={projectOptions}
           placeholder={t('filters.allProjects')}
+          aria-label={t('filters.project')}
           size="md"
         />
       </div>

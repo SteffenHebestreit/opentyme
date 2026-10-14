@@ -11,6 +11,7 @@
  */
 
 import { Chart, ChartOptions } from 'chart.js';
+import type { ChartType, Plugin } from 'chart.js';
 import type { CSSProperties } from 'react';
 
 export type ChartTheme = 'light' | 'dark';
@@ -18,8 +19,11 @@ export type ChartTheme = 'light' | 'dark';
 const FONT_FAMILY = "'Inter Variable', Inter, ui-sans-serif, system-ui, sans-serif";
 
 // App-wide Chart.js defaults: our font and a short, calm entrance animation.
+// Only adjust the animation defaults — replacing the object drops keys Chart.js relies on
+// (e.g. `type: undefined`), and every hover animation then throws ("this._fn is not a
+// function"), which kills the tooltips of all charts.
 Chart.defaults.font.family = FONT_FAMILY;
-Chart.defaults.animation = { duration: 600, easing: 'easeOutQuart' };
+Object.assign(Chart.defaults.animation, { duration: 600, easing: 'easeOutQuart' });
 
 /**
  * Color palette for charts (brand cyan + accents)
@@ -201,6 +205,57 @@ export const getDayTickStyle = (kind: ChartDayKind, theme: ChartTheme = currentC
   }
 };
 
+/** Background band behind a day's column: weekends a faint grey, holidays a faint tint. */
+export const getDayBandColor = (kind: ChartDayKind, theme: ChartTheme = currentChartTheme()): string | null => {
+  const palette = getChartPalette(theme);
+  switch (kind) {
+    case 'weekend':
+      return theme === 'dark' ? 'rgba(255, 255, 255, 0.045)' : 'rgba(12, 21, 34, 0.045)';
+    case 'national-holiday':
+      return withAlpha(palette[2], theme === 'dark' ? 0.16 : 0.12);
+    case 'regional-holiday':
+      return withAlpha(palette[1], theme === 'dark' ? 0.16 : 0.14);
+    default:
+      return null;
+  }
+};
+
+declare module 'chart.js' {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface PluginOptionsByType<TType extends ChartType> {
+    /** Day kind per category (x) index — see `dayBandsPlugin`. */
+    dayBands?: { kinds?: ChartDayKind[]; theme?: ChartTheme };
+  }
+}
+
+/**
+ * Shades the columns of weekends and holidays on a category x axis, behind the bars.
+ * Pass it in the chart's `plugins` and set `options.plugins.dayBands.kinds`.
+ */
+export const dayBandsPlugin: Plugin<'bar'> = {
+  id: 'dayBands',
+  beforeDatasetsDraw(chart, _args, options) {
+    const kinds = (options as { kinds?: ChartDayKind[] } | undefined)?.kinds;
+    const x = chart.scales.x;
+    if (!kinds?.length || !x) return;
+    const theme = (options as { theme?: ChartTheme }).theme;
+    const { top, bottom, left, right } = chart.chartArea;
+    const step = kinds.length > 1 ? Math.abs(x.getPixelForValue(1) - x.getPixelForValue(0)) : right - left;
+    const ctx = chart.ctx;
+    ctx.save();
+    kinds.forEach((kind, index) => {
+      const fill = getDayBandColor(kind, theme);
+      if (!fill) return;
+      const center = x.getPixelForValue(index);
+      const from = Math.max(left, center - step / 2);
+      const to = Math.min(right, center + step / 2);
+      ctx.fillStyle = fill;
+      ctx.fillRect(from, top, to - from, bottom - top);
+    });
+    ctx.restore();
+  },
+};
+
 /**
  * Text, grid and tooltip colours for a theme.
  */
@@ -283,8 +338,11 @@ export const getDefaultChartOptions = (theme: ChartTheme = currentChartTheme()):
         borderWidth: 1,
         padding: 10,
         cornerRadius: 10,
+        // Chart.js draws footers white by default — invisible on the light tooltip
+        footerColor: colors.tooltipTitle,
         titleFont: { size: 12, weight: 600, family: FONT_FAMILY },
         bodyFont: { size: 12, family: FONT_FAMILY },
+        footerFont: { size: 12, weight: 600, family: FONT_FAMILY },
         displayColors: true,
         boxPadding: 4,
         usePointStyle: true,

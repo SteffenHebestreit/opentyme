@@ -102,6 +102,7 @@ export const RecentTimeEntries: FC<RecentTimeEntriesProps> = ({ entries }) => {
             const project = entry.project_name ?? t('recentTimeEntries.unassigned');
             const client = entry.client_name ?? '—';
             const duration = formatDuration(entry.duration_minutes);
+            const description = entry.description || t('recentTimeEntries.noDescription');
 
             return (
               <li
@@ -109,10 +110,11 @@ export const RecentTimeEntries: FC<RecentTimeEntriesProps> = ({ entries }) => {
                 className="flex items-start justify-between gap-4 px-6 py-3.5 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
-                    {entry.description || t('recentTimeEntries.noDescription')}
+                  {/* Single-line rows: the full text stays available on hover */}
+                  <p className="truncate text-sm font-medium text-gray-900 dark:text-white" title={description}>
+                    {description}
                   </p>
-                  <p className="mt-0.5 truncate text-sm text-gray-500 dark:text-gray-400">
+                  <p className="mt-0.5 truncate text-sm text-gray-500 dark:text-gray-400" title={`${project} · ${client}`}>
                     <span className="font-medium text-brand-600 dark:text-brand-400">{project}</span>
                     <span className="mx-1.5 text-gray-300 dark:text-gray-600" aria-hidden="true">·</span>
                     <span>{client}</span>

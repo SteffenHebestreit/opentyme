@@ -42,11 +42,13 @@ const BudgetRow: FC<{ budget: ProjectTimeBudget }> = ({ budget }) => {
     <div className="min-w-0 space-y-1.5">
       <div className="flex items-baseline justify-between gap-3">
         <div className="flex min-w-0 items-baseline gap-2">
-          <span className="truncate text-sm font-medium text-gray-900 dark:text-white">
+          <span className="truncate text-sm font-medium text-gray-900 dark:text-white" title={budget.project_name}>
             {budget.project_name}
           </span>
           {budget.client_name && (
-            <span className="truncate text-xs text-gray-500 dark:text-gray-400">{budget.client_name}</span>
+            <span className="truncate text-xs text-gray-500 dark:text-gray-400" title={budget.client_name}>
+              {budget.client_name}
+            </span>
           )}
         </div>
         <div className="shrink-0 text-xs tabular-nums text-gray-600 dark:text-gray-300">
