@@ -4,6 +4,8 @@ declare module 'node-cron' {
     stop: () => void;
     destroy: () => void;
     getStatus: () => 'scheduled' | 'running' | 'stopped' | 'destroyed';
+    /** node-cron 4 task events, e.g. 'execution:missed' (see utils/cron-schedule.util). */
+    on: (event: string, listener: (...args: any[]) => void) => void;
   }
 
   export function schedule(

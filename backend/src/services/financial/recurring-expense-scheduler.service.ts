@@ -7,10 +7,11 @@
  * @module services/financial/recurring-expense-scheduler.service
  */
 
-import cron, { ScheduledTask } from 'node-cron';
+import { ScheduledTask } from 'node-cron';
 import { getDbClient } from '../../utils/database';
 import { RecurrenceFrequency } from '../../models/business/expense.model';
 import { logger } from '../../utils/logger';
+import { scheduleCron } from '../../utils/cron-schedule.util';
 
 const pool = getDbClient();
 
@@ -25,7 +26,7 @@ class RecurringExpenseSchedulerService {
     logger.info('[RecurringExpenseScheduler] Initializing scheduler...');
     
     // Run daily at 2:00 AM
-    this.cronJob = cron.schedule('0 2 * * *', async () => {
+    this.cronJob = scheduleCron('[RecurringExpenseScheduler]', '0 2 * * *', async () => {
       logger.info('[RecurringExpenseScheduler] Running scheduled recurring expense generation...');
       await this.processRecurringExpenses();
     });

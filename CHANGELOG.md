@@ -40,6 +40,13 @@
   (600 requests/minute by default). Guide: [docs/API_TOKENS.md](docs/API_TOKENS.md).
 
 ### Fixed on the way
+- **Scheduled jobs no longer skip a run.** The nightly backup, recurring invoices and
+  expenses, payment reminders, the project-rate sync and the API-token reminders run on
+  node-cron, which drops a run without retrying when its timer fires a second late (busy
+  server, VM briefly paused) and only logs "missed execution". That cost the backup of
+  31 October. A missed run is now made up at once, and a backup that fell due while the
+  backend was down runs as soon as it starts. Recurring invoices and expenses were never
+  lost — they catch up on the next run — but now arrive on the right day.
 - **Document converter updated** (OCR for scanned receipts without an AI key, SSRF guard,
   CORS fix). OpenTyme understands its new "no text found" answer, so a receipt without
   readable text still asks you to enter the details by hand instead of showing an error.
