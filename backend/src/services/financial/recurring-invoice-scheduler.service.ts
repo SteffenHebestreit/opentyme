@@ -11,6 +11,7 @@
 import cron, { ScheduledTask } from 'node-cron';
 import { recurringInvoiceService } from './recurring-invoice.service';
 import { logger } from '../../utils/logger';
+import { scheduleCron } from '../../utils/cron-schedule.util';
 
 class RecurringInvoiceSchedulerService {
   private cronJob: ScheduledTask | null = null;
@@ -27,7 +28,7 @@ class RecurringInvoiceSchedulerService {
       return;
     }
 
-    this.cronJob = cron.schedule(cronExpression, async () => {
+    this.cronJob = scheduleCron('[RecurringInvoice]', cronExpression, async () => {
       logger.info('[RecurringInvoice] Running recurring invoice generation...');
       try {
         const result = await recurringInvoiceService.generateDueInvoices();

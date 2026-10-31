@@ -61,6 +61,9 @@ interface ScheduleConfig {
   retention_days: number;
   notification_email?: string;
   created_by: string;
+  last_run_at?: Date | null;
+  /** When the next run is due; advanced by each run (see BackupScheduler). */
+  next_run_at?: Date | null;
 }
 
 class BackupService {

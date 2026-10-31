@@ -14,6 +14,7 @@
 import cron, { ScheduledTask } from 'node-cron';
 import { getDbClient } from '../../utils/database';
 import { logger } from '../../utils/logger';
+import { scheduleCron } from '../../utils/cron-schedule.util';
 import { keycloakService } from '../keycloak.service';
 import { EmailService } from '../external/email.service';
 
@@ -42,7 +43,7 @@ export class ApiTokenExpirySchedulerService {
       logger.error(`[ApiTokenExpiry] Invalid cron expression "${expression}", reminders not scheduled`);
       return;
     }
-    this.cronJob = cron.schedule(expression, async () => {
+    this.cronJob = scheduleCron('[ApiTokenExpiry]', expression, async () => {
       try {
         await this.sendReminders();
       } catch (error) {

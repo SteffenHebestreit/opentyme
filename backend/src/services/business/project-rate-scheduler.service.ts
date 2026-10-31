@@ -19,6 +19,7 @@ import cron, { ScheduledTask } from 'node-cron';
 import { getDbClient } from '../../utils/database';
 import { runRateRepair } from './time-entry-rate-repair.service';
 import { logger } from '../../utils/logger';
+import { scheduleCron } from '../../utils/cron-schedule.util';
 
 /**
  * Re-derives `projects.hourly_rate` from the timeline for every project.
@@ -66,7 +67,7 @@ class ProjectRateSchedulerService {
       return;
     }
 
-    this.cronJob = cron.schedule(cronExpression, async () => {
+    this.cronJob = scheduleCron('[ProjectRates]', cronExpression, async () => {
       try {
         const updated = await resyncCurrentProjectRates();
         if (updated > 0) {

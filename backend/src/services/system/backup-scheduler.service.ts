@@ -11,6 +11,7 @@ import { Pool } from 'pg';
 import BackupService from './backup.service';
 import { logger } from '../../utils/logger';
 import { getNextCronRun } from '../../utils/cron.util';
+import { scheduleCron } from '../../utils/cron-schedule.util';
 
 interface ScheduledTaskInfo {
   scheduleId: string;
@@ -53,6 +54,18 @@ class BackupScheduler {
 
       this.isInitialized = true;
       logger.info(`Backup scheduler initialized with ${schedules.length} schedule(s)`);
+
+      // Make up a run that was due while the backend was down (next_run_at is only
+      // advanced by a run), so a restart or outage never costs a day of backups.
+      for (const schedule of schedules) {
+        const dueAt = schedule.next_run_at ? new Date(schedule.next_run_at) : null;
+        if (dueAt && dueAt.getTime() < Date.now() - 60_000) {
+          logger.warn(`Backup ${schedule.schedule_name} was due at ${dueAt.toISOString()} and did not run; running it now`);
+          this.runScheduledBackup(schedule).catch((error) =>
+            logger.error(`Catch-up backup failed: ${schedule.schedule_name} - ${error.message}`)
+          );
+        }
+      }
     } catch (error: any) {
       logger.error(`Failed to initialize backup scheduler: ${error.message}`);
       throw error;
@@ -73,51 +86,12 @@ class BackupScheduler {
 
     logger.info(`Scheduling backup: ${schedule.schedule_name} with cron: ${schedule.cron_expression}`);
 
-    // Create scheduled task
-    const task = cron.schedule(schedule.cron_expression, async () => {
-      logger.info(`Executing scheduled backup: ${schedule.schedule_name}`);
-
-      // 1) Run the backup itself.
-      let backupSucceeded = false;
-      try {
-        await this.backupService.createBackup(
-          'system', // System user for scheduled backups
-          {
-            includeDatabase: schedule.includes_database,
-            includeStorage: schedule.includes_storage,
-            includeConfig: schedule.includes_config,
-            backupName: `scheduled_${schedule.schedule_name}_${Date.now()}`
-          },
-          'scheduled'
-        );
-        backupSucceeded = true;
-        logger.info(`Scheduled backup completed: ${schedule.schedule_name}`);
-      } catch (error: any) {
-        logger.error(`Scheduled backup failed: ${schedule.schedule_name} - ${error.message}`);
-      }
-
-      // 2) Update schedule metadata. Isolated so a failure here can never block
-      //    retention cleanup (a past bug let a metadata error skip cleanup entirely).
-      try {
-        const nextRun = this.getNextRunTime(schedule.cron_expression);
-        await this.backupService.updateScheduleLastRun(
-          schedule.id,
-          backupSucceeded ? 'completed' : 'failed',
-          nextRun
-        );
-      } catch (error: any) {
-        logger.error(`Failed to update schedule metadata for ${schedule.schedule_name}: ${error.message}`);
-      }
-
-      // 3) Apply the retention policy independently, only after a successful backup.
-      if (backupSucceeded && schedule.retention_days > 0) {
-        try {
-          await this.backupService.cleanupOldBackups(schedule.retention_days);
-        } catch (error: any) {
-          logger.error(`Retention cleanup failed for ${schedule.schedule_name}: ${error.message}`);
-        }
-      }
-    });
+    // Create scheduled task (scheduleCron also runs it when node-cron skips a late timer)
+    const task = scheduleCron(
+      `[BackupScheduler] ${schedule.schedule_name}:`,
+      schedule.cron_expression,
+      () => this.runScheduledBackup(schedule)
+    );
 
     // Store task
     this.scheduledTasks.set(schedule.id, {
@@ -126,6 +100,55 @@ class BackupScheduler {
     });
 
     logger.info(`Backup scheduled successfully: ${schedule.schedule_name}`);
+  }
+
+  /**
+   * Run one scheduled backup: backup, schedule metadata, retention cleanup.
+   * Never throws; every step logs its own failure.
+   */
+  private async runScheduledBackup(schedule: any): Promise<void> {
+    logger.info(`Executing scheduled backup: ${schedule.schedule_name}`);
+
+    // 1) Run the backup itself.
+    let backupSucceeded = false;
+    try {
+      await this.backupService.createBackup(
+        'system', // System user for scheduled backups
+        {
+          includeDatabase: schedule.includes_database,
+          includeStorage: schedule.includes_storage,
+          includeConfig: schedule.includes_config,
+          backupName: `scheduled_${schedule.schedule_name}_${Date.now()}`
+        },
+        'scheduled'
+      );
+      backupSucceeded = true;
+      logger.info(`Scheduled backup completed: ${schedule.schedule_name}`);
+    } catch (error: any) {
+      logger.error(`Scheduled backup failed: ${schedule.schedule_name} - ${error.message}`);
+    }
+
+    // 2) Update schedule metadata. Isolated so a failure here can never block
+    //    retention cleanup (a past bug let a metadata error skip cleanup entirely).
+    try {
+      const nextRun = this.getNextRunTime(schedule.cron_expression);
+      await this.backupService.updateScheduleLastRun(
+        schedule.id,
+        backupSucceeded ? 'completed' : 'failed',
+        nextRun
+      );
+    } catch (error: any) {
+      logger.error(`Failed to update schedule metadata for ${schedule.schedule_name}: ${error.message}`);
+    }
+
+    // 3) Apply the retention policy independently, only after a successful backup.
+    if (backupSucceeded && schedule.retention_days > 0) {
+      try {
+        await this.backupService.cleanupOldBackups(schedule.retention_days);
+      } catch (error: any) {
+        logger.error(`Retention cleanup failed for ${schedule.schedule_name}: ${error.message}`);
+      }
+    }
   }
 
   /**

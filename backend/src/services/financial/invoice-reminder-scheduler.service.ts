@@ -16,6 +16,7 @@
 import cron, { ScheduledTask } from 'node-cron';
 import { getDbClient } from '../../utils/database';
 import { logger } from '../../utils/logger';
+import { scheduleCron } from '../../utils/cron-schedule.util';
 import { emailService, getUserSmtpConfig } from '../external/email.service';
 
 interface OverdueInvoiceRow {
@@ -44,7 +45,7 @@ class InvoiceReminderSchedulerService {
       return;
     }
 
-    this.cronJob = cron.schedule(cronExpression, async () => {
+    this.cronJob = scheduleCron('[InvoiceReminder]', cronExpression, async () => {
       logger.info('[InvoiceReminder] Running overdue invoice reminder job...');
       try {
         await this.processOverdueReminders();
