@@ -60,6 +60,8 @@ interface Props {
   activeThreadId?: string | null;
   /** Enables the history view */
   onOpenConversation?: (id: string) => void;
+  /** Adds delete buttons to the history view; resolves true once deleted */
+  onDeleteConversation?: (id: string) => Promise<boolean>;
 }
 
 /** Scrolled this close to the bottom counts as "following the conversation" */
@@ -512,6 +514,7 @@ export default function AIChatPanel({
   conversationsError = false,
   activeThreadId = null,
   onOpenConversation,
+  onDeleteConversation,
 }: Props) {
   const { t } = useTranslation('common');
   const [input, setInput] = useState('');
@@ -653,10 +656,12 @@ export default function AIChatPanel({
           conversations={conversations}
           loadError={conversationsError}
           activeThreadId={activeThreadId}
+          activeBusy={isStreaming}
           onOpen={(id) => {
             onOpenConversation(id);
             setShowHistory(false);
           }}
+          onDelete={onDeleteConversation}
           onBack={() => {
             setShowHistory(false);
             historyButtonRef.current?.focus({ preventScroll: true });

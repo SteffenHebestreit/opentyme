@@ -2,6 +2,13 @@
 
 ## Unreleased (since v1.5.0)
 
+### AI assistant — delete old conversations
+- Every conversation in the assistant's history has a **delete button** (on hover or keyboard
+  focus, always on touch screens). After a confirmation the conversation and all its messages
+  are gone; deleting the one that is open starts a new chat.
+- A conversation the assistant is still answering in can't be deleted — the button is hidden
+  for it, and the server refuses with 409 (e.g. from another tab or an API token's run).
+
 ### Security fix — registration could create administrators
 - **Anyone who could reach the app could register as an administrator**: the public sign-up
   accepted a `role` field and assigned "admin" when asked. Sign-up no longer accepts a role.

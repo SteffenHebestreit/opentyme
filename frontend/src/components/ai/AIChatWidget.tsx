@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Sparkles, X } from 'lucide-react';
 import { useAIChat } from '../../api/hooks/useAIChat';
+import { AI_CONVERSATIONS_QUERY_KEY, useDeleteConversation } from '../../api/hooks/useDeleteConversation';
 import { getConversations } from '../../api/services/ai-chat.service';
 import AIChatPanel from './AIChatPanel';
 import { getSettings } from '../../api/services/settings.service';
@@ -73,7 +74,7 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
   // outside this tab — an API token's run waiting for its owner — so look
   // again every minute, whenever the panel opens and after each run.
   const conversations = useQuery({
-    queryKey: ['aiConversations'],
+    queryKey: AI_CONVERSATIONS_QUERY_KEY,
     queryFn: getConversations,
     refetchInterval: 60_000,
   });
@@ -83,6 +84,8 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
   }, [open, chat.isStreaming, refetchConversations]);
   const waitingElsewhere =
     conversations.data?.some((c) => c.awaiting_approval && c.id !== chat.threadId) ?? false;
+  // Deleting the open conversation starts a new one
+  const deleteConversation = useDeleteConversation(chat.threadId, chat.clearConversation);
 
   return (
     <>
@@ -128,6 +131,7 @@ function AIChatWidgetInner({ sttEnabled }: { sttEnabled: boolean }) {
               conversationsError={conversations.isError}
               activeThreadId={chat.threadId}
               onOpenConversation={chat.openConversation}
+              onDeleteConversation={deleteConversation}
             />
           </div>
         </>

@@ -9,7 +9,7 @@ import {
 } from '../../services/ai/ai-assistant.service';
 import { transcriptionService, TranscriptionError } from '../../services/ai/transcription.service';
 import { normalizeLanguage } from '../../services/ai/system-prompt.builder';
-import { runLockKey, tryAcquireRunLock, releaseRunLock } from '../../services/ai/run-lock';
+import { runLockKey, tryAcquireRunLock, releaseRunLock, isRunActive } from '../../services/ai/run-lock';
 
 // ── Guardrails ────────────────────────────────────────────────────────────────
 
@@ -400,6 +400,12 @@ export async function deleteConversation(req: Request, res: Response): Promise<v
   }
   if (!UUID_RE.test(id)) {
     res.status(404).json({ error: 'Conversation not found' });
+    return;
+  }
+  // Not while the assistant is still answering in it (another tab, an API
+  // token's run): the run would go on writing into a deleted conversation.
+  if (isRunActive(runLockKey(userId, id))) {
+    res.status(409).json(RUN_IN_PROGRESS_BODY);
     return;
   }
 

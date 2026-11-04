@@ -254,6 +254,32 @@ describe('conversation ids', () => {
     expect(res.statusCode).toBe(404);
     expect(ctlHooks.__ctlQueries).toHaveLength(0);
   });
+
+  it('DELETE while the assistant is answering in it is a 409 and deletes nothing', async () => {
+    const user = nextUser();
+    const key = runLockKey(user, THREAD);
+    expect(tryAcquireRunLock(key)).toBe(true);
+    try {
+      const res = new FakeRes();
+      await deleteConversation({ params: { id: THREAD }, user: { id: user } } as any, res as any);
+      expect(res.statusCode).toBe(409);
+      expect(res.body.code).toBe('RUN_IN_PROGRESS');
+      expect(ctlHooks.__ctlQueries).toHaveLength(0);
+    } finally {
+      releaseRunLock(key);
+    }
+  });
+
+  it('DELETE of an idle conversation deletes it, scoped to the caller', async () => {
+    const user = nextUser();
+    const res = new FakeRes();
+    await deleteConversation({ params: { id: THREAD }, user: { id: user } } as any, res as any);
+    // the mocked pool finds the conversation (see jest.mock above)
+    expect(res.statusCode).toBe(204);
+    expect(ctlHooks.__ctlQueries).toHaveLength(1);
+    expect(ctlHooks.__ctlQueries[0].sql).toMatch(/DELETE FROM ai_conversations c WHERE c\.id = \$1 AND c\.user_id = \$2/);
+    expect(ctlHooks.__ctlQueries[0].params).toEqual([THREAD, user]);
+  });
 });
 
 describe('POST /api/ai/transcribe error mapping', () => {
