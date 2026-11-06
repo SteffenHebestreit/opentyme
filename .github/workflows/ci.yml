@@ -7,7 +7,8 @@ on:
   workflow_dispatch: # so a run can be triggered without a dummy commit
 
 # Notes:
-# - Required gates (must pass): backend type-check, backend + frontend lint,
+# - Required gates (must pass): backend type-check, backend tests (unit +
+#   integration, against the postgres service), backend + frontend lint,
 #   frontend type-check, frontend build, frontend unit tests.
 # - Lint policy: errors always fail. Warnings are capped by a RATCHET —
 #   frontend `npm run lint` runs with --max-warnings 175 against a current count
@@ -15,8 +16,9 @@ on:
 #   block the build. Lower the cap as the backlog is worked down; never raise it.
 #   (It was --max-warnings 0, which contradicted this note and would have failed
 #   the build on the pre-existing backlog the moment CI could run at all.)
-# - Non-blocking gate (continue-on-error): backend tests — promote once the
-#   postgres service-container setup is validated in a real CI run.
+# - The postgres service container starts before the checkout, so it cannot
+#   mount init.sql the way docker-compose does; the backend job loads the
+#   schema with psql inside the container before the tests run.
 
 jobs:
   backend:
@@ -39,18 +41,19 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
       - name: Type-check
         run: npx tsc --noEmit
-      - name: Unit tests
-        run: npm run test:unit
-        continue-on-error: true # promote to required once validated in CI
+      - name: Load test database schema
+        run: docker exec -i ${{ job.services.postgres.id }} psql -q -v ON_ERROR_STOP=1 -U postgres -d opentyme_test < ../init.sql
+      - name: Tests (unit + integration)
+        run: npx jest --ci --forceExit
         env:
           NODE_ENV: test
           DATABASE_URL: postgresql://postgres:testpass@localhost:5432/opentyme_test
@@ -64,10 +67,10 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
