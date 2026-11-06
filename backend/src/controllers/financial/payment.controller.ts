@@ -187,16 +187,9 @@ export class PaymentController {
       const result = await client.query(queryText, values);
       const paymentRecord = result.rows[0];
 
-      // Insert into payment_invoices junction table for all invoices
-      // Store each invoice's total_amount as the allocated amount
+      // Link the invoices; each gets the share of the amount it actually received
       if (invoiceIds.length > 0) {
-        const insertJunctionQuery = `
-          INSERT INTO payment_invoices (payment_id, invoice_id, amount)
-          SELECT $1, i.id, i.total_amount
-          FROM invoices i
-          WHERE i.id = ANY($2::uuid[]) AND i.user_id = $3
-        `;
-        await client.query(insertJunctionQuery, [paymentRecord.id, invoiceIds, userId]);
+        await this.linkInvoices(client, paymentRecord.id, Number(amount), payment_type, invoiceIds, userId);
       }
 
       // Update invoice statuses for all linked invoices
@@ -242,9 +235,65 @@ export class PaymentController {
     }
   }
 
+  /**
+   * Splits a payment's amount over its invoices and (re)writes its payment_invoices rows.
+   *
+   * A payment fills each invoice up to what is still open on it (oldest invoice first, counting
+   * every other payment), so a partial payment leaves the invoice partially paid. Whatever is left
+   * over — an overpayment, or a refund, which has nothing "open" to fill — goes to the last invoice,
+   * so the rows always add up to the payment amount. Amounts are split in cents.
+   */
+  private async linkInvoices(
+    db: Pick<PoolClient, 'query'>,
+    paymentId: string,
+    amount: number,
+    paymentType: string,
+    invoiceIds: string[],
+    userId: string
+  ): Promise<void> {
+    await db.query('DELETE FROM payment_invoices WHERE payment_id = $1', [paymentId]);
+    if (invoiceIds.length === 0) return;
+
+    // Paid on each invoice by all OTHER payments — same rule as updateInvoiceStatus
+    const { rows } = await db.query(
+      `SELECT i.id, i.total_amount,
+              COALESCE((
+                SELECT SUM(CASE WHEN p.payment_type = 'payment' THEN COALESCE(pi.amount, p.amount)
+                                ELSE -COALESCE(pi.amount, p.amount) END)
+                FROM payments p
+                LEFT JOIN payment_invoices pi ON pi.payment_id = p.id AND pi.invoice_id = i.id
+                WHERE p.id <> $3::uuid
+                  AND (pi.invoice_id = i.id
+                       OR (p.invoice_id = i.id AND NOT EXISTS (SELECT 1 FROM payment_invoices x WHERE x.payment_id = p.id)))
+              ), 0) AS paid_by_others
+       FROM invoices i
+       WHERE i.id = ANY($1::uuid[]) AND i.user_id = $2
+       ORDER BY i.issue_date, i.invoice_number`,
+      [invoiceIds, userId, paymentId]
+    );
+    if (rows.length === 0) return;
+
+    let remaining = Math.round(amount * 100);
+    const shares = rows.map((row: any) => {
+      const open = Math.max(0, Math.round((Number(row.total_amount) - Number(row.paid_by_others)) * 100));
+      const cents = paymentType === 'payment' ? Math.min(remaining, open) : 0;
+      remaining -= cents;
+      return { invoiceId: row.id as string, cents };
+    });
+    shares[shares.length - 1].cents += remaining;
+
+    for (const share of shares) {
+      await db.query(
+        'INSERT INTO payment_invoices (payment_id, invoice_id, amount) VALUES ($1, $2, $3)',
+        [paymentId, share.invoiceId, share.cents / 100]
+      );
+    }
+  }
+
   // Helper method to update invoice status based on payments.
   // Owner-scoped: only an invoice of `userId` is ever re-statused, so a payment
   // can never flip another tenant's invoice to paid/overdue.
+  // A cancelled invoice stays cancelled whatever is linked to it.
   private async updateInvoiceStatus(invoiceId: string, userId: string, db: Pick<PoolClient, 'query'> = this.db) {
     // Calculate total paid for this invoice
     // Use amount from junction table if available, otherwise use payment amount
@@ -287,7 +336,7 @@ export class PaymentController {
       }
 
       await db.query(
-        `UPDATE invoices SET status = $1 WHERE id = $2 AND user_id = $3`,
+        `UPDATE invoices SET status = $1 WHERE id = $2 AND user_id = $3 AND status <> 'cancelled'`,
         [newStatus, invoiceId, userId]
       );
     }
@@ -363,9 +412,10 @@ export class PaymentController {
     }
   }
 
-  // Update a payment record
+  // Update a payment record.
+  // Every field is optional. Changing the linked invoices, the amount, the type or the client
+  // re-splits the payment over its invoices and re-statuses every invoice it was or is linked to.
   async update(req: Request, res: Response) {
-    // Params validation is done by Joi schema
     const { id } = req.params;
     const userId = (req as any).user?.id;
     if (!userId) {
@@ -373,149 +423,139 @@ export class PaymentController {
       return;
     }
 
-    // Body validation is done by Joi schema
-    const validatedBody = req.body;
-    const { client_id, amount, payment_type, payment_method, transaction_id, payment_date, notes, exclude_from_tax, invoice_ids } = validatedBody; 
+    const { client_id, amount, payment_type, payment_method, transaction_id, payment_date, notes, exclude_from_tax, invoice_ids } = req.body;
 
-    const setParts = [];
+    if (amount !== undefined && !(Number(amount) > 0)) {
+      res.status(400).json({ message: 'Amount must be a positive number.' });
+      return;
+    }
+    if (invoice_ids !== undefined && (!Array.isArray(invoice_ids) || invoice_ids.some((invoiceId: unknown) => !isUuid(invoiceId as string)))) {
+      res.status(400).json({ message: 'invoice_ids must be a list of invoice ids.' });
+      return;
+    }
+    if (payment_date !== undefined && payment_date !== null && Number.isNaN(new Date(payment_date).getTime())) {
+      res.status(400).json({ message: 'Invalid payment date.' });
+      return;
+    }
+
+    const setParts: string[] = [];
     const values: any[] = [];
+    const set = (column: string, value: unknown) => {
+      values.push(value);
+      setParts.push(`${column} = $${values.length}`);
+    };
 
-    if (client_id !== undefined) {
-        setParts.push(`client_id = $${values.length + 1}`); 
-        values.push(client_id);
-    }
-    if (amount !== undefined) {
-        setParts.push(`amount = $${values.length + 1}`);
-        values.push(Number(amount));
-    }
-    if (payment_type !== undefined) {
-        setParts.push(`payment_type = $${values.length + 1}`);
-        values.push(payment_type);
-    }
-    if (payment_method !== undefined) {
-        setParts.push(`payment_method = $${values.length + 1}`);
-        values.push(payment_method || null);
-    }
-    if (transaction_id !== undefined) {
-        setParts.push(`transaction_id = $${values.length + 1}`); 
-        values.push(transaction_id || null);
-    }
-    if (payment_date !== undefined) {
-        setParts.push(`payment_date = $${values.length + 1}`);
-        values.push(payment_date ? new Date(payment_date) : null);
-    }
-    if (notes !== undefined) {
-        setParts.push(`notes = $${values.length + 1}`); 
-        values.push(notes || null);
-    }
-    if (exclude_from_tax !== undefined) {
-        setParts.push(`exclude_from_tax = $${values.length + 1}`); 
-        values.push(exclude_from_tax);
-    }
+    if (client_id !== undefined) set('client_id', client_id);
+    if (amount !== undefined) set('amount', Number(amount));
+    if (payment_type !== undefined) set('payment_type', payment_type);
+    if (payment_method !== undefined) set('payment_method', payment_method || null);
+    if (transaction_id !== undefined) set('transaction_id', transaction_id || null);
+    if (payment_date !== undefined) set('payment_date', payment_date ? new Date(payment_date) : null);
+    if (notes !== undefined) set('notes', notes || null);
+    if (exclude_from_tax !== undefined) set('exclude_from_tax', exclude_from_tax);
 
-    // Handle invoice_ids update - also update the legacy invoice_id field
-    if (invoice_ids !== undefined && Array.isArray(invoice_ids) && invoice_ids.length > 0) {
-        setParts.push(`invoice_id = $${values.length + 1}`);
-        values.push(invoice_ids[0]); // First invoice for backward compatibility
-    }
-
-    if (setParts.length === 0 && (!invoice_ids || invoice_ids.length === 0)) {
-        res.status(400).json({ message: 'No fields to update.' });
-        return;
+    if (setParts.length === 0 && invoice_ids === undefined) {
+      res.status(400).json({ message: 'No fields to update.' });
+      return;
     }
 
     // Another user's payment reads as not found — checked before anything is
     // read or written for it.
     if (!isUuid(id) || !(await this.paymentBelongsTo(id, userId))) {
-        res.status(404).json({ message: 'Payment not found or no access.' });
-        return;
+      res.status(404).json({ message: 'Payment not found or no access.' });
+      return;
     }
 
     // A payment may only move to the caller's own client and invoices.
     // Otherwise it would re-status (paid/overdue) another tenant's invoice.
     if (client_id !== undefined && client_id !== null && !(await ownsRow('clients', client_id, userId))) {
-        res.status(404).json({ message: 'Client not found for this user.' });
-        return;
+      res.status(404).json({ message: 'Client not found for this user.' });
+      return;
     }
     if (Array.isArray(invoice_ids) && (await findUnownedIds('invoices', invoice_ids, userId)).length > 0) {
-        res.status(404).json({ message: 'Invoice(s) not found for this user.' });
-        return;
+      res.status(404).json({ message: 'Invoice(s) not found for this user.' });
+      return;
     }
 
     const client: PoolClient = await this.db.connect();
+    const fail = async (status: number, message: string) => {
+      await client.query('ROLLBACK');
+      res.status(status).json({ message });
+    };
     try {
-        await client.query('BEGIN');
+      await client.query('BEGIN');
 
-        // Get old invoice IDs before update (to update their statuses later)
-        const oldInvoicesQuery = `
-          SELECT pi.invoice_id FROM payment_invoices pi
-          JOIN payments p ON p.id = pi.payment_id
-          WHERE pi.payment_id = $1 AND p.user_id = $2
-        `;
-        const oldInvoicesResult = await client.query(oldInvoicesQuery, [id, userId]);
-        const oldInvoiceIds = oldInvoicesResult.rows.map((r: any) => r.invoice_id);
+      const current = (await client.query(
+        `SELECT id, client_id, invoice_id, project_id, payment_type FROM payments WHERE id = $1 AND user_id = $2 FOR UPDATE`,
+        [id, userId]
+      )).rows[0];
+      if (!current) {
+        await fail(404, 'Payment not found or no access.');
+        return;
+      }
 
-        // Update payment record if there are fields to update
-        let paymentRecord;
-        if (setParts.length > 0) {
-            values.push(id); // For WHERE id = $x
-            const queryText = `
-              UPDATE payments 
-              SET ${setParts.join(', ')}, updated_at = CURRENT_TIMESTAMP 
-              WHERE id = $${values.length} AND user_id = $${values.length + 1}
-              RETURNING id, user_id, client_id, invoice_id, amount, payment_type, payment_method, transaction_id, payment_date, notes, exclude_from_tax, created_at
-            `;
-            values.push(userId);
+      // Invoices linked before the update: junction rows, or the legacy invoice_id alone
+      const linkedRows = (await client.query(
+        `SELECT invoice_id FROM payment_invoices WHERE payment_id = $1`,
+        [id]
+      )).rows.map((r: any) => r.invoice_id as string);
+      const oldInvoiceIds = linkedRows.length > 0 ? linkedRows : (current.invoice_id ? [current.invoice_id as string] : []);
 
-            const result = await client.query(queryText, values);
-            if (result.rows.length === 0) {
-                await client.query('ROLLBACK');
-                res.status(404).json({ message: 'Payment not found or no access.' });
-                return;
-            }
-            paymentRecord = result.rows[0];
+      const newClientId = client_id !== undefined ? client_id : current.client_id;
+      const newType = payment_type !== undefined ? payment_type : current.payment_type;
+      const newInvoiceIds: string[] = invoice_ids !== undefined ? [...new Set<string>(invoice_ids)] : oldInvoiceIds;
+      const clientChanged = client_id !== undefined && client_id !== current.client_id;
+
+      if (invoice_ids !== undefined || clientChanged) {
+        if (newInvoiceIds.length > 0) {
+          const found = (await client.query(
+            `SELECT id, project_id FROM invoices WHERE id = ANY($1::uuid[]) AND client_id = $2 AND user_id = $3`,
+            [newInvoiceIds, newClientId, userId]
+          )).rows;
+          if (found.length !== newInvoiceIds.length) {
+            await fail(400, 'All linked invoices must belong to the payment\'s client.');
+            return;
+          }
+          if (invoice_ids !== undefined) {
+            const first = found.find((row: any) => row.id === newInvoiceIds[0]);
+            set('invoice_id', newInvoiceIds[0]); // first invoice, for backward compatibility
+            if (first?.project_id) set('project_id', first.project_id);
+          }
+        } else if (newType === 'refund') {
+          await fail(400, 'A refund must stay linked to an invoice.');
+          return;
+        } else if (newType === 'payment' && !current.project_id) {
+          await fail(400, 'A payment without an invoice needs a project.');
+          return;
         } else {
-            // Just fetch the current payment if no field updates
-            const fetchQuery = `
-              SELECT id, user_id, client_id, invoice_id, amount, payment_type, payment_method, transaction_id, payment_date, notes, exclude_from_tax, created_at
-              FROM payments WHERE id = $1 AND user_id = $2
-            `;
-            const fetchResult = await client.query(fetchQuery, [id, userId]);
-            if (fetchResult.rows.length === 0) {
-                await client.query('ROLLBACK');
-                res.status(404).json({ message: 'Payment not found or no access.' });
-                return;
-            }
-            paymentRecord = fetchResult.rows[0];
+          set('invoice_id', null);
         }
+      }
 
-        // Update invoice links if invoice_ids provided
-        if (invoice_ids !== undefined && Array.isArray(invoice_ids)) {
-            // Delete existing links
-            await client.query(`DELETE FROM payment_invoices WHERE payment_id = $1`, [id]);
-            
-            // Insert new links
-            if (invoice_ids.length > 0) {
-                const insertJunctionQuery = `
-                  INSERT INTO payment_invoices (payment_id, invoice_id)
-                  SELECT $1, unnest($2::uuid[])
-                `;
-                await client.query(insertJunctionQuery, [id, invoice_ids]);
-            }
+      values.push(id, userId);
+      const payment = (await client.query(
+        `UPDATE payments
+         SET ${setParts.join(', ')}${setParts.length > 0 ? ', ' : ''}updated_at = CURRENT_TIMESTAMP
+         WHERE id = $${values.length - 1} AND user_id = $${values.length}
+         RETURNING id, user_id, client_id, invoice_id, project_id, amount, payment_type, payment_method, transaction_id, payment_date, notes, exclude_from_tax, created_at`,
+        values
+      )).rows[0];
 
-            // Update statuses for all affected invoices (old and new)
-            const allAffectedInvoices = [...new Set([...oldInvoiceIds, ...invoice_ids])];
-            for (const invoiceId of allAffectedInvoices) {
-                await this.updateInvoiceStatus(invoiceId as string, userId, client);
-            }
+      const relink = invoice_ids !== undefined || amount !== undefined || payment_type !== undefined || clientChanged;
+      if (relink) {
+        await this.linkInvoices(client, id, Number(payment.amount), payment.payment_type, newInvoiceIds, userId);
+        for (const invoiceId of new Set([...oldInvoiceIds, ...newInvoiceIds])) {
+          await this.updateInvoiceStatus(invoiceId, userId, client);
         }
+      }
 
-        await client.query('COMMIT');
+      await client.query('COMMIT');
 
-        res.status(200).json({
-          message: 'Payment updated successfully',
-          payment: paymentRecord
-        });
+      payment.invoice_ids = newInvoiceIds;
+      res.status(200).json({
+        message: 'Payment updated successfully',
+        payment,
+      });
     } catch (err: any) {
       await client.query('ROLLBACK').catch(() => undefined);
       logger.error('Update payment error:', err);
@@ -525,49 +565,52 @@ export class PaymentController {
     }
   }
 
-  // Delete a payment record
+  // Delete a payment record; the invoices it was linked to are re-statused in the same transaction
   async delete(req: Request, res: Response) {
-    // Params validation is done by Joi schema
-    const { id } = req.params; 
+    const { id } = req.params;
     const userId = (req as any).user?.id;
     if (!userId) {
       res.status(401).json({ message: 'Authentication required' });
       return;
     }
+    if (!isUuid(id)) {
+      res.status(404).json({ message: 'Payment not found or no access.' });
+      return;
+    }
 
+    const client: PoolClient = await this.db.connect();
     try {
-      if (!isUuid(id)) {
+      await client.query('BEGIN');
+
+      // Linked invoices before deletion — only for the caller's own payment
+      const invoiceIds = (await client.query(
+        `SELECT pi.invoice_id FROM payment_invoices pi
+         JOIN payments p ON p.id = pi.payment_id
+         WHERE pi.payment_id = $1 AND p.user_id = $2
+         UNION
+         SELECT invoice_id FROM payments WHERE id = $1 AND user_id = $2 AND invoice_id IS NOT NULL`,
+        [id, userId]
+      )).rows.map((r: any) => r.invoice_id as string);
+
+      const result = await client.query(`DELETE FROM payments WHERE id = $1 AND user_id = $2`, [id, userId]);
+      if ((result.rowCount ?? 0) === 0) {
+        await client.query('ROLLBACK');
         res.status(404).json({ message: 'Payment not found or no access.' });
         return;
       }
 
-      // Get linked invoices before deletion (to update their statuses) —
-      // only for the caller's own payment
-      const linkedInvoicesQuery = `
-        SELECT pi.invoice_id FROM payment_invoices pi
-        JOIN payments p ON p.id = pi.payment_id
-        WHERE pi.payment_id = $1 AND p.user_id = $2
-        UNION
-        SELECT invoice_id FROM payments WHERE id = $1 AND user_id = $2 AND invoice_id IS NOT NULL
-      `;
-      const linkedInvoicesResult = await this.db.query(linkedInvoicesQuery, [id, userId]);
-      const invoiceIds = linkedInvoicesResult.rows.map((r: any) => r.invoice_id);
-
-      const queryText = `DELETE FROM payments WHERE id = $1 AND user_id = $2`;
-      const result = await this.db.query(queryText, [id, userId]);
-      
-      if ((result.rowCount ?? 0) > 0) {
-        // Update statuses for all previously linked invoices
-        for (const invoiceId of invoiceIds) {
-          await this.updateInvoiceStatus(invoiceId, userId);
-        }
-        res.status(200).json({ message: 'Payment deleted successfully' });
-      } else {
-        res.status(404).json({ message: 'Payment not found or no access.' });
+      for (const invoiceId of invoiceIds) {
+        await this.updateInvoiceStatus(invoiceId, userId, client);
       }
+
+      await client.query('COMMIT');
+      res.status(200).json({ message: 'Payment deleted successfully' });
     } catch (err: any) {
+      await client.query('ROLLBACK').catch(() => undefined);
       logger.error('Delete payment error:', err);
       res.status(500).json({ message: err.message || 'Internal server error' });
+    } finally {
+      client.release();
     }
   }
 

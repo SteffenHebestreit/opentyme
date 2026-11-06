@@ -71,7 +71,9 @@
     "saving": "Saving...",
     "saveChanges": "Save Changes",
     "cancel": "Cancel",
-    "updateFailed": "Failed to update payment"
+    "updateFailed": "Failed to update payment",
+    "deleteConfirmDetail": "The payment of {{amount}} on {{date}} will be deleted. Its linked invoices count as open again unless something else paid them.",
+    "deleteFailed": "Payment could not be deleted"
   },
   "loading": "Loading payments...",
   "loadError": "Error loading payments",
@@ -104,5 +106,12 @@
       "descriptionRequired": "Please enter a description",
       "failed": "Failed to record expense"
     }
+  },
+  "editForm": {
+    "statusHint": "Saving recalculates the status of every affected invoice, including the ones you deselect here.",
+    "dateRequired": "Please enter a payment date",
+    "invoiceRequired": "Please select at least one invoice",
+    "lessThanInvoices": "The amount is less than the selected invoices ({{total}}); at least one invoice will show as partially paid.",
+    "moreThanInvoices": "The amount is more than the selected invoices ({{total}}); the surplus goes to the newest invoice."
   }
 }

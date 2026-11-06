@@ -71,7 +71,9 @@
     "saving": "Wird gespeichert...",
     "saveChanges": "Änderungen speichern",
     "cancel": "Abbrechen",
-    "updateFailed": "Zahlung konnte nicht aktualisiert werden"
+    "updateFailed": "Zahlung konnte nicht aktualisiert werden",
+    "deleteConfirmDetail": "Die Zahlung über {{amount}} vom {{date}} wird gelöscht. Die verknüpften Rechnungen werden danach wieder als offen geführt, soweit sie nicht anders bezahlt sind.",
+    "deleteFailed": "Zahlung konnte nicht gelöscht werden"
   },
   "loading": "Zahlungen werden geladen...",
   "loadError": "Fehler beim Laden der Zahlungen",
@@ -104,5 +106,12 @@
       "descriptionRequired": "Bitte geben Sie eine Beschreibung ein",
       "failed": "Ausgabe konnte nicht erfasst werden"
     }
+  },
+  "editForm": {
+    "statusHint": "Beim Speichern wird der Status aller betroffenen Rechnungen neu berechnet – auch der Rechnungen, die Sie hier abwählen.",
+    "dateRequired": "Bitte geben Sie ein Zahlungsdatum ein",
+    "invoiceRequired": "Bitte wählen Sie mindestens eine Rechnung aus",
+    "lessThanInvoices": "Der Betrag ist kleiner als die Summe der ausgewählten Rechnungen ({{total}}) – mindestens eine Rechnung wird als teilweise bezahlt geführt.",
+    "moreThanInvoices": "Der Betrag ist größer als die Summe der ausgewählten Rechnungen ({{total}}) – der Überschuss wird der neuesten Rechnung zugeordnet."
   }
 }

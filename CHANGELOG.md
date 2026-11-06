@@ -2,6 +2,16 @@
 
 ## Unreleased (since v1.5.0)
 
+### Payments — edit and delete
+- A payment's detail view has **Edit** and **Delete**. Edit changes the amount, date, method,
+  transaction ID, notes, "exclude from tax" and **which invoices it pays** — so a payment booked
+  on the wrong invoice can be moved. Saving or deleting re-statuses every invoice the payment was
+  or is linked to (paid / partially paid / sent / overdue); a cancelled invoice stays cancelled.
+- **Partial payments now count as partial**: a payment used to mark each linked invoice as fully
+  paid whatever its amount. It is now split over its invoices by what is still open on each,
+  oldest first, so paying less leaves the invoice "partially paid". Existing payments keep their
+  stored split until they are edited.
+
 ### AI assistant — delete old conversations
 - Every conversation in the assistant's history has a **delete button** (on hover or keyboard
   focus, always on touch screens). After a confirmation the conversation and all its messages
