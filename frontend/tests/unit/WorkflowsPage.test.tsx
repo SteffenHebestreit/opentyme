@@ -46,6 +46,7 @@ jest.mock('../../src/hooks/api/useWorkflows', () => ({
   useSetWorkflowStatus: () => ({ mutateAsync: mockSetStatus, isPending: false }),
   useDeleteWorkflow: () => ({ mutateAsync: mockDelete, isPending: false }),
   useCreateWorkflow: () => ({ mutateAsync: mockCreate, isPending: false }),
+  useWorkflowCatalog: () => ({ data: jest.requireActual('../mocks/workflowFixtures').catalog }),
   useWorkflowTemplates: () => ({
     data: [{ key: 'timesheet-signature', name: 'Timesheet with signature', description: 'Signed timesheet, then invoice', subject_type: 'client', graph: { nodes: [], edges: [] } }],
   }),

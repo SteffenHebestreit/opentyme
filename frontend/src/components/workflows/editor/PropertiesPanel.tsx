@@ -10,6 +10,7 @@ import { Button } from '../../common/Button';
 import { fieldClasses, fieldHelperClass, fieldLabelClass } from '../../forms/fieldStyles';
 import { useClients } from '../../../hooks/api/useClients';
 import { useProjects } from '../../../hooks/api/useProjects';
+import { useWorkflowSubjectOptions } from '../../../hooks/api/useWorkflows';
 import type {
   ActionNodeData,
   EndNodeData,
@@ -18,6 +19,7 @@ import type {
   TaskNodeData,
   WaitNodeData,
   WorkflowCatalog,
+  WorkflowFieldType,
   WorkflowFormField,
   WorkflowIssue,
   WorkflowSchedule,
@@ -28,6 +30,7 @@ import type {
 import { WORKFLOW_TASK_KINDS } from '../../../api/types/workflow.types';
 import { gatewayEdges } from '../graph/flowGraph';
 import type { AnyNodeData, FlowEdge, FlowNode } from '../graph/flowGraph';
+import { SubjectOptions } from '../EntityOptions';
 import { referenceOptions } from '../graph/references';
 import type { ReferenceOption } from '../graph/references';
 import { useWorkflowLabels } from '../useWorkflowLabels';
@@ -102,8 +105,15 @@ function PanelHeading({ eyebrow, title, detail }: { eyebrow: string; title: stri
   );
 }
 
-/** Subjects a scheduled start runs for — the user's clients or projects. */
-const SubjectChecklist: FC<{ subjectType: 'client' | 'project'; selected: string[]; onChange: (ids: string[]) => void; legend: string; empty: string }> = ({
+/** The field type a record of this kind of subject is picked with. Only OpenTyme's own have one; an addon's ids are plain text. */
+const subjectFieldType = (subjectType: string): WorkflowFieldType =>
+  subjectType === 'client' || subjectType === 'project' || subjectType === 'invoice' ? subjectType : 'string';
+
+/**
+ * Records a start is for: the subjects of a scheduled start, or the clients an event start is limited to.
+ * Clients and projects come from the app's own lists, any other kind of subject from the workflow API.
+ */
+const SubjectChecklist: FC<{ subjectType: string; selected: string[]; onChange: (ids: string[]) => void; legend: string; empty: string }> = ({
   subjectType,
   selected,
   onChange,
@@ -112,7 +122,13 @@ const SubjectChecklist: FC<{ subjectType: 'client' | 'project'; selected: string
 }) => {
   const clients = useClients();
   const projects = useProjects();
-  const items = subjectType === 'client' ? clients.data ?? [] : projects.data ?? [];
+  const others = useWorkflowSubjectOptions(subjectType, subjectType !== 'client' && subjectType !== 'project');
+  const items: Array<{ id: string; name: string }> =
+    subjectType === 'client'
+      ? clients.data ?? []
+      : subjectType === 'project'
+        ? projects.data ?? []
+        : (others.data ?? []).map((option) => ({ id: option.id, name: option.label }));
   return (
     <fieldset className="mb-4">
       <legend className={fieldLabelClass()}>{legend}</legend>
@@ -156,9 +172,15 @@ function StartSettings({
   catalog?: WorkflowCatalog;
 }) {
   const { t } = labels;
-  const schedulable = subjectType === 'client' || subjectType === 'project';
+  // A scheduled start runs for a fixed list of records (or for nothing in particular). Which kinds of subject
+  // allow that is the server's to say; clients and projects do, also while the catalog is still loading.
+  const subjectSpec = catalog?.subjects?.find((subject) => subject.key === subjectType);
+  const schedulable = subjectType === 'none' || (subjectSpec ? !!subjectSpec.schedulable : subjectType === 'client' || subjectType === 'project');
   // Events happen to a kind of record; only a flow about that kind can start with them
   const events = (catalog?.events ?? []).filter((event) => event.subject_type === subjectType);
+  // An event start can be limited to some clients — where what the flow is about belongs to one
+  const hasClient = (catalog?.variables?.[subjectType] ?? []).some((variable) => variable.path === 'client.id');
+  const subjectName = labels.subjectTypeLabel(subjectType);
   const schedule = config.schedule ?? DEFAULT_SCHEDULE;
   const setSchedule = (patch: Partial<WorkflowSchedule>) => onChange({ ...config, trigger: 'schedule', schedule: { ...schedule, ...patch } });
   return (
@@ -166,7 +188,9 @@ function StartSettings({
       <Field
         id="start-trigger"
         label={t('start.trigger')}
-        hint={schedulable ? t('start.triggerHint') : events.length > 0 ? t('start.triggerHintEvent') : t('start.scheduleNeedsSubject')}
+        hint={
+          schedulable ? t('start.triggerHint') : events.length > 0 ? t('start.triggerHintEvent') : t('start.scheduleNeedsSubject', { subject: subjectName })
+        }
       >
         <select
           id="start-trigger"
@@ -206,13 +230,15 @@ function StartSettings({
               ))}
             </select>
           </Field>
-          <SubjectChecklist
-            subjectType="client"
-            selected={config.event?.clientIds ?? []}
-            onChange={(clientIds) => onChange({ ...config, event: { type: config.event?.type ?? '', clientIds } })}
-            legend={t('start.eventClients')}
-            empty={t('start.noSubjects.client')}
-          />
+          {hasClient && (
+            <SubjectChecklist
+              subjectType="client"
+              selected={config.event?.clientIds ?? []}
+              onChange={(clientIds) => onChange({ ...config, event: { type: config.event?.type ?? '', clientIds } })}
+              legend={t('start.eventClients')}
+              empty={t('start.noSubjects.client')}
+            />
+          )}
         </>
       )}
       {config.trigger === 'schedule' && schedulable && (
@@ -243,13 +269,15 @@ function StartSettings({
               <option value="previous_month">{t('start.periodPrevious')}</option>
             </select>
           </Field>
-          <SubjectChecklist
-            subjectType={subjectType}
-            selected={schedule.subjectIds}
-            onChange={(subjectIds) => setSchedule({ subjectIds })}
-            legend={t(`start.subjects.${subjectType}`)}
-            empty={t(`start.noSubjects.${subjectType}`)}
-          />
+          {subjectType !== 'none' && (
+            <SubjectChecklist
+              subjectType={subjectType}
+              selected={schedule.subjectIds}
+              onChange={(subjectIds) => setSchedule({ subjectIds })}
+              legend={t(`start.subjects.${subjectType}`, { defaultValue: t('start.subjectsGeneric', { subject: subjectName }) })}
+              empty={t(`start.noSubjects.${subjectType}`, { defaultValue: t('start.noSubjectsGeneric', { subject: subjectName }) })}
+            />
+          )}
         </>
       )}
     </>
@@ -607,6 +635,18 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
     const wait = config as WaitNodeData;
     const waitsForEvent = wait.mode === 'event';
     const waitEvents = catalog?.events ?? [];
+    // What the event happens to decides what is picked here; the run's own subject needs no picking
+    const waitSubject = waitEvents.find((candidate) => candidate.key === wait.event)?.subject_type;
+    const waitsForOwnSubject = waitSubject === subjectType;
+    const waitSubjectField = waitSubject ? subjectFieldType(waitSubject) : 'string';
+    // Offered first: something that happens to what the flow is about (for an invoice, that it is paid)
+    const ownEvents = waitEvents.filter((candidate) => candidate.subject_type === subjectType);
+    const defaultWaitEvent = (
+      ownEvents.find((candidate) => candidate.key === 'invoice.paid') ??
+      ownEvents[0] ??
+      waitEvents.find((candidate) => candidate.key === 'invoice.paid') ??
+      waitEvents[0]
+    )?.key;
     body = (
       <>
         <Field id="wait-mode" label={t('wait.mode')}>
@@ -616,7 +656,7 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
             value={waitsForEvent ? 'event' : 'duration'}
             onChange={(event) =>
               event.target.value === 'event'
-                ? setConfig({ label: wait.label, mode: 'event', event: wait.event ?? waitEvents.find((candidate) => candidate.key === 'invoice.paid')?.key ?? waitEvents[0]?.key })
+                ? setConfig({ label: wait.label, mode: 'event', event: wait.event ?? defaultWaitEvent })
                 : setConfig({ label: wait.label, mode: 'duration', days: wait.days, hours: wait.hours })
             }
           >
@@ -633,7 +673,11 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
                 id="wait-event"
                 className={cn(control, 'cursor-pointer')}
                 value={wait.event ?? ''}
-                onChange={(event) => setConfig({ ...wait, event: event.target.value })}
+                onChange={(event) => {
+                  const next = waitEvents.find((candidate) => candidate.key === event.target.value)?.subject_type;
+                  // A record of another kind cannot stay chosen
+                  setConfig({ ...wait, event: event.target.value, ...(next === waitSubject ? {} : { subject: undefined }) });
+                }}
               >
                 {!waitEvents.some((event) => event.key === wait.event) && <option value="">{t('value.choose')}</option>}
                 {waitEvents.map((event) => (
@@ -643,17 +687,24 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
                 ))}
               </select>
             </Field>
-            <ValueField
-              key={`${nodeId}:subject`}
-              id="wait-subject"
-              label={t(subjectType === 'invoice' ? 'wait.subjectOptional' : 'wait.subject')}
-              spec={{ type: 'invoice', required: subjectType !== 'invoice' }}
-              value={wait.subject}
-              onChange={(value) => setConfig({ ...wait, subject: value })}
-              references={references}
-              naming={naming}
-              error={fieldIssue('subject')}
-            />
+            {waitSubject && (
+              <ValueField
+                key={`${nodeId}:subject:${waitSubject}`}
+                id="wait-subject"
+                label={
+                  waitsForOwnSubject
+                    ? t('wait.subjectOptional', { subject: labels.subjectTypeLabel(waitSubject) })
+                    : labels.subjectTypeLabel(waitSubject)
+                }
+                spec={{ type: waitSubjectField, required: !waitsForOwnSubject }}
+                literalOptions={waitSubjectField === 'string' ? <SubjectOptions type={waitSubject} /> : undefined}
+                value={wait.subject}
+                onChange={(value) => setConfig({ ...wait, subject: value })}
+                references={references}
+                naming={naming}
+                error={fieldIssue('subject')}
+              />
+            )}
             <NumberField
               id="wait-timeout"
               label={t('wait.timeoutDays')}

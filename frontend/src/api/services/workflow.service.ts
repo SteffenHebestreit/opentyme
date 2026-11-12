@@ -25,8 +25,20 @@ const BASE = '/workflows';
 
 // ── Catalog and templates ────────────────────────────────────────────────────
 
-export const getWorkflowCatalog = async (): Promise<WorkflowCatalog> => {
-  const response = await apiClient.get(`${BASE}/catalog`);
+/** What the editor offers. What an addon registered comes named in `lang` (the app's language) where the addon ships it. */
+export const getWorkflowCatalog = async (lang?: string): Promise<WorkflowCatalog> => {
+  const response = await apiClient.get(`${BASE}/catalog`, lang ? { params: { lang } } : undefined);
+  return response.data;
+};
+
+export interface WorkflowSubjectOption {
+  id: string;
+  label: string;
+}
+
+/** The user's records of one subject type — any registered one, an addon's included — for pickers (at most 200). */
+export const getWorkflowSubjectOptions = async (type: WorkflowSubjectType, search?: string): Promise<WorkflowSubjectOption[]> => {
+  const response = await apiClient.get(`${BASE}/subjects/${encodeURIComponent(type)}/options`, search ? { params: { search } } : undefined);
   return response.data;
 };
 

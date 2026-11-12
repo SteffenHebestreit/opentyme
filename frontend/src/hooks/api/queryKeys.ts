@@ -69,6 +69,7 @@ export const queryKeys = {
     all: ['workflows'] as const,
     catalog: ['workflows', 'catalog'] as const,
     templates: ['workflows', 'templates'] as const,
+    subjectOptions: (type: string) => ['workflows', 'subjects', type] as const,
     definitions: ['workflows', 'definitions'] as const,
     definition: (id: string) => ['workflows', 'definition', id] as const,
     runs: (filters?: unknown) => ['workflows', 'runs', filters] as const,

@@ -8,6 +8,7 @@ import { Table, Column } from '../../common/Table';
 import { cn } from '../../../lib/cn';
 import { InvoiceStatusBadge } from './InvoiceStatusBadge';
 import { RowActionButton } from './RowActionButton';
+import { StartWorkflowButton } from '../../workflows/StartWorkflowButton';
 
 /**
  * Extended invoice type with optional project name and payments.
@@ -209,6 +210,14 @@ export const InvoiceTable: FC<InvoiceTableProps> = ({ invoices, onView, onEdit, 
             <RowActionButton label={t('view')} onClick={() => onView(invoice)}>
               <Eye className="h-4 w-4" aria-hidden="true" />
             </RowActionButton>
+            {/* Starts one of the user's flows for this invoice — absent while there is none */}
+            <StartWorkflowButton
+              subjectType="invoice"
+              subjectId={invoice.id}
+              subjectName={invoice.invoice_number}
+              compact
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white"
+            />
             {canEdit && (
               <RowActionButton label={t('edit')} onClick={() => onEdit(invoice)}>
                 <Pencil className="h-4 w-4" aria-hidden="true" />

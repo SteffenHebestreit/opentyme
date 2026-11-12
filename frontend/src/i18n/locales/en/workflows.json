@@ -141,7 +141,7 @@
     "manual": "By hand",
     "schedule": "Monthly, by itself",
     "triggerHint": "A run can always be started by hand, too.",
-    "scheduleNeedsSubject": "Only flows for clients or projects can start by themselves.",
+    "scheduleNeedsSubject": "This kind of flow ({{subject}}) cannot start by itself on a schedule.",
     "dayOfMonth": "Day of the month",
     "dayHint": "Starts at 06:00 UTC on that day.",
     "lastDay": "Last day of the month",
@@ -179,13 +179,16 @@
       "unpublishedChanges": "The run uses version {{version}}. Changes you have not published are not part of it.",
       "runExists": "This flow already ran for this subject and period.",
       "openExisting": "Open that run",
-      "error": "The run could not be started."
+      "error": "The run could not be started.",
+      "subjectRequiredGeneric": "Choose what the run is for ({{subject}})."
     },
     "event": "When something happens",
     "triggerHintEvent": "The flow starts by itself as soon as the event happens. It can also be started by hand.",
     "eventLabel": "Event",
-    "eventHint": "What has to happen to an invoice for a run to start.",
-    "eventClients": "Only for these clients (none chosen = all)"
+    "eventHint": "What has to happen for a run to start.",
+    "eventClients": "Only for these clients (none chosen = all)",
+    "subjectsGeneric": "Start for these records ({{subject}})",
+    "noSubjectsGeneric": "There are no records yet ({{subject}})."
   },
   "task": {
     "kind": "Kind of task",
@@ -230,8 +233,7 @@
     "modeDuration": "A fixed time",
     "modeEvent": "Until something happens",
     "event": "Event",
-    "subject": "Invoice",
-    "subjectOptional": "Invoice (empty = this run's invoice)",
+    "subjectOptional": "{{subject}} (empty = what this run is about)",
     "timeoutDays": "At most this many days",
     "timeoutHint": "Empty = no limit. With a limit the node gets the exit “time expired”.",
     "untilEvent": "Wait for: {{event}}"
@@ -325,7 +327,8 @@
     "permissions": "Runs of this flow may",
     "permissionsHint": "Derived from the actions in the flow. A run can never do more than this.",
     "schedule_one": "Starts by itself: {{day}}, for {{count}} subject.",
-    "schedule_other": "Starts by itself: {{day}}, for {{count}} subjects."
+    "schedule_other": "Starts by itself: {{day}}, for {{count}} subjects.",
+    "scheduleNoSubject": "Starts by itself: {{day}}."
   },
   "list": {
     "title": "Flows",
@@ -724,18 +727,19 @@
     "BAD_TASK": "Choose what kind of task this is.",
     "MISSING_TITLE": "The task needs a title.",
     "BAD_DOCUMENT_TYPE": "Choose the type the uploaded file is stored as.",
-    "UPLOAD_NEEDS_CLIENT": "An upload is stored with a client, so the flow needs a client, project or invoice as its subject.",
+    "UPLOAD_NEEDS_CLIENT": "An upload is stored with a client, so the flow needs a subject that belongs to one (client, project, invoice).",
     "NO_FORM_FIELDS": "The form needs at least one field.",
     "BAD_FORM_FIELD": "Every form field needs a label, a type and a unique key.",
     "BAD_DUE": "The due date must be between 1 and 365 days.",
     "BAD_DURATION": "Set how long to wait (at most a year).",
     "BAD_EVENT": "Choose the event.",
-    "EVENT_SUBJECT": "This event happens to an invoice. Only a flow about invoices can start with it.",
+    "EVENT_SUBJECT": "This event happens to another kind of record. Only a flow about that kind can start with it.",
     "EVENT_LOOP": "This flow creates an invoice and would start itself again. Choose another start or remove that action.",
     "BAD_WAIT": "Choose what to wait for.",
-    "WAIT_NO_SUBJECT": "Choose the invoice to wait for.",
+    "WAIT_NO_SUBJECT": "Choose the record whose event is waited for.",
     "PARALLEL_CONDITION": "A parallel branch takes all its exits. They cannot have conditions.",
-    "BAD_GATEWAY": "Choose whether the branch takes one exit or all."
+    "BAD_GATEWAY": "Choose whether the branch takes one exit or all.",
+    "UNKNOWN_SUBJECT": "The server does not know what this flow is about at the moment (is its addon enabled?)."
   },
   "preview": {
     "labels": {
@@ -757,7 +761,8 @@
     "INTERRUPTED": "The server stopped while this step was running. Check whether it took effect, then retry or skip it.",
     "TOO_MANY_STEPS": "The run has taken {{max}} steps. The flow probably runs in a circle.",
     "STEP_MISSING": "This step no longer exists in the flow.",
-    "WAIT_NO_SUBJECT": "There is no invoice in this run to wait for."
+    "WAIT_NO_SUBJECT": "This run lacks what the step waits for ({{subject}}).",
+    "WAIT_UNKNOWN_EVENT": "The server does not know the event “{{event}}” at the moment (is its addon enabled?)."
   },
   "events": {
     "invoice": {

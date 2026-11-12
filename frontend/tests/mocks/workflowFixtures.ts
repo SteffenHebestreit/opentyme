@@ -1,7 +1,8 @@
 /**
  * Shared test data for the workflow UI: a small catalog and the "timesheet
  * with signature" flow (start → summarize → branch → timesheet → mail →
- * upload with a reminder loop → end).
+ * upload with a reminder loop → end) — and the same catalog as a server with
+ * an addon for job applications returns it.
  */
 import type {
   WorkflowCatalog,
@@ -81,6 +82,11 @@ export const catalog: WorkflowCatalog = {
     form: [],
   },
   documentTypes: ['contract', 'timesheet', 'timesheet_signed', 'other'],
+  subjects: [
+    { key: 'client', title: 'Client', schedulable: true },
+    { key: 'project', title: 'Project', schedulable: true },
+    { key: 'invoice', title: 'Invoice', schedulable: false },
+  ],
   events: [
     {
       key: 'invoice.paid',
@@ -101,6 +107,59 @@ export const catalog: WorkflowCatalog = {
     },
   ],
 };
+
+export const ADDON_SUBJECT = 'applications.application';
+
+/**
+ * The catalog of a server on which an addon registered a subject (a job
+ * application — a record that belongs to no client and cannot be scheduled),
+ * something that happens to it and an action. The addon's texts arrive in the
+ * language the catalog was asked for, as `GET /catalog?lang=` returns them;
+ * the frontend has no translations of its own for them.
+ */
+export function addonCatalog(lang: 'en' | 'de' = 'en'): WorkflowCatalog {
+  const de = lang === 'de';
+  return {
+    ...catalog,
+    actions: [
+      ...catalog.actions,
+      {
+        key: 'applications.setStatus',
+        category: 'applications',
+        categoryTitle: de ? 'Bewerbungen' : 'Applications',
+        title: de ? 'Status der Bewerbung setzen' : 'Set application status',
+        description: de ? 'Setzt den Status einer Bewerbung.' : 'Sets the status of an application.',
+        effect: 'write',
+        defaultMode: 'auto',
+        input: [
+          { key: 'applicationId', type: 'string', label: de ? 'Bewerbung' : 'Application', required: true, default: { $ref: 'application.id' } },
+          { key: 'status', type: 'select', label: 'Status', required: true, options: ['invited', 'rejected'] },
+        ],
+        output: [{ key: 'status', type: 'string', label: de ? 'Neuer Status' : 'New status' }],
+      },
+    ],
+    subjects: [...catalog.subjects, { key: ADDON_SUBJECT, title: de ? 'Bewerbung' : 'Application', schedulable: false }],
+    variables: {
+      ...catalog.variables,
+      // A flow about an invoice knows the invoice's client; an application has none
+      invoice: [...catalog.variables.invoice, { path: 'client.id', type: 'client', label: 'Client' }],
+      [ADDON_SUBJECT]: [
+        { path: 'application.id', type: 'string', label: de ? 'Bewerbung' : 'Application' },
+        { path: 'application.title', type: 'string', label: de ? 'Bewerbung: Titel' : 'Application: title' },
+      ],
+    },
+    events: [
+      ...catalog.events,
+      {
+        key: 'applications.answered',
+        subject_type: ADDON_SUBJECT,
+        title: de ? 'Antwort erhalten' : 'Answer received',
+        description: de ? 'Auf die Bewerbung kam eine Antwort.' : 'The application got an answer.',
+        output: [{ key: 'answer', type: 'string', label: de ? 'Antwort' : 'Answer' }],
+      },
+    ],
+  };
+}
 
 export const graph: WorkflowGraph = {
   nodes: [

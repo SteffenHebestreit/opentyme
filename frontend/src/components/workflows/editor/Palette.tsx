@@ -121,7 +121,10 @@ export const Palette: FC<PaletteProps> = ({ catalog, hasStart, onAdd }) => {
       </Group>
 
       {categories.map((category) => (
-        <Group key={category.key} title={t(`categories.${category.key}`, { defaultValue: category.key })}>
+        <Group key={category.key} title={t(`categories.${category.key}`, {
+            // An addon's own category: the name the addon gives it, in the app's language where it ships one
+            defaultValue: category.actions.find((action) => action.categoryTitle)?.categoryTitle ?? category.key,
+          })}>
           {category.actions.map((action) => (
             <PaletteButton
               key={action.key}

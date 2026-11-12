@@ -17,7 +17,11 @@ export type WorkflowNodeType = (typeof WORKFLOW_NODE_TYPES)[number];
 
 /** What a run is about. `none` = a flow without a subject (started by hand). */
 export const WORKFLOW_SUBJECT_TYPES = ['client', 'project', 'invoice', 'none'] as const;
-export type WorkflowSubjectType = (typeof WORKFLOW_SUBJECT_TYPES)[number];
+/**
+ * A subject key. The four above are built in (`none` = about nothing); addons register
+ * more — the catalog's `subjects` lists what is available.
+ */
+export type WorkflowSubjectType = string;
 
 /**
  * A configured value: a literal, or `{ $ref: 'path' }` into the run's data
@@ -235,6 +239,8 @@ export type WorkflowActionEffect = 'read' | 'write' | 'external';
 export interface WorkflowActionSpec {
   key: string;
   category: string;
+  /** Heading of the category in the palette, for a category OpenTyme has no name for (an addon's own). */
+  categoryTitle?: string;
   /** English fallback; the UI translates `workflows:actions.<key>.title`. */
   title: string;
   description: string;
@@ -263,11 +269,36 @@ export interface WorkflowEventSpec {
   output: WorkflowOutputSpec[];
 }
 
+/** What a flow can be about, besides nothing. */
+export interface WorkflowSubjectSpec {
+  key: WorkflowSubjectType;
+  /** English fallback (or the requested language's, for addons); the UI translates `workflows:subjectTypes.<key>`. */
+  title: string;
+  /** Whether a flow about it can start on a schedule (for a fixed list of subjects). */
+  schedulable?: boolean;
+}
+
+/**
+ * Texts of an action, event or subject in one language. Addons ship these with their
+ * definitions; `GET /catalog?lang=` returns them in place of the English ones.
+ */
+export interface WorkflowLocalization {
+  title?: string;
+  description?: string;
+  /** Heading of the action's category in the palette (actions). */
+  category?: string;
+  /** Input field key → label (actions). */
+  fields?: Record<string, string>;
+  /** Output key → label (actions, events). */
+  outputs?: Record<string, string>;
+}
+
 export interface WorkflowCatalog {
   actions: WorkflowActionSpec[];
   events: WorkflowEventSpec[];
+  subjects: WorkflowSubjectSpec[];
   /** Run data available per subject type, besides the steps' outputs. */
-  variables: Record<WorkflowSubjectType, WorkflowVariableSpec[]>;
+  variables: Record<WorkflowSubjectType, WorkflowVariableSpec[]>; // keyed by subject, plus `none`
   /** Outputs of task nodes, by kind (form fields add their own keys). */
   taskOutputs: Record<WorkflowTaskKind, WorkflowOutputSpec[]>;
   documentTypes: string[];

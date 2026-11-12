@@ -16,6 +16,7 @@ import {
   getWorkflowDefinitions,
   getWorkflowRun,
   getWorkflowRuns,
+  getWorkflowSubjectOptions,
   getWorkflowTaskCount,
   getWorkflowTasks,
   getWorkflowTemplates,
@@ -59,6 +60,19 @@ describe('reads', () => {
   it('asks for templates in the language of the app', async () => {
     await getWorkflowTemplates('de');
     expect(client.get).toHaveBeenCalledWith('/workflows/templates', { params: { lang: 'de' } });
+  });
+
+  it('asks for the catalog in the language of the app, so an addon’s texts arrive translated', async () => {
+    await getWorkflowCatalog('de');
+    expect(client.get).toHaveBeenCalledWith('/workflows/catalog', { params: { lang: 'de' } });
+  });
+
+  it('lists the records of any kind of subject, also one an addon registered', async () => {
+    client.get.mockResolvedValue({ data: [{ id: 'a1', label: 'Backend developer · ACME' }] });
+    await expect(getWorkflowSubjectOptions('applications.application')).resolves.toEqual([{ id: 'a1', label: 'Backend developer · ACME' }]);
+    expect(client.get).toHaveBeenLastCalledWith('/workflows/subjects/applications.application/options', undefined);
+    await getWorkflowSubjectOptions('crm/lead', 'acme');
+    expect(client.get).toHaveBeenLastCalledWith('/workflows/subjects/crm%2Flead/options', { params: { search: 'acme' } });
   });
 
   it('lists runs with only the filters that are set', async () => {

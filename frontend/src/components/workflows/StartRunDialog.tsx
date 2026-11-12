@@ -13,10 +13,11 @@ import { Alert } from '../common/Alert';
 import { Select } from '../forms';
 import { fieldClasses, fieldLabelClass } from '../forms/fieldStyles';
 import { workflowApiError } from '../../api/services/workflow.service';
-import { useStartWorkflowRun } from '../../hooks/api/useWorkflows';
+import { useStartWorkflowRun, useWorkflowCatalog } from '../../hooks/api/useWorkflows';
 import type { StartRunRequest, WorkflowDefinitionSummary } from '../../api/types/workflow.types';
 import { currentMonth } from './graph/period';
-import { ClientOptions, InvoiceOptions, ProjectOptions } from './EntityOptions';
+import { ClientOptions, InvoiceOptions, ProjectOptions, SubjectOptions } from './EntityOptions';
+import { useWorkflowLabels } from './useWorkflowLabels';
 
 export type StartableWorkflow = Pick<WorkflowDefinitionSummary, 'id' | 'name' | 'subject_type' | 'published_version' | 'has_unpublished_changes'>;
 
@@ -33,6 +34,8 @@ export const StartRunDialog: FC<StartRunDialogProps> = ({ definition, open, onCl
   const navigate = useNavigate();
   const formId = useId();
   const startRun = useStartWorkflowRun();
+  const { data: catalog } = useWorkflowCatalog();
+  const { subjectTypeLabel } = useWorkflowLabels(catalog);
   const [month] = useState(() => currentMonth());
   const [subjectId, setSubjectId] = useState(fixedSubjectId ?? '');
   const [periodStart, setPeriodStart] = useState(month.start);
@@ -43,14 +46,18 @@ export const StartRunDialog: FC<StartRunDialogProps> = ({ definition, open, onCl
 
   const subjectType = definition.subject_type;
   const needsSubject = subjectType !== 'none';
-  const hasPeriod = subjectType !== 'invoice';
+  const subjectName = subjectTypeLabel(subjectType);
+  // A period belongs to what recurs (a month of work for a client or project) — the kinds of subject a flow can
+  // also be scheduled for. One invoice, or one record of an addon, has none.
+  const subjectSpec = catalog?.subjects?.find((subject) => subject.key === subjectType);
+  const hasPeriod = !needsSubject || (subjectSpec ? !!subjectSpec.schedulable : subjectType === 'client' || subjectType === 'project');
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
     setExistingRunId(null);
     if (needsSubject && !subjectId) {
-      setError(t(`start.dialog.subjectRequired.${subjectType}`));
+      setError(t(`start.dialog.subjectRequired.${subjectType}`, { defaultValue: t('start.dialog.subjectRequiredGeneric', { subject: subjectName }) }));
       return;
     }
     if (hasPeriod && periodStart && periodEnd && periodEnd < periodStart) {
@@ -105,11 +112,22 @@ export const StartRunDialog: FC<StartRunDialogProps> = ({ definition, open, onCl
         )}
 
         {needsSubject && !fixedSubjectId && (
-          <Select label={t(`start.dialog.subject.${subjectType}`)} value={subjectId} onChange={(event) => setSubjectId(event.target.value)} required>
+          <Select
+            label={t(`start.dialog.subject.${subjectType}`, { defaultValue: subjectName })}
+            value={subjectId}
+            onChange={(event) => setSubjectId(event.target.value)}
+            required
+          >
             <option value="">{t('value.choose')}</option>
-            {subjectType === 'client' && <ClientOptions />}
-            {subjectType === 'project' && <ProjectOptions />}
-            {subjectType === 'invoice' && <InvoiceOptions />}
+            {subjectType === 'client' ? (
+              <ClientOptions />
+            ) : subjectType === 'project' ? (
+              <ProjectOptions />
+            ) : subjectType === 'invoice' ? (
+              <InvoiceOptions />
+            ) : (
+              <SubjectOptions type={subjectType} />
+            )}
           </Select>
         )}
 

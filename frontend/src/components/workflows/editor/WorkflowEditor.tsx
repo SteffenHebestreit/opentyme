@@ -430,7 +430,7 @@ export const WorkflowEditor: FC<WorkflowEditorProps> = ({ definition }) => {
           </div>
           {schedule && (
             <p>
-              {t('publish.schedule', {
+              {t(definition.subject_type === 'none' ? 'publish.scheduleNoSubject' : 'publish.schedule', {
                 day: schedule.dayOfMonth === 'last' ? t('start.lastDay') : t('start.dayN', { day: schedule.dayOfMonth }),
                 count: schedule.subjectIds.length,
               })}

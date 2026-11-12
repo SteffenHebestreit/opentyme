@@ -6,6 +6,7 @@
  * lib/dataSync covers the business data an action may have changed.)
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   approveWorkflowTask,
   cancelWorkflowRun,
@@ -18,6 +19,7 @@ import {
   getWorkflowDefinitions,
   getWorkflowRun,
   getWorkflowRuns,
+  getWorkflowSubjectOptions,
   getWorkflowTaskCount,
   getWorkflowTasks,
   getWorkflowTemplates,
@@ -53,9 +55,24 @@ const TASK_POLL_MS = 60_000;
 
 // ── Queries ──────────────────────────────────────────────────────────────────
 
-/** Actions, run-data variables and document types the editor offers. Static per server version. */
-export const useWorkflowCatalog = () =>
-  useQuery({ queryKey: queryKeys.workflows.catalog, queryFn: getWorkflowCatalog, staleTime: Infinity });
+/**
+ * Actions, events, subjects, run-data variables and document types the editor
+ * offers. Static per server version; what an addon registered is named in the
+ * app's language, so the language is part of the key.
+ */
+export const useWorkflowCatalog = () => {
+  const { i18n } = useTranslation();
+  const lang = i18n?.language;
+  return useQuery({ queryKey: [...queryKeys.workflows.catalog, lang], queryFn: () => getWorkflowCatalog(lang), staleTime: Infinity });
+};
+
+/** The user's records of one subject type, for pickers — works for every registered subject, an addon's included. */
+export const useWorkflowSubjectOptions = (type: string | undefined, enabled = true) =>
+  useQuery({
+    queryKey: queryKeys.workflows.subjectOptions(type ?? ''),
+    queryFn: () => getWorkflowSubjectOptions(type as string),
+    enabled: enabled && !!type && type !== 'none',
+  });
 
 /** Templates to start a flow from, in the given language. */
 export const useWorkflowTemplates = (enabled = true, lang?: string) =>

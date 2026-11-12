@@ -9,6 +9,7 @@ import { formatCurrency as formatMoney } from '../../../utils/currency';
 import { formatYmd } from '../../../utils/date';
 import { Table, Column } from '../../common/Table';
 import { iconButtonClass } from './uiClasses';
+import { StartWorkflowButton } from '../../workflows/StartWorkflowButton';
 
 /**
  * Props for the ProjectTable component.
@@ -216,6 +217,8 @@ export const ProjectTable: FC<ProjectTableProps> = ({ projects, onEdit, onManage
             >
               {t('rates.manage')}
             </Button>
+            {/* Starts one of the user's flows for this project — absent while there is none */}
+            <StartWorkflowButton subjectType="project" subjectId={project.id} subjectName={project.name} compact />
             <button
               type="button"
               className={iconButtonClass()}

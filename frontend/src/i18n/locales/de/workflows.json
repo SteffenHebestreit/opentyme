@@ -141,7 +141,7 @@
     "manual": "Von Hand",
     "schedule": "Monatlich von selbst",
     "triggerHint": "Von Hand lässt sich ein Lauf immer zusätzlich starten.",
-    "scheduleNeedsSubject": "Nur Abläufe für Kunden oder Projekte können von selbst starten.",
+    "scheduleNeedsSubject": "Diese Art von Ablauf ({{subject}}) kann nicht nach Termin von selbst starten.",
     "dayOfMonth": "Tag im Monat",
     "dayHint": "Startet an diesem Tag um 06:00 UTC.",
     "lastDay": "Letzter Tag des Monats",
@@ -179,13 +179,16 @@
       "unpublishedChanges": "Der Lauf nutzt Version {{version}}. Noch nicht veröffentlichte Änderungen sind nicht enthalten.",
       "runExists": "Dieser Ablauf lief für diesen Gegenstand und Zeitraum bereits.",
       "openExisting": "Diesen Lauf öffnen",
-      "error": "Der Lauf konnte nicht gestartet werden."
+      "error": "Der Lauf konnte nicht gestartet werden.",
+      "subjectRequiredGeneric": "Wählen Sie, wofür der Lauf gilt ({{subject}})."
     },
     "event": "Wenn etwas passiert",
     "triggerHintEvent": "Der Ablauf startet von selbst, sobald das Ereignis eintritt. Von Hand lässt er sich zusätzlich starten.",
     "eventLabel": "Ereignis",
-    "eventHint": "Was mit einer Rechnung passieren muss, damit ein Lauf startet.",
-    "eventClients": "Nur bei diesen Kunden (keine Auswahl = alle)"
+    "eventHint": "Was passieren muss, damit ein Lauf startet.",
+    "eventClients": "Nur bei diesen Kunden (keine Auswahl = alle)",
+    "subjectsGeneric": "Für diese Einträge starten ({{subject}})",
+    "noSubjectsGeneric": "Es gibt noch keine Einträge ({{subject}})."
   },
   "task": {
     "kind": "Art der Aufgabe",
@@ -230,8 +233,7 @@
     "modeDuration": "Eine feste Zeit",
     "modeEvent": "Bis etwas passiert",
     "event": "Ereignis",
-    "subject": "Rechnung",
-    "subjectOptional": "Rechnung (leer = die Rechnung dieses Laufs)",
+    "subjectOptional": "{{subject}} (leer = Gegenstand dieses Laufs)",
     "timeoutDays": "Höchstens so viele Tage",
     "timeoutHint": "Leer = unbegrenzt. Mit einer Frist bekommt der Baustein den Ausgang „Frist abgelaufen“.",
     "untilEvent": "Warten auf: {{event}}"
@@ -325,7 +327,8 @@
     "permissions": "Läufe dieses Ablaufs dürfen",
     "permissionsHint": "Ergibt sich aus den Aktionen im Ablauf. Mehr als das kann ein Lauf nie.",
     "schedule_one": "Startet von selbst: {{day}}, für {{count}} Gegenstand.",
-    "schedule_other": "Startet von selbst: {{day}}, für {{count}} Gegenstände."
+    "schedule_other": "Startet von selbst: {{day}}, für {{count}} Gegenstände.",
+    "scheduleNoSubject": "Startet von selbst: {{day}}."
   },
   "list": {
     "title": "Abläufe",
@@ -724,18 +727,19 @@
     "BAD_TASK": "Wählen Sie die Art der Aufgabe.",
     "MISSING_TITLE": "Die Aufgabe braucht einen Titel.",
     "BAD_DOCUMENT_TYPE": "Wählen Sie den Typ, unter dem die hochgeladene Datei abgelegt wird.",
-    "UPLOAD_NEEDS_CLIENT": "Ein Upload wird bei einem Kunden abgelegt – der Ablauf braucht dafür einen Kunden, ein Projekt oder eine Rechnung als Gegenstand.",
+    "UPLOAD_NEEDS_CLIENT": "Ein Upload wird bei einem Kunden abgelegt – der Ablauf braucht dafür einen Gegenstand, der zu einem Kunden gehört (Kunde, Projekt, Rechnung).",
     "NO_FORM_FIELDS": "Das Formular braucht mindestens ein Feld.",
     "BAD_FORM_FIELD": "Jedes Formularfeld braucht eine Beschriftung, einen Typ und einen eindeutigen Schlüssel.",
     "BAD_DUE": "Die Frist muss zwischen 1 und 365 Tagen liegen.",
     "BAD_DURATION": "Legen Sie fest, wie lange gewartet wird (höchstens ein Jahr).",
     "BAD_EVENT": "Wählen Sie das Ereignis.",
-    "EVENT_SUBJECT": "Dieses Ereignis betrifft eine Rechnung. Nur ein Ablauf für Rechnungen kann damit starten.",
+    "EVENT_SUBJECT": "Dieses Ereignis betrifft eine andere Art von Gegenstand. Nur ein Ablauf für diese Art kann damit starten.",
     "EVENT_LOOP": "Dieser Ablauf erstellt eine Rechnung und würde sich damit selbst erneut starten. Wählen Sie einen anderen Start oder entfernen Sie die Aktion.",
     "BAD_WAIT": "Wählen Sie, worauf gewartet wird.",
-    "WAIT_NO_SUBJECT": "Wählen Sie die Rechnung, auf die gewartet wird.",
+    "WAIT_NO_SUBJECT": "Wählen Sie, bei welchem Eintrag auf das Ereignis gewartet wird.",
     "PARALLEL_CONDITION": "Eine parallele Verzweigung nimmt alle Ausgänge. Sie können keine Bedingung tragen.",
-    "BAD_GATEWAY": "Wählen Sie, ob die Verzweigung einen Ausgang nimmt oder alle."
+    "BAD_GATEWAY": "Wählen Sie, ob die Verzweigung einen Ausgang nimmt oder alle.",
+    "UNKNOWN_SUBJECT": "Wofür dieser Ablauf läuft, kennt der Server gerade nicht (ist das Addon aktiv?)."
   },
   "preview": {
     "labels": {
@@ -757,7 +761,8 @@
     "INTERRUPTED": "Der Server wurde angehalten, während dieser Schritt lief. Prüfen Sie, ob er gewirkt hat, und wiederholen oder überspringen Sie ihn dann.",
     "TOO_MANY_STEPS": "Der Lauf hat {{max}} Schritte gebraucht. Vermutlich läuft der Ablauf im Kreis.",
     "STEP_MISSING": "Diesen Schritt gibt es im Ablauf nicht mehr.",
-    "WAIT_NO_SUBJECT": "In diesem Lauf gibt es keine Rechnung, auf die gewartet werden kann."
+    "WAIT_NO_SUBJECT": "In diesem Lauf fehlt, worauf der Schritt wartet ({{subject}}).",
+    "WAIT_UNKNOWN_EVENT": "Das Ereignis „{{event}}“ kennt der Server gerade nicht (ist das Addon aktiv?)."
   },
   "events": {
     "invoice": {

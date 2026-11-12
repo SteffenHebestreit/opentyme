@@ -36,6 +36,7 @@ jest.mock('../../src/hooks/api/useWorkflows', () => ({
   useValidateWorkflow: () => ({ mutateAsync: mockValidate, isPending: false }),
   usePublishWorkflow: () => ({ mutateAsync: mockPublish, isPending: false }),
   useStartWorkflowRun: () => ({ mutateAsync: jest.fn(), isPending: false }),
+  useWorkflowSubjectOptions: () => ({ data: [] }),
 }));
 
 const valid: WorkflowValidation = {

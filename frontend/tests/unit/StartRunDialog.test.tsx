@@ -2,6 +2,7 @@
  * Starting a run: subject and period are asked for, a test run is one
  * checkbox away, the new run opens — and a duplicate start points at the run
  * that already exists. Plus the "Start flow" button for one client.
+ * (What an addon's subject looks like here: workflowAddonSubject.test.tsx.)
  */
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -10,7 +11,7 @@ import { StartRunDialog } from '../../src/components/workflows/StartRunDialog';
 import { StartWorkflowButton } from '../../src/components/workflows/StartWorkflowButton';
 import { currentMonth } from '../../src/components/workflows/graph/period';
 import type { WorkflowDefinitionSummary } from '../../src/api/types/workflow.types';
-import { definition } from '../mocks/workflowFixtures';
+import { ADDON_SUBJECT, addonCatalog, definition } from '../mocks/workflowFixtures';
 
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
@@ -26,13 +27,16 @@ jest.mock('../../src/components/workflows/EntityOptions', () => ({
   ClientOptions: () => <option value="client-1">ACME GmbH</option>,
   ProjectOptions: () => <option value="project-1">Website</option>,
   InvoiceOptions: () => <option value="invoice-1">2026-10-003</option>,
+  SubjectOptions: ({ type }: { type: string }) => <option value="record-1">{`a record of ${type}`}</option>,
 }));
 
 const mockStart = jest.fn();
 const mockDefinitions = jest.fn();
+const mockCatalog = jest.fn();
 jest.mock('../../src/hooks/api/useWorkflows', () => ({
   useStartWorkflowRun: () => ({ mutateAsync: mockStart, isPending: false }),
   useWorkflowDefinitions: () => mockDefinitions(),
+  useWorkflowCatalog: () => ({ data: mockCatalog() }),
 }));
 
 const month = currentMonth();
@@ -51,6 +55,7 @@ beforeEach(() => {
   mockNavigate.mockReset();
   mockStart.mockReset().mockResolvedValue({ id: 'run-7' });
   mockDefinitions.mockReset();
+  mockCatalog.mockReset().mockReturnValue(addonCatalog());
 });
 
 it('starts a run for the chosen client and the current month, then opens it', async () => {
@@ -115,6 +120,30 @@ it('needs no subject for a flow without one and no period for an invoice', async
   expect(mockStart.mock.calls[0][0].request).toEqual({ test: false, period_start: month.start, period_end: month.end });
 });
 
+it('asks for a period only where a flow can recur — not for one invoice', async () => {
+  const { user } = renderDialog({ subject_type: 'invoice' });
+  expect(screen.queryByLabelText('start.dialog.periodStart')).not.toBeInTheDocument();
+  await user.selectOptions(screen.getByLabelText('start.dialog.subject.invoice'), 'invoice-1');
+  await user.click(screen.getByRole('button', { name: 'start.dialog.submit' }));
+  expect(mockStart.mock.calls[0][0].request).toEqual({ test: false, subject_id: 'invoice-1' });
+});
+
+it('keeps the period for clients and projects while the catalog is still loading', () => {
+  mockCatalog.mockReturnValue(undefined);
+  renderDialog({ subject_type: 'project' });
+  expect(screen.getByLabelText('start.dialog.periodStart')).toHaveValue(month.start);
+});
+
+it('lists the records of a subject an addon brought along, as the workflow API knows them', async () => {
+  const { user } = renderDialog({ subject_type: ADDON_SUBJECT });
+  // not schedulable: one application has no period
+  expect(screen.queryByLabelText('start.dialog.periodStart')).not.toBeInTheDocument();
+  await user.selectOptions(screen.getByLabelText(`start.dialog.subject.${ADDON_SUBJECT}`), 'record-1');
+  expect(screen.getByRole('option', { name: `a record of ${ADDON_SUBJECT}` })).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'start.dialog.submit' }));
+  expect(mockStart.mock.calls[0][0].request).toEqual({ test: false, subject_id: 'record-1' });
+});
+
 describe('StartWorkflowButton', () => {
   const renderButton = () =>
     render(
@@ -139,6 +168,31 @@ describe('StartWorkflowButton', () => {
     expect(screen.queryByLabelText('start.dialog.subject.client')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'start.dialog.submit' }));
     expect(mockStart.mock.calls[0][0]).toMatchObject({ definitionId: 'def-1', request: { subject_id: 'client-9' } });
+  });
+
+  it('is not a click on the table row it sits in — neither the button nor its dialog', async () => {
+    mockDefinitions.mockReturnValue({ data: [definition({ subject_type: 'invoice' })] });
+    const onRowClick = jest.fn();
+    render(
+      <MemoryRouter>
+        <table>
+          <tbody>
+            <tr onClick={onRowClick}>
+              <td>
+                <StartWorkflowButton subjectType="invoice" subjectId="invoice-9" compact />
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </MemoryRouter>
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'start.button' }));
+    // the dialog is a portal, but React lets its clicks bubble to the row
+    await user.click(screen.getByRole('checkbox', { name: /testRun\.checkbox/ }));
+    await user.click(screen.getByRole('button', { name: 'start.dialog.submitTest' }));
+    expect(mockStart.mock.calls[0][0]).toMatchObject({ definitionId: 'def-1', request: { test: true, subject_id: 'invoice-9' } });
+    expect(onRowClick).not.toHaveBeenCalled();
   });
 
   it('lets the user choose when several flows fit — as an icon button in a table row', async () => {

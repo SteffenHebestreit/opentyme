@@ -13,9 +13,10 @@ import { Alert } from '../common/Alert';
 import { Input, Select } from '../forms';
 import { fieldLabelClass } from '../forms/fieldStyles';
 import { workflowApiError } from '../../api/services/workflow.service';
-import { useCreateWorkflow, useWorkflowTemplates } from '../../hooks/api/useWorkflows';
+import { useCreateWorkflow, useWorkflowCatalog, useWorkflowTemplates } from '../../hooks/api/useWorkflows';
 import { WORKFLOW_SUBJECT_TYPES } from '../../api/types/workflow.types';
 import type { WorkflowDefinition, WorkflowSubjectType } from '../../api/types/workflow.types';
+import { useWorkflowLabels } from './useWorkflowLabels';
 
 interface CreateWorkflowDialogProps {
   open: boolean;
@@ -31,6 +32,10 @@ export const CreateWorkflowDialog: FC<CreateWorkflowDialogProps> = ({ open, onCl
   // The server names a template's blocks in the app's language
   const lang = i18n.language;
   const { data: templates } = useWorkflowTemplates(open, lang);
+  const { data: catalog } = useWorkflowCatalog();
+  const { subjectTypeLabel } = useWorkflowLabels(catalog);
+  // What a flow can be about is the server's to say (addons add to it); the built-in kinds stand in while it loads
+  const subjectTypes: WorkflowSubjectType[] = catalog?.subjects ? [...catalog.subjects.map((subject) => subject.key), 'none'] : [...WORKFLOW_SUBJECT_TYPES];
   const createWorkflow = useCreateWorkflow();
   const [templateKey, setTemplateKey] = useState(BLANK);
   const [name, setName] = useState('');
@@ -125,9 +130,9 @@ export const CreateWorkflowDialog: FC<CreateWorkflowDialogProps> = ({ open, onCl
           disabled={!!template}
           helperText={t('create.subjectTypeHint')}
         >
-          {WORKFLOW_SUBJECT_TYPES.map((type) => (
+          {subjectTypes.map((type) => (
             <option key={type} value={type}>
-              {t(`subjectTypes.${type}`)}
+              {subjectTypeLabel(type)}
             </option>
           ))}
         </Select>

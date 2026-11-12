@@ -5,7 +5,7 @@
  * text as fallback, so an action a newer server (or an addon) adds still
  * reads sensibly before its translation exists:
  *   workflows:actions.<key>.title | description | fields.<field> | outputs.<key>
- *   workflows:variables.<path>, workflows:issues.<CODE>
+ *   workflows:variables.<path>, workflows:issues.<CODE>, workflows:subjectTypes.<key>
  */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -40,6 +40,9 @@ export function useWorkflowLabels(catalog?: WorkflowCatalog) {
       t(`actions.${key}.description`, { defaultValue: actionSpec(key)?.description ?? '' });
     const fieldLabel = (actionKey: string, field: Pick<WorkflowFieldSpec, 'key' | 'label'>): string =>
       t(`actions.${actionKey}.fields.${field.key}`, { defaultValue: field.label || field.key });
+    /** What a flow is about. A subject an addon registered has no translation here and keeps the catalog's title. */
+    const subjectTypeLabel = (type: WorkflowSubjectType): string =>
+      t(`subjectTypes.${type}`, { defaultValue: catalog?.subjects?.find((subject) => subject.key === type)?.title ?? type });
     /**
      * What went wrong in a step. Errors the engine raises itself carry a code
      * (and, for an input, the action and field) and are translated; anything
@@ -52,12 +55,14 @@ export function useWorkflowLabels(catalog?: WorkflowCatalog) {
       const action = typeof params.action === 'string' ? params.action : '';
       const key = typeof params.field === 'string' ? params.field : '';
       const field = key ? fieldLabel(action, { key, label: typeof params.label === 'string' ? params.label : key }) : '';
-      return t(`stepErrors.${step.error_code}`, { ...params, field, defaultValue: fallback });
+      // A wait names what it could not find the way the lists do; before subjects could be anything, that was an invoice
+      const subject =
+        step.error_code === 'WAIT_NO_SUBJECT' ? subjectTypeLabel(typeof params.subject === 'string' ? params.subject : 'invoice') : undefined;
+      return t(`stepErrors.${step.error_code}`, { ...params, field, ...(subject ? { subject } : {}), defaultValue: fallback });
     };
     const nodeTypeLabel = (type: WorkflowNodeType): string => t(`nodeTypes.${type}`);
     const taskKindLabel = (kind: string): string => t(`taskKinds.${kind}`, { defaultValue: kind });
     const handleLabel = (handle: WorkflowHandle | string): string => t(`handles.${handle}`, { defaultValue: handle });
-    const subjectTypeLabel = (type: WorkflowSubjectType): string => t(`subjectTypes.${type}`);
     const documentTypeLabel = (type: string): string => t(`clients:documents.types.${type}`, { defaultValue: type });
     /**
      * A validation issue in the user's language; codes without a translation

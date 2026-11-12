@@ -21,13 +21,14 @@ import { Select } from '../../components/forms';
 import { confirmDialog } from '../../lib/confirm';
 import { toast } from '../../lib/toast';
 import { workflowApiError } from '../../api/services/workflow.service';
-import { useDeleteWorkflow, useSetWorkflowStatus, useWorkflowDefinitions, useWorkflowRuns } from '../../hooks/api/useWorkflows';
+import { useDeleteWorkflow, useSetWorkflowStatus, useWorkflowCatalog, useWorkflowDefinitions, useWorkflowRuns } from '../../hooks/api/useWorkflows';
 import { WORKFLOW_RUN_STATUSES } from '../../api/types/workflow.types';
 import type { WorkflowDefinitionStatus, WorkflowDefinitionSummary, WorkflowRunStatus } from '../../api/types/workflow.types';
 import { CreateWorkflowDialog } from '../../components/workflows/CreateWorkflowDialog';
 import { StartRunDialog } from '../../components/workflows/StartRunDialog';
 import { RunsTable } from '../../components/workflows/runs/RunsTable';
 import { DefinitionStatusBadge } from '../../components/workflows/WorkflowBadges';
+import { useWorkflowLabels } from '../../components/workflows/useWorkflowLabels';
 import { formatDate } from '../../utils/date';
 
 type PageTab = 'flows' | 'runs';
@@ -43,6 +44,9 @@ export default function WorkflowsPage() {
   const [starting, setStarting] = useState<WorkflowDefinitionSummary | null>(null);
 
   const definitions = useWorkflowDefinitions();
+  // Names what a flow is about — also when that is something an addon brought along
+  const { data: catalog } = useWorkflowCatalog();
+  const { subjectTypeLabel } = useWorkflowLabels(catalog);
   const runFilters = useMemo(
     () => ({ definition_id: definitionFilter || undefined, status: statusFilter || undefined, limit: 100 }),
     [definitionFilter, statusFilter]
@@ -138,7 +142,7 @@ export default function WorkflowsPage() {
         header: t('list.columns.subject'),
         sortable: true,
         sortValue: (definition) => definition.subject_type,
-        render: (definition) => <span className="text-gray-700 dark:text-gray-300">{t(`subjectTypes.${definition.subject_type}`)}</span>,
+        render: (definition) => <span className="text-gray-700 dark:text-gray-300">{subjectTypeLabel(definition.subject_type)}</span>,
       },
       {
         key: 'status',

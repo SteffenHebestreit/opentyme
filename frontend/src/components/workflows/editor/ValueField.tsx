@@ -61,10 +61,28 @@ interface ValueFieldProps {
   documentTypes?: string[];
   /** Text that is always typed (a title, a message) — placeholders yes, a whole-value reference no. */
   literalOnly?: boolean;
+  /**
+   * <option>s to pick the value from instead of typing it — for an id the catalog has no field type of its own
+   * for (a record of an addon's subject).
+   */
+  literalOptions?: ReactNode;
   error?: string;
 }
 
-export const ValueField: FC<ValueFieldProps> = ({ id, label, spec, value, onChange, references, naming, optionLabel, documentTypes, literalOnly = false, error }) => {
+export const ValueField: FC<ValueFieldProps> = ({
+  id,
+  label,
+  spec,
+  value,
+  onChange,
+  references,
+  naming,
+  optionLabel,
+  documentTypes,
+  literalOnly = false,
+  literalOptions,
+  error,
+}) => {
   const { t } = useTranslation('workflows');
   const compatible = referencesFor(spec.type, references);
   const referenceOnly = isReferenceOnly(spec.type);
@@ -133,6 +151,18 @@ export const ValueField: FC<ValueFieldProps> = ({ id, label, spec, value, onChan
     );
   } else if (mode === 'reference') {
     editor = referenceSelect(isRef(value) ? value.$ref : '', (path) => onChange(path ? refOf(path) : undefined), compatible.length === 0 ? t('value.noReferences') : t('value.chooseReference'));
+  } else if (literalOptions) {
+    editor = (
+      <select
+        id={id}
+        className={cn(controlClass(!!error), 'cursor-pointer')}
+        value={typeof value === 'string' ? value : ''}
+        onChange={(event) => onChange(event.target.value || undefined)}
+      >
+        <option value="">{t('value.choose')}</option>
+        {literalOptions}
+      </select>
+    );
   } else {
     const text = typeof value === 'string' ? value : value === undefined || value === null ? '' : String(value);
     switch (spec.type) {
@@ -200,7 +230,7 @@ export const ValueField: FC<ValueFieldProps> = ({ id, label, spec, value, onChan
   }
 
   const showToggle = !literalOnly && !referenceOnly && spec.type !== 'documents' && (compatible.length > 0 || mode === 'reference');
-  const placeholders = mode === 'literal' && allowsPlaceholders(spec.type) ? referencesFor('text', references) : [];
+  const placeholders = mode === 'literal' && !literalOptions && allowsPlaceholders(spec.type) ? referencesFor('text', references) : [];
 
   return (
     <div className="mb-4">

@@ -1,7 +1,8 @@
 /**
- * "Start flow" for one client, project or invoice: offers the user's active,
- * published flows for that kind of subject and opens the start dialog with the
- * subject already set. Renders nothing while there is no such flow.
+ * "Start flow" for one client, project, invoice or record of an addon: offers
+ * the user's active, published flows for that kind of subject and opens the
+ * start dialog with the subject already set. Renders nothing while there is
+ * no such flow.
  */
 import { FC, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -39,7 +40,9 @@ export const StartWorkflowButton: FC<StartWorkflowButtonProps> = ({ subjectType,
   const open = () => (startable.length === 1 ? setChosen(startable[0]) : setChoosing(true));
 
   return (
-    <>
+    // Its dialogs are portals, but React lets their clicks bubble to where the button sits — in a table whose
+    // rows open something on click, neither the button nor a dialog of it may count as a click on the row.
+    <span className="contents" onClick={(event) => event.stopPropagation()}>
       {compact ? (
         <button type="button" className={className ?? iconButtonClass()} onClick={open} aria-label={label} title={t('start.button')}>
           <Play className="h-4 w-4" aria-hidden="true" />
@@ -77,6 +80,6 @@ export const StartWorkflowButton: FC<StartWorkflowButtonProps> = ({ subjectType,
       </Modal>
 
       {chosen && <StartRunDialog definition={chosen} open onClose={() => setChosen(null)} subjectId={subjectId} />}
-    </>
+    </span>
   );
 };
