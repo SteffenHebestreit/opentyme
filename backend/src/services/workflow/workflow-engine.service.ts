@@ -10,16 +10,23 @@
  * - An action with an outside effect runs at most once per attempt. A step
  *   found `running` after a restart is not repeated: it fails as
  *   "interrupted" and the run waits for the user (retry / skip / cancel).
- * - Everything that resumes a run — a settled task, a fired timer, a retry —
- *   only flips rows and then calls advance(); advance() runs one at a time
- *   per run in this process, and the claim uses SKIP LOCKED, so a second
- *   trigger never executes the same step twice.
+ * - Everything that resumes a run — a settled task, a fired timer, an event,
+ *   a retry — only flips rows and then calls advance(); advance() runs one at
+ *   a time per run in this process, and the claim uses SKIP LOCKED, so a
+ *   second trigger never executes the same step twice.
+ * - Events (an invoice sent, paid, corrected …) are rows a database trigger
+ *   writes in the transaction that changed the invoice. processEvents()
+ *   claims them: runs waiting for one continue, flows starting with one start.
+ * - A parallel gateway sends the run down all its exits; where the branches
+ *   meet again, a parallel gateway waits for every one of them. An end closes
+ *   its branch — the run ends with its last one.
  *
  * @module services/workflow/workflow-engine
  */
 
 import crypto from 'crypto';
 import type {
+  WorkflowEdge,
   WorkflowGraph,
   WorkflowHandle,
   WorkflowNode,
@@ -58,6 +65,20 @@ import { findNode, nodeLabel, outgoing, startNode } from './workflow-graph';
 /** A run that loops without ever resting is stopped here instead of spinning forever. */
 const MAX_STEPS_PER_RUN = 500;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+/**
+ * Events that are a state an invoice reaches and keeps: a run that starts
+ * waiting for one after it happened must not wait forever.
+ */
+const REACHED_BY_STATUS: Record<string, string[]> = {
+  'invoice.sent': ['sent', 'partially_paid', 'paid', 'overdue'],
+  'invoice.partially_paid': ['partially_paid', 'paid'],
+  'invoice.paid': ['paid'],
+  'invoice.cancelled': ['cancelled'],
+};
+/** An event older than this starts nothing: a restore or an import is not something that just happened. */
+const EVENT_START_MAX_AGE_MS = 24 * 3_600_000;
+/** A flow that starts itself over and over through its own events is stopped here. */
+const MAX_EVENT_STARTS_PER_HOUR = 60;
 /** Input types that name a record. */
 const ID_FIELD_TYPES: readonly string[] = ['client', 'project', 'invoice', 'document', 'documents', 'emailTemplate'];
 
@@ -91,7 +112,11 @@ export interface StartRunParams {
   periodStart?: string;
   periodEnd?: string;
   test?: boolean;
-  startedBy?: 'manual' | 'schedule';
+  startedBy?: 'manual' | 'schedule' | 'event';
+  /** Replaces the "one run per subject and period" key (event starts: one run per event). */
+  businessKey?: string;
+  /** The event that started the run, as run data (`event.type`, `event.reason` …). */
+  event?: Record<string, unknown>;
 }
 
 export type TaskDecision = 'complete' | 'reject' | 'approve' | 'skip' | 'dismiss';
@@ -316,10 +341,13 @@ export class WorkflowEngine {
       period: { ...period, label: period.start.slice(0, 7) },
       owner: { email: owner?.email ?? '', name: owner?.name ?? '' },
       run: { id: runId, test },
+      ...(params.event ? { event: params.event } : {}),
       steps: {},
     };
     // Test runs carry no key: they may repeat, and must not block the real run.
-    const businessKey = test ? null : `${definition.subject_type}:${subject.id ?? '-'}:${period.start}:${period.end}`;
+    const businessKey = test
+      ? null
+      : (params.businessKey ?? `${definition.subject_type}:${subject.id ?? '-'}:${period.start}:${period.end}`);
 
     try {
       await db.query(
@@ -487,6 +515,10 @@ export class WorkflowEngine {
         await this.openTask(run, graph, node, step);
         return;
       case 'wait': {
+        if (node.data.mode === 'event') {
+          await this.waitForEvent(run, graph, node, step);
+          return;
+        }
         const hours = (Number(node.data.days) || 0) * 24 + (Number(node.data.hours) || 0);
         const pending = await db.query(`SELECT 1 FROM workflow_timers WHERE step_id = $1 AND fired_at IS NULL`, [step.id]);
         if (pending.rows.length === 0) {
@@ -499,6 +531,11 @@ export class WorkflowEngine {
         return;
       }
       case 'gateway': {
+        if (node.data.mode === 'parallel') {
+          // Every exit is taken (completeStep follows them all); a join got here only once all branches arrived.
+          await this.completeStep(run, graph, node, step, {}, 'all');
+          return;
+        }
         const data = this.dataOf(run);
         const exits = outgoing(graph, node.id, 'out');
         const chosen =
@@ -519,7 +556,14 @@ export class WorkflowEngine {
           `UPDATE workflow_steps SET status = 'completed', outcome = 'end', finished_at = CURRENT_TIMESTAMP WHERE id = $1`,
           [step.id]
         );
-        await this.finishRun(run.id, 'completed', result);
+        // With parallel branches an end closes its branch; the run ends with the last one.
+        const open = await db.query(
+          `SELECT 1 FROM workflow_steps
+           WHERE run_id = $1 AND id <> $2 AND status IN ('pending', 'running', 'waiting', 'failed') LIMIT 1`,
+          [run.id, step.id]
+        );
+        if (open.rows.length === 0) await this.finishRun(run.id, 'completed', result);
+        else if (result) await db.query(`UPDATE workflow_runs SET result = $2 WHERE id = $1`, [run.id, result]);
         return;
       }
     }
@@ -670,17 +714,27 @@ export class WorkflowEngine {
     );
     run.context = { ...run.context, steps: { ...(run.context.steps ?? {}), [node.id]: recorded } };
 
-    const edge =
-      node.type === 'gateway'
-        ? graph.edges.find((candidate) => candidate.id === outcome)
-        : outgoing(graph, node.id, outcome as WorkflowHandle)[0];
-    const target = edge ? findNode(graph, edge.target) : undefined;
-    if (!target) {
+    const exits =
+      node.type !== 'gateway'
+        ? outgoing(graph, node.id, outcome as WorkflowHandle).slice(0, 1)
+        : node.data.mode === 'parallel'
+          ? outgoing(graph, node.id, 'out')
+          : graph.edges.filter((candidate) => candidate.id === outcome);
+    if (exits.length === 0) {
       // Only an unwired "rejected" exit gets here (validation wires every "out").
       await this.finishRun(run.id, 'cancelled', outcome === 'rejected' ? 'Rejected' : `Ended at "${nodeLabel(node)}"`);
       return;
     }
-    const next = step.seq + 1;
+    for (const edge of exits) await this.enqueue(run, graph, edge);
+  }
+
+  /** Queues the node an edge leads to. A parallel gateway with several entries is a join: it waits for all of them. */
+  private async enqueue(run: RunRow, graph: WorkflowGraph, edge: WorkflowEdge): Promise<void> {
+    const db = getDbClient();
+    const target = findNode(graph, edge.target);
+    if (!target) return;
+    const seq = await db.query(`SELECT COALESCE(max(seq), 0) + 1 AS next FROM workflow_steps WHERE run_id = $1`, [run.id]);
+    const next: number = seq.rows[0].next;
     if (next > MAX_STEPS_PER_RUN) {
       await db.query(
         `INSERT INTO workflow_steps (run_id, node_id, node_type, seq, status, error, error_code, error_params, finished_at)
@@ -693,7 +747,68 @@ export class WorkflowEngine {
       );
       return;
     }
+    const entries = graph.edges.filter((candidate) => candidate.target === target.id);
+    if (target.type === 'gateway' && target.data.mode === 'parallel' && entries.length > 1) {
+      // The join's step collects the branches that arrived; it becomes runnable with the last one.
+      const waiting = await db.query(
+        `SELECT id, input FROM workflow_steps WHERE run_id = $1 AND node_id = $2 AND status = 'waiting' ORDER BY seq DESC LIMIT 1`,
+        [run.id, target.id]
+      );
+      const arrived = new Set<string>([...((waiting.rows[0]?.input?.arrived as string[] | undefined) ?? []), edge.id]);
+      const status = entries.every((entry) => arrived.has(entry.id)) ? 'pending' : 'waiting';
+      const input = JSON.stringify({ arrived: Array.from(arrived) });
+      if (waiting.rows.length > 0) {
+        await db.query(`UPDATE workflow_steps SET status = $2, input = $3::jsonb WHERE id = $1`, [waiting.rows[0].id, status, input]);
+      } else {
+        await db.query(
+          `INSERT INTO workflow_steps (run_id, node_id, node_type, seq, status, input) VALUES ($1, $2, 'gateway', $3, $4, $5::jsonb)`,
+          [run.id, target.id, next, status, input]
+        );
+      }
+      return;
+    }
     await db.query(`INSERT INTO workflow_steps (run_id, node_id, node_type, seq) VALUES ($1, $2, $3, $4)`, [run.id, target.id, target.type, next]);
+  }
+
+  /** Parks a run until an event happens to an invoice — unless it already has. */
+  private async waitForEvent(run: RunRow, graph: WorkflowGraph, node: WorkflowNode, step: StepRow): Promise<void> {
+    if (node.type !== 'wait') return;
+    const db = getDbClient();
+    const type = String(node.data.event ?? '');
+    const subjectId = resolveValue(node.data.subject ?? { $ref: 'invoice.id' }, this.dataOf(run));
+    if (!isUuid(subjectId)) {
+      throw new WorkflowStepError('WAIT_NO_SUBJECT', 'There is no invoice in this run to wait for.');
+    }
+    const known = await db.query(`SELECT status FROM invoices WHERE id = $1 AND user_id = $2`, [subjectId, run.user_id]);
+    if (known.rows.length === 0) throw new WorkflowStepError('WAIT_NO_SUBJECT', 'There is no invoice in this run to wait for.');
+
+    // Registered first, checked second: an event arriving in between finds the wait and is not lost.
+    const registered = await db.query(`SELECT 1 FROM workflow_waits WHERE step_id = $1`, [step.id]);
+    if (registered.rows.length === 0) {
+      await db.query(
+        `INSERT INTO workflow_waits (user_id, run_id, step_id, event_type, subject_id) VALUES ($1, $2, $3, $4, $5)`,
+        [run.user_id, run.id, step.id, type, subjectId]
+      );
+      const days = Number(node.data.timeoutDays);
+      if (days > 0 && outgoing(graph, node.id, 'timeout').length > 0) {
+        await db.query(
+          `INSERT INTO workflow_timers (kind, run_id, step_id, due_at) VALUES ('wait_timeout', $1, $2, $3)`,
+          [run.id, step.id, new Date(Date.now() + days * 86_400_000)]
+        );
+      }
+    }
+    // Only from "running": if the event got here first, the step is already settled.
+    await db.query(`UPDATE workflow_steps SET status = 'waiting' WHERE id = $1 AND status = 'running'`, [step.id]);
+
+    const status = (await db.query(`SELECT status FROM invoices WHERE id = $1`, [subjectId])).rows[0]?.status;
+    if (REACHED_BY_STATUS[type]?.includes(status)) {
+      // Whoever deletes the wait settles the step — the event handler or this.
+      const claimed = await db.query(`DELETE FROM workflow_waits WHERE step_id = $1 RETURNING id`, [step.id]);
+      if ((claimed.rowCount ?? 0) > 0) {
+        await db.query(`DELETE FROM workflow_timers WHERE step_id = $1 AND fired_at IS NULL`, [step.id]);
+        await this.completeStep(run, graph, node, step, { event: type, status, alreadyHappened: true }, 'out');
+      }
+    }
   }
 
   private async failStep(step: Pick<StepRow, 'id' | 'run_id' | 'node_id'>, error: unknown): Promise<void> {
@@ -726,7 +841,8 @@ export class WorkflowEngine {
   private async finishRun(runId: string, status: 'completed' | 'cancelled', result: string | null): Promise<void> {
     const db = getDbClient();
     await db.query(
-      `UPDATE workflow_runs SET status = $2, result = $3, ended_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      `UPDATE workflow_runs
+       SET status = $2, result = COALESCE($3, result), ended_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
        WHERE id = $1 AND status NOT IN ('completed', 'cancelled')`,
       [runId, status, result]
     );
@@ -742,6 +858,7 @@ export class WorkflowEngine {
       [runId]
     );
     await db.query(`DELETE FROM workflow_timers WHERE run_id = $1 AND fired_at IS NULL`, [runId]);
+    await db.query(`DELETE FROM workflow_waits WHERE run_id = $1`, [runId]);
     logger.info(`[Workflow] Run ${runId} ${status}`);
   }
 
@@ -947,7 +1064,7 @@ export class WorkflowEngine {
     return due.rows.length;
   }
 
-  private async fireStepTimer(kind: 'wait' | 'task_timeout', runId: string, stepId: string): Promise<void> {
+  private async fireStepTimer(kind: 'wait' | 'task_timeout' | 'wait_timeout', runId: string, stepId: string): Promise<void> {
     const db = getDbClient();
     const run = await this.loadRun(runId);
     const stepResult = await db.query(
@@ -969,10 +1086,128 @@ export class WorkflowEngine {
       );
       if (expired.rowCount === 0) return;
       await this.completeStep(run, version.graph, node, step, {}, 'timeout');
+    } else if (kind === 'wait_timeout') {
+      // The event may have arrived in the instant the timer came due — then it wins.
+      const claimed = await db.query(`DELETE FROM workflow_waits WHERE step_id = $1 RETURNING id`, [stepId]);
+      if ((claimed.rowCount ?? 0) === 0) return;
+      await this.completeStep(run, version.graph, node, step, {}, 'timeout');
     } else {
       await this.completeStep(run, version.graph, node, step, {}, 'out');
     }
     await this.advance(runId);
+  }
+
+  // ── Events ─────────────────────────────────────────────────────────────────
+
+  /** Handles the events recorded since the last look. Returns how many there were. */
+  async processEvents(): Promise<number> {
+    const db = getDbClient();
+    const claimed = await db.query(
+      `UPDATE workflow_events SET processed_at = CURRENT_TIMESTAMP
+       WHERE id IN (SELECT id FROM workflow_events WHERE processed_at IS NULL
+                    ORDER BY created_at LIMIT 200 FOR UPDATE SKIP LOCKED)
+       RETURNING id, user_id, type, subject_type, subject_id, payload, created_at`
+    );
+    for (const event of claimed.rows) {
+      try {
+        await this.resumeWaits(event);
+        await this.startFlowsFor(event);
+      } catch (error) {
+        logger.error(`[Workflow] Event ${event.id} (${event.type}) failed: ${errorText(error)}`);
+      }
+    }
+    if (claimed.rows.length > 0) {
+      await db.query(`DELETE FROM workflow_events WHERE processed_at < CURRENT_TIMESTAMP - interval '30 days'`);
+    }
+    return claimed.rows.length;
+  }
+
+  /** Runs that wait for exactly this event on exactly this record continue. */
+  private async resumeWaits(event: DbRow): Promise<void> {
+    if (!event.subject_id) return;
+    const db = getDbClient();
+    // Deleting the wait is the claim: the timeout timer and a late status check go for the same row.
+    const waits = await db.query(
+      `DELETE FROM workflow_waits w USING workflow_steps s
+       WHERE w.step_id = s.id AND s.status = 'waiting'
+         AND w.user_id = $1 AND w.event_type = $2 AND w.subject_id = $3
+       RETURNING w.run_id, w.step_id`,
+      [event.user_id, event.type, event.subject_id]
+    );
+    for (const wait of waits.rows) {
+      const run = await this.loadRun(wait.run_id);
+      const stepResult = await db.query(
+        `SELECT id, run_id, node_id, node_type, status, seq, input, outcome FROM workflow_steps WHERE id = $1`,
+        [wait.step_id]
+      );
+      const step = stepResult.rows[0] as StepRow | undefined;
+      const version = run ? await this.definitions.version(run.version_id) : null;
+      const node = version && step ? findNode(version.graph, step.node_id) : undefined;
+      if (!run || !step || !version || !node) continue;
+      await db.query(`DELETE FROM workflow_timers WHERE step_id = $1 AND fired_at IS NULL`, [step.id]);
+      await this.completeStep(run, version.graph, node, step, { event: event.type, ...(event.payload ?? {}) }, 'out');
+      await this.advance(run.id);
+    }
+  }
+
+  /** Active flows about an invoice whose start is this event get a run of their own. */
+  private async startFlowsFor(event: DbRow): Promise<void> {
+    if (event.subject_type !== 'invoice' || !event.subject_id) return;
+    const db = getDbClient();
+    const flows = await db.query(
+      `SELECT d.id, v.graph FROM workflow_definitions d
+       JOIN workflow_versions v ON v.definition_id = d.id AND v.version = d.published_version
+       WHERE d.user_id = $1 AND d.status = 'active' AND d.subject_type = 'invoice'`,
+      [event.user_id]
+    );
+    const starting = flows.rows.filter((flow) => {
+      const start = startNode(flow.graph as WorkflowGraph);
+      return start?.type === 'start' && start.data.trigger === 'event' && start.data.event?.type === event.type;
+    });
+    if (starting.length === 0) return;
+
+    const found = await db.query(
+      `SELECT client_id, created_at, updated_at FROM invoices WHERE id = $1 AND user_id = $2`,
+      [event.subject_id, event.user_id]
+    );
+    const invoice = found.rows[0];
+    if (!invoice) return;
+    // The invoice's own timestamps decide: rows a restore or an import writes carry old ones, and
+    // must not set off a flow as if the invoice had just been created or sent.
+    const changedAt = new Date(event.type === 'invoice.created' ? invoice.created_at : (invoice.updated_at ?? invoice.created_at));
+    if (Date.now() - changedAt.getTime() > EVENT_START_MAX_AGE_MS) {
+      logger.info(`[Workflow] Event ${event.type} for invoice ${event.subject_id} is not recent; no flow started`);
+      return;
+    }
+
+    for (const flow of starting) {
+      const start = startNode(flow.graph as WorkflowGraph);
+      const clients = start?.type === 'start' ? (start.data.event?.clientIds ?? []) : [];
+      if (clients.length > 0 && !clients.includes(invoice.client_id)) continue;
+      const recent = await db.query(
+        `SELECT count(*)::int AS n FROM workflow_runs
+         WHERE definition_id = $1 AND started_by = 'event' AND started_at > CURRENT_TIMESTAMP - interval '1 hour'`,
+        [flow.id]
+      );
+      if (recent.rows[0].n >= MAX_EVENT_STARTS_PER_HOUR) {
+        logger.warn(`[Workflow] Flow ${flow.id} was started by events ${recent.rows[0].n} times within an hour; not starting again`);
+        continue;
+      }
+      try {
+        await this.startRun({
+          userId: event.user_id,
+          definitionId: flow.id,
+          subjectId: event.subject_id,
+          startedBy: 'event',
+          businessKey: `event:${event.id}`,
+          event: { type: event.type, ...(event.payload ?? {}) },
+        });
+      } catch (error) {
+        if (!(error instanceof RunExistsError)) {
+          logger.warn(`[Workflow] Flow ${flow.id} could not start on ${event.type}: ${errorText(error)}`);
+        }
+      }
+    }
   }
 
   /** A scheduled start: one run per listed subject, then the next start is planned. */

@@ -40,6 +40,7 @@ import aiInsightsRoutes from './ai/ai-insights.routes';
 import { getAgentCard } from '../controllers/ai/a2a.controller';
 import mcpRoutes from './mcp/mcp.routes';
 import workflowRoutes from './workflow/workflow.routes';
+import workflowScheduler from '../services/workflow/workflow-scheduler.service';
 
 // Analytics routes
 import analyticsRoutes from './analytics/analytics.routes';
@@ -64,6 +65,17 @@ export default function setupRoutes(app: Application) {
   logger.debug('API token routes registered under /api/api-tokens');
 
   // Business endpoints
+  // A write to an invoice or a payment can raise a workflow event (a database trigger records
+  // it). Have the engine look once the response is out, instead of at its next minute tick.
+  app.use(['/api/invoices', '/api/payments', '/api/recurring-invoices', '/api/email'], (req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.on('finish', () => {
+        if (res.statusCode < 400) workflowScheduler.nudge();
+      });
+    }
+    next();
+  });
+
   app.use('/api/clients', clientRoutes);
   logger.debug('Client routes registered under /api/clients');
 

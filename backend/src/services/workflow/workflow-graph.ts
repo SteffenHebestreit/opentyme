@@ -31,7 +31,13 @@ import {
   WorkflowValidation,
   WorkflowValue,
 } from '../../types/workflow.types';
-import { SUBJECT_VARIABLES, TASK_OUTPUTS, WORKFLOW_DOCUMENT_TYPES, getWorkflowAction } from './workflow-actions';
+import {
+  SUBJECT_VARIABLES,
+  TASK_OUTPUTS,
+  WORKFLOW_DOCUMENT_TYPES,
+  getWorkflowAction,
+  getWorkflowEvent,
+} from './workflow-actions';
 import { collectPaths, isValidPath } from './workflow-expression';
 
 export const MAX_NODES = 100;
@@ -69,6 +75,9 @@ export function nodeLabel(node: WorkflowNode): string {
 /** Exits a node of this configuration has. */
 export function handlesOf(node: WorkflowNode): WorkflowHandle[] {
   if (node.type === 'end') return [];
+  if (node.type === 'wait') {
+    return node.data.mode === 'event' && Number(node.data.timeoutDays) > 0 ? ['out', 'timeout'] : ['out'];
+  }
   if (node.type !== 'task') return ['out'];
   const handles: WorkflowHandle[] = ['out'];
   if (node.data.kind === 'confirm') handles.push('rejected');
@@ -112,6 +121,9 @@ function reachableFrom(graph: WorkflowGraph, nodeId: string): Set<string> {
 function producesKey(node: WorkflowNode, key: string): boolean {
   if (key === 'outcome') return true;
   if (node.type === 'action') return getWorkflowAction(node.data.action)?.output.some((o) => o.key === key) ?? false;
+  if (node.type === 'wait') {
+    return node.data.mode === 'event' && (getWorkflowEvent(node.data.event)?.output.some((o) => o.key === key) ?? false);
+  }
   if (node.type === 'task') {
     if (TASK_OUTPUTS[node.data.kind]?.some((o) => o.key === key)) return true;
     return node.data.kind === 'form' && (node.data.fields ?? []).some((field) => field.key === key);
@@ -244,6 +256,12 @@ export function validateGraph(candidate: unknown, subjectType: WorkflowSubjectTy
 
   const known = new Set(SUBJECT_VARIABLES[subjectType].map((variable) => variable.path));
   for (const extra of ['subject.id', 'subject.type', 'subject.label', 'run.id', 'run.test']) known.add(extra);
+  // A run started by an event knows what happened.
+  const startsWith = starts[0]?.type === 'start' && starts[0].data.trigger === 'event' ? getWorkflowEvent(starts[0].data.event?.type) : undefined;
+  if (startsWith) {
+    known.add('event.type');
+    for (const output of startsWith.output) known.add(`event.${output.key}`);
+  }
   const reachable = starts.length > 0 ? reachableFrom(graph, starts[0].id) : new Set<string>();
 
   for (const edge of graph.edges) {
@@ -256,6 +274,14 @@ export function validateGraph(candidate: unknown, subjectType: WorkflowSubjectTy
     }
     if (edge.condition && source.type !== 'gateway') {
       add({ code: 'BAD_CONDITION', message: 'Only the exits of a branch can have conditions.', edgeId: edge.id });
+    }
+    if (edge.condition && source.type === 'gateway' && source.data.mode === 'parallel') {
+      add({
+        code: 'PARALLEL_CONDITION',
+        message: 'A parallel branch takes all its exits; they cannot have conditions.',
+        edgeId: edge.id,
+        nodeId: source.id,
+      });
     }
   }
 
@@ -282,7 +308,28 @@ export function validateGraph(candidate: unknown, subjectType: WorkflowSubjectTy
     switch (node.type) {
       case 'start': {
         const { trigger, schedule } = node.data;
-        if (trigger !== 'manual' && trigger !== 'schedule') add({ code: 'BAD_START', message: 'Choose how the flow starts.', ...where });
+        if (trigger !== 'manual' && trigger !== 'schedule' && trigger !== 'event') {
+          add({ code: 'BAD_START', message: 'Choose how the flow starts.', ...where });
+        }
+        if (trigger === 'event') {
+          const event = getWorkflowEvent(node.data.event?.type);
+          const clients = node.data.event?.clientIds;
+          if (!event) {
+            add({ code: 'BAD_EVENT', message: 'Choose the event the flow starts with.', ...where });
+          } else if (event.subject_type !== subjectType) {
+            add({ code: 'EVENT_SUBJECT', message: `This event happens to an ${event.subject_type}; the flow must be about one.`, ...where });
+          }
+          if (clients !== undefined && (!Array.isArray(clients) || clients.some((id) => typeof id !== 'string'))) {
+            add({ code: 'BAD_EVENT', message: 'The clients of the event start are not a list.', ...where });
+          }
+          // A flow that starts when an invoice is created and creates one would start itself again.
+          const loops =
+            event?.key === 'invoice.created' &&
+            graph.nodes.some((other) => other.type === 'action' && other.data.action === 'invoice.createDraft');
+          if (loops) {
+            add({ code: 'EVENT_LOOP', message: 'This flow creates an invoice, which would start it again. Use another start or remove that action.', ...where });
+          }
+        }
         if (trigger === 'schedule') {
           const day = schedule?.dayOfMonth;
           const dayOk = day === 'last' || (typeof day === 'number' && Number.isInteger(day) && day >= 1 && day <= 28);
@@ -359,12 +406,34 @@ export function validateGraph(candidate: unknown, subjectType: WorkflowSubjectTy
         break;
       }
       case 'wait': {
-        const hours = (Number(node.data.days) || 0) * 24 + (Number(node.data.hours) || 0);
-        if (!(hours > 0) || hours > 366 * 24) add({ code: 'BAD_DURATION', message: 'Choose how long to wait (at most a year).', ...where });
+        if (node.data.mode !== undefined && node.data.mode !== 'duration' && node.data.mode !== 'event') {
+          add({ code: 'BAD_WAIT', message: 'Choose what to wait for.', ...where });
+        } else if (node.data.mode === 'event') {
+          const event = getWorkflowEvent(node.data.event);
+          if (!event) add({ code: 'BAD_EVENT', message: 'Choose the event to wait for.', ...where });
+          // Without its own setting the wait is about the run's invoice — which only an invoice flow has.
+          const subject = node.data.subject;
+          const unset = subject === undefined || subject === null || subject === '';
+          if (unset && subjectType !== 'invoice') {
+            add({ code: 'WAIT_NO_SUBJECT', message: 'Choose the invoice to wait for.', field: 'subject', ...where });
+          }
+          checkValue(subject, { ...where, field: 'subject' }, graph, known, ancestors, issues);
+          const days = node.data.timeoutDays;
+          if (days !== undefined && days !== null && !(Number(days) > 0 && Number(days) <= 365)) {
+            add({ code: 'BAD_DUE', message: 'The due date must be between 1 and 365 days.', ...where });
+          }
+        } else {
+          const hours = (Number(node.data.days) || 0) * 24 + (Number(node.data.hours) || 0);
+          if (!(hours > 0) || hours > 366 * 24) add({ code: 'BAD_DURATION', message: 'Choose how long to wait (at most a year).', ...where });
+        }
         break;
       }
       case 'gateway': {
         const exits = outgoing(graph, node.id, 'out');
+        if (node.data.mode !== undefined && node.data.mode !== 'exclusive' && node.data.mode !== 'parallel') {
+          add({ code: 'BAD_GATEWAY', message: 'Choose whether the branch takes one exit or all.', ...where });
+        }
+        if (node.data.mode === 'parallel') break; // all exits are taken; conditions are refused with the edges above
         if (exits.filter((edge) => !edge.condition).length > 1) {
           add({ code: 'MULTIPLE_DEFAULTS', message: 'A branch can have only one exit without a condition.', ...where });
         }

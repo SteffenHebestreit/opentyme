@@ -5,9 +5,10 @@ attached" — are drawn on a canvas from building blocks of OpenTyme and then ru
 period. This document describes the model, the semantics and the API. The types live in
 `backend/src/types/workflow.types.ts` (mirrored in `frontend/src/api/types/workflow.types.ts`).
 
-Stage 1 (this document): engine, canvas editor, task list, manual and scheduled start, the
-billing actions, test runs. Later stages add events as triggers, cancellation / correction
-actions, parallel branches and an addon API.
+Built so far: the engine, the canvas editor, the task list, manual and scheduled starts, the
+billing actions and test runs (stage 1); events as starts and as something to wait for, the
+cancellation and correction documents, parallel branches (stage 2). An addon API for further
+subjects, actions and events is the next stage.
 
 ## Concepts
 
@@ -23,12 +24,12 @@ actions, parallel branches and an addon API.
 
 | Type | Does | Exits (`sourceHandle`) |
 |---|---|---|
-| `start` | Where a run begins. `trigger: 'manual'` or `'schedule'` (monthly, per listed subject). Exactly one per graph. | `out` |
+| `start` | Where a run begins. `trigger: 'manual'`, `'schedule'` (monthly, per listed subject) or `'event'` (whenever the event happens, optionally only for some clients). Exactly one per graph. | `out` |
 | `action` | Runs a catalog action with resolved input. `mode: 'auto'` runs at once; `'approval'` opens an approval task first. | `out` |
 | `task` | Opens a task and waits. Kinds: `confirm`, `upload`, `form`. With `dueInDays` it expires. | `out`, `rejected` (confirm only), `timeout` (with `dueInDays`) |
-| `wait` | Waits `days` / `hours`. | `out` |
-| `gateway` | Takes exactly one exit: edges are tried in order, the first whose `condition` holds wins; an edge without a condition is "otherwise". | `out` (several edges) |
-| `end` | Ends the run, optionally with a `result` text. | — |
+| `wait` | `mode: 'duration'` (default) waits `days` / `hours`. `mode: 'event'` waits until `event` happens to `subject` (an invoice; default: the run's own), at most `timeoutDays`. | `out`, `timeout` (event wait with `timeoutDays`) |
+| `gateway` | `mode: 'exclusive'` (default) takes exactly one exit: edges are tried in order, the first whose `condition` holds wins; an edge without a condition is "otherwise". `mode: 'parallel'` takes all exits at once; with several entries it is a join and waits for every one of them. | `out` (several edges) |
+| `end` | Ends its branch, optionally with a `result` text. The run ends when no branch is left. | — |
 
 Only gateways may have more than one `out` edge. Loops are allowed (e.g. reminder → back to the
 task). If a task has no edge for `rejected` / `timeout`, rejecting cancels the run and the task
@@ -48,7 +49,8 @@ A value in a node's configuration is a literal or a reference `{ "$ref": "path" 
 | `period.start`, `period.end`, `period.label` | `YYYY-MM-DD`; label e.g. `2026-10` |
 | `owner.email`, `owner.name` | The flow's owner |
 | `run.id`, `run.test`, `today` | |
-| `steps.<nodeId>.<key>` | Output of an earlier step; `steps.<nodeId>.outcome` is the exit it took |
+| `event.type`, `event.<key>` | In a run an event started: what happened (`status`, `previous_status`, `reason` — see the catalog's `events`) |
+| `steps.<nodeId>.<key>` | Output of an earlier step; `steps.<nodeId>.outcome` is the exit it took. A wait for an event outputs what the event carried. |
 
 A condition is `{ match: 'all' | 'any', rules: [{ left: path, op, right }] }` with the operators
 `eq ne gt gte lt lte contains empty not_empty`. Numbers compare numerically when both sides are
@@ -90,13 +92,45 @@ numeric. There is no free-form code anywhere in a flow.
 | `time.summarize` | read | auto | client/project, period → `totalHours`, `billableHours`, `entryCount`, `billableValue` |
 | `timesheet.generate` | write | auto | client/project, period, `hidePrices`, `lang` → `documentId`, `filename`, `totalHours` |
 | `invoice.createDraft` | write | auto | client/project, period, `headline` → `invoiceId`, `invoiceNumber`, `total` |
-| `invoice.pdf` | write | auto | `invoiceId`, `zugferd` → `documentId`, `filename` |
+| `invoice.pdf` | write | auto | `invoiceId`, `kind` (`invoice` \| `cancellation` \| `correction`), `zugferd` → `documentId`, `filename` |
+| `invoice.cancel` | external | approval | `invoiceId` → `status` (needs the right to delete invoices; not executed in a test run) |
 | `email.send` | external | approval | `to`, `templateId`, `attachInvoiceId`, `attachDocumentIds`, `markInvoiceSent` → `messageId`, `to` |
 | `invoice.markSent` | write | auto | `invoiceId` → `status` |
 | `document.link` | write | auto | `documentId`, `invoiceId`, `documentType` → `documentId` |
 | `notify.owner` | write | auto | `message`, `email` → — (opens a notice in the task list) |
 
 New actions are registered with `registerWorkflowAction()` (`services/workflow/workflow-actions.ts`).
+
+## Events
+
+| Event | Happens when |
+|---|---|
+| `invoice.created` | an invoice is inserted — by hand, from time entries, from a recurring invoice |
+| `invoice.sent`, `invoice.partially_paid`, `invoice.paid`, `invoice.cancelled` | the invoice's status changes to that |
+| `invoice.corrected` | a correction is saved (`correction_date` changes) |
+
+- A database trigger on `invoices` writes the event into `workflow_events` inside the transaction
+  that changed the invoice. That covers every writer — the service, the payment sync, the mail
+  route's own status update — and an event exists exactly when the change does. The trigger
+  swallows its own failures: it can never stop an invoice from being saved.
+- `processEvents()` claims events on every tick, and right after a write to invoices, payments or
+  mail (`workflowScheduler.nudge()`). For each event, runs waiting for it continue, and active flows
+  about an invoice whose start is this event (and whose client filter fits) get a run of their own —
+  one per event, started by `event`.
+- Guards: an event starts nothing if the invoice itself was not created / changed within the last
+  24 hours (a restore or an import is not news; a dump is also restored with an empty search path,
+  under which the trigger writes nothing); a flow is started by events at most 60 times an hour; a
+  flow that starts on `invoice.created` and creates an invoice is refused at publish (`EVENT_LOOP`).
+- A wait for a status event (`sent`, `partially_paid`, `paid`, `cancelled`) that the invoice has
+  already reached continues at once.
+
+## Parallel branches
+
+A parallel gateway's exits carry no conditions; each becomes a branch with its own steps. Where the
+branches meet, a second parallel gateway collects them (`input.arrived` on its waiting step) and
+runs when all its entries have arrived. Without a join, each branch runs to its own end, and the
+run completes with the last one. An incident in one branch makes the run an incident; cancelling
+ends all branches.
 
 ## API
 
@@ -138,5 +172,7 @@ e.g. a task that is already settled) and 422 (invalid graph).
 ## Tables
 
 `workflow_definitions`, `workflow_versions`, `workflow_runs`, `workflow_steps`, `workflow_tasks`,
-`workflow_timers` — created by `ensureSchemaUpgrades()` and `init.sql`. `client_documents` gains the
+`workflow_timers`, `workflow_events` (what happened to an invoice) and `workflow_waits` (runs parked
+until an event) — created at startup (`ensureWorkflowTables()`) and by `init.sql`, together with the
+trigger `workflow_invoice_events` on `invoices`. `client_documents` gains the
 types `timesheet` and `timesheet_signed` and the columns `invoice_id`, `period_start`, `period_end`.

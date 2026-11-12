@@ -353,3 +353,57 @@ describe('API tokens on the workflow routes', () => {
     expect((await call('full', 'POST', '/tasks/00000000-0000-4000-8000-000000000000/dismiss')).status).toBe(404);
   });
 });
+
+// ── Stage 2: an event raised by a real route starts a flow ───────────────────
+
+it('cancelling an invoice through the API starts the flow that reacts to it', async () => {
+  const invoiceFlow = async (name: string, start: Record<string, unknown>, action: Record<string, unknown>) => {
+    const graph: WorkflowGraph = {
+      nodes: [
+        { id: 's', type: 'start', position: { x: 0, y: 0 }, data: start as any },
+        { id: 'act', type: 'action', position: { x: 0, y: 0 }, data: action as any },
+        { id: 'e', type: 'end', position: { x: 0, y: 0 }, data: { result: '{{invoice.number}}' } },
+      ],
+      edges: [
+        { id: 'e1', source: 's', target: 'act' },
+        { id: 'e2', source: 'act', target: 'e' },
+      ],
+    };
+    const definition = await definitions.create(TEST_USER_ID, { name, subject_type: 'invoice', graph });
+    expect(await definitions.publish(definition.id, TEST_USER_ID)).toMatchObject({ ok: true });
+    return definition.id;
+  };
+  const cancelFlow = await invoiceFlow('Storno', { trigger: 'manual' }, { action: 'invoice.cancel', mode: 'auto', input: { invoiceId: { $ref: 'invoice.id' } } });
+  const reactFlow = await invoiceFlow(
+    'Nach Storno',
+    { trigger: 'event', event: { type: 'invoice.cancelled' } },
+    { action: 'invoice.pdf', mode: 'auto', input: { invoiceId: { $ref: 'invoice.id' }, kind: 'cancellation' } }
+  );
+  // The published permissions follow from the actions: cancelling needs the right to delete invoices.
+  expect((await definitions.get(cancelFlow, TEST_USER_ID))?.published_permissions).toEqual({ resources: { invoices: 'delete' }, capabilities: [] });
+
+  // The invoice the first test sent.
+  const sent = await db.query(`SELECT id, invoice_number FROM invoices WHERE user_id = $1 AND status = 'sent' ORDER BY created_at LIMIT 1`, [TEST_USER_ID]);
+  const invoice = sent.rows[0];
+  await db.query(`DELETE FROM workflow_events`);
+
+  const runId = await engine.startRun({ userId: TEST_USER_ID, definitionId: cancelFlow, subjectId: invoice.id });
+  const cancelRun = (await engine.getRun(runId, TEST_USER_ID)) as WorkflowRun;
+  expect(cancelRun.steps.filter((step) => step.status === 'failed').map((step) => step.error)).toEqual([]);
+  expect(cancelRun.status).toBe('completed');
+  expect((await db.query(`SELECT status FROM invoices WHERE id = $1`, [invoice.id])).rows[0].status).toBe('cancelled');
+
+  // The route's write raised the event; the engine (nudged by the request, or here by hand) starts the reacting flow.
+  await engine.processEvents();
+  let reacted = await engine.listRuns(TEST_USER_ID, { definitionId: reactFlow });
+  for (let attempt = 0; attempt < 60 && reacted[0]?.status !== 'completed' && reacted[0]?.status !== 'incident'; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    reacted = await engine.listRuns(TEST_USER_ID, { definitionId: reactFlow });
+  }
+  expect(reacted).toHaveLength(1);
+  const reaction = (await engine.getRun(reacted[0].id, TEST_USER_ID)) as WorkflowRun;
+  expect(reaction.steps.filter((step) => step.status === 'failed').map((step) => step.error)).toEqual([]);
+  expect(reaction).toMatchObject({ status: 'completed', started_by: 'event', result: invoice.invoice_number });
+  const filed = await db.query(`SELECT title, invoice_id, file_mimetype FROM client_documents WHERE id = $1`, [stepOf(reaction, 'act')?.output?.documentId]);
+  expect(filed.rows[0]).toMatchObject({ title: `Stornorechnung ${invoice.invoice_number}`, invoice_id: invoice.id, file_mimetype: 'application/pdf' });
+}, 120000);

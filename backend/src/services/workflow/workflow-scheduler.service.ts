@@ -2,8 +2,10 @@
  * @fileoverview The workflow engine's clock.
  *
  * Once a minute it fires the timers that are due — task due dates, waits and
- * scheduled starts. Timers are rows, so what came due while the server was
- * down fires on the first tick after it is back.
+ * scheduled starts — and handles the events recorded since. Both are rows, so
+ * what came due or happened while the server was down is picked up on the
+ * first tick after it is back. nudge() looks for events right away, for the
+ * requests that are likely to have raised one.
  *
  * @module services/workflow/workflow-scheduler
  */
@@ -16,6 +18,7 @@ import { workflowEngine } from './workflow-engine.service';
 class WorkflowSchedulerService {
   private cronJob: ScheduledTask | null = null;
   private ticking = false;
+  private nudged: NodeJS.Timeout | null = null;
 
   public initialize(): void {
     this.cronJob = scheduleCron('[Workflow]', '* * * * *', () => this.tick());
@@ -29,6 +32,8 @@ class WorkflowSchedulerService {
     try {
       const fired = await workflowEngine.fireDueTimers();
       if (fired > 0) logger.info(`[Workflow] Fired ${fired} timer(s)`);
+      const events = await workflowEngine.processEvents();
+      if (events > 0) logger.info(`[Workflow] Handled ${events} event(s)`);
     } catch (error) {
       logger.error('[Workflow] Timer tick failed:', error);
     } finally {
@@ -46,6 +51,25 @@ class WorkflowSchedulerService {
     } catch (error) {
       logger.error('[Workflow] Could not recover interrupted runs:', error);
     }
+  }
+
+  /**
+   * An invoice or a payment was just written: handle the events it raised now
+   * rather than at the next tick. Several writes in a row share one look.
+   */
+  public nudge(): void {
+    if (this.nudged) return;
+    this.nudged = setTimeout(() => {
+      this.nudged = null;
+      workflowEngine
+        .processEvents()
+        .then((events) => {
+          if (events > 0) logger.info(`[Workflow] Handled ${events} event(s)`);
+        })
+        .catch((error) => logger.debug(`[Workflow] Looking for events failed: ${error instanceof Error ? error.message : error}`));
+    }, 300);
+    // Never keeps the process (or a test run) alive.
+    this.nudged.unref();
   }
 
   public stop(): void {

@@ -173,6 +173,61 @@ function signedTimesheetGraph(lang: Lang): WorkflowGraph {
   };
 }
 
+const CORRECTION_TEXT = {
+  de: {
+    name: 'Rechnungskorrektur versenden',
+    description:
+      'Startet von selbst, sobald Sie eine Rechnung korrigieren: legt das Korrekturdokument ab und schickt es nach Ihrer Freigabe an den Rechnungsempfänger.',
+    start: 'Rechnung korrigiert',
+    pdf: 'Korrekturdokument ablegen',
+    mail: 'Korrektur an Rechnungsempfänger',
+    end: 'Ende',
+    endResult: 'Korrektur zu {{invoice.number}} versendet ({{event.reason}})',
+  },
+  en: {
+    name: 'Send invoice correction',
+    description:
+      'Starts by itself when you correct an invoice: files the correction document and, once you approve, mails it to the invoice recipient.',
+    start: 'Invoice corrected',
+    pdf: 'File the correction document',
+    mail: 'Correction to the invoice recipient',
+    end: 'End',
+    endResult: 'Correction of {{invoice.number}} sent ({{event.reason}})',
+  },
+} as const;
+
+function invoiceCorrectionGraph(lang: Lang): WorkflowGraph {
+  const t = CORRECTION_TEXT[lang];
+  return {
+    nodes: [
+      { id: 'n_start', type: 'start', position: { x: 0, y: 120 }, data: { label: t.start, trigger: 'event', event: { type: 'invoice.corrected' } } },
+      {
+        id: 'n_pdf',
+        type: 'action',
+        position: { x: 160, y: 100 },
+        data: { label: t.pdf, action: 'invoice.pdf', mode: 'auto', input: { invoiceId: { $ref: 'invoice.id' }, kind: 'correction', zugferd: false } },
+      },
+      {
+        id: 'n_mail',
+        type: 'action',
+        position: { x: 420, y: 100 },
+        data: {
+          label: t.mail,
+          action: 'email.send',
+          mode: 'approval',
+          input: { to: { $ref: 'client.invoice_email' }, templateId: '', attachDocumentIds: [{ $ref: 'steps.n_pdf.documentId' }], markInvoiceSent: false },
+        },
+      },
+      { id: 'n_end', type: 'end', position: { x: 680, y: 120 }, data: { label: t.end, result: t.endResult } },
+    ],
+    edges: [
+      { id: 'e_start', source: 'n_start', target: 'n_pdf' },
+      { id: 'e_pdf', source: 'n_pdf', target: 'n_mail' },
+      { id: 'e_mail', source: 'n_mail', target: 'n_end' },
+    ],
+  };
+}
+
 export function listWorkflowTemplates(lang: string | undefined): WorkflowTemplate[] {
   const language: Lang = lang?.toLowerCase().startsWith('de') ? 'de' : 'en';
   return [
@@ -182,6 +237,13 @@ export function listWorkflowTemplates(lang: string | undefined): WorkflowTemplat
       description: TEXT[language].description,
       subject_type: 'client',
       graph: signedTimesheetGraph(language),
+    },
+    {
+      key: 'invoice-correction',
+      name: CORRECTION_TEXT[language].name,
+      description: CORRECTION_TEXT[language].description,
+      subject_type: 'invoice',
+      graph: invoiceCorrectionGraph(language),
     },
   ];
 }

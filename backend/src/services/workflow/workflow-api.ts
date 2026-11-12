@@ -44,6 +44,7 @@ export interface WorkflowApi {
   getBinary(path: string, query?: QueryParams): Promise<Buffer>;
   post<T = unknown>(path: string, body?: unknown): Promise<T>;
   put<T = unknown>(path: string, body?: unknown): Promise<T>;
+  patch<T = unknown>(path: string, body?: unknown): Promise<T>;
   upload<T = unknown>(path: string, fields: Record<string, string | null | undefined>, file: WorkflowUploadFile): Promise<T>;
 }
 
@@ -119,6 +120,7 @@ export function createWorkflowApi(identity: WorkflowApiIdentity): WorkflowApi {
       Buffer.from(await (await send('GET', path, { query })).arrayBuffer()),
     post: async <T>(path: string, body?: unknown) => json<T>(await send('POST', path, { body: body ?? {} })),
     put: async <T>(path: string, body?: unknown) => json<T>(await send('PUT', path, { body: body ?? {} })),
+    patch: async <T>(path: string, body?: unknown) => json<T>(await send('PATCH', path, { body: body ?? {} })),
     upload: async <T>(path: string, fields: Record<string, string | null | undefined>, file: WorkflowUploadFile) => {
       const form = new FormData();
       for (const [key, value] of Object.entries(fields)) {

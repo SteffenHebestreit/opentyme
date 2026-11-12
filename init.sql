@@ -2556,7 +2556,7 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
   status varchar(20) NOT NULL DEFAULT 'running'
     CHECK (status IN ('running', 'waiting', 'incident', 'completed', 'cancelled')),
   test_mode boolean NOT NULL DEFAULT false,
-  started_by varchar(20) NOT NULL DEFAULT 'manual' CHECK (started_by IN ('manual', 'schedule')),
+  started_by varchar(20) NOT NULL DEFAULT 'manual' CHECK (started_by IN ('manual', 'schedule', 'event')),
   context jsonb NOT NULL DEFAULT '{}'::jsonb,
   business_key varchar(255),
   result text,
@@ -2626,7 +2626,7 @@ CREATE INDEX IF NOT EXISTS idx_workflow_tasks_run ON workflow_tasks(run_id);
 
 CREATE TABLE IF NOT EXISTS workflow_timers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  kind varchar(20) NOT NULL CHECK (kind IN ('task_timeout', 'wait', 'schedule')),
+  kind varchar(20) NOT NULL CHECK (kind IN ('task_timeout', 'wait', 'wait_timeout', 'schedule')),
   run_id uuid REFERENCES workflow_runs(id) ON DELETE CASCADE,
   step_id uuid REFERENCES workflow_steps(id) ON DELETE CASCADE,
   definition_id uuid REFERENCES workflow_definitions(id) ON DELETE CASCADE,
@@ -2639,6 +2639,78 @@ CREATE INDEX IF NOT EXISTS idx_workflow_timers_due ON workflow_timers(due_at) WH
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_workflow_timers_schedule ON workflow_timers(definition_id)
   WHERE kind = 'schedule' AND fired_at IS NULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'workflow_runs_started_by_check' AND pg_get_constraintdef(oid) LIKE '%event%'
+  ) THEN
+    ALTER TABLE workflow_runs DROP CONSTRAINT IF EXISTS workflow_runs_started_by_check;
+    ALTER TABLE workflow_runs ADD CONSTRAINT workflow_runs_started_by_check
+      CHECK (started_by IN ('manual', 'schedule', 'event'));
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'workflow_timers_kind_check' AND pg_get_constraintdef(oid) LIKE '%wait_timeout%'
+  ) THEN
+    ALTER TABLE workflow_timers DROP CONSTRAINT IF EXISTS workflow_timers_kind_check;
+    ALTER TABLE workflow_timers ADD CONSTRAINT workflow_timers_kind_check
+      CHECK (kind IN ('task_timeout', 'wait', 'wait_timeout', 'schedule'));
+  END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS workflow_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  type varchar(60) NOT NULL,
+  subject_type varchar(20) NOT NULL,
+  subject_id uuid,
+  payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+  processed_at timestamp with time zone
+);
+
+CREATE INDEX IF NOT EXISTS idx_workflow_events_pending ON workflow_events(created_at) WHERE processed_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS workflow_waits (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  run_id uuid NOT NULL REFERENCES workflow_runs(id) ON DELETE CASCADE,
+  step_id uuid NOT NULL REFERENCES workflow_steps(id) ON DELETE CASCADE,
+  event_type varchar(60) NOT NULL,
+  subject_id uuid NOT NULL,
+  created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_workflow_waits_event ON workflow_waits(event_type, subject_id);
+
+CREATE OR REPLACE FUNCTION workflow_invoice_events() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+  BEGIN
+    IF TG_OP = 'INSERT' THEN
+      INSERT INTO workflow_events (user_id, type, subject_type, subject_id, payload)
+      VALUES (NEW.user_id, 'invoice.created', 'invoice', NEW.id, jsonb_build_object('status', NEW.status));
+    ELSE
+      IF NEW.status IS DISTINCT FROM OLD.status THEN
+        INSERT INTO workflow_events (user_id, type, subject_type, subject_id, payload)
+        VALUES (NEW.user_id, 'invoice.' || NEW.status, 'invoice', NEW.id,
+                jsonb_build_object('status', NEW.status, 'previous_status', OLD.status));
+      END IF;
+      IF NEW.correction_date IS NOT NULL AND NEW.correction_date IS DISTINCT FROM OLD.correction_date THEN
+        INSERT INTO workflow_events (user_id, type, subject_type, subject_id, payload)
+        VALUES (NEW.user_id, 'invoice.corrected', 'invoice', NEW.id,
+                jsonb_build_object('status', NEW.status, 'reason', NEW.correction_reason));
+      END IF;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'workflow_invoice_events: %', SQLERRM;
+  END;
+  RETURN NULL;
+END $fn$;
+
+CREATE OR REPLACE TRIGGER workflow_invoice_events AFTER INSERT OR UPDATE ON invoices
+  FOR EACH ROW EXECUTE FUNCTION workflow_invoice_events();
 
 ALTER TABLE client_documents ADD COLUMN IF NOT EXISTS invoice_id uuid REFERENCES invoices(id) ON DELETE SET NULL;
 

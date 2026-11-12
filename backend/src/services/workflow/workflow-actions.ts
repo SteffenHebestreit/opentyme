@@ -21,6 +21,7 @@ import type {
 import type {
   WorkflowActionSpec,
   WorkflowCatalog,
+  WorkflowEventSpec,
   WorkflowOutputSpec,
   WorkflowSubjectType,
   WorkflowTaskKind,
@@ -185,6 +186,13 @@ const endField = { key: 'end', type: 'date' as const, label: 'Until', required: 
 const needsClientOrProject = (config: Record<string, WorkflowValue>): string | null =>
   isSet(config.clientId) || isSet(config.projectId) ? null : 'Choose a client or a project.';
 
+/** The PDFs an invoice has, and what the filed copy is called. */
+const INVOICE_DOCUMENTS: Record<string, { route: string; title: string; file: string }> = {
+  invoice: { route: 'pdf', title: 'Rechnung', file: 'invoice' },
+  cancellation: { route: 'storno-pdf', title: 'Stornorechnung', file: 'cancellation' },
+  correction: { route: 'correction-pdf', title: 'Rechnungskorrektur', file: 'correction' },
+};
+
 const BUILT_IN: WorkflowActionDefinition[] = [
   {
     key: 'time.summarize',
@@ -312,11 +320,12 @@ const BUILT_IN: WorkflowActionDefinition[] = [
     key: 'invoice.pdf',
     category: 'invoice',
     title: 'File invoice PDF',
-    description: "Creates the invoice's PDF and files it with the client's documents.",
+    description: "Creates the invoice's PDF — or its cancellation or correction document — and files it with the client's documents.",
     effect: 'write',
     defaultMode: 'auto',
     input: [
       { key: 'invoiceId', type: 'invoice', label: 'Invoice', required: true },
+      { key: 'kind', type: 'select', label: 'Document', options: ['invoice', 'cancellation', 'correction'], default: 'invoice' },
       { key: 'zugferd', type: 'boolean', label: 'As e-invoice (ZUGFeRD)', default: false },
     ],
     output: [
@@ -332,15 +341,19 @@ const BUILT_IN: WorkflowActionDefinition[] = [
     execute: async (input, ctx) => {
       const invoiceId = required(input, 'invoiceId', 'The invoice');
       const invoice = await ctx.api.get<{ client_id: string; invoice_number: string }>(`/api/invoices/${invoiceId}`);
-      const pdf = await ctx.api.getBinary(`/api/invoices/${invoiceId}/pdf`, flag(input.zugferd) ? { zugferd: 'true' } : {});
+      const kind = INVOICE_DOCUMENTS[text(input.kind) ?? 'invoice'] ?? INVOICE_DOCUMENTS.invoice;
+      const pdf = await ctx.api.getBinary(
+        `/api/invoices/${invoiceId}/${kind.route}`,
+        kind === INVOICE_DOCUMENTS.invoice && flag(input.zugferd) ? { zugferd: 'true' } : {}
+      );
       const document = await ctx.api.upload<{ id: string; file_filename: string }>(
         `/api/clients/${invoice.client_id}/documents`,
         {
-          title: `${testPrefix(ctx)}Rechnung ${invoice.invoice_number}`.slice(0, 255),
+          title: `${testPrefix(ctx)}${kind.title} ${invoice.invoice_number}`.slice(0, 255),
           document_type: ClientDocumentType.OTHER,
           invoice_id: invoiceId,
         },
-        { field: 'document', buffer: pdf, filename: `invoice-${invoice.invoice_number}.pdf`, contentType: 'application/pdf' }
+        { field: 'document', buffer: pdf, filename: `${kind.file}-${invoice.invoice_number}.pdf`, contentType: 'application/pdf' }
       );
       return { documentId: document.id, filename: document.file_filename };
     },
@@ -461,6 +474,26 @@ const BUILT_IN: WorkflowActionDefinition[] = [
     },
   },
   {
+    key: 'invoice.cancel',
+    category: 'invoice',
+    title: 'Cancel invoice',
+    description: 'Cancels the invoice. This cannot be undone.',
+    // Not "write": like a mail, a cancellation is not something to repeat or to run unseen.
+    effect: 'external',
+    defaultMode: 'approval',
+    input: [{ key: 'invoiceId', type: 'invoice', label: 'Invoice', required: true }],
+    output: [{ key: 'status', type: 'string', label: 'Status' }],
+    needs: () => ({ resources: [{ key: 'invoices', level: 'delete' }] }),
+    execute: async (input, ctx) => {
+      const invoiceId = required(input, 'invoiceId', 'The invoice');
+      const invoice = await ctx.api.get<{ status: string }>(`/api/invoices/${invoiceId}`);
+      if (invoice.status === 'cancelled') return { status: 'cancelled' };
+      if (ctx.testMode) return { status: invoice.status, skipped: 'test run' };
+      await ctx.api.patch(`/api/invoices/${invoiceId}/cancel`);
+      return { status: 'cancelled' };
+    },
+  },
+  {
     key: 'document.link',
     category: 'documents',
     title: 'Assign document',
@@ -548,6 +581,46 @@ export const SUBJECT_VARIABLES: Record<WorkflowSubjectType, WorkflowVariableSpec
   none: COMMON_VARIABLES,
 };
 
+const EVENT_STATUS: WorkflowOutputSpec[] = [
+  { key: 'status', type: 'string', label: 'Status of the invoice' },
+  { key: 'previous_status', type: 'string', label: 'Status before' },
+];
+
+/** What can happen to an invoice. Recorded by the database trigger in workflow-schema.ts. */
+export const WORKFLOW_EVENTS: WorkflowEventSpec[] = [
+  {
+    key: 'invoice.created',
+    subject_type: 'invoice',
+    title: 'Invoice created',
+    description: 'A new invoice exists — written by hand, from time entries or from a recurring invoice.',
+    output: [{ key: 'status', type: 'string', label: 'Status of the invoice' }],
+  },
+  { key: 'invoice.sent', subject_type: 'invoice', title: 'Invoice sent', description: 'The invoice was marked as sent.', output: EVENT_STATUS },
+  {
+    key: 'invoice.partially_paid',
+    subject_type: 'invoice',
+    title: 'Part payment received',
+    description: 'A payment covers part of the invoice.',
+    output: EVENT_STATUS,
+  },
+  { key: 'invoice.paid', subject_type: 'invoice', title: 'Invoice paid', description: 'The invoice is paid in full.', output: EVENT_STATUS },
+  { key: 'invoice.cancelled', subject_type: 'invoice', title: 'Invoice cancelled', description: 'The invoice was cancelled.', output: EVENT_STATUS },
+  {
+    key: 'invoice.corrected',
+    subject_type: 'invoice',
+    title: 'Invoice corrected',
+    description: 'A correction of the invoice was saved.',
+    output: [
+      { key: 'status', type: 'string', label: 'Status of the invoice' },
+      { key: 'reason', type: 'string', label: 'Reason for the correction' },
+    ],
+  },
+];
+
+export function getWorkflowEvent(key: string | undefined): WorkflowEventSpec | undefined {
+  return WORKFLOW_EVENTS.find((event) => event.key === key);
+}
+
 export const TASK_OUTPUTS: Record<WorkflowTaskKind, WorkflowOutputSpec[]> = {
   confirm: [{ key: 'comment', type: 'string', label: 'Comment' }],
   upload: [
@@ -567,6 +640,7 @@ function toSpec(action: WorkflowActionDefinition): WorkflowActionSpec {
 export function buildWorkflowCatalog(): WorkflowCatalog {
   return {
     actions: listWorkflowActions().map(toSpec),
+    events: WORKFLOW_EVENTS,
     variables: SUBJECT_VARIABLES,
     taskOutputs: TASK_OUTPUTS,
     documentTypes: WORKFLOW_DOCUMENT_TYPES,

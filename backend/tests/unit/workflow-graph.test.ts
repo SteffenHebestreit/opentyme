@@ -248,3 +248,159 @@ describe('nextScheduledStart', () => {
     expect(nextScheduledStart(schedule, at('2026-11-30T06:00:00Z')).toISOString()).toBe('2026-12-31T06:00:00.000Z');
   });
 });
+
+// ── Stage 2: events and parallel branches ────────────────────────────────────
+
+/** A small flow about an invoice: start → file the PDF → end. */
+function invoiceFlow(start: Record<string, unknown> = { trigger: 'manual' }): WorkflowGraph {
+  return {
+    nodes: [
+      { id: 's', type: 'start', position: { x: 0, y: 0 }, data: start as any },
+      { id: 'pdf', type: 'action', position: { x: 0, y: 0 }, data: { action: 'invoice.pdf', mode: 'auto', input: { invoiceId: { $ref: 'invoice.id' }, kind: 'correction' } } },
+      { id: 'e', type: 'end', position: { x: 0, y: 0 }, data: {} },
+    ],
+    edges: [
+      { id: 'e1', source: 's', target: 'pdf' },
+      { id: 'e2', source: 'pdf', target: 'e' },
+    ],
+  };
+}
+
+describe('event starts', () => {
+  it('ships a flow that sends the correction document when an invoice is corrected', () => {
+    for (const lang of ['de', 'en']) {
+      const template = getWorkflowTemplate('invoice-correction', lang)!;
+      expect(template.subject_type).toBe('invoice');
+      // Like the other template it only lacks what the user must choose: the email template.
+      expect(validateGraph(template.graph, 'invoice').issues.map((issue) => `${issue.code}:${issue.nodeId}:${issue.field}`)).toEqual([
+        'MISSING_INPUT:n_mail:templateId',
+      ]);
+      expect(derivePermissions(template.graph)).toEqual({
+        resources: { invoices: 'read', clients: 'write', templates: 'read' },
+        capabilities: ['email_send'],
+      });
+    }
+  });
+
+  it('a flow about an invoice can start with something that happens to one', () => {
+    const graph = invoiceFlow({ trigger: 'event', event: { type: 'invoice.corrected', clientIds: [] } });
+    expect(validateGraph(graph, 'invoice')).toMatchObject({ valid: true });
+    // The run knows what happened.
+    withNode(graph, 'e', (node) => (node.data.result = 'Korrigiert: {{event.reason}} ({{event.type}})'));
+    expect(codes(graph, 'invoice')).toEqual([]);
+    // … but only what this event carries, and only in a flow that starts with one.
+    withNode(graph, 'e', (node) => (node.data.result = '{{event.previous_status}}'));
+    expect(codes(graph, 'invoice')).toEqual(['BAD_REFERENCE']);
+    expect(codes(withNode(invoiceFlow(), 'e', (node) => (node.data.result = '{{event.type}}')), 'invoice')).toEqual(['BAD_REFERENCE']);
+  });
+
+  it('needs a known event and a flow about what it happens to', () => {
+    expect(codes(invoiceFlow({ trigger: 'event' }), 'invoice')).toEqual(['BAD_EVENT']);
+    expect(codes(invoiceFlow({ trigger: 'event', event: { type: 'invoice.teleported' } }), 'invoice')).toEqual(['BAD_EVENT']);
+    expect(codes(invoiceFlow({ trigger: 'event', event: { type: 'invoice.paid', clientIds: 'all' } }), 'invoice')).toEqual(['BAD_EVENT']);
+    const forClient = validFlow();
+    withNode(forClient, 'n_start', (node) => Object.assign(node.data, { trigger: 'event', event: { type: 'invoice.paid' } }));
+    expect(codes(forClient, 'client')).toEqual(['EVENT_SUBJECT']);
+  });
+
+  it('refuses a flow that would start itself', () => {
+    const graph = invoiceFlow({ trigger: 'event', event: { type: 'invoice.created' } });
+    graph.nodes.push({
+      id: 'again', type: 'action', position: { x: 0, y: 0 },
+      data: { action: 'invoice.createDraft', mode: 'auto', input: { clientId: { $ref: 'client.id' }, start: { $ref: 'period.start' }, end: { $ref: 'period.end' } } },
+    });
+    graph.edges = [
+      { id: 'e1', source: 's', target: 'again' },
+      { id: 'e2', source: 'again', target: 'pdf' },
+      { id: 'e3', source: 'pdf', target: 'e' },
+    ];
+    expect(codes(graph, 'invoice')).toEqual(['EVENT_LOOP']);
+  });
+
+  it('grants a cancelling flow the right to cancel, and nothing less will do', () => {
+    const graph = invoiceFlow();
+    withNode(graph, 'pdf', (node) => Object.assign(node.data, { action: 'invoice.cancel', mode: 'approval', input: { invoiceId: { $ref: 'invoice.id' } } }));
+    expect(validateGraph(graph, 'invoice')).toMatchObject({ valid: true, permissions: { resources: { invoices: 'delete' } } });
+  });
+});
+
+describe('waiting for an event', () => {
+  const waiting = (data: Record<string, unknown>, subject: any = 'invoice'): string[] => {
+    const graph = invoiceFlow();
+    graph.nodes.push({ id: 'w', type: 'wait', position: { x: 0, y: 0 }, data: data as any });
+    graph.edges = [
+      { id: 'e1', source: 's', target: 'w' },
+      { id: 'e2', source: 'w', target: 'pdf' },
+      { id: 'e3', source: 'pdf', target: 'e' },
+    ];
+    return codes(graph, subject);
+  };
+
+  it('waits for a known event on the run\'s invoice, or on one a step produced', () => {
+    expect(waiting({ mode: 'event', event: 'invoice.paid' })).toEqual([]);
+    expect(waiting({ mode: 'event', event: 'invoice.paid', timeoutDays: 30 })).toEqual([]);
+    expect(waiting({ mode: 'event' })).toEqual(['BAD_EVENT']);
+    expect(waiting({ mode: 'event', event: 'invoice.paid', timeoutDays: 0 })).toEqual(['BAD_DUE']);
+    expect(waiting({ mode: 'sometime' })).toEqual(['BAD_WAIT']);
+    // The old form — just a duration — still means what it meant.
+    expect(waiting({ days: 3 })).toEqual([]);
+  });
+
+  it('needs to know which invoice when the flow is not about one', () => {
+    const forClient = validFlow();
+    forClient.nodes.push({ id: 'n_paid', type: 'wait', position: { x: 0, y: 0 }, data: { mode: 'event', event: 'invoice.paid' } });
+    forClient.edges = forClient.edges.filter((edge) => edge.id !== 'e_mail_invoice');
+    forClient.edges.push({ id: 'e_a', source: 'n_mail_invoice', target: 'n_paid' }, { id: 'e_b', source: 'n_paid', target: 'n_end' });
+    expect(validateGraph(forClient, 'client').issues).toEqual([expect.objectContaining({ code: 'WAIT_NO_SUBJECT', nodeId: 'n_paid' })]);
+    withNode(forClient, 'n_paid', (node) => (node.data.subject = { $ref: 'steps.n_invoice.invoiceId' }));
+    expect(codes(forClient)).toEqual([]);
+    // What the event carried is available afterwards.
+    withNode(forClient, 'n_end', (node) => (node.data.result = 'bezahlt, vorher {{steps.n_paid.previous_status}}'));
+    expect(codes(forClient)).toEqual([]);
+  });
+
+  it('has a timeout exit only with a time limit', () => {
+    const graph = invoiceFlow();
+    graph.nodes.push({ id: 'w', type: 'wait', position: { x: 0, y: 0 }, data: { mode: 'event', event: 'invoice.paid' } });
+    graph.edges = [
+      { id: 'e1', source: 's', target: 'w' },
+      { id: 'e2', source: 'w', target: 'pdf' },
+      { id: 'e3', source: 'pdf', target: 'e' },
+      { id: 'e_late', source: 'w', target: 'e', sourceHandle: 'timeout' },
+    ];
+    expect(codes(graph, 'invoice')).toEqual(['BAD_HANDLE']);
+    withNode(graph, 'w', (node) => (node.data.timeoutDays = 14));
+    expect(codes(graph, 'invoice')).toEqual([]);
+  });
+});
+
+describe('parallel branches', () => {
+  function parallelFlow(): WorkflowGraph {
+    return {
+      nodes: [
+        { id: 's', type: 'start', position: { x: 0, y: 0 }, data: { trigger: 'manual' } },
+        { id: 'split', type: 'gateway', position: { x: 0, y: 0 }, data: { mode: 'parallel' } },
+        { id: 'a', type: 'task', position: { x: 0, y: 0 }, data: { kind: 'confirm', title: 'A' } },
+        { id: 'b', type: 'task', position: { x: 0, y: 0 }, data: { kind: 'confirm', title: 'B' } },
+        { id: 'join', type: 'gateway', position: { x: 0, y: 0 }, data: { mode: 'parallel' } },
+        { id: 'e', type: 'end', position: { x: 0, y: 0 }, data: {} },
+      ],
+      edges: [
+        { id: 'e1', source: 's', target: 'split' },
+        { id: 'e_a', source: 'split', target: 'a' },
+        { id: 'e_b', source: 'split', target: 'b' },
+        { id: 'e_a2', source: 'a', target: 'join' },
+        { id: 'e_b2', source: 'b', target: 'join' },
+        { id: 'e2', source: 'join', target: 'e' },
+      ],
+    };
+  }
+
+  it('takes all exits, so they carry no conditions and need no "otherwise"', () => {
+    expect(codes(parallelFlow(), 'none')).toEqual([]);
+    const conditional = parallelFlow();
+    (conditional.edges.find((edge) => edge.id === 'e_a') as WorkflowEdge).condition = { match: 'all', rules: [{ left: 'today', op: 'not_empty' }] };
+    expect(validateGraph(conditional, 'none').issues).toEqual([expect.objectContaining({ code: 'PARALLEL_CONDITION', edgeId: 'e_a', nodeId: 'split' })]);
+    expect(codes(withNode(parallelFlow(), 'split', (node) => (node.data.mode = 'both')), 'none')).toContain('BAD_GATEWAY');
+  });
+});

@@ -88,6 +88,10 @@ class FakeApi {
         if (path.startsWith('/api/invoices/')) this.invoiceStatus = body.status;
         return {} as any;
       },
+      patch: async (path: string, body?: any) => {
+        this.record('PATCH', path, { body });
+        return {} as any;
+      },
       upload: async (path: string, fields: any, file: any) => {
         this.record('POST', path, { body: { ...fields, file: file.filename } });
         return { id: '44444444-4444-4444-8444-444444444444', file_filename: file.filename } as any;
@@ -723,5 +727,224 @@ describe('forms', () => {
     expect(run.status).toBe('incident');
     expect(stepOf(run, 'link')).toMatchObject({ error: '"Document" is not a valid id for this run.', error_code: 'INPUT_NOT_ID' });
     expect(api.calls.some((call) => call.method === 'PUT')).toBe(false);
+  });
+});
+
+// ── Stage 2: events ──────────────────────────────────────────────────────────
+
+describe('events', () => {
+  async function newInvoice(client: string = clientId, status = 'draft', createdDaysAgo = 0): Promise<string> {
+    const inserted = await db.query(
+      `INSERT INTO invoices (user_id, client_id, invoice_number, issue_date, due_date, status, created_at, updated_at)
+       VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_DATE + 14, $4, CURRENT_TIMESTAMP - make_interval(days => $5), CURRENT_TIMESTAMP - make_interval(days => $5))
+       RETURNING id`,
+      [TEST_USER_ID, client, `T-${crypto.randomUUID().slice(0, 8)}`, status, createdDaysAgo]
+    );
+    return inserted.rows[0].id;
+  }
+  const setStatus = (invoiceId: string, status: string) => db.query(`UPDATE invoices SET status = $2 WHERE id = $1`, [invoiceId, status]);
+  const eventsOf = async (invoiceId: string) =>
+    (await db.query(`SELECT type, payload FROM workflow_events WHERE subject_id = $1 ORDER BY created_at, type`, [invoiceId])).rows;
+
+  /** A flow about an invoice: start → note to the owner → end. */
+  async function invoiceFlow(start: Record<string, unknown>, middle: any[] = [], result = '{{event.type}}'): Promise<string> {
+    const chain = ['s', ...middle.map((node) => node.id), 'note', 'e'];
+    const graph: WorkflowGraph = {
+      nodes: [
+        { id: 's', type: 'start', position: { x: 0, y: 0 }, data: start as any },
+        ...middle,
+        { id: 'note', type: 'action', position: { x: 0, y: 0 }, data: { action: 'notify.owner', mode: 'auto', input: { message: 'Rechnung {{invoice.number}}', email: false } } },
+        { id: 'e', type: 'end', position: { x: 0, y: 0 }, data: { result } },
+      ],
+      edges: chain.slice(1).map((target, index) => ({ id: `c${index}`, source: chain[index], target })),
+    };
+    const definition = await definitions.create(TEST_USER_ID, { name: `Event ${crypto.randomUUID().slice(0, 8)}`, subject_type: 'invoice', graph });
+    const published = await definitions.publish(definition.id, TEST_USER_ID);
+    if (!published?.ok) throw new Error(JSON.stringify(published));
+    return definition.id;
+  }
+  const runsOf = (flow: string) => engine.listRuns(TEST_USER_ID, { definitionId: flow });
+
+  beforeEach(async () => {
+    // Events are global, like timers: what earlier tests raised must not be handled here.
+    await db.query(`DELETE FROM workflow_events`);
+    await db.query(`UPDATE workflow_definitions SET status = 'archived' WHERE user_id = $1 AND subject_type = 'invoice'`, [TEST_USER_ID]);
+  });
+
+  it('the database records what happens to an invoice, whoever writes it', async () => {
+    const invoiceId = await newInvoice();
+    await setStatus(invoiceId, 'sent');
+    await db.query(`UPDATE invoices SET notes = 'unverändert wichtig' WHERE id = $1`, [invoiceId]);
+    await db.query(`UPDATE invoices SET correction_date = CURRENT_TIMESTAMP, correction_reason = 'Stunden korrigiert' WHERE id = $1`, [invoiceId]);
+    await setStatus(invoiceId, 'paid');
+    await setStatus(invoiceId, 'paid');
+    expect(await eventsOf(invoiceId)).toEqual([
+      { type: 'invoice.created', payload: { status: 'draft' } },
+      { type: 'invoice.sent', payload: { status: 'sent', previous_status: 'draft' } },
+      { type: 'invoice.corrected', payload: { status: 'sent', reason: 'Stunden korrigiert' } },
+      { type: 'invoice.paid', payload: { status: 'paid', previous_status: 'sent' } },
+    ]);
+  });
+
+  it('starts the flows that begin with the event — once, and only for the chosen clients', async () => {
+    const onSent = await invoiceFlow({ trigger: 'event', event: { type: 'invoice.sent' } }, [], '{{event.type}} nach {{event.previous_status}}');
+    const onSentElsewhere = await invoiceFlow({ trigger: 'event', event: { type: 'invoice.sent', clientIds: [secondClientId] } });
+    const onPaid = await invoiceFlow({ trigger: 'event', event: { type: 'invoice.paid' } });
+
+    const invoiceId = await newInvoice();
+    await setStatus(invoiceId, 'sent');
+    expect(await engine.processEvents()).toBe(2); // created + sent
+    expect(await engine.processEvents()).toBe(0);
+
+    const started = await runsOf(onSent);
+    expect(started).toHaveLength(1);
+    expect(started[0]).toMatchObject({ status: 'completed', started_by: 'event', subject_type: 'invoice', subject_id: invoiceId, result: 'invoice.sent nach draft' });
+    expect(await runsOf(onSentElsewhere)).toHaveLength(0);
+    expect(await runsOf(onPaid)).toHaveLength(0);
+    // The note names the invoice the event was about.
+    const run = (await engine.getRun(started[0].id, TEST_USER_ID))!;
+    expect(run.tasks[0]).toMatchObject({ kind: 'notice', title: `Rechnung ${run.subject_label}` });
+
+    // Paid later: the other flow gets its run; a paused flow would not.
+    await definitions.setStatus(onSent, TEST_USER_ID, 'paused');
+    await setStatus(invoiceId, 'paid');
+    await setStatus(invoiceId, 'sent');
+    await engine.processEvents();
+    expect(await runsOf(onPaid)).toHaveLength(1);
+    expect(await runsOf(onSent)).toHaveLength(1);
+  });
+
+  it('does not treat old invoices as news (a restore, an import)', async () => {
+    const onCreated = await invoiceFlow({ trigger: 'event', event: { type: 'invoice.created' } });
+    await newInvoice(clientId, 'sent', 3);
+    const fresh = await newInvoice();
+    await engine.processEvents();
+    const runs = await runsOf(onCreated);
+    expect(runs.map((run) => run.subject_id)).toEqual([fresh]);
+  });
+
+  it('a run waits for an event on its invoice and goes on with what happened', async () => {
+    const wait = { id: 'w', type: 'wait', position: { x: 0, y: 0 }, data: { mode: 'event', event: 'invoice.paid', timeoutDays: 30 } };
+    const flow = await invoiceFlow({ trigger: 'manual' }, [wait], 'bezahlt, vorher {{steps.w.previous_status}}');
+    // A second end for "not paid in time".
+    const draft = (await definitions.get(flow, TEST_USER_ID))!;
+    draft.graph.nodes.push({ id: 'late', type: 'end', position: { x: 0, y: 0 }, data: { result: 'nicht bezahlt' } });
+    draft.graph.edges.push({ id: 'c_late', source: 'w', target: 'late', sourceHandle: 'timeout' });
+    await definitions.update(flow, TEST_USER_ID, { graph: draft.graph });
+    expect(await definitions.publish(flow, TEST_USER_ID)).toMatchObject({ ok: true });
+    const startFor = async (invoiceId: string) =>
+      (await engine.getRun(await engine.startRun({ userId: TEST_USER_ID, definitionId: flow, subjectId: invoiceId }), TEST_USER_ID))!;
+
+    // 1. Waits, ignores other events, continues when the invoice is paid.
+    const invoiceId = await newInvoice(clientId, 'sent');
+    let run = await startFor(invoiceId);
+    expect(run).toMatchObject({ status: 'waiting', current_node_label: 'Wait' });
+    await db.query(`UPDATE invoices SET correction_date = CURRENT_TIMESTAMP WHERE id = $1`, [invoiceId]);
+    await engine.processEvents();
+    expect((await reload(run)).status).toBe('waiting');
+    await setStatus(invoiceId, 'paid');
+    await engine.processEvents();
+    run = await reload(run);
+    expect(run).toMatchObject({ status: 'completed', result: 'bezahlt, vorher sent' });
+    expect(stepOf(run, 'w')?.output).toMatchObject({ event: 'invoice.paid', status: 'paid', previous_status: 'sent' });
+
+    // 2. Already paid when the run gets there: nothing to wait for.
+    const paid = await startFor(await newInvoice(secondClientId, 'paid'));
+    expect(paid.status).toBe('completed');
+    expect(stepOf(paid, 'w')?.output).toMatchObject({ alreadyHappened: true });
+
+    // 3. Not paid in time: out through "timeout" — and a payment after that changes nothing.
+    const slowInvoice = await newInvoice(clientId, 'sent');
+    let slow = await startFor(slowInvoice);
+    expect(await engine.fireDueTimers(new Date(Date.now() + 31 * 86_400_000))).toBe(1);
+    slow = await reload(slow);
+    expect(slow).toMatchObject({ status: 'completed', result: 'nicht bezahlt' });
+    expect(stepOf(slow, 'w')?.outcome).toBe('timeout');
+    await setStatus(slowInvoice, 'paid');
+    await engine.processEvents();
+    expect((await reload(slow)).steps).toHaveLength(slow.steps.length);
+  });
+});
+
+// ── Stage 2: parallel branches ───────────────────────────────────────────────
+
+describe('parallel branches', () => {
+  const confirm = (id: string) => ({ id, type: 'task' as const, position: { x: 0, y: 0 }, data: { kind: 'confirm' as const, title: `Aufgabe ${id}` } });
+
+  async function publish(graph: WorkflowGraph): Promise<string> {
+    const definition = await definitions.create(TEST_USER_ID, { name: `Parallel ${crypto.randomUUID().slice(0, 8)}`, subject_type: 'none', graph });
+    const published = await definitions.publish(definition.id, TEST_USER_ID);
+    if (!published?.ok) throw new Error(JSON.stringify(published));
+    return definition.id;
+  }
+  const startRun = async (flow: string) =>
+    (await engine.getRun(await engine.startRun({ userId: TEST_USER_ID, definitionId: flow, ...october, periodStart: undefined, periodEnd: undefined, test: true }), TEST_USER_ID))!;
+  const openTaskOf = (run: WorkflowRun, nodeId: string) => run.tasks.find((task) => task.status === 'open' && task.node_id === nodeId)!;
+
+  it('runs both branches and goes on when both have arrived', async () => {
+    const flow = await publish({
+      nodes: [
+        { id: 's', type: 'start', position: { x: 0, y: 0 }, data: { trigger: 'manual' } },
+        { id: 'split', type: 'gateway', position: { x: 0, y: 0 }, data: { mode: 'parallel' } },
+        confirm('a'),
+        confirm('b'),
+        { id: 'join', type: 'gateway', position: { x: 0, y: 0 }, data: { mode: 'parallel' } },
+        { id: 'e', type: 'end', position: { x: 0, y: 0 }, data: { result: 'beide erledigt' } },
+      ],
+      edges: [
+        { id: 'e1', source: 's', target: 'split' },
+        { id: 'e_a', source: 'split', target: 'a' },
+        { id: 'e_b', source: 'split', target: 'b' },
+        { id: 'e_a2', source: 'a', target: 'join' },
+        { id: 'e_b2', source: 'b', target: 'join' },
+        { id: 'e2', source: 'join', target: 'e' },
+      ],
+    });
+    let run = await startRun(flow);
+    expect(run.status).toBe('waiting');
+    expect(run.tasks.filter((task) => task.status === 'open').map((task) => task.node_id).sort()).toEqual(['a', 'b']);
+
+    await engine.settleTask(openTaskOf(run, 'b').id, TEST_USER_ID, 'complete');
+    run = await reload(run);
+    // One branch is through; the join waits for the other.
+    expect(run.status).toBe('waiting');
+    expect(stepOf(run, 'join')).toMatchObject({ status: 'waiting', input: { arrived: ['e_b2'] } });
+    expect(run.steps.some((step) => step.node_id === 'e')).toBe(false);
+
+    await engine.settleTask(openTaskOf(run, 'a').id, TEST_USER_ID, 'complete');
+    run = await reload(run);
+    expect(run).toMatchObject({ status: 'completed', result: 'beide erledigt' });
+    expect(run.steps.filter((step) => step.node_id === 'join')).toHaveLength(1);
+    expect(run.steps.map((step) => step.seq)).toEqual([...run.steps.map((step) => step.seq)].sort((x, y) => x - y));
+    expect(new Set(run.steps.map((step) => step.seq)).size).toBe(run.steps.length);
+  });
+
+  it('an end closes its branch; the run ends with the last one', async () => {
+    const flow = await publish({
+      nodes: [
+        { id: 's', type: 'start', position: { x: 0, y: 0 }, data: { trigger: 'manual' } },
+        { id: 'split', type: 'gateway', position: { x: 0, y: 0 }, data: { mode: 'parallel' } },
+        confirm('a'),
+        confirm('b'),
+        { id: 'end_a', type: 'end', position: { x: 0, y: 0 }, data: { result: 'A fertig' } },
+        { id: 'end_b', type: 'end', position: { x: 0, y: 0 }, data: {} },
+      ],
+      edges: [
+        { id: 'e1', source: 's', target: 'split' },
+        { id: 'e_a', source: 'split', target: 'a' },
+        { id: 'e_b', source: 'split', target: 'b' },
+        { id: 'e_a2', source: 'a', target: 'end_a' },
+        { id: 'e_b2', source: 'b', target: 'end_b' },
+      ],
+    });
+    let run = await startRun(flow);
+    await engine.settleTask(openTaskOf(run, 'a').id, TEST_USER_ID, 'complete');
+    run = await reload(run);
+    expect(run.status).toBe('waiting');
+    expect(openTaskOf(run, 'b')).toBeDefined();
+    await engine.settleTask(openTaskOf(run, 'b').id, TEST_USER_ID, 'complete');
+    run = await reload(run);
+    // The branch that ended without a result does not erase the other's.
+    expect(run).toMatchObject({ status: 'completed', result: 'A fertig' });
   });
 });
