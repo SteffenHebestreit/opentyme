@@ -19,7 +19,7 @@ import {
 import { failedStep, nodeRunStates, traversedEdgeIds } from '../../src/components/workflows/graph/runStatus';
 import { currentMonth } from '../../src/components/workflows/graph/period';
 import { byRecency, byUrgency } from '../../src/components/workflows/tasks/taskOrder';
-import type { TaskNodeData } from '../../src/api/types/workflow.types';
+import type { TaskNodeData, WorkflowGraph } from '../../src/api/types/workflow.types';
 import { catalog, graph, step, task } from '../mocks/workflowFixtures';
 
 describe('graph conversion', () => {
@@ -88,6 +88,16 @@ describe('exits and connections', () => {
     expect(sourceHandles('end', {})).toEqual([]);
   });
 
+  it('gives a wait for an event a "time expired" exit only with a time limit', () => {
+    expect(sourceHandles('wait', { days: 3 })).toEqual(['out']);
+    expect(sourceHandles('wait', { mode: 'event', event: 'invoice.paid' })).toEqual(['out']);
+    expect(sourceHandles('wait', { mode: 'event', event: 'invoice.paid', timeoutDays: 30 })).toEqual(['out', 'timeout']);
+    // A time limit means nothing for a fixed wait
+    expect(sourceHandles('wait', { mode: 'duration', days: 3, timeoutDays: 30 })).toEqual(['out']);
+    // A gateway has one handle whichever way it branches; its edges fan out from there
+    expect(sourceHandles('gateway', { mode: 'parallel' })).toEqual(['out']);
+  });
+
   it('lets only gateways branch: a second edge from another exit replaces the first', () => {
     const nodes = toFlowNodes(graph);
     const edges = toFlowEdges(graph);
@@ -147,6 +157,24 @@ describe('run state', () => {
   it('marks the edges the run took — a gateway by edge id, a task by its exit', () => {
     const taken = traversedEdgeIds(graph, steps);
     expect([...taken].sort()).toEqual(['e1', 'e2', 'e3', 'e5', 'e6', 'e8', 'e9']);
+  });
+
+  it('counts every exit of a parallel branch as taken', () => {
+    const parallel: WorkflowGraph = {
+      nodes: [
+        { id: 's', type: 'start', position: { x: 0, y: 0 }, data: { trigger: 'manual' } },
+        { id: 'g', type: 'gateway', position: { x: 0, y: 0 }, data: { mode: 'parallel' } },
+        { id: 'a', type: 'end', position: { x: 0, y: 0 }, data: {} },
+        { id: 'b', type: 'end', position: { x: 0, y: 0 }, data: {} },
+      ],
+      edges: [
+        { id: 'e1', source: 's', target: 'g' },
+        { id: 'ea', source: 'g', target: 'a' },
+        { id: 'eb', source: 'g', target: 'b' },
+      ],
+    };
+    const done = [step({ id: 's1', node_id: 's', seq: 1 }), step({ id: 's2', node_id: 'g', seq: 2, node_type: 'gateway', outcome: 'all' })];
+    expect([...traversedEdgeIds(parallel, done)].sort()).toEqual(['e1', 'ea', 'eb']);
   });
 
   it('finds the failed step of an incident', () => {

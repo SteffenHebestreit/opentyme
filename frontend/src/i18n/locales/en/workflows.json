@@ -180,7 +180,12 @@
       "runExists": "This flow already ran for this subject and period.",
       "openExisting": "Open that run",
       "error": "The run could not be started."
-    }
+    },
+    "event": "When something happens",
+    "triggerHintEvent": "The flow starts by itself as soon as the event happens. It can also be started by hand.",
+    "eventLabel": "Event",
+    "eventHint": "What has to happen to an invoice for a run to start.",
+    "eventClients": "Only for these clients (none chosen = all)"
   },
   "task": {
     "kind": "Kind of task",
@@ -220,14 +225,30 @@
     "days_other": "{{count}} days",
     "hours_one": "{{count}} hour",
     "hours_other": "{{count}} hours",
-    "summary": "Wait {{duration}}"
+    "summary": "Wait {{duration}}",
+    "mode": "Waits",
+    "modeDuration": "A fixed time",
+    "modeEvent": "Until something happens",
+    "event": "Event",
+    "subject": "Invoice",
+    "subjectOptional": "Invoice (empty = this run's invoice)",
+    "timeoutDays": "At most this many days",
+    "timeoutHint": "Empty = no limit. With a limit the node gets the exit “time expired”.",
+    "untilEvent": "Wait for: {{event}}"
   },
   "gateway": {
     "exits": "Exits, in the order they are checked",
     "noExits": "No exits yet. Connect this branch to the blocks that follow.",
     "moveUp": "Check exit {{n}} earlier",
     "moveDown": "Check exit {{n}} later",
-    "hint": "The first exit whose condition holds is taken. Select an exit to set its condition."
+    "hint": "The first exit whose condition holds is taken. Select an exit to set its condition.",
+    "mode": "Takes",
+    "exclusive": "Exactly one exit (by condition)",
+    "parallel": "All exits at once",
+    "exclusiveHint": "The first exit whose condition holds.",
+    "parallelHint": "The run goes all ways at once. Where they meet again, place a second branch of this kind: it waits until every branch has arrived.",
+    "parallelTitle": "All branches",
+    "exitsParallel": "Branches"
   },
   "edge": {
     "label": "Label",
@@ -236,7 +257,8 @@
     "when": "Taken",
     "condition": "When a condition holds",
     "otherwise": "Otherwise",
-    "orderHint": "One exit per branch can be “otherwise”. The order is set on the branch."
+    "orderHint": "One exit per branch can be “otherwise”. The order is set on the branch.",
+    "parallelExit": "Branch of a parallel gateway: always taken."
   },
   "condition": {
     "match": "The rules",
@@ -378,7 +400,8 @@
       "allStatuses": "Every status"
     },
     "empty": "No runs yet.",
-    "loadError": "The runs could not be loaded."
+    "loadError": "The runs could not be loaded.",
+    "byEvent": "by event"
   },
   "run": {
     "back": "Back to the runs",
@@ -410,7 +433,8 @@
     "outcome": "exit: {{outcome}}",
     "input": "Input",
     "output": "Result",
-    "notFound": "This run does not exist."
+    "notFound": "This run does not exist.",
+    "startedByEvent": "started by an event on {{date}}"
   },
   "tasks": {
     "title": "Tasks",
@@ -513,7 +537,13 @@
       "id": "Run: ID",
       "test": "Run: is a test run"
     },
-    "today": "Today"
+    "today": "Today",
+    "event": {
+      "type": "Event",
+      "status": "Event: status of the invoice",
+      "previous_status": "Event: status before",
+      "reason": "Event: reason for the correction"
+    }
   },
   "taskOutputs": {
     "outcome": "Outcome",
@@ -588,16 +618,34 @@
         "description": "Creates the invoice PDF and stores it with the client.",
         "fields": {
           "invoiceId": "Invoice",
-          "zugferd": "With ZUGFeRD e-invoice data"
+          "zugferd": "With ZUGFeRD e-invoice data",
+          "kind": "Document"
         },
         "outputs": {
           "documentId": "Invoice PDF (document)",
           "filename": "File name"
+        },
+        "options": {
+          "kind": {
+            "invoice": "Invoice",
+            "cancellation": "Cancellation invoice",
+            "correction": "Invoice correction"
+          }
         }
       },
       "markSent": {
         "title": "Mark invoice as sent",
         "description": "Sets the invoice's status to “sent”.",
+        "fields": {
+          "invoiceId": "Invoice"
+        },
+        "outputs": {
+          "status": "Status"
+        }
+      },
+      "cancel": {
+        "title": "Cancel invoice",
+        "description": "Cancels the invoice. This cannot be undone.",
         "fields": {
           "invoiceId": "Invoice"
         },
@@ -680,7 +728,14 @@
     "NO_FORM_FIELDS": "The form needs at least one field.",
     "BAD_FORM_FIELD": "Every form field needs a label, a type and a unique key.",
     "BAD_DUE": "The due date must be between 1 and 365 days.",
-    "BAD_DURATION": "Set how long to wait (at most a year)."
+    "BAD_DURATION": "Set how long to wait (at most a year).",
+    "BAD_EVENT": "Choose the event.",
+    "EVENT_SUBJECT": "This event happens to an invoice. Only a flow about invoices can start with it.",
+    "EVENT_LOOP": "This flow creates an invoice and would start itself again. Choose another start or remove that action.",
+    "BAD_WAIT": "Choose what to wait for.",
+    "WAIT_NO_SUBJECT": "Choose the invoice to wait for.",
+    "PARALLEL_CONDITION": "A parallel branch takes all its exits. They cannot have conditions.",
+    "BAD_GATEWAY": "Choose whether the branch takes one exit or all."
   },
   "preview": {
     "labels": {
@@ -701,6 +756,35 @@
     "NO_BRANCH": "None of the conditions of the branch applies, and it has no exit without a condition.",
     "INTERRUPTED": "The server stopped while this step was running. Check whether it took effect, then retry or skip it.",
     "TOO_MANY_STEPS": "The run has taken {{max}} steps. The flow probably runs in a circle.",
-    "STEP_MISSING": "This step no longer exists in the flow."
+    "STEP_MISSING": "This step no longer exists in the flow.",
+    "WAIT_NO_SUBJECT": "There is no invoice in this run to wait for."
+  },
+  "events": {
+    "invoice": {
+      "created": {
+        "title": "Invoice created",
+        "description": "A new invoice exists: written by hand, from time entries or from a recurring invoice."
+      },
+      "sent": {
+        "title": "Invoice sent",
+        "description": "The invoice was marked as sent."
+      },
+      "partially_paid": {
+        "title": "Part payment received",
+        "description": "A payment covers part of the invoice."
+      },
+      "paid": {
+        "title": "Invoice paid",
+        "description": "The invoice is paid in full."
+      },
+      "cancelled": {
+        "title": "Invoice cancelled",
+        "description": "The invoice was cancelled."
+      },
+      "corrected": {
+        "title": "Invoice corrected",
+        "description": "A correction of the invoice was saved."
+      }
+    }
   }
 }

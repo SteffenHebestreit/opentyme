@@ -7,9 +7,9 @@ import { memo } from 'react';
 import type { ReactNode } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
-import { AlertTriangle, Ban, Check, Clock, Loader2, Play, SkipForward, X } from 'lucide-react';
+import { AlertTriangle, Ban, Check, Clock, Loader2, Play, Plus, SkipForward, X, Zap } from 'lucide-react';
 import { cn } from '../../../lib/cn';
-import type { ActionNodeData, TaskNodeData } from '../../../api/types/workflow.types';
+import type { ActionNodeData, GatewayNodeData, StartNodeData, TaskNodeData, WaitNodeData } from '../../../api/types/workflow.types';
 import { TARGET_HANDLE, sourceHandles } from '../graph/flowGraph';
 import type { FlowNode } from '../graph/flowGraph';
 import type { NodeRunState, NodeRunStatus } from '../graph/runStatus';
@@ -141,6 +141,11 @@ export const CardNode = memo(function CardNode({ id, type, data, selected }: Nod
           {isTask && !!task.dueInDays && <Pill tone="plain">{t('task.dueShort', { count: task.dueInDays })}</Pill>}
         </div>
       )}
+      {type === 'wait' && exits.includes('timeout') && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          <Pill tone="plain">{t('task.dueShort', { count: (config as WaitNodeData).timeoutDays })}</Pill>
+        </div>
+      )}
       <Handle type="source" position={Position.Right} id="out" className={handleClass} />
       {exits.includes('rejected') && (
         <>
@@ -182,7 +187,12 @@ export const StartNode = memo(function StartNode({ id, type, data, selected }: N
       className={cn('relative flex h-12 w-12 items-center justify-center rounded-full border-[1.5px] bg-white shadow-soft dark:bg-gray-900', frame)}
       aria-label={`${labels.nodeTypeLabel('start')}: ${title}`}
     >
-      <Play className="h-4 w-4 translate-x-px fill-current text-gray-500 dark:text-gray-400" aria-hidden="true" />
+      {/* A flow that starts by itself when something happens is marked as such */}
+      {(data.config as StartNodeData).trigger === 'event' ? (
+        <Zap className="h-4 w-4 fill-current text-gray-500 dark:text-gray-400" aria-hidden="true" />
+      ) : (
+        <Play className="h-4 w-4 translate-x-px fill-current text-gray-500 dark:text-gray-400" aria-hidden="true" />
+      )}
       <Handle type="source" position={Position.Right} id="out" className={handleClass} />
       <CaptionBelow>{title}</CaptionBelow>
       <CornerBadges run={run} issues={issues} labelFor={(status) => labels.t(`nodeRunStatus.${status}`)} />
@@ -218,7 +228,12 @@ export const GatewayNode = memo(function GatewayNode({ id, type, data, selected 
         {title}
       </span>
       <div className={cn('absolute inset-[7px] flex rotate-45 items-center justify-center rounded-[5px] border-[1.5px] bg-white shadow-soft dark:bg-gray-900', frame)}>
-        <X className="h-4 w-4 -rotate-45 text-gray-500 dark:text-gray-400" aria-hidden="true" />
+        {/* × = one exit by condition, + = all exits at once (BPMN's markers) */}
+        {(data.config as GatewayNodeData).mode === 'parallel' ? (
+          <Plus className="h-4 w-4 -rotate-45 text-gray-500 dark:text-gray-400" aria-hidden="true" />
+        ) : (
+          <X className="h-4 w-4 -rotate-45 text-gray-500 dark:text-gray-400" aria-hidden="true" />
+        )}
       </div>
       <Handle type="target" position={Position.Left} id={TARGET_HANDLE} className={handleClass} />
       <Handle type="source" position={Position.Right} id="out" className={handleClass} />

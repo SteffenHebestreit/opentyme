@@ -39,11 +39,22 @@ export interface WorkflowSchedule {
   subjectIds: string[];
 }
 
+export interface WorkflowEventTrigger {
+  /** Key of a catalog event, e.g. `invoice.corrected`. */
+  type: string;
+  /** Only for records of these clients; empty or missing = all. */
+  clientIds?: string[];
+}
+
 export interface StartNodeData {
   label?: string;
-  /** `manual` runs can always be started by hand; `schedule` adds the timer. */
-  trigger: 'manual' | 'schedule';
+  /**
+   * `manual` runs can always be started by hand; `schedule` adds the timer;
+   * `event` starts a run whenever the event happens (flows about an invoice).
+   */
+  trigger: 'manual' | 'schedule' | 'event';
   schedule?: WorkflowSchedule;
+  event?: WorkflowEventTrigger;
 }
 
 export type WorkflowActionMode = 'auto' | 'approval';
@@ -83,12 +94,25 @@ export interface TaskNodeData {
 
 export interface WaitNodeData {
   label?: string;
+  /** `duration` (default) waits `days` / `hours`; `event` waits until the event happens to `subject`. */
+  mode?: 'duration' | 'event';
   days?: number;
   hours?: number;
+  /** `event`: key of a catalog event, e.g. `invoice.paid`. */
+  event?: string;
+  /** `event`: the invoice the event is about; defaults to the run's own invoice. */
+  subject?: WorkflowValue;
+  /** `event`: days after which the run stops waiting and leaves through `timeout`. */
+  timeoutDays?: number;
 }
 
 export interface GatewayNodeData {
   label?: string;
+  /**
+   * `exclusive` (default) takes exactly one exit, by its conditions. `parallel` takes all
+   * exits at once; a parallel gateway with several entries waits until every branch arrived.
+   */
+  mode?: 'exclusive' | 'parallel';
 }
 
 export interface EndNodeData {
@@ -227,8 +251,21 @@ export interface WorkflowVariableSpec {
   label: string;
 }
 
+export interface WorkflowEventSpec {
+  /** E.g. `invoice.paid`. */
+  key: string;
+  /** What the event happens to — a flow starting with it runs for that record. */
+  subject_type: WorkflowSubjectType;
+  /** English fallback; the UI translates `workflows:events.<key>.title`. */
+  title: string;
+  description: string;
+  /** Run data an event start provides under `event.<key>`; a wait's step outputs the same keys. */
+  output: WorkflowOutputSpec[];
+}
+
 export interface WorkflowCatalog {
   actions: WorkflowActionSpec[];
+  events: WorkflowEventSpec[];
   /** Run data available per subject type, besides the steps' outputs. */
   variables: Record<WorkflowSubjectType, WorkflowVariableSpec[]>;
   /** Outputs of task nodes, by kind (form fields add their own keys). */
@@ -351,7 +388,7 @@ export interface WorkflowRunSummary {
   period_end: string | null;
   status: WorkflowRunStatus;
   test_mode: boolean;
-  started_by: 'manual' | 'schedule';
+  started_by: 'manual' | 'schedule' | 'event';
   /** Label of the node the run currently rests on, if any. */
   current_node_label: string | null;
   result: string | null;

@@ -18,10 +18,19 @@
 - **Start** by hand, or monthly on a day you choose for the clients you pick; one run per flow,
   client and period. A **test run** plays the flow through with real data, but mails only you
   (subject marked "[Test]") and leaves invoices as drafts.
+- **Start when something happens:** a flow about an invoice can start by itself when an invoice is
+  created, sent, paid (in part or in full), cancelled or corrected — for all clients or the ones you
+  pick. Shipped template: *when an invoice is corrected, file the correction document and mail it
+  to the invoice recipient after your approval*.
+- **Wait for something to happen:** a flow can wait until an invoice is paid (or sent, cancelled …)
+  — with a time limit, after which it goes another way, e.g. to remind you.
+- **Parallel branches:** a branch can take all its exits at once (mail the client *and* update the
+  agency's portal); a second one waits until all branches are done.
 - **Actions so far:** add up the period's hours, create and file the timesheet (with or without
   amounts), create a draft invoice from time entries, file the invoice PDF, send an email from a
-  template with the invoice and filed documents attached, mark an invoice as sent, tie a document
-  to an invoice, notify yourself.
+  template with the invoice and filed documents attached, mark an invoice as sent, cancel an
+  invoice, file its cancellation or correction document, tie a document to an invoice, notify
+  yourself.
 - A flow acts with exactly the permissions its actions need, shown before you publish. It can
   never change settings, administer the system or manage API tokens.
 - **Emails can attach filed client documents** (API: attachment type `document`), and client

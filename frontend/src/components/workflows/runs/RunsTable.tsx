@@ -101,6 +101,7 @@ export const RunsTable: FC<RunsTableProps> = ({ runs, isLoading, hideFlow = fals
           <span className="whitespace-nowrap text-gray-600 dark:text-gray-400">
             {formatDistanceToNow(run.started_at)}
             {run.started_by === 'schedule' && ` · ${t('runs.bySchedule')}`}
+            {run.started_by === 'event' && ` · ${t('runs.byEvent')}`}
           </span>
         ),
       },

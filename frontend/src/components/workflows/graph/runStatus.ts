@@ -44,12 +44,17 @@ export function nodeRunStates(steps: WorkflowStep[]): Record<string, NodeRunStat
 export function traversedEdgeIds(graph: WorkflowGraph, steps: WorkflowStep[]): Set<string> {
   const taken = new Set<string>();
   const typeOf = new Map(graph.nodes.map((node) => [node.id, node.type]));
+  const parallel = new Set(graph.nodes.filter((node) => node.type === 'gateway' && node.data.mode === 'parallel').map((node) => node.id));
   for (const step of steps) {
     if (step.status !== 'completed' && step.status !== 'skipped') continue;
     const outcome = step.outcome ?? 'out';
     for (const edge of graph.edges) {
       if (edge.source !== step.node_id) continue;
-      const matches = typeOf.get(step.node_id) === 'gateway' ? edge.id === outcome : (edge.sourceHandle ?? 'out') === outcome;
+      // A branch records the one edge it took; a parallel one ("all") took every exit
+      const matches =
+        typeOf.get(step.node_id) === 'gateway'
+          ? parallel.has(step.node_id) || edge.id === outcome
+          : (edge.sourceHandle ?? 'out') === outcome;
       if (matches) taken.add(edge.id);
     }
   }

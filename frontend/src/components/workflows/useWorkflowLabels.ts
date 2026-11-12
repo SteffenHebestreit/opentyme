@@ -74,7 +74,12 @@ export function useWorkflowLabels(catalog?: WorkflowCatalog) {
       return t(`issues.${issue.code}`, { defaultValue: issue.message, field });
     };
 
+    const eventTitle = (key: string | undefined): string =>
+      key ? t(`events.${key}.title`, { defaultValue: catalog?.events?.find((event) => event.key === key)?.title ?? key }) : '';
+    const eventDescription = (key: string | undefined): string =>
+      key ? t(`events.${key}.description`, { defaultValue: catalog?.events?.find((event) => event.key === key)?.description ?? '' }) : '';
     const waitSummary = (config: WaitNodeData): string => {
+      if (config.mode === 'event') return config.event ? t('wait.untilEvent', { event: eventTitle(config.event) }) : t('nodeTypes.wait');
       const parts: string[] = [];
       if (config.days) parts.push(t('wait.days', { count: config.days }));
       if (config.hours) parts.push(t('wait.hours', { count: config.hours }));
@@ -93,9 +98,10 @@ export function useWorkflowLabels(catalog?: WorkflowCatalog) {
         case 'wait':
           return waitSummary(config as WaitNodeData);
         case 'start':
+          if ((config as StartNodeData).trigger === 'event') return eventTitle((config as StartNodeData).event?.type) || t('nodeTypes.start');
           return (config as StartNodeData).trigger === 'schedule' ? t('start.scheduled') : t('nodeTypes.start');
         case 'gateway':
-          return (config as GatewayNodeData).label || t('nodeTypes.gateway');
+          return (config as GatewayNodeData).label || t((config as GatewayNodeData).mode === 'parallel' ? 'gateway.parallelTitle' : 'nodeTypes.gateway');
         case 'end':
           return (config as EndNodeData).label || t('nodeTypes.end');
         default:
@@ -107,6 +113,7 @@ export function useWorkflowLabels(catalog?: WorkflowCatalog) {
     const referenceValueLabel = (option: ReferenceOption): string => {
       if (option.source.kind === 'variable') return t(`variables.${option.path}`, { defaultValue: option.label || option.path });
       if (option.source.action) return t(`actions.${option.source.action}.outputs.${option.key}`, { defaultValue: option.label || option.key });
+      if (option.source.nodeType === 'wait') return t(`variables.event.${option.key}`, { defaultValue: option.label || option.key });
       return t(`taskOutputs.${option.key}`, { defaultValue: option.label || option.key });
     };
 
@@ -129,6 +136,8 @@ export function useWorkflowLabels(catalog?: WorkflowCatalog) {
       actionTitle,
       actionDescription,
       fieldLabel,
+      eventTitle,
+      eventDescription,
       stepErrorText,
       nodeTypeLabel,
       taskKindLabel,

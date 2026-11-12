@@ -142,30 +142,79 @@ const SubjectChecklist: FC<{ subjectType: 'client' | 'project'; selected: string
 
 const DEFAULT_SCHEDULE: WorkflowSchedule = { dayOfMonth: 'last', period: 'current_month', subjectIds: [] };
 
-function StartSettings({ config, onChange, subjectType, labels }: { config: StartNodeData; onChange: (config: StartNodeData) => void; subjectType: WorkflowSubjectType; labels: WorkflowLabels }) {
+function StartSettings({
+  config,
+  onChange,
+  subjectType,
+  labels,
+  catalog,
+}: {
+  config: StartNodeData;
+  onChange: (config: StartNodeData) => void;
+  subjectType: WorkflowSubjectType;
+  labels: WorkflowLabels;
+  catalog?: WorkflowCatalog;
+}) {
   const { t } = labels;
   const schedulable = subjectType === 'client' || subjectType === 'project';
+  // Events happen to a kind of record; only a flow about that kind can start with them
+  const events = (catalog?.events ?? []).filter((event) => event.subject_type === subjectType);
   const schedule = config.schedule ?? DEFAULT_SCHEDULE;
   const setSchedule = (patch: Partial<WorkflowSchedule>) => onChange({ ...config, trigger: 'schedule', schedule: { ...schedule, ...patch } });
   return (
     <>
-      <Field id="start-trigger" label={t('start.trigger')} hint={schedulable ? t('start.triggerHint') : t('start.scheduleNeedsSubject')}>
+      <Field
+        id="start-trigger"
+        label={t('start.trigger')}
+        hint={schedulable ? t('start.triggerHint') : events.length > 0 ? t('start.triggerHintEvent') : t('start.scheduleNeedsSubject')}
+      >
         <select
           id="start-trigger"
           className={cn(control, 'cursor-pointer')}
           value={config.trigger}
           onChange={(event) =>
             event.target.value === 'schedule'
-              ? onChange({ ...config, trigger: 'schedule', schedule })
-              : onChange({ label: config.label, trigger: 'manual' })
+              ? onChange({ label: config.label, trigger: 'schedule', schedule })
+              : event.target.value === 'event'
+                ? onChange({ label: config.label, trigger: 'event', event: config.event ?? { type: events[0]?.key ?? '' } })
+                : onChange({ label: config.label, trigger: 'manual' })
           }
         >
           <option value="manual">{t('start.manual')}</option>
           <option value="schedule" disabled={!schedulable}>
             {t('start.schedule')}
           </option>
+          <option value="event" disabled={events.length === 0}>
+            {t('start.event')}
+          </option>
         </select>
       </Field>
+      {config.trigger === 'event' && (
+        <>
+          <Field id="start-event" label={t('start.eventLabel')} hint={labels.eventDescription(config.event?.type) || t('start.eventHint')}>
+            <select
+              id="start-event"
+              className={cn(control, 'cursor-pointer')}
+              value={config.event?.type ?? ''}
+              onChange={(event) => onChange({ ...config, event: { ...config.event, type: event.target.value } })}
+            >
+              {!events.some((event) => event.key === config.event?.type) && <option value="">{t('value.choose')}</option>}
+              {events.map((event) => (
+                <option key={event.key} value={event.key}>
+                  {labels.eventTitle(event.key)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <SubjectChecklist
+            subjectType="client"
+            selected={config.event?.clientIds ?? []}
+            onChange={(clientIds) => onChange({ ...config, event: { type: config.event?.type ?? '', clientIds } })}
+            legend={t('start.eventClients')}
+            empty={t('start.noSubjects.client')}
+          />
+        </>
+      )}
       {config.trigger === 'schedule' && schedulable && (
         <>
           <Field id="start-day" label={t('start.dayOfMonth')} hint={t('start.dayHint')}>
@@ -358,14 +407,15 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
     const source = nodes.find((node) => node.id === selectedEdge.source);
     const target = nodes.find((node) => node.id === selectedEdge.target);
     const data = selectedEdge.data ?? {};
-    const fromGateway = source?.type === 'gateway';
+    const fromParallel = source?.type === 'gateway' && (source.data.config as GatewayNodeData).mode === 'parallel';
+    const fromGateway = source?.type === 'gateway' && !fromParallel;
     const handle = selectedEdge.sourceHandle ?? 'out';
     return (
       <div>
         <PanelHeading
           eyebrow={t('panel.connection')}
           title={`${labels.nodeTitle(source?.type, source?.data.config)} → ${labels.nodeTitle(target?.type, target?.data.config)}`}
-          detail={!fromGateway && handle !== 'out' ? t('edge.exit', { exit: labels.handleLabel(handle) }) : undefined}
+          detail={fromParallel ? t('edge.parallelExit') : !fromGateway && handle !== 'out' ? t('edge.exit', { exit: labels.handleLabel(handle) }) : undefined}
         />
         <TextField
           id="edge-label"
@@ -433,7 +483,7 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
 
   let body: ReactNode = null;
   if (node.type === 'start') {
-    body = <StartSettings config={config as StartNodeData} onChange={setConfig} subjectType={subjectType} labels={labels} />;
+    body = <StartSettings config={config as StartNodeData} onChange={setConfig} subjectType={subjectType} labels={labels} catalog={catalog} />;
   } else if (node.type === 'action') {
     const action = config as ActionNodeData;
     const spec = catalog?.actions.find((candidate) => candidate.key === action.action);
@@ -555,24 +605,98 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
     );
   } else if (node.type === 'wait') {
     const wait = config as WaitNodeData;
+    const waitsForEvent = wait.mode === 'event';
+    const waitEvents = catalog?.events ?? [];
     body = (
-      <div className="grid grid-cols-2 gap-3">
-        <NumberField id="wait-days" label={t('wait.daysLabel')} value={wait.days} onChange={(value) => setConfig({ ...wait, days: value })} />
-        <NumberField id="wait-hours" label={t('wait.hoursLabel')} value={wait.hours} max={23} onChange={(value) => setConfig({ ...wait, hours: value })} />
-      </div>
+      <>
+        <Field id="wait-mode" label={t('wait.mode')}>
+          <select
+            id="wait-mode"
+            className={cn(control, 'cursor-pointer')}
+            value={waitsForEvent ? 'event' : 'duration'}
+            onChange={(event) =>
+              event.target.value === 'event'
+                ? setConfig({ label: wait.label, mode: 'event', event: wait.event ?? waitEvents.find((candidate) => candidate.key === 'invoice.paid')?.key ?? waitEvents[0]?.key })
+                : setConfig({ label: wait.label, mode: 'duration', days: wait.days, hours: wait.hours })
+            }
+          >
+            <option value="duration">{t('wait.modeDuration')}</option>
+            <option value="event" disabled={waitEvents.length === 0}>
+              {t('wait.modeEvent')}
+            </option>
+          </select>
+        </Field>
+        {waitsForEvent ? (
+          <>
+            <Field id="wait-event" label={t('wait.event')} hint={labels.eventDescription(wait.event)}>
+              <select
+                id="wait-event"
+                className={cn(control, 'cursor-pointer')}
+                value={wait.event ?? ''}
+                onChange={(event) => setConfig({ ...wait, event: event.target.value })}
+              >
+                {!waitEvents.some((event) => event.key === wait.event) && <option value="">{t('value.choose')}</option>}
+                {waitEvents.map((event) => (
+                  <option key={event.key} value={event.key}>
+                    {labels.eventTitle(event.key)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <ValueField
+              key={`${nodeId}:subject`}
+              id="wait-subject"
+              label={t(subjectType === 'invoice' ? 'wait.subjectOptional' : 'wait.subject')}
+              spec={{ type: 'invoice', required: subjectType !== 'invoice' }}
+              value={wait.subject}
+              onChange={(value) => setConfig({ ...wait, subject: value })}
+              references={references}
+              naming={naming}
+              error={fieldIssue('subject')}
+            />
+            <NumberField
+              id="wait-timeout"
+              label={t('wait.timeoutDays')}
+              value={wait.timeoutDays}
+              min={1}
+              max={365}
+              onChange={(value) => setConfig({ ...wait, timeoutDays: value })}
+              hint={t('wait.timeoutHint')}
+            />
+          </>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <NumberField id="wait-days" label={t('wait.daysLabel')} value={wait.days} onChange={(value) => setConfig({ ...wait, days: value })} />
+            <NumberField id="wait-hours" label={t('wait.hoursLabel')} value={wait.hours} max={23} onChange={(value) => setConfig({ ...wait, hours: value })} />
+          </div>
+        )}
+      </>
     );
   } else if (node.type === 'gateway') {
     const exits = gatewayEdges(nodeId, edges);
+    const gateway = config as GatewayNodeData;
+    const parallel = gateway.mode === 'parallel';
     body = (
       <div className="mb-4">
-        <p className={fieldLabelClass()}>{t('gateway.exits')}</p>
+        <Field id="gateway-mode" label={t('gateway.mode')} hint={t(parallel ? 'gateway.parallelHint' : 'gateway.exclusiveHint')}>
+          <select
+            id="gateway-mode"
+            className={cn(control, 'cursor-pointer')}
+            value={parallel ? 'parallel' : 'exclusive'}
+            onChange={(event) => setConfig({ ...gateway, mode: event.target.value === 'parallel' ? 'parallel' : 'exclusive' })}
+          >
+            <option value="exclusive">{t('gateway.exclusive')}</option>
+            <option value="parallel">{t('gateway.parallel')}</option>
+          </select>
+        </Field>
+        <p className={fieldLabelClass()}>{t(parallel ? 'gateway.exitsParallel' : 'gateway.exits')}</p>
         {exits.length === 0 ? (
           <p className={fieldHelperClass}>{t('gateway.noExits')}</p>
         ) : (
           <ol className="space-y-1.5">
             {exits.map((edge, index) => {
               const target = nodes.find((candidate) => candidate.id === edge.target);
-              const summary = edge.data?.label?.trim() || labels.conditionSummary(edge.data?.condition);
+              const summary = edge.data?.label?.trim() || (parallel ? labels.nodeTitle(target?.type, target?.data.config) : labels.conditionSummary(edge.data?.condition));
               return (
                 <li key={edge.id} className="flex items-center gap-1 rounded-lg border border-gray-200 py-1 pl-2.5 pr-1 dark:border-gray-800">
                   <button
@@ -587,7 +711,7 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
                   </button>
                   <button
                     type="button"
-                    disabled={index === 0}
+                    disabled={index === 0 || parallel}
                     onClick={() => onMoveEdge(edge.id, -1)}
                     aria-label={t('gateway.moveUp', { n: index + 1 })}
                     className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-30 dark:text-gray-400 dark:hover:bg-white/5"
@@ -596,7 +720,7 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
                   </button>
                   <button
                     type="button"
-                    disabled={index === exits.length - 1}
+                    disabled={index === exits.length - 1 || parallel}
                     onClick={() => onMoveEdge(edge.id, 1)}
                     aria-label={t('gateway.moveDown', { n: index + 1 })}
                     className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-30 dark:text-gray-400 dark:hover:bg-white/5"
@@ -608,7 +732,7 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
             })}
           </ol>
         )}
-        <p className={fieldHelperClass}>{t('gateway.hint')}</p>
+        {!parallel && <p className={fieldHelperClass}>{t('gateway.hint')}</p>}
       </div>
     );
   } else if (node.type === 'end') {

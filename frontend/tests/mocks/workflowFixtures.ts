@@ -81,6 +81,25 @@ export const catalog: WorkflowCatalog = {
     form: [],
   },
   documentTypes: ['contract', 'timesheet', 'timesheet_signed', 'other'],
+  events: [
+    {
+      key: 'invoice.paid',
+      subject_type: 'invoice',
+      title: 'Invoice paid',
+      description: 'The invoice is paid in full.',
+      output: [
+        { key: 'status', type: 'string', label: 'Status of the invoice' },
+        { key: 'previous_status', type: 'string', label: 'Status before' },
+      ],
+    },
+    {
+      key: 'invoice.corrected',
+      subject_type: 'invoice',
+      title: 'Invoice corrected',
+      description: 'A correction of the invoice was saved.',
+      output: [{ key: 'reason', type: 'string', label: 'Reason for the correction' }],
+    },
+  ],
 };
 
 export const graph: WorkflowGraph = {

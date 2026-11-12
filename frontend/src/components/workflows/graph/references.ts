@@ -9,7 +9,9 @@
  */
 import type {
   ActionNodeData,
+  StartNodeData,
   TaskNodeData,
+  WaitNodeData,
   WorkflowCatalog,
   WorkflowFieldType,
   WorkflowFormField,
@@ -39,7 +41,9 @@ export interface ReferenceOption {
   label: string;
   key: string;
   /** Where the value comes from: the run's subject data, or an earlier step. */
-  source: { kind: 'variable' } | { kind: 'step'; nodeId: string; nodeType: WorkflowNodeType; action?: string; taskKind?: string };
+  source:
+    | { kind: 'variable' }
+    | { kind: 'step'; nodeId: string; nodeType: WorkflowNodeType; action?: string; taskKind?: string; event?: string };
 }
 
 export const isRef = (value: unknown): value is { $ref: string } =>
@@ -91,6 +95,11 @@ export function nodeOutputs(node: GraphNode, catalog: WorkflowCatalog | undefine
     if (!outputs.some((output) => output.key === 'outcome')) outputs.push({ key: 'outcome', type: 'string', label: 'Outcome' });
     return outputs;
   }
+  if (node.type === 'wait') {
+    // A wait for an event leaves what the event carried (the invoice's status, a correction's reason …)
+    const wait = node.data.config as WaitNodeData;
+    return wait.mode === 'event' ? (catalog?.events?.find((event) => event.key === wait.event)?.output ?? []) : [];
+  }
   return [];
 }
 
@@ -110,6 +119,15 @@ export function referenceOptions(args: {
     key: variable.path,
     source: { kind: 'variable' },
   }));
+  // A flow that starts with an event knows what happened
+  const start = nodes.find((node) => node.type === 'start')?.data.config as StartNodeData | undefined;
+  const startEvent = start?.trigger === 'event' ? catalog?.events?.find((event) => event.key === start.event?.type) : undefined;
+  if (startEvent) {
+    options.push({ path: 'event.type', type: 'string', label: 'Event', key: 'event.type', source: { kind: 'variable' } });
+    for (const output of startEvent.output) {
+      options.push({ path: `event.${output.key}`, type: output.type, label: output.label, key: `event.${output.key}`, source: { kind: 'variable' } });
+    }
+  }
   const upstream = new Set(upstreamNodeIds(nodeId, edges));
   for (const node of nodes) {
     if (!upstream.has(node.id) || !node.type) continue;
@@ -125,6 +143,7 @@ export function referenceOptions(args: {
           nodeType: node.type,
           action: node.type === 'action' ? (node.data.config as ActionNodeData).action : undefined,
           taskKind: node.type === 'task' ? (node.data.config as TaskNodeData).kind : undefined,
+          event: node.type === 'wait' ? (node.data.config as WaitNodeData).event : undefined,
         },
       });
     }

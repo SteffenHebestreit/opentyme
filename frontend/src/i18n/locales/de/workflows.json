@@ -180,7 +180,12 @@
       "runExists": "Dieser Ablauf lief für diesen Gegenstand und Zeitraum bereits.",
       "openExisting": "Diesen Lauf öffnen",
       "error": "Der Lauf konnte nicht gestartet werden."
-    }
+    },
+    "event": "Wenn etwas passiert",
+    "triggerHintEvent": "Der Ablauf startet von selbst, sobald das Ereignis eintritt. Von Hand lässt er sich zusätzlich starten.",
+    "eventLabel": "Ereignis",
+    "eventHint": "Was mit einer Rechnung passieren muss, damit ein Lauf startet.",
+    "eventClients": "Nur bei diesen Kunden (keine Auswahl = alle)"
   },
   "task": {
     "kind": "Art der Aufgabe",
@@ -220,14 +225,30 @@
     "days_other": "{{count}} Tage",
     "hours_one": "{{count}} Stunde",
     "hours_other": "{{count}} Stunden",
-    "summary": "{{duration}} warten"
+    "summary": "{{duration}} warten",
+    "mode": "Wartet",
+    "modeDuration": "Eine feste Zeit",
+    "modeEvent": "Bis etwas passiert",
+    "event": "Ereignis",
+    "subject": "Rechnung",
+    "subjectOptional": "Rechnung (leer = die Rechnung dieses Laufs)",
+    "timeoutDays": "Höchstens so viele Tage",
+    "timeoutHint": "Leer = unbegrenzt. Mit einer Frist bekommt der Baustein den Ausgang „Frist abgelaufen“.",
+    "untilEvent": "Warten auf: {{event}}"
   },
   "gateway": {
     "exits": "Ausgänge in der Reihenfolge der Prüfung",
     "noExits": "Noch keine Ausgänge. Verbinden Sie die Verzweigung mit den folgenden Bausteinen.",
     "moveUp": "Ausgang {{n}} früher prüfen",
     "moveDown": "Ausgang {{n}} später prüfen",
-    "hint": "Der erste Ausgang, dessen Bedingung zutrifft, wird genommen. Wählen Sie einen Ausgang, um seine Bedingung festzulegen."
+    "hint": "Der erste Ausgang, dessen Bedingung zutrifft, wird genommen. Wählen Sie einen Ausgang, um seine Bedingung festzulegen.",
+    "mode": "Nimmt",
+    "exclusive": "Genau einen Ausgang (nach Bedingung)",
+    "parallel": "Alle Ausgänge gleichzeitig",
+    "exclusiveHint": "Der erste Ausgang, dessen Bedingung zutrifft.",
+    "parallelHint": "Der Lauf geht alle Wege zugleich. Wo sie wieder zusammenlaufen, setzen Sie eine zweite Verzweigung dieser Art: Sie wartet, bis alle Zweige angekommen sind.",
+    "parallelTitle": "Alle Zweige",
+    "exitsParallel": "Zweige"
   },
   "edge": {
     "label": "Beschriftung",
@@ -236,7 +257,8 @@
     "when": "Wird genommen",
     "condition": "Wenn eine Bedingung zutrifft",
     "otherwise": "Sonst",
-    "orderHint": "Pro Verzweigung kann ein Ausgang „Sonst“ sein. Die Reihenfolge legen Sie an der Verzweigung fest."
+    "orderHint": "Pro Verzweigung kann ein Ausgang „Sonst“ sein. Die Reihenfolge legen Sie an der Verzweigung fest.",
+    "parallelExit": "Zweig einer parallelen Verzweigung: wird immer genommen."
   },
   "condition": {
     "match": "Die Regeln",
@@ -378,7 +400,8 @@
       "allStatuses": "Jeder Status"
     },
     "empty": "Noch keine Läufe.",
-    "loadError": "Die Läufe konnten nicht geladen werden."
+    "loadError": "Die Läufe konnten nicht geladen werden.",
+    "byEvent": "durch Ereignis"
   },
   "run": {
     "back": "Zurück zu den Läufen",
@@ -410,7 +433,8 @@
     "outcome": "Ausgang: {{outcome}}",
     "input": "Eingabe",
     "output": "Ergebnis",
-    "notFound": "Diesen Lauf gibt es nicht."
+    "notFound": "Diesen Lauf gibt es nicht.",
+    "startedByEvent": "durch ein Ereignis gestartet am {{date}}"
   },
   "tasks": {
     "title": "Aufgaben",
@@ -513,7 +537,13 @@
       "id": "Lauf: ID",
       "test": "Lauf: ist ein Testlauf"
     },
-    "today": "Heute"
+    "today": "Heute",
+    "event": {
+      "type": "Ereignis",
+      "status": "Ereignis: Status der Rechnung",
+      "previous_status": "Ereignis: Status davor",
+      "reason": "Ereignis: Grund der Korrektur"
+    }
   },
   "taskOutputs": {
     "outcome": "Ausgang",
@@ -588,16 +618,34 @@
         "description": "Erzeugt das Rechnungs-PDF und legt es beim Kunden ab.",
         "fields": {
           "invoiceId": "Rechnung",
-          "zugferd": "Mit ZUGFeRD-E-Rechnungsdaten"
+          "zugferd": "Mit ZUGFeRD-E-Rechnungsdaten",
+          "kind": "Dokument"
         },
         "outputs": {
           "documentId": "Rechnungs-PDF (Dokument)",
           "filename": "Dateiname"
+        },
+        "options": {
+          "kind": {
+            "invoice": "Rechnung",
+            "cancellation": "Stornorechnung",
+            "correction": "Rechnungskorrektur"
+          }
         }
       },
       "markSent": {
         "title": "Rechnung als versendet markieren",
         "description": "Setzt den Status der Rechnung auf „versendet“.",
+        "fields": {
+          "invoiceId": "Rechnung"
+        },
+        "outputs": {
+          "status": "Status"
+        }
+      },
+      "cancel": {
+        "title": "Rechnung stornieren",
+        "description": "Storniert die Rechnung. Das lässt sich nicht rückgängig machen.",
         "fields": {
           "invoiceId": "Rechnung"
         },
@@ -680,7 +728,14 @@
     "NO_FORM_FIELDS": "Das Formular braucht mindestens ein Feld.",
     "BAD_FORM_FIELD": "Jedes Formularfeld braucht eine Beschriftung, einen Typ und einen eindeutigen Schlüssel.",
     "BAD_DUE": "Die Frist muss zwischen 1 und 365 Tagen liegen.",
-    "BAD_DURATION": "Legen Sie fest, wie lange gewartet wird (höchstens ein Jahr)."
+    "BAD_DURATION": "Legen Sie fest, wie lange gewartet wird (höchstens ein Jahr).",
+    "BAD_EVENT": "Wählen Sie das Ereignis.",
+    "EVENT_SUBJECT": "Dieses Ereignis betrifft eine Rechnung. Nur ein Ablauf für Rechnungen kann damit starten.",
+    "EVENT_LOOP": "Dieser Ablauf erstellt eine Rechnung und würde sich damit selbst erneut starten. Wählen Sie einen anderen Start oder entfernen Sie die Aktion.",
+    "BAD_WAIT": "Wählen Sie, worauf gewartet wird.",
+    "WAIT_NO_SUBJECT": "Wählen Sie die Rechnung, auf die gewartet wird.",
+    "PARALLEL_CONDITION": "Eine parallele Verzweigung nimmt alle Ausgänge. Sie können keine Bedingung tragen.",
+    "BAD_GATEWAY": "Wählen Sie, ob die Verzweigung einen Ausgang nimmt oder alle."
   },
   "preview": {
     "labels": {
@@ -701,6 +756,35 @@
     "NO_BRANCH": "Keine Bedingung der Verzweigung trifft zu, und sie hat keinen Ausgang ohne Bedingung.",
     "INTERRUPTED": "Der Server wurde angehalten, während dieser Schritt lief. Prüfen Sie, ob er gewirkt hat, und wiederholen oder überspringen Sie ihn dann.",
     "TOO_MANY_STEPS": "Der Lauf hat {{max}} Schritte gebraucht. Vermutlich läuft der Ablauf im Kreis.",
-    "STEP_MISSING": "Diesen Schritt gibt es im Ablauf nicht mehr."
+    "STEP_MISSING": "Diesen Schritt gibt es im Ablauf nicht mehr.",
+    "WAIT_NO_SUBJECT": "In diesem Lauf gibt es keine Rechnung, auf die gewartet werden kann."
+  },
+  "events": {
+    "invoice": {
+      "created": {
+        "title": "Rechnung erstellt",
+        "description": "Eine neue Rechnung existiert: von Hand geschrieben, aus Zeiteinträgen oder aus einer wiederkehrenden Rechnung."
+      },
+      "sent": {
+        "title": "Rechnung versendet",
+        "description": "Die Rechnung wurde als versendet markiert."
+      },
+      "partially_paid": {
+        "title": "Teilzahlung eingegangen",
+        "description": "Eine Zahlung deckt einen Teil der Rechnung."
+      },
+      "paid": {
+        "title": "Rechnung bezahlt",
+        "description": "Die Rechnung ist vollständig bezahlt."
+      },
+      "cancelled": {
+        "title": "Rechnung storniert",
+        "description": "Die Rechnung wurde storniert."
+      },
+      "corrected": {
+        "title": "Rechnung korrigiert",
+        "description": "Eine Korrektur der Rechnung wurde gespeichert."
+      }
+    }
   }
 }

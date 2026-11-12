@@ -126,7 +126,11 @@ function RunView({ run }: { run: WorkflowRun }) {
               </span>
             )}
             <span>{t('editor.version', { version: run.version })}</span>
-            <span>{t(run.started_by === 'schedule' ? 'run.startedBySchedule' : 'run.startedManually', { date: formatDate(run.started_at) })}</span>
+            <span>
+              {t(run.started_by === 'schedule' ? 'run.startedBySchedule' : run.started_by === 'event' ? 'run.startedByEvent' : 'run.startedManually', {
+                date: formatDate(run.started_at),
+              })}
+            </span>
           </div>
           {run.result && <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">{run.result}</p>}
         </div>

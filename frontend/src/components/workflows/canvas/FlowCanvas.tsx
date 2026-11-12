@@ -8,7 +8,7 @@ import { Background, BackgroundVariant, Controls, MarkerType, MiniMap, ReactFlow
 import type { OnConnect, OnEdgesChange, OnNodesChange, ReactFlowInstance } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useApp } from '../../../store/AppContext';
-import type { WorkflowCatalog } from '../../../api/types/workflow.types';
+import type { GatewayNodeData, WorkflowCatalog } from '../../../api/types/workflow.types';
 import type { FlowEdge, FlowNode, PaletteItem } from '../graph/flowGraph';
 import type { NodeRunState } from '../graph/runStatus';
 import { initialFocus } from '../graph/focus';
@@ -66,10 +66,13 @@ function FlowCanvasInner({
 
   // Labels, arrows and colours are derived for display only — never stored on the edges
   const displayEdges = useMemo(() => {
-    const typeOf = new Map(nodes.map((node) => [node.id, node.type]));
+    // Only a branch that chooses shows what it chooses by; a parallel one takes every exit
+    const choosing = new Set(
+      nodes.filter((node) => node.type === 'gateway' && (node.data.config as GatewayNodeData).mode !== 'parallel').map((node) => node.id)
+    );
     return edges.map((edge) => {
       // A gateway exit shows its condition; a task's extra exits are already named at their handles
-      const label = edge.data?.label?.trim() || (typeOf.get(edge.source) === 'gateway' ? labels.conditionSummary(edge.data?.condition) : undefined);
+      const label = edge.data?.label?.trim() || (choosing.has(edge.source) ? labels.conditionSummary(edge.data?.condition) : undefined);
       const color = issueEdgeIds?.has(edge.id) ? EDGE_COLORS.issue : traversedEdgeIds?.has(edge.id) ? EDGE_COLORS.taken : undefined;
       return {
         ...edge,

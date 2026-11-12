@@ -147,6 +147,11 @@ export function createFlowNode(
 /** The exits a node offers, in display order. */
 export function sourceHandles(type: WorkflowNodeType | undefined, config: AnyNodeData): WorkflowHandle[] {
   if (type === 'end' || !type) return [];
+  if (type === 'wait') {
+    // Waiting for an event can be given a time limit, which is an exit of its own
+    const wait = config as WaitNodeData;
+    return wait.mode === 'event' && !!wait.timeoutDays && wait.timeoutDays > 0 ? ['out', 'timeout'] : ['out'];
+  }
   if (type !== 'task') return ['out'];
   const task = config as TaskNodeData;
   const handles: WorkflowHandle[] = ['out'];

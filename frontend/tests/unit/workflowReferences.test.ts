@@ -133,3 +133,42 @@ describe('values', () => {
     expect(referencedPaths(undefined)).toEqual([]);
   });
 });
+
+// ── Events (stage 2) ─────────────────────────────────────────────────────────
+
+describe('event data', () => {
+  type TestNode = { id: string; type: 'start' | 'wait' | 'end'; data: { config: unknown } };
+  const invoiceNodes: TestNode[] = [
+    { id: 's', type: 'start', data: { config: { trigger: 'event', event: { type: 'invoice.corrected' } } } },
+    { id: 'w', type: 'wait', data: { config: { mode: 'event', event: 'invoice.paid', timeoutDays: 30 } } },
+    { id: 'plain', type: 'wait', data: { config: { days: 2 } } },
+    { id: 'e', type: 'end', data: { config: {} } },
+  ];
+  const invoiceEdges = [
+    { source: 's', target: 'w' },
+    { source: 'w', target: 'plain' },
+    { source: 'plain', target: 'e' },
+  ];
+  const at = (nodeId: string, nodes: TestNode[] = invoiceNodes) =>
+    referenceOptions({ nodeId, nodes, edges: invoiceEdges, catalog, subjectType: 'invoice' }).map((option) => option.path);
+
+  it('a flow that starts with an event can refer to what happened', () => {
+    expect(at('w')).toEqual(expect.arrayContaining(['event.type', 'event.reason']));
+    // Only what THIS event carries — a correction has no "status before"
+    expect(at('w')).not.toContain('event.previous_status');
+    // … and nothing of the kind in a flow started by hand
+    const manual: TestNode[] = [{ ...invoiceNodes[0], data: { config: { trigger: 'manual' } } }, ...invoiceNodes.slice(1)];
+    expect(at('w', manual).some((path) => path.startsWith('event.'))).toBe(false);
+  });
+
+  it('a wait for an event leaves what the event carried; a fixed wait leaves nothing', () => {
+    expect(nodeOutputs(invoiceNodes[1], catalog).map((output) => output.key)).toEqual(['status', 'previous_status']);
+    expect(nodeOutputs(invoiceNodes[2], catalog)).toEqual([]);
+    expect(at('e')).toEqual(expect.arrayContaining(['steps.w.status', 'steps.w.previous_status']));
+    expect(at('e').some((path) => path.startsWith('steps.plain.'))).toBe(false);
+    const fromWait = referenceOptions({ nodeId: 'e', nodes: invoiceNodes, edges: invoiceEdges, catalog, subjectType: 'invoice' }).find(
+      (option) => option.path === 'steps.w.status'
+    );
+    expect(fromWait?.source).toMatchObject({ kind: 'step', nodeType: 'wait', event: 'invoice.paid' });
+  });
+});
