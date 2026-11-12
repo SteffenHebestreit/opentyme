@@ -26,6 +26,11 @@ jest.mock('../../src/hooks/api/useTimeEntries', () => ({
   useTimeEntries: () => ({ data: [] }),
 }));
 
+// The sidebar's open-task badge
+jest.mock('../../src/hooks/api/useWorkflows', () => ({
+  useWorkflowTaskCount: () => ({ data: { open: 0 } }),
+}));
+
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, fallback?: string) => fallback || key,

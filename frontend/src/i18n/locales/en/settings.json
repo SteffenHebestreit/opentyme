@@ -426,6 +426,10 @@
           "label": "Reports",
           "description": "Analytics, reports and summaries — read only"
         },
+        "workflows": {
+          "label": "Flows",
+          "description": "Look at flows and runs; with write access, start runs and settle tasks. Editing flows and approving actions stays with you."
+        },
         "addons": {
           "label": "Addons",
           "description": "Data and actions provided by installed addons"

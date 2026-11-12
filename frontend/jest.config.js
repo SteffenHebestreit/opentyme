@@ -26,6 +26,8 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
     // keycloak-js is ESM-only; map to a lightweight mock for the CommonJS test runtime
     '^keycloak-js$': '<rootDir>/tests/mocks/keycloak-js.ts',
+    // Stylesheets imported from components (the workflow canvas) have no meaning in tests
+    '\\.css$': '<rootDir>/tests/mocks/style.ts',
   },
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   collectCoverageFrom: [

@@ -426,6 +426,10 @@
           "label": "Berichte",
           "description": "Auswertungen, Berichte und Zusammenfassungen – nur lesend"
         },
+        "workflows": {
+          "label": "Abläufe",
+          "description": "Abläufe und Läufe ansehen; mit Schreibrecht Läufe starten und Aufgaben erledigen. Abläufe bearbeiten und Aktionen freigeben bleibt Ihnen vorbehalten."
+        },
         "addons": {
           "label": "Addons",
           "description": "Daten und Aktionen installierter Addons"

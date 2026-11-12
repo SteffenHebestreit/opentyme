@@ -2,6 +2,34 @@
 
 ## Unreleased (since v1.5.0)
 
+### Flows — your own billing processes, drawn on a canvas
+- **Flows** (new menu item) chain OpenTyme's features into a process that runs per client and
+  period: draw it on a canvas from six building blocks — start, action, task, wait, branch, end —
+  and publish it. Example and shipped template: *create the timesheet without amounts → mail it
+  to the client for signature → upload the signed sheet → create the draft invoice → check it →
+  mail the invoice with the signed sheet attached and mark it as sent*.
+- **Automation per step:** every action either runs by itself or waits for your **approval**,
+  which shows what is about to happen (recipient, template, attachments) — and runs exactly that.
+- **Tasks** (new menu item, dashboard tile): what a flow needs from you — uploads, checks,
+  approvals — sorted by due date. A task can expire and lead somewhere else, e.g. to a reminder.
+- **Runs** show where each one stands on the same canvas, with every step's result. If a step
+  fails, the run stops as an incident: retry, skip or cancel. A mail is never sent twice, also not
+  after a restart of the server.
+- **Start** by hand, or monthly on a day you choose for the clients you pick; one run per flow,
+  client and period. A **test run** plays the flow through with real data, but mails only you
+  (subject marked "[Test]") and leaves invoices as drafts.
+- **Actions so far:** add up the period's hours, create and file the timesheet (with or without
+  amounts), create a draft invoice from time entries, file the invoice PDF, send an email from a
+  template with the invoice and filed documents attached, mark an invoice as sent, tie a document
+  to an invoice, notify yourself.
+- A flow acts with exactly the permissions its actions need, shown before you publish. It can
+  never change settings, administer the system or manage API tokens.
+- **Emails can attach filed client documents** (API: attachment type `document`), and client
+  documents know the types "timesheet" and "signed timesheet" with their period and invoice.
+- **API tokens** get a "Flows" permission: read to look, write to start runs and settle tasks.
+  Drawing and publishing flows and approving actions stay with you in OpenTyme. Reference:
+  [docs/WORKFLOW_ENGINE.md](docs/WORKFLOW_ENGINE.md).
+
 ### Payments — edit and delete
 - A payment's detail view has **Edit** and **Delete**. Edit changes the amount, date, method,
   transaction ID, notes, "exclude from tax" and **which invoices it pays** — so a payment booked

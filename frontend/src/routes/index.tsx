@@ -49,6 +49,11 @@ export const router = createBrowserRouter(
         { path: 'time-entries', loader: authGuardLoader, lazy: page(() => import('@/components/business/time-tracking/TimeEntryList')) },
         { path: 'finances', loader: authGuardLoader, lazy: page(() => import('@/pages/finances/FinancesPage')) },
         { path: 'reports', loader: authGuardLoader, lazy: page(() => import('@/pages/Reports')) },
+        // Workflow engine: flows, their canvas editor, runs and the task list
+        { path: 'workflows', loader: authGuardLoader, lazy: page(() => import('@/pages/workflows/WorkflowsPage')) },
+        { path: 'workflows/runs/:id', loader: authGuardLoader, lazy: page(() => import('@/pages/workflows/WorkflowRunPage')) },
+        { path: 'workflows/:id', loader: authGuardLoader, lazy: page(() => import('@/pages/workflows/WorkflowEditorPage')) },
+        { path: 'tasks', loader: authGuardLoader, lazy: page(() => import('@/pages/workflows/TasksPage')) },
         {
           path: 'config',
           loader: authGuardLoader,

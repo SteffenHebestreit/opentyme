@@ -1,0 +1,706 @@
+{
+  "nodeTypes": {
+    "start": "Start",
+    "action": "Action",
+    "task": "Task",
+    "wait": "Wait",
+    "gateway": "Branch",
+    "end": "End"
+  },
+  "taskKinds": {
+    "confirm": "Confirm",
+    "upload": "Upload",
+    "form": "Form",
+    "approval": "Approval",
+    "notice": "Notice"
+  },
+  "handles": {
+    "out": "continue",
+    "rejected": "rejected",
+    "timeout": "due date passed"
+  },
+  "subjectTypes": {
+    "client": "Client",
+    "project": "Project",
+    "invoice": "Invoice",
+    "none": "No subject"
+  },
+  "mode": {
+    "title": "Runs",
+    "auto": "auto",
+    "approval": "Approval",
+    "autoHint": "Runs as soon as the flow reaches this step.",
+    "autoExternalHint": "Runs without asking. This action leaves OpenTYME (e.g. sends mail) — consider an approval.",
+    "approvalHint": "A task shows you what is about to happen first. Nothing runs until you approve it."
+  },
+  "definitionStatus": {
+    "draft": "Draft",
+    "active": "Active",
+    "paused": "Paused",
+    "archived": "Archived"
+  },
+  "runStatus": {
+    "running": "Running",
+    "waiting": "Waiting",
+    "incident": "Incident",
+    "completed": "Completed",
+    "cancelled": "Cancelled"
+  },
+  "stepStatus": {
+    "pending": "Pending",
+    "running": "Running",
+    "waiting": "Waiting",
+    "completed": "Done",
+    "failed": "Failed",
+    "skipped": "Skipped",
+    "cancelled": "Cancelled"
+  },
+  "taskStatus": {
+    "open": "Open",
+    "done": "Done",
+    "rejected": "Rejected",
+    "expired": "Expired",
+    "cancelled": "Cancelled"
+  },
+  "nodeRunStatus": {
+    "idle": "Not reached",
+    "active": "Running",
+    "waiting": "Waiting",
+    "completed": "Done",
+    "failed": "Failed",
+    "skipped": "Skipped",
+    "cancelled": "Cancelled"
+  },
+  "testRun": {
+    "badge": "Test run",
+    "checkbox": "Test run",
+    "hint": "Mails go to your own address, invoices are not marked as sent, stored documents are labelled [Test]."
+  },
+  "permissions": {
+    "none": "This flow needs no access to your data."
+  },
+  "references": {
+    "runData": "Run data"
+  },
+  "categories": {
+    "time": "Time",
+    "billing": "Billing",
+    "invoices": "Invoices",
+    "invoice": "Invoices",
+    "communication": "Communication",
+    "email": "Email",
+    "documents": "Documents",
+    "document": "Documents",
+    "notifications": "Notifications",
+    "notify": "Notifications"
+  },
+  "palette": {
+    "title": "Building blocks",
+    "flow": "Flow",
+    "tasks": "Tasks for you",
+    "oneStart": "A flow has exactly one start.",
+    "loading": "Loading actions…"
+  },
+  "panel": {
+    "title": "Settings",
+    "flow": "Flow",
+    "connection": "Connection",
+    "unnamed": "Untitled flow",
+    "subject": "Runs for: {{subject}}",
+    "name": "Name",
+    "description": "Description",
+    "hint": "Select a building block or a connection to change its settings. Drag from a block's dot to another block to connect them.",
+    "label": "Label",
+    "labelHint": "Shown on the canvas. Leave empty to use the standard name.",
+    "id": "ID for references:",
+    "unknownAction": "This server does not know the action “{{action}}”.",
+    "deleteNode": "Delete block",
+    "deleteConnection": "Delete connection"
+  },
+  "value": {
+    "literal": "Value",
+    "reference": "Run data",
+    "sourceOf": "Source of “{{field}}”",
+    "choose": "Choose…",
+    "chooseReference": "Choose run data…",
+    "noReferences": "No fitting run data before this step",
+    "addDocument": "Add a document…",
+    "removeReference": "Remove “{{name}}”",
+    "insertPlaceholder": "Insert a placeholder…",
+    "insertPlaceholderFor": "Insert a placeholder into “{{field}}”",
+    "referenceOnlyHint": "Comes from an earlier step that creates or receives a document.",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "start": {
+    "button": "Start run",
+    "buttonFor": "Start a flow for “{{name}}”",
+    "chooseFlow": "Which flow?",
+    "scheduled": "Monthly start",
+    "trigger": "Starts",
+    "manual": "By hand",
+    "schedule": "Monthly, by itself",
+    "triggerHint": "A run can always be started by hand, too.",
+    "scheduleNeedsSubject": "Only flows for clients or projects can start by themselves.",
+    "dayOfMonth": "Day of the month",
+    "dayHint": "Starts at 06:00 UTC on that day.",
+    "lastDay": "Last day of the month",
+    "dayN": "Day {{day}}",
+    "period": "Period a run covers",
+    "periodCurrent": "The current month",
+    "periodPrevious": "The previous month",
+    "subjects": {
+      "client": "Start for these clients",
+      "project": "Start for these projects"
+    },
+    "noSubjects": {
+      "client": "You have no clients yet.",
+      "project": "You have no projects yet."
+    },
+    "dialog": {
+      "title": "Start “{{name}}”",
+      "subject": {
+        "client": "Client",
+        "project": "Project",
+        "invoice": "Invoice"
+      },
+      "subjectRequired": {
+        "client": "Choose the client the run is for.",
+        "project": "Choose the project the run is for.",
+        "invoice": "Choose the invoice the run is for."
+      },
+      "period": "Period",
+      "periodStart": "Period from",
+      "periodEnd": "Period to",
+      "periodInvalid": "The period ends before it starts.",
+      "submit": "Start run",
+      "submitTest": "Start test run",
+      "notPublished": "Publish the flow first — only a published version can run.",
+      "unpublishedChanges": "The run uses version {{version}}. Changes you have not published are not part of it.",
+      "runExists": "This flow already ran for this subject and period.",
+      "openExisting": "Open that run",
+      "error": "The run could not be started."
+    }
+  },
+  "task": {
+    "kind": "Kind of task",
+    "kindHints": {
+      "confirm": "You check something and confirm or reject it.",
+      "upload": "You upload a file; it is stored with the client.",
+      "form": "You fill in fields; later steps can use the values."
+    },
+    "title": "Title",
+    "description": "Description",
+    "documentType": "Store the file as",
+    "documentTypeHint": "The document type the uploaded file gets.",
+    "fields": "Fields",
+    "fieldLabel": "Label",
+    "fieldKey": "Key",
+    "fieldLabelOf": "Label of field {{n}}",
+    "fieldKeyOf": "Key of field {{n}}",
+    "fieldTypeOf": "Type of field {{n}}",
+    "fieldTypes": {
+      "text": "Text",
+      "number": "Number",
+      "date": "Date",
+      "boolean": "Yes / No"
+    },
+    "fieldRequired": "Required",
+    "removeField": "Remove field {{n}}",
+    "addField": "Add field",
+    "dueInDays": "Due after (days)",
+    "dueHint": "With a due date the task gets the exit “due date passed”, e.g. for a reminder. Leave empty to wait without limit.",
+    "dueShort_one": "Due in {{count}} day",
+    "dueShort_other": "Due in {{count}} days"
+  },
+  "wait": {
+    "daysLabel": "Days",
+    "hoursLabel": "Hours",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "hours_one": "{{count}} hour",
+    "hours_other": "{{count}} hours",
+    "summary": "Wait {{duration}}"
+  },
+  "gateway": {
+    "exits": "Exits, in the order they are checked",
+    "noExits": "No exits yet. Connect this branch to the blocks that follow.",
+    "moveUp": "Check exit {{n}} earlier",
+    "moveDown": "Check exit {{n}} later",
+    "hint": "The first exit whose condition holds is taken. Select an exit to set its condition."
+  },
+  "edge": {
+    "label": "Label",
+    "labelHint": "Shown on the connection. Leave empty to show the condition.",
+    "exit": "Exit: {{exit}}",
+    "when": "Taken",
+    "condition": "When a condition holds",
+    "otherwise": "Otherwise",
+    "orderHint": "One exit per branch can be “otherwise”. The order is set on the branch."
+  },
+  "condition": {
+    "match": "The rules",
+    "matchAll": "must all hold",
+    "matchAny": "at least one must hold",
+    "and": "and",
+    "or": "or",
+    "rule": "Rule {{n}}",
+    "addRule": "Add rule",
+    "removeRule": "Remove rule {{n}}",
+    "leftOf": "Run data of rule {{n}}",
+    "opOf": "Comparison of rule {{n}}",
+    "rightOf": "Value of rule {{n}}",
+    "valuePlaceholder": "Value",
+    "ops": {
+      "eq": "is equal to",
+      "ne": "is not equal to",
+      "gt": "is greater than",
+      "gte": "is at least",
+      "lt": "is less than",
+      "lte": "is at most",
+      "contains": "contains",
+      "empty": "is empty",
+      "not_empty": "is not empty"
+    }
+  },
+  "end": {
+    "result": "Result text"
+  },
+  "editor": {
+    "back": "Back to the flows",
+    "version": "Version {{version}}",
+    "neverPublished": "Not published yet",
+    "unsaved": "Unsaved changes",
+    "unpublished": "Saved changes not published yet",
+    "validate": "Check",
+    "save": "Save",
+    "publish": "Publish",
+    "nameRequired": "Give the flow a name.",
+    "saveError": "The draft could not be saved.",
+    "valid": "No problems found.",
+    "invalid_one": "{{count}} problem found — see the list above the canvas.",
+    "invalid_other": "{{count}} problems found — see the list above the canvas.",
+    "validateError": "The flow could not be checked.",
+    "published": "Version {{version}} is published.",
+    "publishError": "The flow could not be published.",
+    "issuesTitle_one": "{{count}} problem",
+    "issuesTitle_other": "{{count}} problems",
+    "hideIssues": "Hide",
+    "smallScreen": "The canvas needs a wider screen. Open this flow on a laptop or desktop to edit it.",
+    "canvasLabel": "Canvas of the flow “{{name}}”",
+    "emptyCanvas": "Drag building blocks here or click them on the left. Begin with a start.",
+    "leaveTitle": "Leave without saving?",
+    "leaveMessage": "The changes to this flow have not been saved.",
+    "leaveConfirm": "Leave",
+    "notFound": "This flow does not exist.",
+    "notFoundHint": "It may have been deleted."
+  },
+  "publish": {
+    "title": "Publish version {{version}}",
+    "confirm": "Publish",
+    "introFirst": "Once published, the flow can be started. Runs keep the version they started with.",
+    "introUpdate": "New runs use this version. Runs that are already under way keep theirs.",
+    "permissions": "Runs of this flow may",
+    "permissionsHint": "Derived from the actions in the flow. A run can never do more than this.",
+    "schedule_one": "Starts by itself: {{day}}, for {{count}} subject.",
+    "schedule_other": "Starts by itself: {{day}}, for {{count}} subjects."
+  },
+  "list": {
+    "title": "Flows",
+    "subtitle": "Recurring procedures, drawn once and run per client and period.",
+    "new": "New flow",
+    "tabs": {
+      "flows": "Flows",
+      "runs": "Runs"
+    },
+    "columns": {
+      "name": "Flow",
+      "subject": "Runs for",
+      "status": "Status",
+      "activeRuns": "Active runs",
+      "nextRun": "Next start",
+      "actions": "Actions"
+    },
+    "unpublished": "Unpublished changes",
+    "showRuns_one": "Show the {{count}} active run of “{{name}}”",
+    "showRuns_other": "Show the {{count}} active runs of “{{name}}”",
+    "actions": {
+      "start": "Start a run of “{{name}}”",
+      "runs": "Runs of “{{name}}”",
+      "pause": "Pause “{{name}}”",
+      "activate": "Activate “{{name}}”",
+      "archive": "Archive “{{name}}”",
+      "delete": "Delete “{{name}}”"
+    },
+    "statusChanged": {
+      "active": "“{{name}}” is active.",
+      "paused": "“{{name}}” is paused — it no longer starts by itself.",
+      "archived": "“{{name}}” is archived."
+    },
+    "statusError": "The status could not be changed.",
+    "deleteTitle": "Delete this flow?",
+    "deleteMessage": "“{{name}}” and the history of its runs will be deleted permanently.",
+    "deleted": "“{{name}}” was deleted.",
+    "deleteHasRuns": "The flow still has active runs. Cancel them or let them finish first.",
+    "deleteError": "The flow could not be deleted.",
+    "empty": "No flows yet",
+    "emptyHint": "Draw a procedure once — e.g. timesheet, signature, invoice — and let it run every month.",
+    "loadError": "The flows could not be loaded."
+  },
+  "create": {
+    "title": "New flow",
+    "startFrom": "Start from",
+    "blank": "Empty canvas",
+    "blankHint": "Build the flow from scratch.",
+    "name": "Name",
+    "namePlaceholder": "e.g. Monthly billing",
+    "nameRequired": "Give the flow a name.",
+    "subjectType": "A run is about",
+    "subjectTypeHint": "What a run is started for. This cannot be changed later.",
+    "submit": "Create flow",
+    "error": "The flow could not be created."
+  },
+  "runs": {
+    "columns": {
+      "flow": "Flow",
+      "subject": "For",
+      "period": "Period",
+      "status": "Status",
+      "current": "Currently at",
+      "started": "Started"
+    },
+    "bySchedule": "scheduled",
+    "open": "Open run",
+    "filters": {
+      "flow": "Flow",
+      "allFlows": "All flows",
+      "status": "Status",
+      "allStatuses": "Every status"
+    },
+    "empty": "No runs yet.",
+    "loadError": "The runs could not be loaded."
+  },
+  "run": {
+    "back": "Back to the runs",
+    "openFlow": "Open flow",
+    "startedManually": "started on {{date}}",
+    "startedBySchedule": "started by schedule on {{date}}",
+    "cancel": "Cancel run",
+    "cancelTitle": "Cancel this run?",
+    "cancelMessage": "Open tasks are closed and nothing further is executed. What has already happened stays as it is.",
+    "cancelled": "The run was cancelled.",
+    "incidentTitle": "“{{step}}” failed",
+    "incidentHint": "The run waits for your decision. Nothing is repeated on its own.",
+    "retry": "Retry step",
+    "retryTitle": "Retry “{{step}}”?",
+    "retryMessage": "The step runs again. If it already had an effect outside OpenTYME — a sent mail — that happens a second time.",
+    "retried": "The step is being retried.",
+    "skip": "Skip step",
+    "skipTitle": "Skip “{{step}}”?",
+    "skipMessage": "The run continues without this step's result. Later steps that need it may fail.",
+    "skippedDone": "The step was skipped.",
+    "actionError": "That did not work.",
+    "openTasks_one": "{{count}} open task",
+    "openTasks_other": "{{count}} open tasks",
+    "progress": "Progress",
+    "canvasLabel": "Progress of the run of “{{name}}”",
+    "history": "History",
+    "noSteps": "No steps yet.",
+    "attempt": "attempt {{n}}",
+    "outcome": "exit: {{outcome}}",
+    "input": "Input",
+    "output": "Result",
+    "notFound": "This run does not exist."
+  },
+  "tasks": {
+    "title": "Tasks",
+    "subtitle": "What your flows are waiting for.",
+    "tabs": {
+      "open": "Open",
+      "closed": "Settled"
+    },
+    "emptyOpen": "Nothing to do",
+    "emptyOpenHint": "When a flow needs an upload, a confirmation or an approval, it shows up here.",
+    "emptyClosed": "No settled tasks yet.",
+    "toFlows": "To the flows",
+    "loadError": "The tasks could not be loaded.",
+    "openRun": "Open run",
+    "dueOn": "due {{date}}",
+    "overdueSince": "was due {{date}}",
+    "actionError": "The task could not be settled.",
+    "completed": "Task done.",
+    "rejected": "Task rejected.",
+    "approved": "Approved — the action is running.",
+    "skipped": "The action was skipped.",
+    "uploaded": "File uploaded.",
+    "dismissed": "Notice marked as read.",
+    "confirm": {
+      "comment": "Comment (optional)",
+      "done": "Done",
+      "reject": "Reject",
+      "rejectTitle": "Reject this task?",
+      "rejectMessage": "The run takes the flow's “rejected” exit. If the flow has none, the run is cancelled.",
+      "rejectCancelsMessage": "The flow has no way on from “rejected”: the run is cancelled.",
+      "rejectContinuesMessage": "The run continues through the flow's “rejected” exit."
+    },
+    "upload": {
+      "prompt": "Drop the file here or choose one",
+      "hint": "PDF, image or text document, up to 25 MB",
+      "change": "Choose another file",
+      "remove": "Remove the file",
+      "title": "Document title (optional)",
+      "storedAs": "Stored with the client as: {{type}}",
+      "submit": "Upload",
+      "errors": {
+        "required": "Choose a file.",
+        "size": "The file is larger than 25 MB.",
+        "type": "This file type is not supported."
+      }
+    },
+    "form": {
+      "required": "This field is required.",
+      "submit": "Submit"
+    },
+    "approval": {
+      "approve": "Run it",
+      "skip": "Skip",
+      "skipTitle": "Skip this action?",
+      "skipMessage": "The run continues without it. Later steps that need its result may fail."
+    },
+    "notice": {
+      "dismiss": "Got it"
+    },
+    "dashboard": {
+      "title": "Tasks",
+      "viewAll": "All tasks",
+      "open_one": "open task",
+      "open_other": "open tasks"
+    }
+  },
+  "variables": {
+    "subject": {
+      "id": "Subject: ID",
+      "type": "Subject: kind",
+      "label": "Subject: name"
+    },
+    "client": {
+      "id": "Client",
+      "name": "Client: name",
+      "email": "Client: contact email",
+      "invoice_email": "Client: invoice email",
+      "contact_person": "Client: contact person"
+    },
+    "project": {
+      "id": "Project",
+      "name": "Project: name"
+    },
+    "invoice": {
+      "id": "Invoice",
+      "number": "Invoice: number",
+      "total": "Invoice: total",
+      "status": "Invoice: status"
+    },
+    "period": {
+      "start": "Period: first day",
+      "end": "Period: last day",
+      "label": "Period: label"
+    },
+    "owner": {
+      "email": "My email address",
+      "name": "My name"
+    },
+    "run": {
+      "id": "Run: ID",
+      "test": "Run: is a test run"
+    },
+    "today": "Today"
+  },
+  "taskOutputs": {
+    "outcome": "Outcome",
+    "comment": "Comment",
+    "documentId": "Uploaded document",
+    "filename": "File name"
+  },
+  "actions": {
+    "time": {
+      "summarize": {
+        "title": "Summarize time entries",
+        "description": "Adds up the time entries of the period — to branch on, e.g. “anything to bill?”.",
+        "fields": {
+          "clientId": "Client",
+          "projectId": "Project",
+          "start": "From",
+          "end": "To"
+        },
+        "outputs": {
+          "totalHours": "Total hours",
+          "billableHours": "Billable hours",
+          "entryCount": "Number of entries",
+          "billableValue": "Billable amount"
+        }
+      }
+    },
+    "timesheet": {
+      "generate": {
+        "title": "Create timesheet",
+        "description": "Creates the timesheet PDF for the period and stores it with the client.",
+        "fields": {
+          "clientId": "Client",
+          "projectId": "Project",
+          "start": "From",
+          "end": "To",
+          "hidePrices": "Without prices",
+          "lang": "Language",
+          "title": "Document title"
+        },
+        "outputs": {
+          "documentId": "Timesheet (document)",
+          "filename": "File name",
+          "totalHours": "Total hours"
+        },
+        "options": {
+          "lang": {
+            "de": "German",
+            "en": "English"
+          }
+        }
+      }
+    },
+    "invoice": {
+      "createDraft": {
+        "title": "Create invoice draft",
+        "description": "Creates a draft invoice from the billable time entries of the period.",
+        "fields": {
+          "clientId": "Client",
+          "projectId": "Project",
+          "start": "From",
+          "end": "To",
+          "headline": "Headline"
+        },
+        "outputs": {
+          "invoiceId": "Invoice",
+          "invoiceNumber": "Invoice number",
+          "total": "Total"
+        }
+      },
+      "pdf": {
+        "title": "Create invoice PDF",
+        "description": "Creates the invoice PDF and stores it with the client.",
+        "fields": {
+          "invoiceId": "Invoice",
+          "zugferd": "With ZUGFeRD e-invoice data"
+        },
+        "outputs": {
+          "documentId": "Invoice PDF (document)",
+          "filename": "File name"
+        }
+      },
+      "markSent": {
+        "title": "Mark invoice as sent",
+        "description": "Sets the invoice's status to “sent”.",
+        "fields": {
+          "invoiceId": "Invoice"
+        },
+        "outputs": {
+          "status": "Status"
+        }
+      }
+    },
+    "email": {
+      "send": {
+        "title": "Send email",
+        "description": "Sends a mail from one of your templates, with the invoice and stored documents attached.",
+        "fields": {
+          "to": "To",
+          "templateId": "Template",
+          "attachInvoiceId": "Attach invoice",
+          "attachDocumentIds": "Attach documents",
+          "markInvoiceSent": "Mark the invoice as sent afterwards"
+        },
+        "outputs": {
+          "messageId": "Message ID",
+          "to": "Recipient"
+        }
+      }
+    },
+    "document": {
+      "link": {
+        "title": "Assign document",
+        "description": "Links a stored document to an invoice and sets its type.",
+        "fields": {
+          "documentId": "Document",
+          "invoiceId": "Invoice",
+          "documentType": "Document type"
+        },
+        "outputs": {
+          "documentId": "Document"
+        }
+      }
+    },
+    "notify": {
+      "owner": {
+        "title": "Notify me",
+        "description": "Puts a notice into your task list, optionally by mail as well.",
+        "fields": {
+          "message": "Message",
+          "email": "Also send by email"
+        }
+      }
+    }
+  },
+  "issues": {
+    "BAD_GRAPH": "The flow is empty.",
+    "BAD_NODE_ID": "A block has no valid ID.",
+    "DUPLICATE_NODE_ID": "Two blocks share one ID.",
+    "BAD_NODE": "A block has settings the server cannot read.",
+    "BAD_EDGE": "A connection is incomplete.",
+    "DANGLING_EDGE": "A connection leads to a block that does not exist.",
+    "BAD_HANDLE": "A connection leaves through an exit this block does not have.",
+    "NO_START": "The flow needs a start.",
+    "MULTIPLE_STARTS": "A flow has exactly one start.",
+    "NO_END": "The flow needs an end.",
+    "SELF_LOOP": "A block cannot lead straight back to itself.",
+    "START_HAS_ENTRY": "Nothing can lead into the start.",
+    "END_HAS_EXIT": "Nothing can follow an end.",
+    "BAD_CONDITION": "A condition is incomplete, or sits on a connection that cannot have one.",
+    "UNREACHABLE": "This block is not connected to the start.",
+    "NO_EXIT": "The flow stops here — connect this block or add an end.",
+    "MULTIPLE_EXITS": "Only a branch can lead to several blocks from one exit.",
+    "MULTIPLE_DEFAULTS": "Only one exit of a branch can be “otherwise”.",
+    "BAD_START": "Choose how the flow starts.",
+    "BAD_SCHEDULE": "The schedule is incomplete, or this kind of flow cannot start by itself.",
+    "NO_SCHEDULE_SUBJECTS": "Choose who the scheduled start runs for.",
+    "UNKNOWN_ACTION": "This action does not exist on the server.",
+    "BAD_MODE": "Choose whether the action runs by itself or waits for approval.",
+    "MISSING_INPUT": "“{{field}}” is missing.",
+    "BAD_TASK": "Choose what kind of task this is.",
+    "MISSING_TITLE": "The task needs a title.",
+    "BAD_DOCUMENT_TYPE": "Choose the type the uploaded file is stored as.",
+    "UPLOAD_NEEDS_CLIENT": "An upload is stored with a client, so the flow needs a client, project or invoice as its subject.",
+    "NO_FORM_FIELDS": "The form needs at least one field.",
+    "BAD_FORM_FIELD": "Every form field needs a label, a type and a unique key.",
+    "BAD_DUE": "The due date must be between 1 and 365 days.",
+    "BAD_DURATION": "Set how long to wait (at most a year)."
+  },
+  "preview": {
+    "labels": {
+      "to": "Recipient",
+      "insteadOf": "Test run: instead of",
+      "template": "Template",
+      "subject": "Subject",
+      "attachments": "Attachments",
+      "afterwards": "Afterwards"
+    },
+    "values": {
+      "invoiceMarkedSent": "The invoice is marked as sent."
+    }
+  },
+  "stepErrors": {
+    "INPUT_EMPTY": "“{{field}}” is empty for this run.",
+    "INPUT_NOT_ID": "“{{field}}” is not a valid reference for this run.",
+    "NO_BRANCH": "None of the conditions of the branch applies, and it has no exit without a condition.",
+    "INTERRUPTED": "The server stopped while this step was running. Check whether it took effect, then retry or skip it.",
+    "TOO_MANY_STEPS": "The run has taken {{max}} steps. The flow probably runs in a circle.",
+    "STEP_MISSING": "This step no longer exists in the flow."
+  }
+}

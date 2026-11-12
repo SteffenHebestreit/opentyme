@@ -6,6 +6,7 @@ import { useDashboard } from '../../hooks/api';
 import { PageHeader } from '../common/PageHeader';
 import { EmptyState } from '../common/EmptyState';
 import { DashboardSection } from './DashboardSection';
+import { OpenTasksCard } from './OpenTasksCard';
 import { MetricsGrid } from './MetricsGrid';
 import { YearlyFinancialSummary } from './YearlyFinancialSummary';
 import { RecentTimeEntries } from './RecentTimeEntries';
@@ -83,6 +84,9 @@ export default function Dashboard() {
         <DashboardErrorState message={error instanceof Error ? error.message : undefined} onRetry={() => void refetch()} />
       ) : (
         <Fragment>
+          {/* What the user's flows are waiting for — only shown while there is something */}
+          <OpenTasksCard />
+
           {/* Primary: the year's financial key figures and tax-relevant overview */}
           <YearlyFinancialSummary />
 

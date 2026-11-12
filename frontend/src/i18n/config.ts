@@ -49,6 +49,8 @@ import taxPrepaymentsEN from './locales/en/tax-prepayments.json';
 import taxPrepaymentsDE from './locales/de/tax-prepayments.json';
 import emailTemplatesEN from './locales/en/email-templates.json';
 import emailTemplatesDE from './locales/de/email-templates.json';
+import workflowsEN from './locales/en/workflows.json';
+import workflowsDE from './locales/de/workflows.json';
 
 // Language resources
 const resources = {
@@ -70,6 +72,7 @@ const resources = {
     system: systemEN,
     'tax-prepayments': taxPrepaymentsEN,
     'email-templates': emailTemplatesEN,
+    workflows: workflowsEN,
   },
   de: {
     common: commonDE,
@@ -89,6 +92,7 @@ const resources = {
     system: systemDE,
     'tax-prepayments': taxPrepaymentsDE,
     'email-templates': emailTemplatesDE,
+    workflows: workflowsDE,
   },
 };
 
@@ -121,6 +125,7 @@ i18n
       'system',
       'tax-prepayments',
       'email-templates',
+      'workflows',
     ],
 
     interpolation: {

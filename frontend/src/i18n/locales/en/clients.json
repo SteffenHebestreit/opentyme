@@ -151,6 +151,8 @@
       "offer": "Offer",
       "order": "Purchase order",
       "invoice_terms": "Payment terms",
+      "timesheet": "Timesheet",
+      "timesheet_signed": "Timesheet (signed)",
       "other": "Other"
     },
     "fields": {

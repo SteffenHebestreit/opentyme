@@ -450,6 +450,7 @@ export type ApiTokenResource =
   | 'tax'
   | 'templates'
   | 'reports'
+  | 'workflows'
   | 'addons';
 export type ApiTokenCapability = 'assistant' | 'mcp' | 'email_send';
 /** Who approves the assistant's changes in runs started with the token. */

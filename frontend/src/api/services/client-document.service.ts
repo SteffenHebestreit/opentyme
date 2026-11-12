@@ -28,6 +28,8 @@ export type ClientDocumentType =
   | 'offer'
   | 'order'
   | 'invoice_terms'
+  | 'timesheet'
+  | 'timesheet_signed'
   | 'other';
 
 /** Every document type, in the order they are offered in the UI. */
@@ -38,6 +40,8 @@ export const CLIENT_DOCUMENT_TYPES: ClientDocumentType[] = [
   'offer',
   'order',
   'invoice_terms',
+  'timesheet',
+  'timesheet_signed',
   'other',
 ];
 
@@ -65,6 +69,11 @@ export interface ClientDocument {
   valid_from: string | null;
   valid_until: string | null;
   notes: string | null;
+  /** Invoice the document belongs to, e.g. the signed timesheet sent with it. */
+  invoice_id?: string | null;
+  /** Period a timesheet covers (YYYY-MM-DD). */
+  period_start?: string | null;
+  period_end?: string | null;
   created_at: string;
   updated_at: string;
   client_name?: string;

@@ -151,6 +151,8 @@
       "offer": "Angebot",
       "order": "Auftrag",
       "invoice_terms": "Zahlungsbedingungen",
+      "timesheet": "Stundennachweis",
+      "timesheet_signed": "Stundennachweis (unterschrieben)",
       "other": "Sonstiges"
     },
     "fields": {

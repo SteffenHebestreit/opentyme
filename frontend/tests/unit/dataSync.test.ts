@@ -24,6 +24,7 @@ describe('isDataWrite', () => {
   it('ignores POSTs that only compute or preview', () => {
     expect(isDataWrite(response('post', '/email-templates/42/preview'))).toBe(false);
     expect(isDataWrite(response('post', '/invoices/1/validate-payment'))).toBe(false);
+    expect(isDataWrite(response('post', '/workflows/definitions/abc/validate'))).toBe(false);
     expect(isDataWrite(response('post', '/expenses/analyze-receipt'))).toBe(false);
     expect(isDataWrite(response('post', '/expenses/1/analyze-depreciation'))).toBe(false);
     expect(isDataWrite(response('post', '/settings/test-smtp'))).toBe(false);

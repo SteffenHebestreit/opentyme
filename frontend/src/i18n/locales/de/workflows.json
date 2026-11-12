@@ -1,0 +1,706 @@
+{
+  "nodeTypes": {
+    "start": "Start",
+    "action": "Aktion",
+    "task": "Aufgabe",
+    "wait": "Warten",
+    "gateway": "Verzweigung",
+    "end": "Ende"
+  },
+  "taskKinds": {
+    "confirm": "Bestätigen",
+    "upload": "Hochladen",
+    "form": "Formular",
+    "approval": "Freigabe",
+    "notice": "Hinweis"
+  },
+  "handles": {
+    "out": "weiter",
+    "rejected": "abgelehnt",
+    "timeout": "Frist abgelaufen"
+  },
+  "subjectTypes": {
+    "client": "Kunde",
+    "project": "Projekt",
+    "invoice": "Rechnung",
+    "none": "Ohne Gegenstand"
+  },
+  "mode": {
+    "title": "Ausführung",
+    "auto": "auto",
+    "approval": "Freigabe",
+    "autoHint": "Läuft, sobald der Ablauf diesen Schritt erreicht.",
+    "autoExternalHint": "Läuft ohne Rückfrage. Diese Aktion verlässt OpenTYME (z. B. eine E-Mail) – eine Freigabe ist hier oft sinnvoll.",
+    "approvalHint": "Eine Aufgabe zeigt Ihnen vorher, was passieren wird. Nichts läuft, bevor Sie freigeben."
+  },
+  "definitionStatus": {
+    "draft": "Entwurf",
+    "active": "Aktiv",
+    "paused": "Pausiert",
+    "archived": "Archiviert"
+  },
+  "runStatus": {
+    "running": "Läuft",
+    "waiting": "Wartet",
+    "incident": "Störung",
+    "completed": "Fertig",
+    "cancelled": "Abgebrochen"
+  },
+  "stepStatus": {
+    "pending": "Steht an",
+    "running": "Läuft",
+    "waiting": "Wartet",
+    "completed": "Erledigt",
+    "failed": "Fehlgeschlagen",
+    "skipped": "Übersprungen",
+    "cancelled": "Abgebrochen"
+  },
+  "taskStatus": {
+    "open": "Offen",
+    "done": "Erledigt",
+    "rejected": "Abgelehnt",
+    "expired": "Abgelaufen",
+    "cancelled": "Abgebrochen"
+  },
+  "nodeRunStatus": {
+    "idle": "Nicht erreicht",
+    "active": "Läuft",
+    "waiting": "Wartet",
+    "completed": "Erledigt",
+    "failed": "Fehlgeschlagen",
+    "skipped": "Übersprungen",
+    "cancelled": "Abgebrochen"
+  },
+  "testRun": {
+    "badge": "Testlauf",
+    "checkbox": "Testlauf",
+    "hint": "E-Mails gehen an Ihre eigene Adresse, Rechnungen werden nicht als versendet markiert, abgelegte Dokumente tragen [Test] im Titel."
+  },
+  "permissions": {
+    "none": "Dieser Ablauf braucht keinen Zugriff auf Ihre Daten."
+  },
+  "references": {
+    "runData": "Lauf-Daten"
+  },
+  "categories": {
+    "time": "Zeiten",
+    "billing": "Abrechnung",
+    "invoices": "Rechnungen",
+    "invoice": "Rechnungen",
+    "communication": "Kommunikation",
+    "email": "E-Mail",
+    "documents": "Dokumente",
+    "document": "Dokumente",
+    "notifications": "Benachrichtigungen",
+    "notify": "Benachrichtigungen"
+  },
+  "palette": {
+    "title": "Bausteine",
+    "flow": "Ablauf",
+    "tasks": "Aufgaben für Sie",
+    "oneStart": "Ein Ablauf hat genau einen Start.",
+    "loading": "Aktionen werden geladen …"
+  },
+  "panel": {
+    "title": "Einstellungen",
+    "flow": "Ablauf",
+    "connection": "Verbindung",
+    "unnamed": "Unbenannter Ablauf",
+    "subject": "Läuft für: {{subject}}",
+    "name": "Name",
+    "description": "Beschreibung",
+    "hint": "Wählen Sie einen Baustein oder eine Verbindung, um die Einstellungen zu ändern. Ziehen Sie vom Punkt eines Bausteins zu einem anderen, um beide zu verbinden.",
+    "label": "Beschriftung",
+    "labelHint": "Steht auf dem Canvas. Leer lassen für den Standardnamen.",
+    "id": "ID für Verweise:",
+    "unknownAction": "Dieser Server kennt die Aktion „{{action}}“ nicht.",
+    "deleteNode": "Baustein löschen",
+    "deleteConnection": "Verbindung löschen"
+  },
+  "value": {
+    "literal": "Wert",
+    "reference": "Lauf-Daten",
+    "sourceOf": "Quelle von „{{field}}“",
+    "choose": "Auswählen …",
+    "chooseReference": "Lauf-Daten auswählen …",
+    "noReferences": "Keine passenden Lauf-Daten vor diesem Schritt",
+    "addDocument": "Dokument hinzufügen …",
+    "removeReference": "„{{name}}“ entfernen",
+    "insertPlaceholder": "Platzhalter einfügen …",
+    "insertPlaceholderFor": "Platzhalter in „{{field}}“ einfügen",
+    "referenceOnlyHint": "Kommt aus einem früheren Schritt, der ein Dokument erzeugt oder entgegennimmt.",
+    "yes": "Ja",
+    "no": "Nein"
+  },
+  "start": {
+    "button": "Lauf starten",
+    "buttonFor": "Ablauf für „{{name}}“ starten",
+    "chooseFlow": "Welchen Ablauf starten?",
+    "scheduled": "Monatlicher Start",
+    "trigger": "Startet",
+    "manual": "Von Hand",
+    "schedule": "Monatlich von selbst",
+    "triggerHint": "Von Hand lässt sich ein Lauf immer zusätzlich starten.",
+    "scheduleNeedsSubject": "Nur Abläufe für Kunden oder Projekte können von selbst starten.",
+    "dayOfMonth": "Tag im Monat",
+    "dayHint": "Startet an diesem Tag um 06:00 UTC.",
+    "lastDay": "Letzter Tag des Monats",
+    "dayN": "Tag {{day}}",
+    "period": "Zeitraum eines Laufs",
+    "periodCurrent": "Der laufende Monat",
+    "periodPrevious": "Der Vormonat",
+    "subjects": {
+      "client": "Für diese Kunden starten",
+      "project": "Für diese Projekte starten"
+    },
+    "noSubjects": {
+      "client": "Sie haben noch keine Kunden.",
+      "project": "Sie haben noch keine Projekte."
+    },
+    "dialog": {
+      "title": "„{{name}}“ starten",
+      "subject": {
+        "client": "Kunde",
+        "project": "Projekt",
+        "invoice": "Rechnung"
+      },
+      "subjectRequired": {
+        "client": "Wählen Sie den Kunden, für den der Lauf gilt.",
+        "project": "Wählen Sie das Projekt, für das der Lauf gilt.",
+        "invoice": "Wählen Sie die Rechnung, für die der Lauf gilt."
+      },
+      "period": "Zeitraum",
+      "periodStart": "Zeitraum von",
+      "periodEnd": "Zeitraum bis",
+      "periodInvalid": "Der Zeitraum endet vor seinem Beginn.",
+      "submit": "Lauf starten",
+      "submitTest": "Testlauf starten",
+      "notPublished": "Veröffentlichen Sie den Ablauf zuerst – nur eine veröffentlichte Version kann laufen.",
+      "unpublishedChanges": "Der Lauf nutzt Version {{version}}. Noch nicht veröffentlichte Änderungen sind nicht enthalten.",
+      "runExists": "Dieser Ablauf lief für diesen Gegenstand und Zeitraum bereits.",
+      "openExisting": "Diesen Lauf öffnen",
+      "error": "Der Lauf konnte nicht gestartet werden."
+    }
+  },
+  "task": {
+    "kind": "Art der Aufgabe",
+    "kindHints": {
+      "confirm": "Sie prüfen etwas und bestätigen es oder lehnen ab.",
+      "upload": "Sie laden eine Datei hoch; sie wird beim Kunden abgelegt.",
+      "form": "Sie füllen Felder aus; spätere Schritte können die Werte verwenden."
+    },
+    "title": "Titel",
+    "description": "Beschreibung",
+    "documentType": "Datei ablegen als",
+    "documentTypeHint": "Der Dokumenttyp, den die hochgeladene Datei bekommt.",
+    "fields": "Felder",
+    "fieldLabel": "Beschriftung",
+    "fieldKey": "Schlüssel",
+    "fieldLabelOf": "Beschriftung von Feld {{n}}",
+    "fieldKeyOf": "Schlüssel von Feld {{n}}",
+    "fieldTypeOf": "Typ von Feld {{n}}",
+    "fieldTypes": {
+      "text": "Text",
+      "number": "Zahl",
+      "date": "Datum",
+      "boolean": "Ja / Nein"
+    },
+    "fieldRequired": "Pflichtfeld",
+    "removeField": "Feld {{n}} entfernen",
+    "addField": "Feld hinzufügen",
+    "dueInDays": "Frist (Tage)",
+    "dueHint": "Mit einer Frist bekommt die Aufgabe den Ausgang „Frist abgelaufen“, z. B. für eine Erinnerung. Leer lassen, um unbegrenzt zu warten.",
+    "dueShort_one": "Frist {{count}} Tag",
+    "dueShort_other": "Frist {{count}} Tage"
+  },
+  "wait": {
+    "daysLabel": "Tage",
+    "hoursLabel": "Stunden",
+    "days_one": "{{count}} Tag",
+    "days_other": "{{count}} Tage",
+    "hours_one": "{{count}} Stunde",
+    "hours_other": "{{count}} Stunden",
+    "summary": "{{duration}} warten"
+  },
+  "gateway": {
+    "exits": "Ausgänge in der Reihenfolge der Prüfung",
+    "noExits": "Noch keine Ausgänge. Verbinden Sie die Verzweigung mit den folgenden Bausteinen.",
+    "moveUp": "Ausgang {{n}} früher prüfen",
+    "moveDown": "Ausgang {{n}} später prüfen",
+    "hint": "Der erste Ausgang, dessen Bedingung zutrifft, wird genommen. Wählen Sie einen Ausgang, um seine Bedingung festzulegen."
+  },
+  "edge": {
+    "label": "Beschriftung",
+    "labelHint": "Steht an der Verbindung. Leer lassen, um die Bedingung anzuzeigen.",
+    "exit": "Ausgang: {{exit}}",
+    "when": "Wird genommen",
+    "condition": "Wenn eine Bedingung zutrifft",
+    "otherwise": "Sonst",
+    "orderHint": "Pro Verzweigung kann ein Ausgang „Sonst“ sein. Die Reihenfolge legen Sie an der Verzweigung fest."
+  },
+  "condition": {
+    "match": "Die Regeln",
+    "matchAll": "müssen alle zutreffen",
+    "matchAny": "mindestens eine muss zutreffen",
+    "and": "und",
+    "or": "oder",
+    "rule": "Regel {{n}}",
+    "addRule": "Regel hinzufügen",
+    "removeRule": "Regel {{n}} entfernen",
+    "leftOf": "Lauf-Daten von Regel {{n}}",
+    "opOf": "Vergleich von Regel {{n}}",
+    "rightOf": "Wert von Regel {{n}}",
+    "valuePlaceholder": "Wert",
+    "ops": {
+      "eq": "ist gleich",
+      "ne": "ist ungleich",
+      "gt": "ist größer als",
+      "gte": "ist mindestens",
+      "lt": "ist kleiner als",
+      "lte": "ist höchstens",
+      "contains": "enthält",
+      "empty": "ist leer",
+      "not_empty": "ist nicht leer"
+    }
+  },
+  "end": {
+    "result": "Ergebnistext"
+  },
+  "editor": {
+    "back": "Zurück zu den Abläufen",
+    "version": "Version {{version}}",
+    "neverPublished": "Noch nicht veröffentlicht",
+    "unsaved": "Ungespeicherte Änderungen",
+    "unpublished": "Gespeicherte Änderungen noch nicht veröffentlicht",
+    "validate": "Prüfen",
+    "save": "Speichern",
+    "publish": "Veröffentlichen",
+    "nameRequired": "Geben Sie dem Ablauf einen Namen.",
+    "saveError": "Der Entwurf konnte nicht gespeichert werden.",
+    "valid": "Keine Probleme gefunden.",
+    "invalid_one": "{{count}} Problem gefunden – siehe die Liste über dem Canvas.",
+    "invalid_other": "{{count}} Probleme gefunden – siehe die Liste über dem Canvas.",
+    "validateError": "Der Ablauf konnte nicht geprüft werden.",
+    "published": "Version {{version}} ist veröffentlicht.",
+    "publishError": "Der Ablauf konnte nicht veröffentlicht werden.",
+    "issuesTitle_one": "{{count}} Problem",
+    "issuesTitle_other": "{{count}} Probleme",
+    "hideIssues": "Ausblenden",
+    "smallScreen": "Der Canvas braucht einen breiteren Bildschirm. Öffnen Sie den Ablauf zum Bearbeiten an einem Laptop oder Desktop.",
+    "canvasLabel": "Canvas des Ablaufs „{{name}}“",
+    "emptyCanvas": "Ziehen Sie Bausteine hierher oder klicken Sie links darauf. Beginnen Sie mit einem Start.",
+    "leaveTitle": "Ohne Speichern verlassen?",
+    "leaveMessage": "Die Änderungen an diesem Ablauf sind nicht gespeichert.",
+    "leaveConfirm": "Verlassen",
+    "notFound": "Diesen Ablauf gibt es nicht.",
+    "notFoundHint": "Vielleicht wurde er gelöscht."
+  },
+  "publish": {
+    "title": "Version {{version}} veröffentlichen",
+    "confirm": "Veröffentlichen",
+    "introFirst": "Nach dem Veröffentlichen kann der Ablauf gestartet werden. Läufe behalten die Version, mit der sie gestartet sind.",
+    "introUpdate": "Neue Läufe nutzen diese Version. Bereits laufende Läufe behalten ihre.",
+    "permissions": "Läufe dieses Ablaufs dürfen",
+    "permissionsHint": "Ergibt sich aus den Aktionen im Ablauf. Mehr als das kann ein Lauf nie.",
+    "schedule_one": "Startet von selbst: {{day}}, für {{count}} Gegenstand.",
+    "schedule_other": "Startet von selbst: {{day}}, für {{count}} Gegenstände."
+  },
+  "list": {
+    "title": "Abläufe",
+    "subtitle": "Wiederkehrende Vorgänge, einmal gezeichnet und je Kunde und Zeitraum ausgeführt.",
+    "new": "Neuer Ablauf",
+    "tabs": {
+      "flows": "Abläufe",
+      "runs": "Läufe"
+    },
+    "columns": {
+      "name": "Ablauf",
+      "subject": "Läuft für",
+      "status": "Status",
+      "activeRuns": "Aktive Läufe",
+      "nextRun": "Nächster Start",
+      "actions": "Aktionen"
+    },
+    "unpublished": "Unveröffentlichte Änderungen",
+    "showRuns_one": "Den {{count}} aktiven Lauf von „{{name}}“ anzeigen",
+    "showRuns_other": "Die {{count}} aktiven Läufe von „{{name}}“ anzeigen",
+    "actions": {
+      "start": "Lauf von „{{name}}“ starten",
+      "runs": "Läufe von „{{name}}“",
+      "pause": "„{{name}}“ pausieren",
+      "activate": "„{{name}}“ aktivieren",
+      "archive": "„{{name}}“ archivieren",
+      "delete": "„{{name}}“ löschen"
+    },
+    "statusChanged": {
+      "active": "„{{name}}“ ist aktiv.",
+      "paused": "„{{name}}“ ist pausiert – der Ablauf startet nicht mehr von selbst.",
+      "archived": "„{{name}}“ ist archiviert."
+    },
+    "statusError": "Der Status konnte nicht geändert werden.",
+    "deleteTitle": "Diesen Ablauf löschen?",
+    "deleteMessage": "„{{name}}“ und der Verlauf seiner Läufe werden endgültig gelöscht.",
+    "deleted": "„{{name}}“ wurde gelöscht.",
+    "deleteHasRuns": "Der Ablauf hat noch aktive Läufe. Brechen Sie sie ab oder warten Sie, bis sie fertig sind.",
+    "deleteError": "Der Ablauf konnte nicht gelöscht werden.",
+    "empty": "Noch keine Abläufe",
+    "emptyHint": "Zeichnen Sie einen Vorgang einmal – z. B. Stundennachweis, Unterschrift, Rechnung – und lassen Sie ihn jeden Monat laufen.",
+    "loadError": "Die Abläufe konnten nicht geladen werden."
+  },
+  "create": {
+    "title": "Neuer Ablauf",
+    "startFrom": "Beginnen mit",
+    "blank": "Leerer Canvas",
+    "blankHint": "Den Ablauf von Grund auf bauen.",
+    "name": "Name",
+    "namePlaceholder": "z. B. Monatsabrechnung",
+    "nameRequired": "Geben Sie dem Ablauf einen Namen.",
+    "subjectType": "Ein Lauf gilt für",
+    "subjectTypeHint": "Wofür ein Lauf gestartet wird. Das lässt sich später nicht ändern.",
+    "submit": "Ablauf anlegen",
+    "error": "Der Ablauf konnte nicht angelegt werden."
+  },
+  "runs": {
+    "columns": {
+      "flow": "Ablauf",
+      "subject": "Für",
+      "period": "Zeitraum",
+      "status": "Status",
+      "current": "Steht bei",
+      "started": "Gestartet"
+    },
+    "bySchedule": "per Termin",
+    "open": "Lauf öffnen",
+    "filters": {
+      "flow": "Ablauf",
+      "allFlows": "Alle Abläufe",
+      "status": "Status",
+      "allStatuses": "Jeder Status"
+    },
+    "empty": "Noch keine Läufe.",
+    "loadError": "Die Läufe konnten nicht geladen werden."
+  },
+  "run": {
+    "back": "Zurück zu den Läufen",
+    "openFlow": "Ablauf öffnen",
+    "startedManually": "gestartet am {{date}}",
+    "startedBySchedule": "per Termin gestartet am {{date}}",
+    "cancel": "Lauf abbrechen",
+    "cancelTitle": "Diesen Lauf abbrechen?",
+    "cancelMessage": "Offene Aufgaben werden geschlossen, es wird nichts mehr ausgeführt. Was bereits passiert ist, bleibt bestehen.",
+    "cancelled": "Der Lauf wurde abgebrochen.",
+    "incidentTitle": "„{{step}}“ ist fehlgeschlagen",
+    "incidentHint": "Der Lauf wartet auf Ihre Entscheidung. Von selbst wird nichts wiederholt.",
+    "retry": "Schritt wiederholen",
+    "retryTitle": "„{{step}}“ wiederholen?",
+    "retryMessage": "Der Schritt läuft noch einmal. Hatte er bereits eine Wirkung außerhalb von OpenTYME – etwa eine versendete E-Mail –, geschieht das ein zweites Mal.",
+    "retried": "Der Schritt wird wiederholt.",
+    "skip": "Schritt überspringen",
+    "skipTitle": "„{{step}}“ überspringen?",
+    "skipMessage": "Der Lauf geht ohne das Ergebnis dieses Schritts weiter. Spätere Schritte, die es brauchen, können fehlschlagen.",
+    "skippedDone": "Der Schritt wurde übersprungen.",
+    "actionError": "Das hat nicht geklappt.",
+    "openTasks_one": "{{count}} offene Aufgabe",
+    "openTasks_other": "{{count}} offene Aufgaben",
+    "progress": "Stand",
+    "canvasLabel": "Stand des Laufs von „{{name}}“",
+    "history": "Verlauf",
+    "noSteps": "Noch keine Schritte.",
+    "attempt": "Versuch {{n}}",
+    "outcome": "Ausgang: {{outcome}}",
+    "input": "Eingabe",
+    "output": "Ergebnis",
+    "notFound": "Diesen Lauf gibt es nicht."
+  },
+  "tasks": {
+    "title": "Aufgaben",
+    "subtitle": "Worauf Ihre Abläufe warten.",
+    "tabs": {
+      "open": "Offen",
+      "closed": "Erledigt"
+    },
+    "emptyOpen": "Nichts zu tun",
+    "emptyOpenHint": "Braucht ein Ablauf einen Upload, eine Bestätigung oder eine Freigabe, erscheint das hier.",
+    "emptyClosed": "Noch keine erledigten Aufgaben.",
+    "toFlows": "Zu den Abläufen",
+    "loadError": "Die Aufgaben konnten nicht geladen werden.",
+    "openRun": "Lauf öffnen",
+    "dueOn": "fällig am {{date}}",
+    "overdueSince": "war fällig am {{date}}",
+    "actionError": "Die Aufgabe konnte nicht erledigt werden.",
+    "completed": "Aufgabe erledigt.",
+    "rejected": "Aufgabe abgelehnt.",
+    "approved": "Freigegeben – die Aktion läuft.",
+    "skipped": "Die Aktion wurde übersprungen.",
+    "uploaded": "Datei hochgeladen.",
+    "dismissed": "Hinweis als gelesen markiert.",
+    "confirm": {
+      "comment": "Kommentar (optional)",
+      "done": "Erledigt",
+      "reject": "Ablehnen",
+      "rejectTitle": "Diese Aufgabe ablehnen?",
+      "rejectMessage": "Der Lauf nimmt den Ausgang „abgelehnt“ des Ablaufs. Hat der Ablauf keinen, wird der Lauf abgebrochen.",
+      "rejectCancelsMessage": "Der Ablauf sieht für „abgelehnt“ keinen weiteren Weg vor: Der Lauf wird abgebrochen.",
+      "rejectContinuesMessage": "Der Lauf geht über den Ausgang „abgelehnt“ des Ablaufs weiter."
+    },
+    "upload": {
+      "prompt": "Datei hierher ziehen oder auswählen",
+      "hint": "PDF, Bild oder Textdokument, bis 25 MB",
+      "change": "Andere Datei wählen",
+      "remove": "Datei entfernen",
+      "title": "Titel des Dokuments (optional)",
+      "storedAs": "Wird beim Kunden abgelegt als: {{type}}",
+      "submit": "Hochladen",
+      "errors": {
+        "required": "Wählen Sie eine Datei.",
+        "size": "Die Datei ist größer als 25 MB.",
+        "type": "Dieser Dateityp wird nicht unterstützt."
+      }
+    },
+    "form": {
+      "required": "Dieses Feld ist erforderlich.",
+      "submit": "Absenden"
+    },
+    "approval": {
+      "approve": "Ausführen",
+      "skip": "Überspringen",
+      "skipTitle": "Diese Aktion überspringen?",
+      "skipMessage": "Der Lauf geht ohne sie weiter. Spätere Schritte, die ihr Ergebnis brauchen, können fehlschlagen."
+    },
+    "notice": {
+      "dismiss": "Verstanden"
+    },
+    "dashboard": {
+      "title": "Aufgaben",
+      "viewAll": "Alle Aufgaben",
+      "open_one": "offene Aufgabe",
+      "open_other": "offene Aufgaben"
+    }
+  },
+  "variables": {
+    "subject": {
+      "id": "Gegenstand: ID",
+      "type": "Gegenstand: Art",
+      "label": "Gegenstand: Name"
+    },
+    "client": {
+      "id": "Kunde",
+      "name": "Kunde: Name",
+      "email": "Kunde: Kontakt-E-Mail",
+      "invoice_email": "Kunde: Rechnungs-E-Mail",
+      "contact_person": "Kunde: Ansprechpartner"
+    },
+    "project": {
+      "id": "Projekt",
+      "name": "Projekt: Name"
+    },
+    "invoice": {
+      "id": "Rechnung",
+      "number": "Rechnung: Nummer",
+      "total": "Rechnung: Betrag",
+      "status": "Rechnung: Status"
+    },
+    "period": {
+      "start": "Zeitraum: erster Tag",
+      "end": "Zeitraum: letzter Tag",
+      "label": "Zeitraum: Bezeichnung"
+    },
+    "owner": {
+      "email": "Meine E-Mail-Adresse",
+      "name": "Mein Name"
+    },
+    "run": {
+      "id": "Lauf: ID",
+      "test": "Lauf: ist ein Testlauf"
+    },
+    "today": "Heute"
+  },
+  "taskOutputs": {
+    "outcome": "Ausgang",
+    "comment": "Kommentar",
+    "documentId": "Hochgeladenes Dokument",
+    "filename": "Dateiname"
+  },
+  "actions": {
+    "time": {
+      "summarize": {
+        "title": "Zeiten zusammenfassen",
+        "description": "Summiert die Zeiteinträge des Zeitraums – zum Verzweigen, z. B. „gibt es etwas abzurechnen?“.",
+        "fields": {
+          "clientId": "Kunde",
+          "projectId": "Projekt",
+          "start": "Von",
+          "end": "Bis"
+        },
+        "outputs": {
+          "totalHours": "Stunden gesamt",
+          "billableHours": "Abrechenbare Stunden",
+          "entryCount": "Anzahl Einträge",
+          "billableValue": "Abrechenbarer Betrag"
+        }
+      }
+    },
+    "timesheet": {
+      "generate": {
+        "title": "Stundennachweis erzeugen",
+        "description": "Erzeugt den Stundennachweis als PDF für den Zeitraum und legt ihn beim Kunden ab.",
+        "fields": {
+          "clientId": "Kunde",
+          "projectId": "Projekt",
+          "start": "Von",
+          "end": "Bis",
+          "hidePrices": "Ohne Preise",
+          "lang": "Sprache",
+          "title": "Titel des Dokuments"
+        },
+        "outputs": {
+          "documentId": "Stundennachweis (Dokument)",
+          "filename": "Dateiname",
+          "totalHours": "Stunden gesamt"
+        },
+        "options": {
+          "lang": {
+            "de": "Deutsch",
+            "en": "Englisch"
+          }
+        }
+      }
+    },
+    "invoice": {
+      "createDraft": {
+        "title": "Rechnungsentwurf erzeugen",
+        "description": "Erzeugt aus den abrechenbaren Zeiteinträgen des Zeitraums eine Rechnung im Status Entwurf.",
+        "fields": {
+          "clientId": "Kunde",
+          "projectId": "Projekt",
+          "start": "Von",
+          "end": "Bis",
+          "headline": "Überschrift"
+        },
+        "outputs": {
+          "invoiceId": "Rechnung",
+          "invoiceNumber": "Rechnungsnummer",
+          "total": "Betrag"
+        }
+      },
+      "pdf": {
+        "title": "Rechnungs-PDF erzeugen",
+        "description": "Erzeugt das Rechnungs-PDF und legt es beim Kunden ab.",
+        "fields": {
+          "invoiceId": "Rechnung",
+          "zugferd": "Mit ZUGFeRD-E-Rechnungsdaten"
+        },
+        "outputs": {
+          "documentId": "Rechnungs-PDF (Dokument)",
+          "filename": "Dateiname"
+        }
+      },
+      "markSent": {
+        "title": "Rechnung als versendet markieren",
+        "description": "Setzt den Status der Rechnung auf „versendet“.",
+        "fields": {
+          "invoiceId": "Rechnung"
+        },
+        "outputs": {
+          "status": "Status"
+        }
+      }
+    },
+    "email": {
+      "send": {
+        "title": "E-Mail senden",
+        "description": "Sendet eine E-Mail aus einer Ihrer Vorlagen, mit Rechnung und abgelegten Dokumenten im Anhang.",
+        "fields": {
+          "to": "An",
+          "templateId": "Vorlage",
+          "attachInvoiceId": "Rechnung anhängen",
+          "attachDocumentIds": "Dokumente anhängen",
+          "markInvoiceSent": "Rechnung danach als versendet markieren"
+        },
+        "outputs": {
+          "messageId": "Nachrichten-ID",
+          "to": "Empfänger"
+        }
+      }
+    },
+    "document": {
+      "link": {
+        "title": "Dokument zuordnen",
+        "description": "Verknüpft ein abgelegtes Dokument mit einer Rechnung und setzt seinen Typ.",
+        "fields": {
+          "documentId": "Dokument",
+          "invoiceId": "Rechnung",
+          "documentType": "Dokumenttyp"
+        },
+        "outputs": {
+          "documentId": "Dokument"
+        }
+      }
+    },
+    "notify": {
+      "owner": {
+        "title": "Mich benachrichtigen",
+        "description": "Legt einen Hinweis in Ihre Aufgabenliste, auf Wunsch zusätzlich per E-Mail.",
+        "fields": {
+          "message": "Nachricht",
+          "email": "Zusätzlich per E-Mail senden"
+        }
+      }
+    }
+  },
+  "issues": {
+    "BAD_GRAPH": "Der Ablauf ist leer.",
+    "BAD_NODE_ID": "Ein Baustein hat keine gültige ID.",
+    "DUPLICATE_NODE_ID": "Zwei Bausteine haben dieselbe ID.",
+    "BAD_NODE": "Ein Baustein hat Einstellungen, die der Server nicht lesen kann.",
+    "BAD_EDGE": "Eine Verbindung ist unvollständig.",
+    "DANGLING_EDGE": "Eine Verbindung führt zu einem Baustein, den es nicht gibt.",
+    "BAD_HANDLE": "Eine Verbindung nutzt einen Ausgang, den dieser Baustein nicht hat.",
+    "NO_START": "Der Ablauf braucht einen Start.",
+    "MULTIPLE_STARTS": "Ein Ablauf hat genau einen Start.",
+    "NO_END": "Der Ablauf braucht ein Ende.",
+    "SELF_LOOP": "Ein Baustein kann nicht direkt zu sich selbst führen.",
+    "START_HAS_ENTRY": "In den Start kann nichts hineinführen.",
+    "END_HAS_EXIT": "Nach einem Ende kann nichts folgen.",
+    "BAD_CONDITION": "Eine Bedingung ist unvollständig oder steht an einer Verbindung, die keine haben kann.",
+    "UNREACHABLE": "Dieser Baustein ist nicht mit dem Start verbunden.",
+    "NO_EXIT": "Hier endet der Ablauf – verbinden Sie den Baustein oder fügen Sie ein Ende an.",
+    "MULTIPLE_EXITS": "Nur eine Verzweigung kann von einem Ausgang zu mehreren Bausteinen führen.",
+    "MULTIPLE_DEFAULTS": "Nur ein Ausgang einer Verzweigung kann „Sonst“ sein.",
+    "BAD_START": "Wählen Sie, wie der Ablauf startet.",
+    "BAD_SCHEDULE": "Der Termin ist unvollständig, oder diese Art von Ablauf kann nicht von selbst starten.",
+    "NO_SCHEDULE_SUBJECTS": "Wählen Sie, für wen der Termin-Start gilt.",
+    "UNKNOWN_ACTION": "Diese Aktion gibt es auf dem Server nicht.",
+    "BAD_MODE": "Wählen Sie, ob die Aktion von selbst läuft oder auf eine Freigabe wartet.",
+    "MISSING_INPUT": "„{{field}}“ fehlt.",
+    "BAD_TASK": "Wählen Sie die Art der Aufgabe.",
+    "MISSING_TITLE": "Die Aufgabe braucht einen Titel.",
+    "BAD_DOCUMENT_TYPE": "Wählen Sie den Typ, unter dem die hochgeladene Datei abgelegt wird.",
+    "UPLOAD_NEEDS_CLIENT": "Ein Upload wird bei einem Kunden abgelegt – der Ablauf braucht dafür einen Kunden, ein Projekt oder eine Rechnung als Gegenstand.",
+    "NO_FORM_FIELDS": "Das Formular braucht mindestens ein Feld.",
+    "BAD_FORM_FIELD": "Jedes Formularfeld braucht eine Beschriftung, einen Typ und einen eindeutigen Schlüssel.",
+    "BAD_DUE": "Die Frist muss zwischen 1 und 365 Tagen liegen.",
+    "BAD_DURATION": "Legen Sie fest, wie lange gewartet wird (höchstens ein Jahr)."
+  },
+  "preview": {
+    "labels": {
+      "to": "Empfänger",
+      "insteadOf": "Testlauf: statt an",
+      "template": "Vorlage",
+      "subject": "Betreff",
+      "attachments": "Anhänge",
+      "afterwards": "Danach"
+    },
+    "values": {
+      "invoiceMarkedSent": "Die Rechnung wird als versendet markiert."
+    }
+  },
+  "stepErrors": {
+    "INPUT_EMPTY": "„{{field}}“ ist für diesen Lauf leer.",
+    "INPUT_NOT_ID": "„{{field}}“ ist für diesen Lauf kein gültiger Verweis.",
+    "NO_BRANCH": "Keine Bedingung der Verzweigung trifft zu, und sie hat keinen Ausgang ohne Bedingung.",
+    "INTERRUPTED": "Der Server wurde angehalten, während dieser Schritt lief. Prüfen Sie, ob er gewirkt hat, und wiederholen oder überspringen Sie ihn dann.",
+    "TOO_MANY_STEPS": "Der Lauf hat {{max}} Schritte gebraucht. Vermutlich läuft der Ablauf im Kreis.",
+    "STEP_MISSING": "Diesen Schritt gibt es im Ablauf nicht mehr."
+  }
+}

@@ -50,7 +50,9 @@
     "profile": "Profil",
     "finances": "Finanzen",
     "sendEmail": "E-Mail senden",
-    "systemAdmin": "Systemverwaltung"
+    "systemAdmin": "Systemverwaltung",
+    "workflows": "Abläufe",
+    "tasks": "Aufgaben"
   },
   "language": {
     "title": "Sprache"

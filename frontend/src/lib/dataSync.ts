@@ -33,6 +33,8 @@ const READ_ONLY_WRITE_ENDPOINTS = [
   /\/analyze-receipt\b/,
   /\/analyze-depreciation\b/,
   /\/test-(smtp|ai|stt)\b/,
+  // Checks a flow's graph; nothing is stored
+  /\/workflows\/definitions\/[^/]+\/validate$/,
   /^\/?auth\//,
   /^\/?ai\//,
 ];

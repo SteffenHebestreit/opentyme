@@ -65,4 +65,15 @@ export const queryKeys = {
     events: ['apiTokens', 'events'] as const,
     all: ['apiTokens', 'all'] as const,
   },
+  workflows: {
+    all: ['workflows'] as const,
+    catalog: ['workflows', 'catalog'] as const,
+    templates: ['workflows', 'templates'] as const,
+    definitions: ['workflows', 'definitions'] as const,
+    definition: (id: string) => ['workflows', 'definition', id] as const,
+    runs: (filters?: unknown) => ['workflows', 'runs', filters] as const,
+    run: (id: string) => ['workflows', 'run', id] as const,
+    tasks: (status: string, runId?: string) => ['workflows', 'tasks', status, runId] as const,
+    taskCount: ['workflows', 'taskCount'] as const,
+  },
 };

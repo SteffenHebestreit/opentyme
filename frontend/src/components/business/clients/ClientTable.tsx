@@ -31,6 +31,7 @@ import { Badge } from '../../common/Badge';
 import { Button } from '../../common/Button';
 import { Table, Column } from '../../common/Table';
 import { iconButtonClass } from '../projects/uiClasses';
+import { StartWorkflowButton } from '../../workflows/StartWorkflowButton';
 
 /**
  * Props for the ClientTable component.
@@ -273,6 +274,8 @@ export const ClientTable: FC<ClientTableProps> = ({ clients, onEdit, onDelete, o
                 </span>
               ) : null}
             </Button>
+            {/* Starts one of the user's flows for this client — absent while there is none */}
+            <StartWorkflowButton subjectType="client" subjectId={client.id} subjectName={client.name} compact />
             <button
               type="button"
               className={iconButtonClass()}

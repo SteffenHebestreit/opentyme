@@ -2,6 +2,7 @@ import {
   BarChart3,
   FolderKanban,
   LayoutDashboard,
+  ListChecks,
   Mail,
   Settings,
   ShieldCheck,
@@ -9,6 +10,7 @@ import {
   UserRound,
   Users,
   Wallet,
+  Workflow,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -19,6 +21,8 @@ export interface NavItem {
   fallback: string;
   icon: LucideIcon;
   adminOnly?: boolean;
+  /** Shows a live count next to the item: `openTasks` = workflow tasks waiting for the user. */
+  badge?: 'openTasks';
 }
 
 /** Main sections, in sidebar order. */
@@ -29,6 +33,8 @@ export const primaryNav: NavItem[] = [
   { to: '/clients', labelKey: 'navigation.clients', fallback: 'Clients', icon: Users },
   { to: '/finances', labelKey: 'navigation.finances', fallback: 'Finances', icon: Wallet },
   { to: '/reports', labelKey: 'navigation.reports', fallback: 'Reports', icon: BarChart3 },
+  { to: '/workflows', labelKey: 'navigation.workflows', fallback: 'Flows', icon: Workflow },
+  { to: '/tasks', labelKey: 'navigation.tasks', fallback: 'Tasks', icon: ListChecks, badge: 'openTasks' },
 ];
 
 /** Secondary destinations at the bottom of the sidebar. */

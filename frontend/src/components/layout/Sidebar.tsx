@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { BrandLogo } from './BrandLogo';
 import { primaryNav, secondaryNav, type NavItem } from './navigation';
 import { usePluginNavItems } from './usePluginNavItems';
+import { useWorkflowTaskCount } from '../../hooks/api/useWorkflows';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -25,9 +26,22 @@ const linkClasses = (active: boolean, collapsed: boolean) =>
       : 'text-gray-600 hover:bg-gray-900/[0.04] hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.04] dark:hover:text-gray-100'
   );
 
-function SidebarLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed: boolean; onNavigate?: () => void }) {
+function SidebarLink({
+  item,
+  collapsed,
+  onNavigate,
+  count = 0,
+}: {
+  item: NavItem;
+  collapsed: boolean;
+  onNavigate?: () => void;
+  /** Live count for items with a `badge` (0 = no badge) */
+  count?: number;
+}) {
   const { t } = useTranslation('common');
-  const label = t(item.labelKey, item.fallback);
+  const name = t(item.labelKey, item.fallback);
+  // The count is part of the link's name, so it is announced and shows in the collapsed tooltip
+  const label = count > 0 ? `${name} (${count})` : name;
   const Icon = item.icon;
 
   return (
@@ -35,7 +49,7 @@ function SidebarLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed
       to={item.to}
       onClick={onNavigate}
       title={collapsed ? label : undefined}
-      aria-label={collapsed ? label : undefined}
+      aria-label={collapsed || count > 0 ? label : undefined}
       className={({ isActive }) => linkClasses(isActive, collapsed)}
     >
       {({ isActive }) => (
@@ -56,7 +70,18 @@ function SidebarLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed
             )}
             aria-hidden="true"
           />
-          {!collapsed && <span className="truncate">{label}</span>}
+          {!collapsed && <span className="truncate">{name}</span>}
+          {count > 0 &&
+            (collapsed ? (
+              <span aria-hidden="true" className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-white dark:ring-gray-950" />
+            ) : (
+              <span
+                aria-hidden="true"
+                className="ml-auto rounded-full bg-amber-100 px-1.5 py-px text-[11px] font-semibold tabular-nums text-amber-800 dark:bg-amber-500/15 dark:text-amber-300"
+              >
+                {count > 99 ? '99+' : count}
+              </span>
+            ))}
         </>
       )}
     </NavLink>
@@ -71,6 +96,8 @@ export function Sidebar({ collapsed, onToggleCollapsed, onNavigate, className }:
   const { t } = useTranslation('common');
   const { isAdmin } = useAuth();
   const pluginNavItems = usePluginNavItems();
+  // Tasks the user's flows are waiting for — shown on the Tasks item
+  const openTasks = useWorkflowTaskCount().data?.open ?? 0;
 
   return (
     <div className={cn('flex h-full flex-col', className)}>
@@ -91,7 +118,13 @@ export function Sidebar({ collapsed, onToggleCollapsed, onNavigate, className }:
       >
         <div className={cn('space-y-0.5', collapsed && 'flex flex-col items-center')}>
           {primaryNav.map((item) => (
-            <SidebarLink key={item.to} item={item} collapsed={collapsed} onNavigate={onNavigate} />
+            <SidebarLink
+              key={item.to}
+              item={item}
+              collapsed={collapsed}
+              onNavigate={onNavigate}
+              count={item.badge === 'openTasks' ? openTasks : 0}
+            />
           ))}
         </div>
 
