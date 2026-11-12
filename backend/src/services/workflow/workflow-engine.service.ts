@@ -59,22 +59,14 @@ import {
   isUuid,
   workflowDefinitionService,
 } from './workflow-definition.service';
+import { getWorkflowEvent } from './workflow-events';
 import { evaluateCondition, interpolate, resolveValue } from './workflow-expression';
 import { findNode, nodeLabel, outgoing, startNode } from './workflow-graph';
+import { getWorkflowSubject } from './workflow-subjects';
 
 /** A run that loops without ever resting is stopped here instead of spinning forever. */
 const MAX_STEPS_PER_RUN = 500;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-/**
- * Events that are a state an invoice reaches and keeps: a run that starts
- * waiting for one after it happened must not wait forever.
- */
-const REACHED_BY_STATUS: Record<string, string[]> = {
-  'invoice.sent': ['sent', 'partially_paid', 'paid', 'overdue'],
-  'invoice.partially_paid': ['partially_paid', 'paid'],
-  'invoice.paid': ['paid'],
-  'invoice.cancelled': ['cancelled'],
-};
 /** An event older than this starts nothing: a restore or an import is not something that just happened. */
 const EVENT_START_MAX_AGE_MS = 24 * 3_600_000;
 /** A flow that starts itself over and over through its own events is stopped here. */
@@ -392,50 +384,12 @@ export class WorkflowEngine {
     subjectId: string | null
   ): Promise<{ id: string | null; label: string | null; blocks: Record<string, unknown> }> {
     if (type === 'none') return { id: null, label: null, blocks: {} };
-    if (!isUuid(subjectId)) throw new WorkflowInputError(`Choose the ${type} the flow runs for.`);
-    const db = getDbClient();
-    const clientBlock = (row: DbRow) => ({
-      id: row.client_id,
-      name: row.client_name,
-      email: row.client_email ?? '',
-      invoice_email: row.client_billing_email || row.client_email || '',
-      contact_person: row.client_contact_person ?? '',
-    });
-    const CLIENT_COLUMNS = `c.id AS client_id, c.name AS client_name, c.email AS client_email,
-      c.billing_email AS client_billing_email, c.contact_person AS client_contact_person`;
-
-    if (type === 'client') {
-      const result = await db.query(`SELECT ${CLIENT_COLUMNS} FROM clients c WHERE c.id = $1 AND c.user_id = $2`, [subjectId, userId]);
-      if (result.rows.length === 0) throw new WorkflowNotFoundError('Client not found.');
-      return { id: subjectId, label: result.rows[0].client_name, blocks: { client: clientBlock(result.rows[0]) } };
-    }
-    if (type === 'project') {
-      const result = await db.query(
-        `SELECT p.id, p.name, ${CLIENT_COLUMNS} FROM projects p JOIN clients c ON c.id = p.client_id
-         WHERE p.id = $1 AND p.user_id = $2`,
-        [subjectId, userId]
-      );
-      if (result.rows.length === 0) throw new WorkflowNotFoundError('Project not found.');
-      const row = result.rows[0];
-      return { id: subjectId, label: row.name, blocks: { project: { id: row.id, name: row.name }, client: clientBlock(row) } };
-    }
-    const result = await db.query(
-      `SELECT i.id, i.invoice_number, i.total_amount, i.status, i.project_id, p.name AS project_name, ${CLIENT_COLUMNS}
-       FROM invoices i JOIN clients c ON c.id = i.client_id LEFT JOIN projects p ON p.id = i.project_id
-       WHERE i.id = $1 AND i.user_id = $2`,
-      [subjectId, userId]
-    );
-    if (result.rows.length === 0) throw new WorkflowNotFoundError('Invoice not found.');
-    const row = result.rows[0];
-    return {
-      id: subjectId,
-      label: row.invoice_number,
-      blocks: {
-        invoice: { id: row.id, number: row.invoice_number, total: Number(row.total_amount), status: row.status },
-        client: clientBlock(row),
-        ...(row.project_id ? { project: { id: row.project_id, name: row.project_name } } : {}),
-      },
-    };
+    const subject = getWorkflowSubject(type);
+    if (!subject) throw new WorkflowStateError(`Flows cannot be about "${type}" at the moment (is its addon enabled?).`);
+    if (!isUuid(subjectId)) throw new WorkflowInputError(`Choose the ${subject.title.toLowerCase()} the flow runs for.`);
+    const loaded = await subject.load(userId, subjectId);
+    if (!loaded) throw new WorkflowNotFoundError(`${subject.title} not found.`);
+    return { id: loaded.id, label: loaded.label, blocks: loaded.blocks };
   }
 
   // ── Advancing ──────────────────────────────────────────────────────────────
@@ -770,17 +724,25 @@ export class WorkflowEngine {
     await db.query(`INSERT INTO workflow_steps (run_id, node_id, node_type, seq) VALUES ($1, $2, $3, $4)`, [run.id, target.id, target.type, next]);
   }
 
-  /** Parks a run until an event happens to an invoice — unless it already has. */
+  /** Parks a run until an event happens to a record — unless it already has. */
   private async waitForEvent(run: RunRow, graph: WorkflowGraph, node: WorkflowNode, step: StepRow): Promise<void> {
     if (node.type !== 'wait') return;
     const db = getDbClient();
     const type = String(node.data.event ?? '');
-    const subjectId = resolveValue(node.data.subject ?? { $ref: 'invoice.id' }, this.dataOf(run));
-    if (!isUuid(subjectId)) {
-      throw new WorkflowStepError('WAIT_NO_SUBJECT', 'There is no invoice in this run to wait for.');
+    const event = getWorkflowEvent(type);
+    const subject = getWorkflowSubject(event?.subject_type);
+    if (!event || !subject) {
+      throw new WorkflowStepError('WAIT_UNKNOWN_EVENT', `The event "${type}" is not available at the moment (is its addon enabled?).`, {
+        event: type,
+      });
     }
-    const known = await db.query(`SELECT status FROM invoices WHERE id = $1 AND user_id = $2`, [subjectId, run.user_id]);
-    if (known.rows.length === 0) throw new WorkflowStepError('WAIT_NO_SUBJECT', 'There is no invoice in this run to wait for.');
+    // Without its own setting the wait is about the run's subject (validation made sure the event fits it).
+    const subjectId = resolveValue(node.data.subject ?? { $ref: 'subject.id' }, this.dataOf(run));
+    if (!isUuid(subjectId) || !(await subject.load(run.user_id, subjectId))) {
+      throw new WorkflowStepError('WAIT_NO_SUBJECT', `There is no ${subject.title.toLowerCase()} in this run to wait for.`, {
+        subject: subject.key,
+      });
+    }
 
     // Registered first, checked second: an event arriving in between finds the wait and is not lost.
     const registered = await db.query(`SELECT 1 FROM workflow_waits WHERE step_id = $1`, [step.id]);
@@ -800,13 +762,15 @@ export class WorkflowEngine {
     // Only from "running": if the event got here first, the step is already settled.
     await db.query(`UPDATE workflow_steps SET status = 'waiting' WHERE id = $1 AND status = 'running'`, [step.id]);
 
-    const status = (await db.query(`SELECT status FROM invoices WHERE id = $1`, [subjectId])).rows[0]?.status;
-    if (REACHED_BY_STATUS[type]?.includes(status)) {
+    // A state the record has reached already (paid, cancelled) is not announced a second time.
+    const reached = event.reached ? await event.reached(run.user_id, subjectId) : false;
+    if (reached) {
       // Whoever deletes the wait settles the step — the event handler or this.
       const claimed = await db.query(`DELETE FROM workflow_waits WHERE step_id = $1 RETURNING id`, [step.id]);
       if ((claimed.rowCount ?? 0) > 0) {
         await db.query(`DELETE FROM workflow_timers WHERE step_id = $1 AND fired_at IS NULL`, [step.id]);
-        await this.completeStep(run, graph, node, step, { event: type, status, alreadyHappened: true }, 'out');
+        const carried = reached === true ? {} : reached;
+        await this.completeStep(run, graph, node, step, { event: type, ...carried, alreadyHappened: true }, 'out');
       }
     }
   }
@@ -1150,15 +1114,17 @@ export class WorkflowEngine {
     }
   }
 
-  /** Active flows about an invoice whose start is this event get a run of their own. */
+  /** Active flows about this kind of record whose start is this event get a run of their own. */
   private async startFlowsFor(event: DbRow): Promise<void> {
-    if (event.subject_type !== 'invoice' || !event.subject_id) return;
+    const definition = getWorkflowEvent(event.type);
+    const subject = getWorkflowSubject(event.subject_type);
+    if (!definition || !subject || !isUuid(event.subject_id)) return;
     const db = getDbClient();
     const flows = await db.query(
       `SELECT d.id, v.graph FROM workflow_definitions d
        JOIN workflow_versions v ON v.definition_id = d.id AND v.version = d.published_version
-       WHERE d.user_id = $1 AND d.status = 'active' AND d.subject_type = 'invoice'`,
-      [event.user_id]
+       WHERE d.user_id = $1 AND d.status = 'active' AND d.subject_type = $2`,
+      [event.user_id, event.subject_type]
     );
     const starting = flows.rows.filter((flow) => {
       const start = startNode(flow.graph as WorkflowGraph);
@@ -1166,24 +1132,24 @@ export class WorkflowEngine {
     });
     if (starting.length === 0) return;
 
-    const found = await db.query(
-      `SELECT client_id, created_at, updated_at FROM invoices WHERE id = $1 AND user_id = $2`,
-      [event.subject_id, event.user_id]
-    );
-    const invoice = found.rows[0];
-    if (!invoice) return;
-    // The invoice's own timestamps decide: rows a restore or an import writes carry old ones, and
-    // must not set off a flow as if the invoice had just been created or sent.
-    const changedAt = new Date(event.type === 'invoice.created' ? invoice.created_at : (invoice.updated_at ?? invoice.created_at));
-    if (Date.now() - changedAt.getTime() > EVENT_START_MAX_AGE_MS) {
-      logger.info(`[Workflow] Event ${event.type} for invoice ${event.subject_id} is not recent; no flow started`);
+    const loaded = await subject.load(event.user_id, event.subject_id);
+    if (!loaded) return;
+    // Where the record knows when it changed, its own timestamps decide: rows a restore or an import
+    // writes carry old ones, and must not set off a flow as if the invoice had just been created or sent.
+    const happenedAt = definition.occurredAt
+      ? await definition.occurredAt(event.user_id, event.subject_id)
+      : new Date(event.created_at);
+    if (!happenedAt || Date.now() - happenedAt.getTime() > EVENT_START_MAX_AGE_MS) {
+      logger.info(`[Workflow] Event ${event.type} for ${event.subject_type} ${event.subject_id} is not recent; no flow started`);
       return;
     }
+    // An event start can be limited to some clients — for every subject that belongs to one.
+    const clientId = (loaded.blocks.client as { id?: unknown } | undefined)?.id;
 
     for (const flow of starting) {
       const start = startNode(flow.graph as WorkflowGraph);
       const clients = start?.type === 'start' ? (start.data.event?.clientIds ?? []) : [];
-      if (clients.length > 0 && !clients.includes(invoice.client_id)) continue;
+      if (clients.length > 0 && (typeof clientId !== 'string' || !clients.includes(clientId))) continue;
       const recent = await db.query(
         `SELECT count(*)::int AS n FROM workflow_runs
          WHERE definition_id = $1 AND started_by = 'event' AND started_at > CURRENT_TIMESTAMP - interval '1 hour'`,

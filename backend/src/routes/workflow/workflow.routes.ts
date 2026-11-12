@@ -75,6 +75,7 @@ router.use(extractKeycloakUser);
 
 router.get('/catalog', controller.getCatalog);
 router.get('/templates', controller.getTemplates);
+router.get('/subjects/:type/options', controller.getSubjectOptions);
 
 router.get('/definitions', controller.listDefinitions);
 router.post('/definitions', sessionOnly, controller.createDefinition);

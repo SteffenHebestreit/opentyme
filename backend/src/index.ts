@@ -12,6 +12,7 @@ import workflowScheduler from './services/workflow/workflow-scheduler.service';
 import { mcpClient } from './services/mcp/mcp-client.service';
 import { initObservability, installProcessHandlers } from './utils/observability';
 import { registerCoreAiTools } from './services/ai/core-tools';
+import { registerWorkflowAiTools } from './services/ai/workflow-tools';
 
 const port = process.env.PORT || 8000;
 
@@ -115,6 +116,7 @@ installProcessHandlers();
 // Core composite AI tools must be registered before the first AI request
 // builds the (cached) tool list.
 registerCoreAiTools();
+registerWorkflowAiTools();
 
 // Start the application
 startServer();

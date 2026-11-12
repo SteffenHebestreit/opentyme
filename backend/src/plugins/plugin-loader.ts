@@ -13,13 +13,16 @@
 import fs from 'fs';
 import path from 'path';
 import { Router, Application } from 'express';
-import { AddonManifest, Plugin, PluginContext, AddonPlugin, AIContext } from '../types/plugin.types';
+import { AddonManifest, Plugin, PluginContext, AddonPlugin, AIContext, WorkflowContext } from '../types/plugin.types';
 import { pluginRegistry } from './plugin-registry';
 import { logger } from '../utils/logger';
 import { pool } from '../utils/database';
 import { authenticateKeycloak, extractKeycloakUser } from '../middleware/auth/keycloak.middleware';
 import { registerAddonRoutePrefix } from '../services/auth/api-token-permissions';
 import { registerCustomTool } from '../services/ai/ai-tool-registry.service';
+import { registerWorkflowAction } from '../services/workflow/workflow-actions';
+import { emitWorkflowEvent, registerWorkflowEvent } from '../services/workflow/workflow-events';
+import { registerWorkflowSubject } from '../services/workflow/workflow-subjects';
 import { registerSystemPromptExtension } from '../services/ai/system-prompt-registry.service';
 import semver from 'semver';
 
@@ -54,11 +57,19 @@ class PluginLoader {
         registerSystemPromptExtension: (name, text) => registerSystemPromptExtension(name, text),
       };
 
+      const workflowContext: WorkflowContext = {
+        registerSubject: (subject) => registerWorkflowSubject(subject),
+        registerAction: (action) => registerWorkflowAction(action),
+        registerEvent: (event) => registerWorkflowEvent(event),
+        emitEvent: (event) => emitWorkflowEvent(event),
+      };
+
       const context: PluginContext = {
         app,
         logger,
         database: pool(),
         ai: aiContext,
+        workflows: workflowContext,
       };
 
       for (const pluginDir of pluginDirs) {

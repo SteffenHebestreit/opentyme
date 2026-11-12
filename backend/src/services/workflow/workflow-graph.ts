@@ -31,13 +31,9 @@ import {
   WorkflowValidation,
   WorkflowValue,
 } from '../../types/workflow.types';
-import {
-  SUBJECT_VARIABLES,
-  TASK_OUTPUTS,
-  WORKFLOW_DOCUMENT_TYPES,
-  getWorkflowAction,
-  getWorkflowEvent,
-} from './workflow-actions';
+import { TASK_OUTPUTS, WORKFLOW_DOCUMENT_TYPES, getWorkflowAction } from './workflow-actions';
+import { getWorkflowEvent } from './workflow-events';
+import { getWorkflowSubject, subjectVariables } from './workflow-subjects';
 import { collectPaths, isValidPath } from './workflow-expression';
 
 export const MAX_NODES = 100;
@@ -254,7 +250,11 @@ export function validateGraph(candidate: unknown, subjectType: WorkflowSubjectTy
   if (starts.length > 1) add({ code: 'MULTIPLE_STARTS', message: 'The flow may have only one start.', nodeId: starts[1].id });
   if (!graph.nodes.some((node) => node.type === 'end')) add({ code: 'NO_END', message: 'The flow needs an end.' });
 
-  const known = new Set(SUBJECT_VARIABLES[subjectType].map((variable) => variable.path));
+  const variables = subjectVariables(subjectType);
+  if (!variables) {
+    add({ code: 'UNKNOWN_SUBJECT', message: `Flows cannot be about "${subjectType}" at the moment (is its addon enabled?).` });
+  }
+  const known = new Set((variables ?? []).map((variable) => variable.path));
   for (const extra of ['subject.id', 'subject.type', 'subject.label', 'run.id', 'run.test']) known.add(extra);
   // A run started by an event knows what happened.
   const startsWith = starts[0]?.type === 'start' && starts[0].data.trigger === 'event' ? getWorkflowEvent(starts[0].data.event?.type) : undefined;
@@ -317,7 +317,8 @@ export function validateGraph(candidate: unknown, subjectType: WorkflowSubjectTy
           if (!event) {
             add({ code: 'BAD_EVENT', message: 'Choose the event the flow starts with.', ...where });
           } else if (event.subject_type !== subjectType) {
-            add({ code: 'EVENT_SUBJECT', message: `This event happens to an ${event.subject_type}; the flow must be about one.`, ...where });
+            const about = getWorkflowSubject(event.subject_type)?.title.toLowerCase() ?? event.subject_type;
+            add({ code: 'EVENT_SUBJECT', message: `This event happens to another kind of record (${about}); the flow must be about that.`, ...where });
           }
           if (clients !== undefined && (!Array.isArray(clients) || clients.some((id) => typeof id !== 'string'))) {
             add({ code: 'BAD_EVENT', message: 'The clients of the event start are not a list.', ...where });
@@ -336,8 +337,8 @@ export function validateGraph(candidate: unknown, subjectType: WorkflowSubjectTy
           const periodOk = schedule?.period === 'current_month' || schedule?.period === 'previous_month';
           const subjects = Array.isArray(schedule?.subjectIds) ? schedule.subjectIds : [];
           if (!dayOk || !periodOk) add({ code: 'BAD_SCHEDULE', message: 'Choose the day and the period of the schedule.', ...where });
-          if (subjectType === 'invoice') {
-            add({ code: 'BAD_SCHEDULE', message: 'A flow about an invoice cannot start on a schedule.', ...where });
+          if (subjectType !== 'none' && !getWorkflowSubject(subjectType)?.schedulable) {
+            add({ code: 'BAD_SCHEDULE', message: 'A flow about this cannot start on a schedule.', ...where });
           } else if (subjectType !== 'none' && subjects.length === 0) {
             add({ code: 'NO_SCHEDULE_SUBJECTS', message: 'Choose who the scheduled flow runs for.', ...where });
           }
@@ -377,8 +378,9 @@ export function validateGraph(candidate: unknown, subjectType: WorkflowSubjectTy
         if (data.kind === 'upload' && (!data.documentType || !WORKFLOW_DOCUMENT_TYPES.includes(data.documentType))) {
           add({ code: 'BAD_DOCUMENT_TYPE', message: 'Choose the type the uploaded document is filed as.', ...where });
         }
-        if (data.kind === 'upload' && subjectType === 'none') {
-          add({ code: 'UPLOAD_NEEDS_CLIENT', message: 'An upload is filed with a client, so the flow needs a subject.', ...where });
+        // The uploaded file is filed with a client, so the run has to know one.
+        if (data.kind === 'upload' && !known.has('client.id')) {
+          add({ code: 'UPLOAD_NEEDS_CLIENT', message: 'An upload is filed with a client, so the flow must be about one, or about something that belongs to one.', ...where });
         }
         if (data.kind === 'form') {
           const fields = Array.isArray(data.fields) ? data.fields : [];
@@ -411,11 +413,12 @@ export function validateGraph(candidate: unknown, subjectType: WorkflowSubjectTy
         } else if (node.data.mode === 'event') {
           const event = getWorkflowEvent(node.data.event);
           if (!event) add({ code: 'BAD_EVENT', message: 'Choose the event to wait for.', ...where });
-          // Without its own setting the wait is about the run's invoice — which only an invoice flow has.
+          // Without its own setting the wait is about the run's subject — which fits only if the
+          // event happens to that kind of subject.
           const subject = node.data.subject;
           const unset = subject === undefined || subject === null || subject === '';
-          if (unset && subjectType !== 'invoice') {
-            add({ code: 'WAIT_NO_SUBJECT', message: 'Choose the invoice to wait for.', field: 'subject', ...where });
+          if (unset && event && event.subject_type !== subjectType) {
+            add({ code: 'WAIT_NO_SUBJECT', message: 'Choose the record to wait for.', field: 'subject', ...where });
           }
           checkValue(subject, { ...where, field: 'subject' }, graph, known, ancestors, issues);
           const days = node.data.timeoutDays;

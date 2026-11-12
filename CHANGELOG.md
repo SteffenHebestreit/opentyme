@@ -31,6 +31,15 @@
   template with the invoice and filed documents attached, mark an invoice as sent, cancel an
   invoice, file its cancellation or correction document, tie a document to an invoice, notify
   yourself.
+- **Flows for addons:** an addon can add what its own records are about to flows — a subject (e.g.
+  a job application), actions and events. They appear in the editor, the start dialog and the task
+  list like OpenTyme's own, named in your language. Developers: `context.workflows`, see
+  [docs/WORKFLOW_ENGINE.md](docs/WORKFLOW_ENGINE.md#addons).
+- **Start a flow where you are:** the "Start flow" button is now also on projects and invoices.
+- **The assistant knows your flows:** "start the timesheet flow for Acme for October", "what is
+  waiting for me?", "how is the run for Acme doing?" — it lists flows, starts one (you confirm the
+  flow and the client first), lists open tasks, confirms simple ones and reports on runs.
+  Approving a mail stays with you on the Tasks page.
 - A flow acts with exactly the permissions its actions need, shown before you publish. It can
   never change settings, administer the system or manage API tokens.
 - **Emails can attach filed client documents** (API: attachment type `document`), and client

@@ -197,6 +197,9 @@ Addons receive `context.ai` in `initialize()` — three paths:
 2. **Custom tool** — `context.ai.registerTool({ name, description, parameters, execute })`
 3. **System prompt** — `context.ai.registerSystemPromptExtension('addon-name', '1-3 sentences')`
 
+Addons also receive `context.workflows` to add their own subjects, actions and events to the
+flows users draw — see [docs/WORKFLOW_ENGINE.md](docs/WORKFLOW_ENGINE.md#addons).
+
 ### Frontend slots
 
 | Slot | Where | Context |

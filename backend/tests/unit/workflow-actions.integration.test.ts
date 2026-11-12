@@ -33,6 +33,10 @@ import { WorkflowDefinitionService } from '../../src/services/workflow/workflow-
 import { WorkflowEngine } from '../../src/services/workflow/workflow-engine.service';
 import { createWorkflowApi, WorkflowApiError } from '../../src/services/workflow/workflow-api';
 import { getWorkflowTemplate } from '../../src/services/workflow/workflow-templates';
+import { getCustomToolByName } from '../../src/services/ai/ai-tool-registry.service';
+import { isWriteTool } from '../../src/services/ai/tool-executor.service';
+import { toolPermissionDenial } from '../../src/services/ai/tool-permissions';
+import { registerWorkflowAiTools } from '../../src/services/ai/workflow-tools';
 import type { WorkflowGraph, WorkflowRun } from '../../src/types/workflow.types';
 
 const db = getDbClient();
@@ -407,3 +411,205 @@ it('cancelling an invoice through the API starts the flow that reacts to it', as
   const filed = await db.query(`SELECT title, invoice_id, file_mimetype FROM client_documents WHERE id = $1`, [stepOf(reaction, 'act')?.output?.documentId]);
   expect(filed.rows[0]).toMatchObject({ title: `Stornorechnung ${invoice.invoice_number}`, invoice_id: invoice.id, file_mimetype: 'application/pdf' });
 }, 120000);
+
+// ── Stage 3: subjects for pickers, and what the assistant can do with flows ──
+
+describe('subjects and the catalog over the API', () => {
+  let bearer: string;
+  const get = async (path: string) => {
+    const response = await fetch(`${process.env.INTERNAL_API_URL}/api/workflows${path}`, { headers: { Authorization: bearer } });
+    return { status: response.status, body: await response.json() };
+  };
+
+  beforeAll(async () => {
+    const token = await apiTokenService.create(TEST_USER_ID, { name: 'wf-subjects', permissions: { resources: { workflows: 'read' }, capabilities: [] } } as any);
+    bearer = `Bearer ${token.secret}`;
+  });
+
+  it('lists the caller\'s records of a subject type, searched by name', async () => {
+    expect((await get('/subjects/client/options?search=acme')).body).toContainEqual({ id: clientId, label: 'Acme GmbH' });
+    expect((await get('/subjects/project/options')).body).toContainEqual({ id: projectId, label: 'Mendix-Entwicklung · Acme GmbH' });
+    // A project is also found by its client; an invoice by its number.
+    expect((await get('/subjects/project/options?search=ACME')).body).toContainEqual({ id: projectId, label: 'Mendix-Entwicklung · Acme GmbH' });
+    const invoices = (await get('/subjects/invoice/options')).body;
+    expect(invoices.length).toBeGreaterThan(0);
+    expect((await get(`/subjects/invoice/options?search=${encodeURIComponent(invoices[0].label.split(' · ')[0])}`)).body).toContainEqual(invoices[0]);
+    // Wildcards are text, not patterns.
+    expect((await get('/subjects/client/options?search=%25')).body).toEqual([]);
+    expect((await get('/subjects/client/options?search=_cme')).body).toEqual([]);
+  });
+
+  it('knows no options for what flows cannot be about', async () => {
+    expect((await get('/subjects/crm.lead/options')).status).toBe(404);
+    expect((await get('/subjects/none/options')).status).toBe(404);
+  });
+
+  it('the catalog names the subjects and their run data', async () => {
+    const catalog = (await get('/catalog?lang=de')).body;
+    expect(catalog.subjects).toEqual([
+      { key: 'client', title: 'Client', schedulable: true },
+      { key: 'project', title: 'Project', schedulable: true },
+      { key: 'invoice', title: 'Invoice', schedulable: false },
+    ]);
+    expect(Object.keys(catalog.variables).sort()).toEqual(['client', 'invoice', 'none', 'project']);
+    expect(catalog.events.map((event: any) => event.key)).toEqual(expect.arrayContaining(['invoice.created', 'invoice.paid', 'invoice.corrected']));
+  });
+});
+
+describe('the assistant\'s flow tools, through the real routes', () => {
+  const tool = (name: string) => getCustomToolByName(name)!;
+  let full: { bearerToken: string };
+  let starter: { bearerToken: string };
+  let projectFlowId: string;
+  let monthEnd: any;
+
+  const flowAboutNothing = async (name: string, middle: any, publish = true): Promise<string> => {
+    const graph: WorkflowGraph = {
+      nodes: [
+        { id: 's', type: 'start', position: { x: 0, y: 0 }, data: { trigger: 'manual' } },
+        { id: 'm', position: { x: 0, y: 0 }, ...middle },
+        { id: 'e', type: 'end', position: { x: 0, y: 0 }, data: { result: 'erledigt' } },
+      ],
+      edges: [
+        { id: 'e1', source: 's', target: 'm' },
+        { id: 'e2', source: 'm', target: 'e' },
+      ],
+    };
+    const definition = await definitions.create(TEST_USER_ID, { name, subject_type: 'none', graph });
+    if (publish) expect(await definitions.publish(definition.id, TEST_USER_ID)).toMatchObject({ ok: true });
+    return definition.id;
+  };
+
+  beforeAll(async () => {
+    registerWorkflowAiTools();
+    const mint = async (name: string, permissions: Record<string, unknown>) => ({
+      bearerToken: `Bearer ${(await apiTokenService.create(TEST_USER_ID, { name, permissions } as any)).secret}`,
+    });
+    full = await mint('wf-ai-full', { resources: { workflows: 'write', invoices: 'write', clients: 'write', templates: 'read' }, capabilities: ['email_send'] });
+    starter = await mint('wf-ai-starter', { resources: { workflows: 'write' }, capabilities: [] });
+    projectFlowId = (await definitions.list(TEST_USER_ID)).find((flow) => flow.name === 'Projekt-Rechnung')!.id;
+    await flowAboutNothing('Monatsabschluss', { type: 'task', data: { kind: 'confirm', title: 'Monat abschließen?' } });
+    await flowAboutNothing('Hinweis mit Freigabe', {
+      type: 'action',
+      data: { action: 'notify.owner', mode: 'approval', input: { message: 'Bitte prüfen', email: false } },
+    });
+    await flowAboutNothing('Entwurf', { type: 'task', data: { kind: 'confirm', title: 'Noch nicht fertig' } }, false);
+  });
+
+  it('lists the flows and says which can be started', async () => {
+    const flows = (await tool('list_workflows').execute({}, starter)) as any[];
+    expect(flows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ workflow_id: projectFlowId, name: 'Projekt-Rechnung', runs_for: 'a project', can_be_started: true }),
+        expect.objectContaining({ name: 'Monatsabschluss', runs_for: 'nothing in particular', can_be_started: true }),
+        expect.objectContaining({ name: 'Entwurf', can_be_started: false, why_not: expect.stringContaining('not published') }),
+      ])
+    );
+    await expect(tool('list_workflows').execute({}, undefined)).rejects.toThrow(/authenticated/);
+  });
+
+  it('resolves the flow and what it runs for before the user approves the start', async () => {
+    const prepare = (args: Record<string, unknown>) => tool('start_workflow_run').prepare!(args, full);
+    const october = { period_start: '2026-10-01', period_end: '2026-10-31', test: true };
+    const prepared = await prepare({ workflow: 'projekt-rechnung', subject: 'mendix-entwicklung', ...october });
+    expect(prepared).toEqual({
+      workflow: 'Projekt-Rechnung', workflow_id: projectFlowId, subject: 'Mendix-Entwicklung · Acme GmbH', subject_id: projectId, ...october,
+    });
+    // Part of a name is enough when it fits one record only; a flow about nothing needs no subject.
+    expect(await prepare({ workflow: 'Projekt-R', subject: 'Mendix' })).toMatchObject({ workflow_id: projectFlowId, subject_id: projectId });
+    expect(await prepare({ workflow: 'Monatsabschluss', subject: 'egal' })).toEqual({ workflow: 'Monatsabschluss', workflow_id: expect.any(String) });
+
+    // What cannot be resolved goes back to the model as a question for the user — no card is shown.
+    await expect(prepare({ workflow: 'stor' })).rejects.toThrow(/ambiguous.*Storno/);
+    await expect(prepare({ workflow: 'Gibtsnicht' })).rejects.toThrow(/No flow matches "Gibtsnicht"\. Available: .*Projekt-Rechnung/);
+    await expect(prepare({ workflow: 'Entwurf' })).rejects.toThrow(/has not been published yet/);
+    await expect(prepare({ workflow: 'Projekt-Rechnung' })).rejects.toThrow(/runs for a project: pass its name/);
+    await expect(prepare({ workflow: 'Projekt-Rechnung', subject: 'Nirgendwo' })).rejects.toThrow(/No project matches "Nirgendwo"/);
+    await expect(prepare({ workflow: 'Projekt-Rechnung', subject: 'Mendix', period_start: '1.10.2026' })).rejects.toThrow(/YYYY-MM-DD/);
+
+    // Approved as shown: the run is the one the card named.
+    const started: any = await tool('start_workflow_run').execute(prepared, full);
+    expect(started.failed_steps).toEqual([]);
+    expect(started).toMatchObject({ started: true, workflow: 'Projekt-Rechnung', subject: 'Mendix-Entwicklung', status: 'completed', test_run: true });
+    expect(started.steps.length).toBeGreaterThan(3);
+    // If the user changed the name on the card, the name counts, not the id filled in before.
+    await expect(tool('start_workflow_run').execute({ ...prepared, subject: 'Nirgendwo' }, full)).rejects.toThrow(/No project matches/);
+  });
+
+  it('starts within what the caller may do, and only once per period', async () => {
+    // The API refuses a token that lacks what the flow acts with; the tool passes the refusal on.
+    await expect(tool('start_workflow_run').execute({ workflow: 'Projekt-Rechnung', subject: 'Mendix-Entwicklung', test: true }, starter)).rejects.toMatchObject({
+      status: 403,
+    });
+    monthEnd = await tool('start_workflow_run').execute({ workflow: 'Monatsabschluss' }, starter);
+    expect(monthEnd).toMatchObject({
+      started: true,
+      status: 'waiting',
+      waiting_at: 'Monat abschließen?',
+      open_tasks: [expect.objectContaining({ title: 'Monat abschließen?', kind: 'confirm', how_to_settle: expect.stringContaining('settle_workflow_task') })],
+    });
+    await expect(tool('start_workflow_run').execute({ workflow: 'Monatsabschluss' }, starter)).rejects.toThrow(
+      new RegExp(`already has a run .* \\(run_id ${monthEnd.run_id}\\)`)
+    );
+  });
+
+  it('settles a simple task, and leaves approvals to the Tasks page', async () => {
+    const settle = tool('settle_workflow_task');
+    const approval: any = await tool('start_workflow_run').execute({ workflow: 'Hinweis mit Freigabe' }, starter);
+    const tasks = (await tool('list_workflow_tasks').execute({}, starter)) as any[];
+    const confirm = tasks.find((task) => task.task_id === monthEnd.open_tasks[0].task_id);
+    const approve = tasks.find((task) => task.task_id === approval.open_tasks[0].task_id);
+    expect(confirm).toMatchObject({ kind: 'confirm', workflow: 'Monatsabschluss' });
+    expect(approve).toMatchObject({ kind: 'approval', workflow: 'Hinweis mit Freigabe', how_to_settle: expect.stringContaining('Tasks page') });
+
+    await expect(settle.prepare!({ task_id: approve.task_id, decision: 'complete' }, starter)).rejects.toThrow(/cannot be settled here.*Tasks page/);
+    await expect(settle.execute({ task_id: approve.task_id, decision: 'complete' }, starter)).rejects.toThrow(/cannot be settled here/);
+    await expect(settle.prepare!({ task_id: confirm.task_id, decision: 'dismiss' }, starter)).rejects.toThrow(/is a confirm task/);
+    await expect(settle.prepare!({ task_id: 'the first one', decision: 'complete' }, starter)).rejects.toThrow(/task_id must be/);
+
+    // The card names the task; the id alone would tell the user nothing.
+    expect(await settle.prepare!({ task_id: confirm.task_id, decision: 'complete', comment: 'passt' }, starter)).toEqual({
+      task_id: confirm.task_id, decision: 'complete', comment: 'passt', task: 'Monat abschließen? (Monatsabschluss)',
+    });
+    expect(await settle.execute({ task_id: confirm.task_id, decision: 'complete', comment: 'passt' }, starter)).toMatchObject({
+      settled: true, task: 'Monat abschließen?', task_status: 'done', run: { run_id: monthEnd.run_id, status: 'completed', result: 'erledigt', open_tasks: [] },
+    });
+    await expect(settle.execute({ task_id: confirm.task_id, decision: 'complete' }, starter)).rejects.toThrow(/no open task/);
+    // The approval is still waiting for a person.
+    expect((await engine.getRun(approval.run_id, TEST_USER_ID))?.status).toBe('waiting');
+  });
+
+  it('says how runs are doing', async () => {
+    const runs = tool('get_workflow_runs');
+    const ofFlow = (await runs.execute({ workflow: 'monatsabschluss' }, starter)) as any[];
+    expect(ofFlow).toHaveLength(1);
+    expect(ofFlow[0]).toMatchObject({ run_id: monthEnd.run_id, workflow: 'Monatsabschluss', status: 'completed', result: 'erledigt', started_by: 'manual' });
+    expect(await runs.execute({ run_id: monthEnd.run_id }, starter)).toMatchObject({
+      status: 'completed',
+      steps: ['Start: completed', 'Monat abschließen?: completed', 'End: completed'],
+      failed_steps: [],
+    });
+    const waiting = (await runs.execute({ status: 'waiting' }, starter)) as any[];
+    expect(waiting.length).toBeGreaterThan(0);
+    expect(new Set(waiting.map((run) => run.status))).toEqual(new Set(['waiting']));
+    await expect(runs.execute({ run_id: 'the last one' }, starter)).rejects.toThrow(/run_id must be/);
+    await expect(runs.execute({ run_id: '00000000-0000-4000-8000-000000000000' }, starter)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('a conversation started with an API token gets only the tools the token allows', () => {
+    const reader = { resources: { workflows: 'read' }, capabilities: [] } as any;
+    const writer = { resources: { workflows: 'write' }, capabilities: [] } as any;
+    const stranger = { resources: { invoices: 'write' }, capabilities: [] } as any;
+    for (const name of ['list_workflows', 'list_workflow_tasks', 'get_workflow_runs']) {
+      expect([name, toolPermissionDenial(name, reader)]).toEqual([name, null]);
+      expect([name, toolPermissionDenial(name, stranger)]).toEqual([name, expect.stringMatching(/^workflows/)]);
+      // Looking needs no approval card.
+      expect([name, isWriteTool(name)]).toEqual([name, false]);
+    }
+    for (const name of ['start_workflow_run', 'settle_workflow_task']) {
+      expect([name, toolPermissionDenial(name, writer)]).toEqual([name, null]);
+      expect([name, toolPermissionDenial(name, reader)]).toEqual([name, expect.stringMatching(/^workflows/)]);
+      expect([name, isWriteTool(name)]).toEqual([name, true]);
+    }
+  });
+});

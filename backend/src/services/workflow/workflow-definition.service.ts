@@ -23,6 +23,7 @@ import type {
 import { getDbClient } from '../../utils/database';
 import { logger } from '../../utils/logger';
 import { EMPTY_GRAPH, MAX_EDGES, MAX_NODES, startNode, validateGraph } from './workflow-graph';
+import { isWorkflowSubjectType } from './workflow-subjects';
 import { getWorkflowTemplate } from './workflow-templates';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -148,6 +149,9 @@ export class WorkflowDefinitionService {
       graph = template.graph;
     }
     if (!name) throw new WorkflowInputError('The flow needs a name.');
+    if (!isWorkflowSubjectType(subjectType)) {
+      throw new WorkflowInputError(`Flows cannot be about "${subjectType}".`);
+    }
     assertStorableGraph(graph);
 
     const result = await getDbClient().query(

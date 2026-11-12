@@ -271,6 +271,30 @@ const isEnabled = await SettingsHelper.isEnabled(userId, 'my-addon');
 const apiKey = await SettingsHelper.getConfig(userId, 'my-addon', 'apiKey');
 ```
 
+### Flows (workflow engine)
+
+Users draw business flows on a canvas from building blocks ("create the timesheet, mail it, wait
+for the signed copy, create the invoice"). Your addon can add its own building blocks through
+`context.workflows`:
+
+```typescript
+async initialize(context: PluginContext): Promise<void> {
+  const { workflows } = context;
+
+  workflows.registerSubject({ /* a record of yours a flow can be about */ });
+  workflows.registerAction({ /* a step that does something with it */ });
+  workflows.registerEvent({ /* something that happens to it */ });
+}
+
+// later, where your addon changes the record:
+await context.workflows.emitEvent({ userId, type: 'my-addon.answered', subjectId: record.id, payload: { answer: 'yes' } });
+```
+
+Registered entries show up in the editor's palette, the start dialog and the assistant, in the
+user's language if you ship `i18n` texts. The full example, the rules (UUID ids, user scoping, key
+names, permissions of actions, test runs) and what happens when your addon is disabled are in
+[WORKFLOW_ENGINE.md](WORKFLOW_ENGINE.md#addons).
+
 ### Logging
 
 ```typescript

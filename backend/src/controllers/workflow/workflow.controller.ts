@@ -21,7 +21,7 @@ import {
   workflowEngine,
 } from '../../services/workflow/workflow-engine.service';
 import { listWorkflowTemplates } from '../../services/workflow/workflow-templates';
-import { WORKFLOW_SUBJECT_TYPES } from '../../types/workflow.types';
+import { getWorkflowSubject } from '../../services/workflow/workflow-subjects';
 import { logger } from '../../utils/logger';
 
 const graphSchema = Joi.object({ nodes: Joi.array().required(), edges: Joi.array().required() }).unknown(false);
@@ -29,7 +29,7 @@ const graphSchema = Joi.object({ nodes: Joi.array().required(), edges: Joi.array
 const createSchema = Joi.object({
   name: Joi.string().trim().max(255).allow(''),
   description: Joi.string().max(2000).allow(null, ''),
-  subject_type: Joi.string().valid(...WORKFLOW_SUBJECT_TYPES),
+  subject_type: Joi.string().max(60),
   graph: graphSchema,
   template: Joi.string().max(100),
   lang: Joi.string().max(10),
@@ -94,13 +94,34 @@ function missingPermission(token: ApiTokenPermissions, flow: ApiTokenPermissions
 
 // ── Catalog ──────────────────────────────────────────────────────────────────
 
-export function getCatalog(_req: Request, res: Response): void {
-  res.json(buildWorkflowCatalog());
+const languageOf = (req: Request): string | undefined => {
+  const lang = typeof req.query.lang === 'string' ? req.query.lang : req.headers['accept-language'];
+  return typeof lang === 'string' ? lang.split(',')[0] : undefined;
+};
+
+export function getCatalog(req: Request, res: Response): void {
+  res.json(buildWorkflowCatalog(languageOf(req)));
+}
+
+/** The caller's records of one subject type, for pickers (start dialog, scheduled starts). */
+export async function getSubjectOptions(req: Request, res: Response): Promise<void> {
+  const userId = userIdOf(req, res);
+  if (!userId) return;
+  const subject = getWorkflowSubject(req.params.type);
+  if (!subject) {
+    res.status(404).json({ message: 'Flows cannot be about this.' });
+    return;
+  }
+  try {
+    const search = typeof req.query.search === 'string' ? req.query.search.slice(0, 100) : undefined;
+    res.json(await subject.options(userId, search));
+  } catch (error) {
+    fail(res, error, 'Listing subjects');
+  }
 }
 
 export function getTemplates(req: Request, res: Response): void {
-  const lang = typeof req.query.lang === 'string' ? req.query.lang : req.headers['accept-language'];
-  res.json(listWorkflowTemplates(typeof lang === 'string' ? lang : undefined));
+  res.json(listWorkflowTemplates(languageOf(req)));
 }
 
 // ── Flows ────────────────────────────────────────────────────────────────────

@@ -5,6 +5,9 @@
 import { Router, Application } from 'express';
 import { Pool } from 'pg';
 import type { CustomToolDefinition } from '../services/ai/ai-tool-registry.service';
+import type { WorkflowActionDefinition } from '../services/workflow/workflow-actions';
+import type { EmittedWorkflowEvent, WorkflowEventDefinition } from '../services/workflow/workflow-events';
+import type { WorkflowSubjectDefinition } from '../services/workflow/workflow-subjects';
 
 /**
  * Addon manifest structure - defines the complete plugin configuration
@@ -166,6 +169,29 @@ export interface AIContext {
 }
 
 /**
+ * Workflow integration — how an addon makes its own records, features and events part of
+ * the flows users draw (docs/WORKFLOW_ENGINE.md, "Addons"). Call these during initialize().
+ */
+export interface WorkflowContext {
+  /** Something a flow can be about, e.g. an application. Runs load it, pickers list it. */
+  registerSubject: (subject: WorkflowSubjectDefinition) => void;
+  /** A step users can put into a flow. It runs with the permissions it declares in `needs`. */
+  registerAction: (action: WorkflowActionDefinition) => void;
+  /** Something that can happen to one of your subjects: flows can start with it or wait for it. */
+  registerEvent: (event: WorkflowEventDefinition) => void;
+  /**
+   * Record that a registered event happened. Call it where your addon changes the record —
+   * flows that start with the event get a run, runs waiting for it continue.
+   *
+   * @example
+   * await context.workflows.emitEvent({
+   *   userId, type: 'applications.answered', subjectId: application.id, payload: { answer: 'invited' },
+   * });
+   */
+  emitEvent: (event: EmittedWorkflowEvent) => Promise<void>;
+}
+
+/**
  * Plugin initialization context
  */
 export interface PluginContext {
@@ -177,6 +203,8 @@ export interface PluginContext {
    * Safe to call even when the user hasn't configured the AI assistant.
    */
   ai: AIContext;
+  /** Workflow integration hooks — always present. */
+  workflows: WorkflowContext;
 }
 
 /**

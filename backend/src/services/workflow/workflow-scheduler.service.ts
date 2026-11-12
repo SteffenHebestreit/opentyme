@@ -14,6 +14,7 @@ import { ScheduledTask } from 'node-cron';
 import { scheduleCron } from '../../utils/cron-schedule.util';
 import { logger } from '../../utils/logger';
 import { workflowEngine } from './workflow-engine.service';
+import { onWorkflowEventEmitted } from './workflow-events';
 
 class WorkflowSchedulerService {
   private cronJob: ScheduledTask | null = null;
@@ -22,6 +23,8 @@ class WorkflowSchedulerService {
 
   public initialize(): void {
     this.cronJob = scheduleCron('[Workflow]', '* * * * *', () => this.tick());
+    // What an addon records with emitWorkflowEvent() does not wait for the next tick either.
+    onWorkflowEventEmitted(() => this.nudge());
     logger.info('[Workflow] Timer tick scheduled (every minute)');
   }
 

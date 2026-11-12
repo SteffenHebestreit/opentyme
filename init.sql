@@ -2521,8 +2521,7 @@ CREATE TABLE IF NOT EXISTS workflow_definitions (
   user_id uuid NOT NULL,
   name varchar(255) NOT NULL,
   description text,
-  subject_type varchar(20) NOT NULL DEFAULT 'client'
-    CHECK (subject_type IN ('client', 'project', 'invoice', 'none')),
+  subject_type varchar(60) NOT NULL DEFAULT 'client',
   status varchar(20) NOT NULL DEFAULT 'draft'
     CHECK (status IN ('draft', 'active', 'paused', 'archived')),
   draft_graph jsonb NOT NULL DEFAULT '{"nodes":[],"edges":[]}'::jsonb,
@@ -2548,7 +2547,7 @@ CREATE TABLE IF NOT EXISTS workflow_runs (
   user_id uuid NOT NULL,
   definition_id uuid NOT NULL REFERENCES workflow_definitions(id) ON DELETE CASCADE,
   version_id uuid NOT NULL REFERENCES workflow_versions(id) ON DELETE CASCADE,
-  subject_type varchar(20) NOT NULL,
+  subject_type varchar(60) NOT NULL,
   subject_id uuid,
   subject_label varchar(255),
   period_start date,
@@ -2664,7 +2663,7 @@ CREATE TABLE IF NOT EXISTS workflow_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
   type varchar(60) NOT NULL,
-  subject_type varchar(20) NOT NULL,
+  subject_type varchar(60) NOT NULL,
   subject_id uuid,
   payload jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
@@ -2684,6 +2683,19 @@ CREATE TABLE IF NOT EXISTS workflow_waits (
 );
 
 CREATE INDEX IF NOT EXISTS idx_workflow_waits_event ON workflow_waits(event_type, subject_id);
+
+DO $$
+BEGIN
+  ALTER TABLE workflow_definitions DROP CONSTRAINT IF EXISTS workflow_definitions_subject_type_check;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'workflow_definitions' AND column_name = 'subject_type' AND character_maximum_length < 60
+  ) THEN
+    ALTER TABLE workflow_definitions ALTER COLUMN subject_type TYPE varchar(60);
+    ALTER TABLE workflow_runs ALTER COLUMN subject_type TYPE varchar(60);
+    ALTER TABLE workflow_events ALTER COLUMN subject_type TYPE varchar(60);
+  END IF;
+END $$;
 
 CREATE OR REPLACE FUNCTION workflow_invoice_events() RETURNS trigger LANGUAGE plpgsql AS $fn$
 BEGIN

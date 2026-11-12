@@ -22,16 +22,17 @@ import type {
   WorkflowActionSpec,
   WorkflowCatalog,
   WorkflowEventSpec,
+  WorkflowLocalization,
   WorkflowOutputSpec,
-  WorkflowSubjectType,
   WorkflowTaskKind,
   WorkflowValue,
-  WorkflowVariableSpec,
 } from '../../types/workflow.types';
 import { ClientDocumentType } from '../../models/business/client-document.model';
 import { logger } from '../../utils/logger';
 import type { WorkflowApi } from './workflow-api';
+import { listWorkflowEvents } from './workflow-events';
 import { getPath } from './workflow-expression';
+import { COMMON_VARIABLES, listWorkflowSubjects, subjectVariables } from './workflow-subjects';
 
 export interface WorkflowPermissionNeed {
   resources?: Array<{ key: ResourceKey; level: PermissionLevel }>;
@@ -71,6 +72,8 @@ export interface WorkflowActionDefinition extends WorkflowActionSpec {
   /** What an approval task shows before the action runs. Defaults to the resolved input. */
   preview?: (input: Record<string, unknown>, ctx: WorkflowActionContext) => Promise<WorkflowPreviewRow[]>;
   execute: (input: Record<string, unknown>, ctx: WorkflowActionContext) => Promise<Record<string, unknown>>;
+  /** Texts in other languages: `{ de: { title, description, category, fields: { key: label }, outputs: { key: label } } }`. */
+  i18n?: Record<string, WorkflowLocalization>;
 }
 
 // ── Registry ─────────────────────────────────────────────────────────────────
@@ -545,82 +548,6 @@ for (const action of BUILT_IN) registerWorkflowAction(action);
 
 // ── Catalog ──────────────────────────────────────────────────────────────────
 
-const COMMON_VARIABLES: WorkflowVariableSpec[] = [
-  { path: 'period.start', type: 'date', label: 'Period: first day' },
-  { path: 'period.end', type: 'date', label: 'Period: last day' },
-  { path: 'period.label', type: 'string', label: 'Period: name (e.g. 2026-10)' },
-  { path: 'owner.email', type: 'email', label: 'My email address' },
-  { path: 'owner.name', type: 'string', label: 'My name' },
-  { path: 'today', type: 'date', label: 'Today' },
-];
-
-const CLIENT_VARIABLES: WorkflowVariableSpec[] = [
-  { path: 'client.id', type: 'client', label: 'Client' },
-  { path: 'client.name', type: 'string', label: 'Client: name' },
-  { path: 'client.invoice_email', type: 'email', label: 'Client: invoice email address' },
-  { path: 'client.email', type: 'email', label: 'Client: contact email address' },
-  { path: 'client.contact_person', type: 'string', label: 'Client: contact person' },
-];
-
-const PROJECT_VARIABLES: WorkflowVariableSpec[] = [
-  { path: 'project.id', type: 'project', label: 'Project' },
-  { path: 'project.name', type: 'string', label: 'Project: name' },
-];
-
-const INVOICE_VARIABLES: WorkflowVariableSpec[] = [
-  { path: 'invoice.id', type: 'invoice', label: 'Invoice' },
-  { path: 'invoice.number', type: 'string', label: 'Invoice: number' },
-  { path: 'invoice.total', type: 'number', label: 'Invoice: total' },
-  { path: 'invoice.status', type: 'string', label: 'Invoice: status' },
-];
-
-export const SUBJECT_VARIABLES: Record<WorkflowSubjectType, WorkflowVariableSpec[]> = {
-  client: [...CLIENT_VARIABLES, ...COMMON_VARIABLES],
-  project: [...PROJECT_VARIABLES, ...CLIENT_VARIABLES, ...COMMON_VARIABLES],
-  invoice: [...INVOICE_VARIABLES, ...CLIENT_VARIABLES, ...PROJECT_VARIABLES, ...COMMON_VARIABLES],
-  none: COMMON_VARIABLES,
-};
-
-const EVENT_STATUS: WorkflowOutputSpec[] = [
-  { key: 'status', type: 'string', label: 'Status of the invoice' },
-  { key: 'previous_status', type: 'string', label: 'Status before' },
-];
-
-/** What can happen to an invoice. Recorded by the database trigger in workflow-schema.ts. */
-export const WORKFLOW_EVENTS: WorkflowEventSpec[] = [
-  {
-    key: 'invoice.created',
-    subject_type: 'invoice',
-    title: 'Invoice created',
-    description: 'A new invoice exists — written by hand, from time entries or from a recurring invoice.',
-    output: [{ key: 'status', type: 'string', label: 'Status of the invoice' }],
-  },
-  { key: 'invoice.sent', subject_type: 'invoice', title: 'Invoice sent', description: 'The invoice was marked as sent.', output: EVENT_STATUS },
-  {
-    key: 'invoice.partially_paid',
-    subject_type: 'invoice',
-    title: 'Part payment received',
-    description: 'A payment covers part of the invoice.',
-    output: EVENT_STATUS,
-  },
-  { key: 'invoice.paid', subject_type: 'invoice', title: 'Invoice paid', description: 'The invoice is paid in full.', output: EVENT_STATUS },
-  { key: 'invoice.cancelled', subject_type: 'invoice', title: 'Invoice cancelled', description: 'The invoice was cancelled.', output: EVENT_STATUS },
-  {
-    key: 'invoice.corrected',
-    subject_type: 'invoice',
-    title: 'Invoice corrected',
-    description: 'A correction of the invoice was saved.',
-    output: [
-      { key: 'status', type: 'string', label: 'Status of the invoice' },
-      { key: 'reason', type: 'string', label: 'Reason for the correction' },
-    ],
-  },
-];
-
-export function getWorkflowEvent(key: string | undefined): WorkflowEventSpec | undefined {
-  return WORKFLOW_EVENTS.find((event) => event.key === key);
-}
-
 export const TASK_OUTPUTS: Record<WorkflowTaskKind, WorkflowOutputSpec[]> = {
   confirm: [{ key: 'comment', type: 'string', label: 'Comment' }],
   upload: [
@@ -633,15 +560,58 @@ export const TASK_OUTPUTS: Record<WorkflowTaskKind, WorkflowOutputSpec[]> = {
 export const WORKFLOW_DOCUMENT_TYPES: string[] = Object.values(ClientDocumentType);
 
 function toSpec(action: WorkflowActionDefinition): WorkflowActionSpec {
-  const { key, category, title, description, effect, defaultMode, input, output } = action;
-  return { key, category, title, description, effect, defaultMode, input, output };
+  const { key, category, categoryTitle, title, description, effect, defaultMode, input, output } = action;
+  return { key, category, ...(categoryTitle ? { categoryTitle } : {}), title, description, effect, defaultMode, input, output };
 }
 
-export function buildWorkflowCatalog(): WorkflowCatalog {
+/** The texts for `lang` (`de-DE` falls back to `de`), if the definition ships any. */
+function textsFor(i18n: Record<string, WorkflowLocalization> | undefined, lang: string | undefined): WorkflowLocalization {
+  if (!i18n || !lang) return {};
+  const wanted = lang.toLowerCase();
+  return i18n[wanted] ?? i18n[wanted.split('-')[0]] ?? {};
+}
+
+const relabel = <T extends { key: string; label: string }>(items: T[], labels: Record<string, string> | undefined): T[] =>
+  labels ? items.map((item) => (labels[item.key] ? { ...item, label: labels[item.key] } : item)) : items;
+
+/**
+ * Everything the editor offers. OpenTyme's own entries are translated in the frontend by key;
+ * what an addon registers arrives in `lang` if the addon ships that language.
+ */
+export function buildWorkflowCatalog(lang?: string): WorkflowCatalog {
+  const subjects = listWorkflowSubjects();
   return {
-    actions: listWorkflowActions().map(toSpec),
-    events: WORKFLOW_EVENTS,
-    variables: SUBJECT_VARIABLES,
+    actions: listWorkflowActions().map((action) => {
+      const texts = textsFor(action.i18n, lang);
+      const spec = toSpec(action);
+      return {
+        ...spec,
+        ...(texts.category ? { categoryTitle: texts.category } : {}),
+        title: texts.title ?? spec.title,
+        description: texts.description ?? spec.description,
+        input: relabel(spec.input, texts.fields),
+        output: relabel(spec.output, texts.outputs),
+      };
+    }),
+    events: listWorkflowEvents().map((event): WorkflowEventSpec => {
+      const texts = textsFor(event.i18n, lang);
+      return {
+        key: event.key,
+        subject_type: event.subject_type,
+        title: texts.title ?? event.title,
+        description: texts.description ?? event.description,
+        output: relabel(event.output, texts.outputs),
+      };
+    }),
+    subjects: subjects.map((subject) => ({
+      key: subject.key,
+      title: textsFor(subject.i18n, lang).title ?? subject.title,
+      schedulable: !!subject.schedulable,
+    })),
+    variables: Object.fromEntries([
+      ['none', COMMON_VARIABLES],
+      ...subjects.map((subject) => [subject.key, subjectVariables(subject.key) ?? []] as const),
+    ]),
     taskOutputs: TASK_OUTPUTS,
     documentTypes: WORKFLOW_DOCUMENT_TYPES,
   };
