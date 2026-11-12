@@ -1,7 +1,7 @@
 /**
  * @fileoverview Email Send Controller
  * Handles sending emails using user templates with auto-populated variables
- * and configurable PDF attachments (invoice PDFs and/or report PDFs).
+ * and configurable attachments (invoice PDFs, report PDFs, filed client documents).
  *
  * POST /api/email/send
  */
@@ -13,12 +13,15 @@ import { emailService } from '../../services/external/email.service';
 import { InvoiceController } from '../financial/invoice.controller';
 import { reportService } from '../../services/analytics/report.service';
 import reportPDFService from '../../services/analytics/report-pdf.service';
+import { ClientDocumentService } from '../../services/business/client-document.service';
 import { logger } from '../../utils/logger';
 import { ensureTokenAllows } from '../../middleware/auth/token-permission';
 
 /** Attachment specification for a single PDF to attach to the outgoing email. */
 interface AttachmentSpec {
-  type: 'invoice' | 'report';
+  type: 'invoice' | 'report' | 'document';
+  /** Required when type === 'document': a client document (e.g. the signed timesheet) */
+  documentId?: string;
   /** Required when type === 'invoice' */
   invoiceId?: string;
   /** Required when type === 'report': one of vat | income-expense | invoice | expense | time-tracking */
@@ -44,6 +47,8 @@ interface SendEmailBody {
   updateInvoiceStatus?: boolean;
   /** List of PDFs to attach. */
   attachments?: AttachmentSpec[];
+  /** Put in front of the rendered subject (workflow test runs send "[Test] …"). */
+  subjectPrefix?: string;
 }
 
 const REPORT_LABELS: Record<string, string> = {
@@ -53,6 +58,17 @@ const REPORT_LABELS: Record<string, string> = {
   expense: 'Expense Report',
   'time-tracking': 'Time Tracking Report',
 };
+
+/** Reads a client document's stored file. Throws when it is not the caller's or has no file. */
+async function readClientDocument(
+  documentId: string,
+  userId: string
+): Promise<{ filename: string; mimetype: string; content: Buffer }> {
+  const { stream, filename, mimetype } = await new ClientDocumentService().getDocumentFileStream(documentId, userId);
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  return { filename, mimetype, content: Buffer.concat(chunks) };
+}
 
 /** Generates a report PDF buffer for a given report type and date range. */
 async function generateReportPdfBuffer(
@@ -112,6 +128,7 @@ export async function sendEmail(req: Request, res: Response): Promise<void> {
     attachInvoiceId,
     updateInvoiceStatus = false,
     attachments: attachmentSpecs,
+    subjectPrefix,
   }: SendEmailBody = req.body;
 
   if (!to) {
@@ -136,6 +153,7 @@ export async function sendEmail(req: Request, res: Response): Promise<void> {
   const needs: Parameters<typeof ensureTokenAllows>[2] = [];
   if (resolvedSpecs.some((spec) => spec.type === 'invoice')) needs.push({ resource: 'invoices', level: 'read' });
   if (resolvedSpecs.some((spec) => spec.type === 'report')) needs.push({ resource: 'reports', level: 'read' });
+  if (resolvedSpecs.some((spec) => spec.type === 'document')) needs.push({ resource: 'clients', level: 'read' });
   if (updateInvoiceStatus && attachInvoiceId) needs.push({ resource: 'invoices', level: 'write' });
   if (!ensureTokenAllows(req, res, needs)) return;
 
@@ -256,6 +274,26 @@ export async function sendEmail(req: Request, res: Response): Promise<void> {
           content: pdfBuffer,
           contentType: 'application/pdf',
         });
+      } else if (spec.type === 'document') {
+        // A filed client document goes out as it was stored. Unlike a PDF we
+        // generate, one that is missing is an error: the mail would otherwise
+        // leave without the attachment it exists to carry.
+        if (!spec.documentId) {
+          res.status(400).json({ message: 'A document attachment needs a documentId.' });
+          return;
+        }
+        let file;
+        try {
+          file = await readClientDocument(spec.documentId, userId);
+        } catch {
+          res.status(404).json({ message: 'An attached document was not found.' });
+          return;
+        }
+        builtAttachments.push({
+          filename: spec.filename ?? file.filename,
+          content: file.content,
+          contentType: file.mimetype,
+        });
       }
     }
 
@@ -263,7 +301,7 @@ export async function sendEmail(req: Request, res: Response): Promise<void> {
     const messageId = await emailService.sendEmail({
       userId,
       to,
-      subject: rendered.subject,
+      subject: `${typeof subjectPrefix === 'string' ? subjectPrefix.slice(0, 20) : ''}${rendered.subject}`,
       html: rendered.html,
       attachments: builtAttachments.length > 0 ? builtAttachments : undefined,
     });

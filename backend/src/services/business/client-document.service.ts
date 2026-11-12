@@ -44,6 +44,8 @@ function mapRow(row: any): ClientDocumentWithRelations {
     signed_at: toDateStr(row.signed_at),
     valid_from: toDateStr(row.valid_from),
     valid_until: toDateStr(row.valid_until),
+    period_start: toDateStr(row.period_start),
+    period_end: toDateStr(row.period_end),
   };
 }
 
@@ -103,6 +105,18 @@ export class ClientDocumentService {
   }
 
   /**
+   * Verify that an invoice belongs to the given user AND to the given client.
+   * A document may only be tied to an invoice of the client it hangs on.
+   */
+  private async isInvoiceValidFor(invoiceId: string, clientId: string, userId: string): Promise<boolean> {
+    const result = await this.db.query(
+      'SELECT 1 FROM invoices WHERE id = $1 AND client_id = $2 AND user_id = $3',
+      [invoiceId, clientId, userId]
+    );
+    return result.rows.length > 0;
+  }
+
+  /**
    * Create a document for a client from an uploaded file.
    *
    * When `supersedes_document_id` is given the new row becomes the next version
@@ -134,6 +148,9 @@ export class ClientDocumentService {
 
     if (data.project_id && !(await this.isProjectValidFor(data.project_id, clientId, userId))) {
       throw new Error('Project not found or does not belong to this client');
+    }
+    if (data.invoice_id && !(await this.isInvoiceValidFor(data.invoice_id, clientId, userId))) {
+      throw new Error('Invoice not found or does not belong to this client');
     }
 
     // Check before the storage round trip, so the common case fails without
@@ -199,9 +216,10 @@ export class ClientDocumentService {
         INSERT INTO client_documents (
           user_id, client_id, project_id, title, document_type,
           file_url, file_filename, file_size, file_mimetype,
-          version, supersedes_document_id, signed_at, valid_from, valid_until, notes
+          version, supersedes_document_id, signed_at, valid_from, valid_until, notes,
+          invoice_id, period_start, period_end
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
         RETURNING *
       `;
 
@@ -221,6 +239,9 @@ export class ClientDocumentService {
         data.valid_from || null,
         data.valid_until || null,
         data.notes || null,
+        data.invoice_id || null,
+        data.period_start || null,
+        data.period_end || null,
       ];
 
       const result = await client.query(query, values);
@@ -357,6 +378,9 @@ export class ClientDocumentService {
     ) {
       throw new Error('Project not found or does not belong to this client');
     }
+    if (data.invoice_id && !(await this.isInvoiceValidFor(data.invoice_id, existing.client_id, userId))) {
+      throw new Error('Invoice not found or does not belong to this client');
+    }
 
     const fields: string[] = [];
     const values: any[] = [];
@@ -374,6 +398,9 @@ export class ClientDocumentService {
     if (data.valid_from !== undefined) set('valid_from', data.valid_from || null);
     if (data.valid_until !== undefined) set('valid_until', data.valid_until || null);
     if (data.notes !== undefined) set('notes', data.notes || null);
+    if (data.invoice_id !== undefined) set('invoice_id', data.invoice_id || null);
+    if (data.period_start !== undefined) set('period_start', data.period_start || null);
+    if (data.period_end !== undefined) set('period_end', data.period_end || null);
 
     if (fields.length === 0) return existing;
 

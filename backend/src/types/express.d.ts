@@ -22,7 +22,9 @@ declare global {
             tokenName: string;
             permissions: ApiTokenPermissions;
             approvalMode: ApprovalMode;
-          };
+          }
+        /** A workflow run calling the API over loopback, within its flow's permissions */
+        | { method: 'workflow'; runId: string; permissions: ApiTokenPermissions };
 
       /**
        * User information from JWT or Keycloak authentication

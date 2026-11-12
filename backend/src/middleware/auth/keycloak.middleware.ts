@@ -6,6 +6,8 @@ import jwt, { JwtPayload } from 'jsonwebtoken';
 import { logger } from '../../utils/logger';
 import { isApiToken } from '../../services/auth/api-token.service';
 import { authenticateApiToken } from './api-token.middleware';
+import { isWorkflowCredential } from '../../services/workflow/workflow-credential';
+import { authenticateWorkflowCredential } from './workflow-credential.middleware';
 import { setBearerChallenge } from './token-permission';
 
 // Use the internal service URL for backend-to-Keycloak communication so
@@ -213,6 +215,12 @@ export const authenticateKeycloak = async (req: Request, res: Response, next: Ne
     // Personal access tokens carry their own prefix and never reach Keycloak.
     if (isApiToken(token)) {
       await authenticateApiToken(req, res, next, token);
+      return;
+    }
+
+    // A workflow run's own calls back into the API (loopback only).
+    if (isWorkflowCredential(token)) {
+      await authenticateWorkflowCredential(req, res, next, token);
       return;
     }
 

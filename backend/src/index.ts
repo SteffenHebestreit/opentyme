@@ -8,6 +8,7 @@ import invoiceReminderScheduler from './services/financial/invoice-reminder-sche
 import { apiTokenExpiryScheduler } from './services/auth/api-token-expiry-scheduler.service';
 import recurringInvoiceScheduler from './services/financial/recurring-invoice-scheduler.service';
 import projectRateScheduler from './services/business/project-rate-scheduler.service';
+import workflowScheduler from './services/workflow/workflow-scheduler.service';
 import { mcpClient } from './services/mcp/mcp-client.service';
 import { initObservability, installProcessHandlers } from './utils/observability';
 import { registerCoreAiTools } from './services/ai/core-tools';
@@ -82,8 +83,17 @@ async function startServer() {
       logger.error('Failed to initialize recurring invoice scheduler:', err);
     }
 
+    // Workflow engine: fire due timers every minute
+    try {
+      workflowScheduler.initialize();
+    } catch (err: any) {
+      logger.error('Failed to initialize the workflow scheduler:', err);
+    }
+
     // Start the server
     app.listen(port, () => {
+      // Runs a restart interrupted resume now: their actions call this API over loopback.
+      void workflowScheduler.recover();
       logger.info(`⚡️ [server]: Server is running at ${process.env.PUBLIC_URL || `http://localhost:${port}`}`);
       logger.info(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
     });

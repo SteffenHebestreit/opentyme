@@ -16,6 +16,7 @@ import { ensureMigrationLedger, hasRun, markAsRun, runOnce } from './migrations'
 import { resyncCurrentProjectRates } from '../services/business/project-rate-scheduler.service';
 import fs from 'fs';
 import path from 'path';
+import { ensureWorkflowSchema } from '../services/workflow/workflow-schema';
 
 /**
  * Initialize all existing users from Keycloak
@@ -550,6 +551,24 @@ async function ensureSchemaUpgrades(): Promise<void> {
 }
 
 /**
+ * Create the workflow engine's tables and the client-document columns its
+ * timesheets use (services/workflow/workflow-schema.ts).
+ *
+ * After ensureSchemaUpgrades, which creates client_documents on older
+ * databases, and in its own try/catch so a failure here cannot skip the
+ * upgrades registered there.
+ */
+async function ensureWorkflowTables(): Promise<void> {
+  try {
+    await ensureWorkflowSchema(getDbClient());
+    logger.info('[Startup] ✓ Workflow tables ensured');
+  } catch (error) {
+    logger.error('[Startup] Error creating the workflow tables:', error);
+    // Don't throw - startup should continue
+  }
+}
+
+/**
  * Make "a document may be superseded at most once" a database invariant.
  *
  * Two concurrent uploads against the same predecessor both read its version and
@@ -776,6 +795,7 @@ export async function runStartupInitialization(): Promise<void> {
 
     // Apply additive schema upgrades for newer features
     await ensureSchemaUpgrades();
+    await ensureWorkflowTables();
 
     // Seed rate history (one-time), stamp unrated entries, advance due periods
     await applyProjectRateMaintenance();

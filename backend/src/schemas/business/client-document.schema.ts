@@ -48,6 +48,9 @@ export const createClientDocumentSchema = Joi.object({
   valid_until: optionalDate,
   notes: Joi.string().max(5000).optional().allow(null, ''),
   supersedes_document_id: optionalUuid,
+  invoice_id: optionalUuid,
+  period_start: optionalDate,
+  period_end: optionalDate,
 });
 
 /**
@@ -83,6 +86,9 @@ export const updateClientDocumentSchema = Joi.object({
       'string.pattern.base': 'Date must be in YYYY-MM-DD format',
     }),
   notes: Joi.string().max(5000).optional().allow(null, ''),
+  invoice_id: Joi.string().uuid().optional().allow(null),
+  period_start: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow(null),
+  period_end: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow(null),
 }).min(1).messages({
   'object.min': 'At least one field must be provided for update',
 });

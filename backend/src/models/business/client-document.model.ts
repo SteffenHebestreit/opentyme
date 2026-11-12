@@ -22,6 +22,8 @@ export enum ClientDocumentType {
   OFFER = 'offer',
   ORDER = 'order',
   INVOICE_TERMS = 'invoice_terms',
+  TIMESHEET = 'timesheet',
+  TIMESHEET_SIGNED = 'timesheet_signed',
   OTHER = 'other',
 }
 
@@ -65,6 +67,11 @@ export interface ClientDocument {
   valid_from: string | null;
   valid_until: string | null;
   notes: string | null;
+  /** Invoice the document belongs to (e.g. the signed timesheet sent with it) */
+  invoice_id: string | null;
+  /** Period the document covers (timesheets), YYYY-MM-DD */
+  period_start: string | null;
+  period_end: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -105,6 +112,9 @@ export interface CreateClientDocumentData {
   valid_until?: string | null;
   notes?: string | null;
   supersedes_document_id?: string | null;
+  invoice_id?: string | null;
+  period_start?: string | null;
+  period_end?: string | null;
 }
 
 /**
@@ -120,6 +130,9 @@ export interface UpdateClientDocumentData {
   valid_from?: string | null;
   valid_until?: string | null;
   notes?: string | null;
+  invoice_id?: string | null;
+  period_start?: string | null;
+  period_end?: string | null;
 }
 
 /**

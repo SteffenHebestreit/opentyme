@@ -37,7 +37,7 @@ export function refuseScope(res: Response, missing: string): void {
 /**
  * For permissions that depend on what a request touches, not just its path
  * (e.g. which PDFs an email attaches). Always true for a signed-in session;
- * for a token, true if it has every level — otherwise answers 403 exactly
+ * for a token or a workflow run, true if it has every level — otherwise answers 403 exactly
  * like the path check and returns false.
  */
 export function ensureTokenAllows(
@@ -46,11 +46,12 @@ export function ensureTokenAllows(
   needs: Array<{ resource: ResourceKey; level: PermissionLevel }>
 ): boolean {
   const ctx = req.authContext;
-  if (ctx?.method !== 'pat') return true;
+  if (ctx?.method !== 'pat' && ctx?.method !== 'workflow') return true;
+  const who = ctx.method === 'pat' ? `Token ${ctx.tokenId}` : `Workflow run ${ctx.runId}`;
   for (const need of needs) {
     if (!hasLevel(ctx.permissions.resources[need.resource], need.level)) {
       const missing = `${need.resource}:${need.level}`;
-      logger.warn(`[ApiToken] Token ${ctx.tokenId} denied ${req.method} ${req.baseUrl}${req.path}: needs ${missing}`);
+      logger.warn(`[ApiToken] ${who} denied ${req.method} ${req.baseUrl}${req.path}: needs ${missing}`);
       refuseScope(res, missing);
       return false;
     }

@@ -31,6 +31,7 @@ export const RESOURCE_KEYS = [
   'tax',
   'templates',
   'reports',
+  'workflows',
   'addons',
 ] as const;
 export type ResourceKey = (typeof RESOURCE_KEYS)[number];
@@ -74,6 +75,10 @@ export const RESOURCES: readonly ResourceDefinition[] = [
   },
   { key: 'templates', maxLevel: 'delete', paths: ['/api/admin/invoice-templates', '/api/email-templates'] },
   { key: 'reports', maxLevel: 'read', paths: ['/api/analytics', '/api/reports', '/api/insights'] },
+  // Flows: read to look, write to start runs and settle tasks. Drawing and publishing a
+  // flow hands it permissions of its own, so that needs a signed-in session (see
+  // routes/workflow) - which is also why DELETE is out of a token's reach here.
+  { key: 'workflows', maxLevel: 'write', paths: ['/api/workflows'] },
   { key: 'addons', maxLevel: 'delete', paths: [] },
 ];
 

@@ -39,6 +39,7 @@ import aiRoutes from './ai/ai-assistant.routes';
 import aiInsightsRoutes from './ai/ai-insights.routes';
 import { getAgentCard } from '../controllers/ai/a2a.controller';
 import mcpRoutes from './mcp/mcp.routes';
+import workflowRoutes from './workflow/workflow.routes';
 
 // Analytics routes
 import analyticsRoutes from './analytics/analytics.routes';
@@ -143,6 +144,9 @@ export default function setupRoutes(app: Application) {
   logger.debug('AI insights routes registered under /api/insights');
 
   // OpenTyme's MCP server (Streamable HTTP) for MCP clients with an API token
+  app.use('/api/workflows', workflowRoutes);
+  logger.debug('Workflow routes registered under /api/workflows');
+
   app.use('/api/mcp', mcpRoutes);
   logger.debug('MCP server registered under /api/mcp');
 
