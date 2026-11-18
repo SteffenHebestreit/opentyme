@@ -195,7 +195,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"  # host-only; from elsewhere use an SSH tunnel
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -218,7 +218,7 @@ services:
     volumes:
       - keycloak_postgres_data:/var/lib/postgresql/data
     ports:
-      - "5433:5432"  # Different port to avoid conflict
+      - "127.0.0.1:5433:5432"  # Different port to avoid conflict; host-only
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U keycloak_user"]
       interval: 10s
@@ -239,7 +239,7 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=testpass
     ports:
-      - "5434:5432"
+      - "127.0.0.1:5434:5432"
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
@@ -302,10 +302,14 @@ services:
     container_name: opentyme-redis
     restart: unless-stopped
     mem_limit: 256m  # observed ~6MiB
+    # Password from .env (REDIS_PASSWORD); empty = no password. redis-cli (healthcheck) reads REDISCLI_AUTH.
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-}"]
+    environment:
+      - REDISCLI_AUTH=${REDIS_PASSWORD:-}
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"  # host-only
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -414,8 +418,8 @@ services:
     restart: unless-stopped
     mem_limit: 128m  # observed ~3MiB
     ports:
-      - "1025:1025"  # SMTP server
-      - "8025:8025"  # Web UI
+      - "127.0.0.1:1025:1025"  # SMTP server (host-only)
+      - "127.0.0.1:8025:8025"  # Web UI (host-only; via Traefik at MAIL_HOST)
     networks:
       - project-network
     labels:
@@ -491,7 +495,7 @@ services:
     mem_limit: 512m  # observed ~115MiB
     command: ["server", "-s3", "-dir=/data", "-s3.port=8333", "-s3.config=/etc/seaweedfs/s3.json"]
     ports:
-      - "8333:8333"  # S3 API (exposed to host for direct access and migration tooling)
+      - "127.0.0.1:8333:8333"  # S3 API (host-only, for migration tooling; the app uses seaweedfs:8333)
     volumes:
       - seaweedfs_data:/data
       - ./config/seaweedfs:/etc/seaweedfs:ro
