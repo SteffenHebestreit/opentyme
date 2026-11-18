@@ -321,7 +321,7 @@ services:
 
   # Keycloak Identity and Access Management
   keycloak:
-    image: quay.io/keycloak/keycloak:26.0.7
+    image: quay.io/keycloak/keycloak:26.8.2
     container_name: opentyme-keycloak
     restart: unless-stopped
     mem_limit: 1536m  # observed ~690MiB (JVM); 2x headroom
