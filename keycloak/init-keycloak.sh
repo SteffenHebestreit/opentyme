@@ -20,6 +20,28 @@ sync_frontend_client() {
     -s 'attributes."pkce.code.challenge.method"=S256' >/dev/null
 }
 
+# Since 26.6, Keycloak only answers token introspection for a client
+# that is in the token's audience. The backend introspects browser tokens as
+# opentyme-admin-service, so frontend tokens must carry it in "aud". Realms
+# imported before the mapper was added to realm-import.tpl get it here.
+ensure_admin_audience_mapper() {
+  frontend_client_id="$1"
+
+  if /opt/keycloak/bin/kcadm.sh get "clients/${frontend_client_id}/protocol-mappers/models" -r opentyme --fields name \
+    | grep -q '"admin-service-audience"'; then
+    return 0
+  fi
+
+  /opt/keycloak/bin/kcadm.sh create "clients/${frontend_client_id}/protocol-mappers/models" -r opentyme \
+    -s name=admin-service-audience \
+    -s protocol=openid-connect \
+    -s protocolMapper=oidc-audience-mapper \
+    -s 'config."included.client.audience"=opentyme-admin-service' \
+    -s 'config."id.token.claim"=false' \
+    -s 'config."access.token.claim"=true' \
+    -s 'config."introspection.token.claim"=true' >/dev/null
+}
+
 sync_backend_client() {
   backend_client_id="$1"
   backend_redirects='["http://localhost:8000/*","http://localhost/*","http://'"${APP_HOST}"'/*","https://'"${APP_HOST}"'/*"]'
@@ -84,6 +106,8 @@ backend_client_id="$(wait_for_client_id opentyme-app || true)"
 
 if [ -n "${frontend_client_id}" ]; then
   sync_frontend_client "${frontend_client_id}"
+  ensure_admin_audience_mapper "${frontend_client_id}" \
+    || echo "init-keycloak: could not add the admin-service audience mapper" >&2
 fi
 
 if [ -n "${backend_client_id}" ]; then
